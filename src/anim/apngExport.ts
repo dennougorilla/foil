@@ -35,9 +35,22 @@ export function apngPlan(loopMs?: number): ApngPlan {
   return { width: W, height: H, delays, bytes: frames * BYTES_PER_FRAME, sourceSpan };
 }
 
-const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
-
 const aborted = () => new DOMException('Export cancelled', 'AbortError');
+
+/** Waits for the next animation frame, or rejects as soon as the export is stopped. */
+const nextFrame = (signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal.aborted) return reject(aborted());
+    const onAbort = () => {
+      cancelAnimationFrame(id);
+      reject(aborted());
+    };
+    const id = requestAnimationFrame(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    });
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 
 export interface ApngResult {
   file: string;
@@ -91,8 +104,7 @@ export async function exportApng(
     scene = createScene(input, plan.width, plan.height, true, true);
     send({ type: 'start', width: plan.width, height: plan.height });
     for (let i = 0; i < frames; i++) {
-      await nextFrame();
-      if (signal.aborted) throw aborted();
+      await nextFrame(signal);
       scene.draw(at / loopMs, 0, at / 1000, (at / loopMs) * plan.sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, plan.width, plan.height);
       send({ type: 'frame', data: data.buffer, delay: plan.delays[i] }, [data.buffer]);
