@@ -20,11 +20,11 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   float d1 = v1.y - v1.x;
   float d2 = v2.y - v2.x;
   float wide = 0.014 + 0.018 * vnoise(uv * 24.0);
-  float seam = smoothstep(wide, wide * 0.3, d1);
-  float hair = smoothstep(0.014, 0.004, d2) * step(0.65, hash12(v2.zw)) * smoothstep(0.25, 0.0, d1);
+  float seam = (1.0 - smoothstep(wide * 0.3, wide, d1));
+  float hair = (1.0 - smoothstep(0.004, 0.014, d2)) * step(0.65, hash12(v2.zw)) * (1.0 - smoothstep(0.0, 0.25, d1));
   float vein = max(seam, hair * 0.8);
   // A thin darker rim on each seam, so the gold reads as raised.
-  float rim = smoothstep(wide * 2.4, wide, d1) * (1.0 - seam);
+  float rim = (1.0 - smoothstep(wide, wide * 2.4, d1)) * (1.0 - seam);
   // Gold: a warm ramp along the seam, and a bead of light that runs along it as you tilt.
   vec3 gold = mix(vec3(0.62, 0.38, 0.1), vec3(0.98, 0.8, 0.4), 0.5 + 0.5 * sin(d1 * 70.0 + uv.y * 9.0 + t.x * 2.0));
   float run = smoothstep(0.75, 1.0, sin((uv.x * 0.8 + uv.y) * 6.0 - (t.x + t.y) * 3.4 - uTime * 0.7));
@@ -57,7 +57,7 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
   // The picture stays the subject: dusk only settles on its darker parts and
   // edges, while a small eclipse hangs in the upper corner and backlights it.
   vec2 q = (uv - 0.5) * vec2(1.0, 1.4);
-  float keep = max(smoothstep(0.3, 0.68, L), smoothstep(0.55, 0.15, length(q)) * 0.6);
+  float keep = max(smoothstep(0.3, 0.68, L), (1.0 - smoothstep(0.15, 0.55, length(q))) * 0.6);
   vec3 col = mix(c * vec3(0.42, 0.44, 0.62), c * vec3(0.97, 0.96, 1.02), keep);
   // The sun sits behind the card, so it slides against the tilt.
   vec2 ctr = vec2(0.76, 0.17) - t * vec2(0.03, 0.025);
@@ -73,21 +73,21 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
   // Its glow grazes the picture, warmest towards the sun.
   col += vec3(1.0, 0.55, 0.25) * exp(-r * 3.2) * (1.0 - keep * 0.5) * 0.2;
   // Chromosphere: a thin red-gold ring hugging the moon.
-  col += vec3(1.0, 0.62, 0.42) * smoothstep(0.01, 0.0, abs(r - R)) * 0.9;
+  col += vec3(1.0, 0.62, 0.42) * (1.0 - smoothstep(0.0, 0.01, abs(r - R))) * 0.9;
   // Diamond ring: one bead of sunlight on the rim, swinging round as you tilt.
   float ba = atan(t.y + 0.6, t.x + 0.0001) + uTime * 0.05;
   vec2 bead = vec2(cos(ba), sin(ba)) * R;
   // The moon: near black with a faint earthshine, its limb catching a little
   // light on the side where the sun breaks through.
-  float disc = smoothstep(R + 0.003, R - 0.003, r);
+  float disc = (1.0 - smoothstep(R - 0.003, R + 0.003, r));
   float limb = smoothstep(R * 0.35, R, r);
   float side = 0.5 + 0.5 * dot(d / max(r, 1e-4), bead / R);
   vec3 moon = c * 0.16 + vec3(0.008, 0.008, 0.02) + vec3(0.16, 0.12, 0.1) * limb * limb * side * side;
   col = mix(col, moon, disc);
   vec2 bd = d - bead;
   float glow = exp(-length(bd) * 50.0);
-  float flare = (smoothstep(0.005, 0.0, abs(bd.x)) * smoothstep(0.1, 0.0, abs(bd.y))
-               + smoothstep(0.005, 0.0, abs(bd.y)) * smoothstep(0.14, 0.0, abs(bd.x)));
+  float flare = ((1.0 - smoothstep(0.0, 0.005, abs(bd.x))) * (1.0 - smoothstep(0.0, 0.1, abs(bd.y)))
+               + (1.0 - smoothstep(0.0, 0.005, abs(bd.y))) * (1.0 - smoothstep(0.0, 0.14, abs(bd.x))));
   col += vec3(1.0, 0.97, 0.9) * (glow * 1.3 + flare * 0.6);
   return col;
 }
@@ -108,7 +108,7 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   vec3 nacre = hsv2rgb(vec3(mix(0.45, 0.92, tint), 0.42, 1.0)) * (0.86 + 0.14 * sin(lines * 2.0));
   vec3 pearl = mix(vec3(0.94, 0.93, 0.97), nacre, 0.7) * (0.84 + 0.2 * L);
   // The outer frame band only: the picture's border stays crisp and the nameplate stays paper.
-  float frame = (1.0 - artMask) * smoothstep(0.072, 0.058, edge);
+  float frame = (1.0 - artMask) * (1.0 - smoothstep(0.058, 0.072, edge));
   col = mix(col, pearl, frame * 0.85);
   // A soft sheen that slides across as you tilt.
   float sheen = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin((uv.y * 1.4 + uv.x * 0.5) * 3.2 + (t.x + t.y) * 2.2));

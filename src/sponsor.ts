@@ -100,7 +100,11 @@ export function initSponsor(o: SponsorOptions) {
   note.className = 'sp-menu-note';
   note.hidden = true;
   menu?.querySelector('.support-title')?.after(note);
-  menu?.querySelectorAll<HTMLAnchorElement>('.support-link').forEach((a) => a.addEventListener('click', unlock));
+  menu?.querySelectorAll<HTMLAnchorElement>('.support-link').forEach((a) => {
+    a.addEventListener('click', unlock);
+    // A middle click opens the link too; it counts the same (navigation is left alone).
+    a.addEventListener('auxclick', (e) => e.button === 1 && unlock());
+  });
   // The hint only shows when the secret card sent you here; otherwise the menu stays as it was.
   let hinting = false;
   btn?.addEventListener('click', () => {

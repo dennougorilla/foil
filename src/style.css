@@ -1548,7 +1548,10 @@ input[type='range']:focus-visible::-moz-range-thumb {
 }
 
 .sr-only {
+  /* Pinned to the corner: left in the flow it sat below the app and made the page scroll. */
   position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;
