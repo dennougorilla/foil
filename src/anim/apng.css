@@ -1,9 +1,9 @@
-/* High-quality (APNG) export: a slim full-width row under PNG / GIF / Video. Same raised,
-   pressable build as its neighbours, in the panel's own colour so the three main ones still lead. */
+/* High-quality (APNG) export: a full-width tile under PNG / GIF / Video, built like its
+   neighbours but wearing a holographic face, like the rare finishes it saves. */
 
 .export .btn-hq {
-  --c: #3d5259;
-  --lo: var(--edge);
+  --c: #4a7fd0;
+  --lo: #2c3f7a;
   --fill: var(--green);
   grid-column: 1 / -1;
   display: grid;
@@ -14,8 +14,8 @@
   position: relative;
   overflow: hidden;
   padding: 3px 12px 3px 7px;
-  background: linear-gradient(#465d65, var(--c));
-  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(63, 194, 143, 0.7);
+  background: linear-gradient(110deg, #2fae84 0%, #3a8fd6 38%, #8a63d2 70%, #d0609a 100%);
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 
 /* A band of foil light sweeps across once on hover, the same sheen the cards wear. */
@@ -73,7 +73,7 @@
 
 /* Hover: the edge lights up and the little clear card tips, like the thumbnails do. */
 .export .btn-hq:not([aria-busy]):hover {
-  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px var(--green);
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(255, 255, 255, 0.45);
 }
 
 /* Keyboard focus: the gold ring alone marks it, so the green edge steps aside instead of doubling up. */
@@ -128,8 +128,8 @@
 .hq-meta b {
   font-weight: 400;
   font-size: 18px;
-  color: color-mix(in srgb, var(--green) 55%, #fff);
-  text-shadow: 0 2px 0 var(--edge);
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 }
 
 .hq-meta small {
@@ -146,8 +146,8 @@
 
 .export .btn-hq .btn-text::after {
   content: '';
-  height: 4px;
-  margin-top: 2px;
+  height: 7px;
+  margin-top: 3px;
   border-radius: 1px;
 }
 
@@ -160,6 +160,16 @@
 
 .export .btn-hq[aria-busy] .btn-text b {
   color: var(--green);
+}
+
+/* Just stopped: a quiet beat on the dark face before the tile returns, unlike a finished save. */
+.export .btn-hq.is-stopped {
+  background: var(--panel-lo);
+  box-shadow: 0 5px 0 var(--edge), inset 0 0 0 2px var(--text-dim);
+}
+
+.export .btn-hq.is-stopped .btn-text b {
+  color: var(--text-dim);
 }
 
 /* The right side becomes the way out: a stop key that brightens on hover. */

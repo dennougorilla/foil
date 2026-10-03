@@ -9,7 +9,7 @@ const TEXT = {
     title: 'APNG',
     badge: '高画質',
     sub: 'フルカラー・背景透過',
-    about: 'APNG で保存します。背景が透明で、色と影がそのまま残ります。Discord・Slack では動かないので、SNS には GIF を。',
+    about: 'APNG で保存します。背景が透明で、色と影がそのまま残ります。書き出し中は Esc かもう一度クリックで中止できます。Discord・Slack では動かないので、SNS には GIF を。',
     size: '約{n}',
     meta: '{s}秒ループ',
     working: '書き出し中…',
@@ -17,6 +17,7 @@ const TEXT = {
     stop: '中止',
     cancelLabel: 'APNG の書き出しを中止',
     cancelled: '書き出しを中止しました',
+    stopped: '中止しました',
     saved: '保存しました: {file} ({size})。',
     note: 'Discord・Slack では静止します。',
     error: 'APNG を書き出せませんでした。もう一度お試しください。',
@@ -25,7 +26,7 @@ const TEXT = {
     title: 'APNG',
     badge: 'HQ',
     sub: 'Full colour, clear bg',
-    about: 'Saves an APNG: transparent background, every colour and the soft shadow kept. Discord and Slack won’t play it, so share a GIF there.',
+    about: 'Saves an APNG: transparent background, every colour and the soft shadow kept. While it saves, press Esc or click again to stop. Discord and Slack won’t play it, so share a GIF there.',
     size: '~{n}',
     meta: '{s}s loop',
     working: 'Saving…',
@@ -33,6 +34,7 @@ const TEXT = {
     stop: 'Stop',
     cancelLabel: 'Stop the APNG export',
     cancelled: 'Export stopped',
+    stopped: 'Stopped',
     saved: 'Saved: {file} ({size}). ',
     note: 'It won’t move on Discord or Slack.',
     error: "Couldn't make the APNG. Please try again.",
@@ -60,10 +62,12 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
   const [b, small] = [label.querySelector('b')!, label.querySelector('small')!];
   const [mb, msmall] = [meta.querySelector('b')!, meta.querySelector('small')!];
   let job: AbortController | null = null;
+  /** After a stop, the row says so for a moment, so a stop never looks like a finished save. */
+  let hold = 0;
 
   /** Idle label: what it is, plus how big and how long the file will be for the current image. */
   const refresh = () => {
-    if (job) return;
+    if (job || hold) return;
     const t = TEXT[lang()];
     const plan = apngPlan(input().loopMs);
     const size = fill(t.size, { n: formatBytes(plan.bytes) });
@@ -81,6 +85,9 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
 
   async function run() {
     const t = TEXT[lang()];
+    clearTimeout(hold);
+    hold = 0;
+    btn.classList.remove('is-stopped');
     const ctl = new AbortController();
     job = ctl;
     others().forEach((x) => (x.disabled = true));
@@ -97,12 +104,14 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
       btn.style.setProperty('--p', (cells / total).toFixed(4));
       btn.style.setProperty('--n', String(total));
     };
+    let stopped = false;
     try {
       const { file, bytes } = await exportApng(input(), progress, ctl.signal);
       sfx.coin();
       toast(fill(t.saved, { file, size: formatBytes(bytes) }) + t.note);
     } catch (err) {
       if ((err as DOMException).name === 'AbortError') {
+        stopped = true;
         toast(t.cancelled);
       } else {
         console.error(err);
@@ -115,7 +124,18 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
       btn.removeAttribute('aria-busy');
       btn.style.removeProperty('--p');
       btn.style.removeProperty('--n');
-      refresh();
+      if (stopped) {
+        b.textContent = t.stopped;
+        small.textContent = '';
+        mb.textContent = '';
+        msmall.textContent = '';
+        btn.classList.add('is-stopped');
+        hold = window.setTimeout(() => {
+          hold = 0;
+          btn.classList.remove('is-stopped');
+          refresh();
+        }, 1600);
+      } else refresh();
     }
   }
 
