@@ -71,7 +71,15 @@ export async function exportApng(
       else reject(new Error(m.message));
     };
     worker.onerror = (e) => reject(new Error(e.message || 'apng-worker'));
-    signal.addEventListener('abort', () => reject(aborted()), { once: true });
+    // Stop encoding at once, even if drawing is paused (a hidden tab skips animation frames).
+    signal.addEventListener(
+      'abort',
+      () => {
+        worker.terminate();
+        reject(aborted());
+      },
+      { once: true },
+    );
   });
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});

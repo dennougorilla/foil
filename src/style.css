@@ -1737,7 +1737,8 @@ input[type='range']:focus-visible::-moz-range-thumb {
     right: auto;
     translate: -50% 0;
     width: min(420px, calc(100vw - 32px));
-    bottom: calc(96px + env(safe-area-inset-bottom));
+    /* Above the sticky Export bar (with its APNG row), so it never hides the buttons just pressed. */
+    bottom: calc(184px + env(safe-area-inset-bottom));
   }
 }
 

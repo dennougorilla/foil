@@ -43,9 +43,19 @@ export function sniffAnimated(bytes: Uint8Array): Exclude<AnimKind, 'GIF'> | nul
  * (PNG signature plus acTL), return the same file labelled image/png; otherwise null.
  */
 export async function asTypedApng(file: File): Promise<File | null> {
-  // acTL sits right after IHDR, so the first few KB are plenty to tell.
-  const head = new Uint8Array(await file.slice(0, 64 * 1024).arrayBuffer());
-  return sniffAnimated(head) === 'APNG' ? new File([file], file.name, { type: 'image/png' }) : null;
+  const read = async (at: number, n: number) => new Uint8Array(await file.slice(at, at + n).arrayBuffer());
+  if (!isPng(await read(0, 9))) return null;
+  // acTL must come before the first IDAT; hop from chunk header to chunk header until either shows.
+  for (let p = 8; p + 12 <= file.size; ) {
+    const head = await read(p, 12);
+    const v = new DataView(head.buffer);
+    const len = v.getUint32(0);
+    const type = String.fromCharCode(...head.subarray(4, 8));
+    if (type === 'acTL') return v.getUint32(8) > 1 ? new File([file], file.name, { type: 'image/png' }) : null;
+    if (type === 'IDAT' || type === 'IEND') return null;
+    p += 12 + len;
+  }
+  return null;
 }
 
 function outputSize(w: number, h: number, frames: number) {
@@ -138,6 +148,8 @@ async function viaApngReader(bytes: Uint8Array): Promise<Anim | null> {
   const shared: Uint8Array<ArrayBuffer>[] = [];
   const ctls: FrameCtl[] = [];
   let cur: FrameCtl | null = null;
+  // PLTE and tRNS may sit after the first fcTL; they are global until image data starts.
+  let dataStarted = false;
   for (const c of chunks(bytes)) {
     const v = new DataView(c.data.buffer, c.data.byteOffset, c.data.byteLength);
     if (c.type === 'IHDR') ihdr = c.data;
@@ -157,11 +169,13 @@ async function viaApngReader(bytes: Uint8Array): Promise<Anim | null> {
       };
       ctls.push(cur);
     } else if (c.type === 'IDAT') {
+      dataStarted = true;
       // An IDAT without an fcTL before it is a still fallback image, not part of the animation.
       cur?.data.push(c.data);
     } else if (c.type === 'fdAT') {
+      dataStarted = true;
       cur?.data.push(c.data.subarray(4));
-    } else if (!ctls.length && ['PLTE', 'tRNS', 'gAMA', 'cHRM', 'sRGB', 'iCCP', 'sBIT'].includes(c.type)) {
+    } else if (!dataStarted && ['PLTE', 'tRNS', 'gAMA', 'cHRM', 'sRGB', 'iCCP', 'sBIT'].includes(c.type)) {
       shared.push(chunk(c.type, c.data));
     }
   }
@@ -172,6 +186,8 @@ async function viaApngReader(bytes: Uint8Array): Promise<Anim | null> {
   const W = hv.getUint32(0);
   const H = hv.getUint32(4);
   if (W * H > SCREEN_PIXEL_MAX) return null;
+  // Every frame must be a real rectangle inside the canvas, or the file is not trusted as animation.
+  if (frames.some((f) => !f.w || !f.h || f.x + f.w > W || f.y + f.h > H)) return null;
   const { outW, outH } = outputSize(W, H, frames.length);
   const screen = document.createElement('canvas');
   screen.width = W;

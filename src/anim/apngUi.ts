@@ -124,6 +124,7 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
       btn.removeAttribute('aria-busy');
       btn.style.removeProperty('--p');
       btn.style.removeProperty('--n');
+      btn.removeAttribute('aria-label');
       if (stopped) {
         b.textContent = t.stopped;
         small.textContent = '';
