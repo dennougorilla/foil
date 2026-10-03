@@ -25,6 +25,8 @@ export function mountShelf(o: ShelfOptions) {
   const { host, store } = o;
   /** Packs shown last time, so one that just arrived (the Supporter pack) gets an entrance. */
   let shown = new Set<PackId>();
+  /** A folder just made by an opening, greeted once when the overlay closes. */
+  let fresh: PackId | null = null;
 
   const render = () => {
     const t = o.dict().pack;
@@ -47,6 +49,7 @@ export function mountShelf(o: ShelfOptions) {
       b.dataset.state = active ? 'active' : opened ? 'open' : 'sealed';
       if (p.supporter) b.classList.add('is-supporter');
       if (shown.size && !shown.has(p.id)) b.classList.add('is-new');
+      if (p.id === fresh) b.classList.add('is-fresh');
       b.style.setProperty('--a', p.colors[0]);
       b.style.setProperty('--b', p.colors[1]);
       b.style.setProperty('--c', p.colors[2]);
@@ -66,7 +69,7 @@ export function mountShelf(o: ShelfOptions) {
         r.className = 'pk-replay';
         r.setAttribute('aria-label', t.replay);
         r.title = t.replay;
-        r.innerHTML = REPLAY_ICON;
+        r.innerHTML = `${REPLAY_ICON}<span aria-hidden="true">${t.replayShort}</span>`;
         r.addEventListener('click', () => o.onOpen(p, b.getBoundingClientRect()));
         host.appendChild(r);
       }
@@ -80,5 +83,13 @@ export function mountShelf(o: ShelfOptions) {
     if (changed.has('folder') || changed.has('lang')) render();
   });
   render();
-  return { render, focus: (id: PackId) => host.querySelector<HTMLElement>(`[data-pack="${id}"]`)?.focus() };
+  return {
+    render,
+    focus: (id: PackId) => host.querySelector<HTMLElement>(`[data-pack="${id}"]`)?.focus(),
+    greet(id: PackId) {
+      fresh = id;
+      render();
+      fresh = null;
+    },
+  };
 }

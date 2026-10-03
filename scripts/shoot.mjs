@@ -39,7 +39,11 @@ for (const s of shots) {
   const page = await ctx.newPage();
   page.on('console', (m) => m.type() === 'error' && errors.push(`${s.name}: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`${s.name}: ${e.message}`));
-  await page.addInitScript(() => localStorage.clear());
+  // Every theme pack opened, so each finish can be dealt into the hand from its folder.
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['metal', 'light', 'nature', 'studio'], supporter: false }));
+  });
   await page.goto(`${URL}?lang=${s.lang}`);
   await page.waitForTimeout(2600);
   const card = page.locator('#cardSlot');
@@ -100,8 +104,13 @@ for (const s of shots) {
   }
   await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
   if (s.name === 'desktop-ja') {
-    // One frame per edition, cropped to the card (secrets too: their hidden slots still take a scripted click).
+    // One frame per edition, cropped to the card; a pack's finish is dealt in by picking its folder first.
     for (let i = 0; i < editions.length; i++) {
+      for (const chip of await page.$$('.pk-chip')) {
+        if (await page.$(`.hand-slot[data-id=${editions[i]}]`)) break;
+        await chip.click();
+        await page.waitForTimeout(800);
+      }
       await page.$eval(`.hand-slot[data-id=${editions[i]}]`, (el) => el.click());
       await page.waitForTimeout(900);
       const b = await card.boundingBox();

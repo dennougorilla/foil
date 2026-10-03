@@ -1078,14 +1078,15 @@ function openPack(pack: Pack, from: DOMRect) {
         back,
         tune: store.get().tune,
         intensity: store.get().intensity,
-        sound: store.get().sound,
         finishes,
         pause: (on) => stage.pause(on),
         onOpened: () => packs.open(pack.id),
         onClose: (pick) => {
           opening = false;
-          // A pack just opened becomes the folder in the hand; a pick also goes on the card.
-          if (!replay || pick) store.set({ folder: pack.id });
+          // A pack just opened becomes the folder in the hand; a pick also goes on the card. Closed
+          // before the tear, it stays sealed and nothing changes.
+          if (packs.isOpened(pack.id) && (!replay || pick)) store.set({ folder: pack.id });
+          if (packs.isOpened(pack.id) && !replay) shelfUi.greet(pack.id);
           if (pick && pick !== store.get().edition) stage.flipTo(() => selectEdition(pick));
           shelfUi.focus(pack.id);
         },

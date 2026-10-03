@@ -5,7 +5,7 @@ import type { FinishModule } from './types';
 const GLSL = /* glsl */ `
 // Roughly the pixel size of the card art, so effects can land on the same grid.
 const vec2 PIXEL_GRID = vec2(64.0, 89.6);
-// Set just before each sponsor finish runs: 1 inside the art window, 0 on the frame.
+// Set just before each supporter finish runs: 1 inside the art window, 0 on the frame.
 float artMask = 1.0;
 vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   // The picture stays the subject: a few fine seams of gold mend it, and the

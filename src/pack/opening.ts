@@ -10,11 +10,12 @@ import { BackgroundRenderer, CardRenderer, hexToRgb, type CardDraw, type Particl
 import { editionById, type EditionId } from '../editions';
 import { tierOf, type Pack } from '../packs';
 import type { Dict } from '../i18n';
+import type { PackId } from '../packs';
 import { tuneGl, type Tune } from '../tune/model';
 import type { FinishModule } from '../gl/finishes/types';
 import { Spring } from '../stage';
 import { sfx } from '../audio';
-import { paintPack, PACK_H, PACK_W, TEAR_Y } from './packArt';
+import { paintPack, paintShowpieceBack, PACK_H, PACK_W, TEAR_Y } from './packArt';
 import { buzz, packSfx } from './sounds';
 import { PACK_EN } from '../packText';
 
@@ -30,7 +31,6 @@ export interface OpeningOptions {
   back: HTMLCanvasElement;
   tune: Tune;
   intensity: number;
-  sound: boolean;
   /** The pack's finishes arriving (src/gl/finishes/registry.ts). */
   finishes: Promise<FinishModule>;
   /** Stops the stage underneath from drawing while the overlay is up. */
@@ -71,6 +71,15 @@ const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p 
 const easeOutBack = (p: number) => 1 + 2.2 * Math.pow(p - 1, 3) + 1.2 * Math.pow(p - 1, 2);
 const band = (d: number, k = 520) => (d * 0.9) / (1 + Math.abs(d) / k);
 const WHITE: RGB = [1, 1, 1];
+
+/** What each theme's sparks are made of: hot metal sparks, rising star motes, drifting petals, print dots, gold leaf. */
+const STYLES: Record<PackId, { palette: string[]; g: number; drag: number; sway: number; size: [number, number] }> = {
+  metal: { palette: ['#fff6d8', '#f2c14e', '#d18a2c'], g: 1200, drag: 1.2, sway: 0, size: [3, 7] },
+  light: { palette: ['#ffffff', '#c8f4ff', '#a99bff'], g: -50, drag: 2.6, sway: 0, size: [3, 6] },
+  nature: { palette: ['#ffe0ea', '#ffa8c8', '#ff7aa8'], g: 120, drag: 3.2, sway: 120, size: [6, 9] },
+  studio: { palette: ['#00b7eb', '#ff2e88', '#ffe600', '#f3eee2'], g: 800, drag: 1.4, sway: 0, size: [6, 9] },
+  supporter: { palette: ['#f2c14e', '#ffe7a8', '#ffffff'], g: 900, drag: 1.5, sway: 40, size: [4, 8] },
+};
 const GOLD: RGB = hexToRgb('#f2c14e');
 
 export function openPack(o: OpeningOptions) {
@@ -82,6 +91,8 @@ export function openPack(o: OpeningOptions) {
   const name = t.name[pack.id];
   const n = pack.finishes.length;
   const colors = pack.colors.map(hexToRgb) as [RGB, RGB, RGB];
+  const style = STYLES[pack.id];
+  const themed = style.palette.map(hexToRgb);
   /** The room's swirl: the pack's dark and mid tones, its light one held back so the cards stay the brightest thing. */
   const room = [colors[0], colors[1], colors[1].map((v, i) => v * 0.6 + colors[2][i] * 0.2)] as [RGB, RGB, RGB];
 
@@ -111,15 +122,17 @@ export function openPack(o: OpeningOptions) {
     </div>
     <header class="pk-head">
       <p class="pk-title"><b></b><small></small></p>
-      <button class="pk-skip" type="button"><span></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3l6 5-6 5zm6 0l6 5-6 5z"/></svg></button>
+      <div class="pk-tools">
+        <button class="pk-skip" type="button"><span></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3l6 5-6 5zm6 0l6 5-6 5z"/></svg></button>
+        <button class="pk-x" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></button>
+      </div>
     </header>
     <p class="pk-hint" aria-hidden="true"></p>
     <button class="btn btn-paper pk-open" type="button"></button>
-    <div class="pk-label" aria-hidden="true"><span class="pk-tag"></span><b></b><small></small></div>
+    <div class="pk-label" aria-hidden="true"><span class="pk-tags"><span class="pk-step"></span><span class="pk-tag"></span></span><b></b><small></small></div>
     <div class="pk-haul">
-      <p class="pk-haul-title"></p>
+      <p class="pk-haul-title"><b></b><small></small></p>
       <ol class="pk-names"></ol>
-      <p class="pk-haul-hint"></p>
       <div class="pk-actions">
         <button class="btn btn-quiet pk-close" type="button"></button>
         <button class="btn btn-primary pk-try" type="button"></button>
@@ -143,12 +156,14 @@ export function openPack(o: OpeningOptions) {
   $('.pk-title b').textContent = t.title.replace('{name}', name);
   $('.pk-title small').textContent = rich ? t.thanks : t.count.replace('{n}', String(n));
   skipBtn.querySelector('span')!.textContent = t.skip;
-  skipBtn.setAttribute('aria-label', t.skip);
+  $('.pk-x').setAttribute('aria-label', t.close);
+  $('.pk-x').title = t.close;
   openBtn.textContent = t.openBtn;
   hintEl.textContent = t.loading;
-  $('.pk-haul-title').textContent = (o.replay ? t.haulReplay : t.haul).replace('{name}', name);
-  $('.pk-haul-hint').textContent = t.haulHint;
-  $('.pk-try').textContent = t.try;
+  $('.pk-haul-title b').textContent = (o.replay ? t.haulReplay : t.haul).replace('{name}', name).replace('{n}', String(n));
+  // One line under the title: where the finishes went (first time only), and what to do now.
+  $('.pk-haul-title small').textContent = (o.replay ? '' : t.haulSub.replace('{name}', name) + ' ') + t.haulHint;
+  $('.pk-try').textContent = t.try.replace('{finish}', dict.edition[pack.finishes[n - 1]]);
   $('.pk-close').textContent = t.close;
   document.body.appendChild(root);
   root.focus({ preventScroll: true });
@@ -167,7 +182,10 @@ export function openPack(o: OpeningOptions) {
   const swirl = new BackgroundRenderer($<HTMLCanvasElement>('.pk-swirl'));
   r.tune = tuneGl(o.tune);
   r.setFace(o.face, o.mask);
-  r.setBack(o.back);
+  // Only the showpiece is ever seen face down, so the overlay's card back is its back.
+  const back = document.createElement('canvas');
+  paintShowpieceBack(back, o.back, pack);
+  r.setBack(back);
   const packFace = document.createElement('canvas');
   const packMask = document.createElement('canvas');
   const wrap = editionById(pack.wrap).shader;
@@ -262,6 +280,9 @@ export function openPack(o: OpeningOptions) {
   let hit: 'down' | 'charge' | 'up' = 'down';
   let hitT = 0;
   let boomed = false;
+  /** Seconds since the showpiece turned up: for a moment it is held up and a light sweeps across it. */
+  let revealT = 0;
+  const REVEAL = 1.6;
   let nextBuzz = 0;
   const drag = { active: false, pid: -1, sx: 0, sy: 0, lx: 0, lt: 0, vx: 0, moved: 0 };
   const pointer = { x: cx, y: cy, at: -10 };
@@ -274,19 +295,20 @@ export function openPack(o: OpeningOptions) {
   };
   addEventListener('deviceorientation', onTilt);
 
-  const particles: (Particle & { g: number })[] = [];
+  const particles: (Particle & { g: number; drag: number; sway: number; ph: number })[] = [];
   const shake = { t: 0, dur: 0, amp: 0 };
   const quake = (dur: number, amp: number) => {
     if (reduced) return;
     Object.assign(shake, { t: 0, dur, amp });
   };
+  /** Particles in the theme's own make unless told otherwise. */
   const spray = (x: number, y: number, count: number, opts: { speed: [number, number]; up?: number; spread?: number; dir?: number; g?: number; size?: [number, number]; palette?: RGB[] }) => {
     if (reduced) return;
-    const pal = opts.palette ?? [WHITE, colors[2], colors[1]];
+    const pal = opts.palette ?? themed;
     for (let i = 0; i < count && particles.length < 500; i++) {
       const a = (opts.dir ?? -Math.PI / 2) + (Math.random() - 0.5) * (opts.spread ?? TAU);
       const sp = opts.speed[0] + Math.random() * (opts.speed[1] - opts.speed[0]);
-      const size = opts.size ?? [5, 10];
+      const size = opts.size ?? style.size;
       particles.push({
         x,
         y,
@@ -296,7 +318,10 @@ export function openPack(o: OpeningOptions) {
         life: 1,
         decay: 0.8 + Math.random() * 1.1,
         color: pal[Math.floor(Math.random() * pal.length)],
-        g: opts.g ?? 900,
+        g: opts.g ?? style.g,
+        drag: style.drag,
+        sway: style.sway,
+        ph: Math.random() * TAU,
       });
     }
   };
@@ -313,8 +338,10 @@ export function openPack(o: OpeningOptions) {
     void labelEl.offsetWidth;
     labelEl.classList.add('is-pop');
   };
-  const hint = (text: string) => {
+  /** The next step under the card; with a keyboard at hand, its key too. */
+  const hint = (text: string, key = '') => {
     hintEl.textContent = text;
+    if (key && !coarse) hintEl.insertAdjacentHTML('beforeend', ` <kbd>${key}</kbd>`);
     hintEl.classList.toggle('is-on', !!text);
   };
 
@@ -345,19 +372,22 @@ export function openPack(o: OpeningOptions) {
     pk.s.v += 1.6;
     pk.flash = 0.6;
     quake(0.22, 10);
-    for (let i = 0; i < 40; i++) spray(pk.x.x + (Math.random() - 0.5) * packW, ty, 1, { speed: [200, 620], dir: -Math.PI / 2, spread: 1.4, palette: rich ? [GOLD, WHITE, colors[2]] : undefined });
-    if (rich) spray(pk.x.x, ty, 60, { speed: [300, 900], dir: -Math.PI / 2, spread: 2.4, palette: [GOLD, GOLD, WHITE], size: [6, 12], g: 1200 });
+    for (let i = 0; i < 36; i++) spray(pk.x.x + (Math.random() - 0.5) * packW, ty, 1, { speed: [200, 620], dir: -Math.PI / 2, spread: 1.4 });
     pourEl.classList.add('is-on');
   }
 
   /** The cards rise out of the bag and the bag drops away. */
   function draw() {
     setPhase('draw');
+    // The bag slides down as the cards rise out of it, so they come up in full view, never past the top.
+    const slide = Math.min(packH * 0.3, vh - (cy + packH / 2) + packH * 0.42);
+    pk.y.target = cy + slide;
     const opening = pk.y.x - packH / 2 + packH * TEAR_Y;
+    const later = cy + slide - packH / 2 + packH * TEAR_Y;
     cards.forEach((c, i) => {
       c.x.x = c.x.target = pk.x.x;
       c.y.x = opening + cardH * 0.5 + 8;
-      c.y.target = opening - cardH * 0.18 - i * 4;
+      c.y.target = Math.max(later - cardH * 0.2, 70 + cardH / 2) - i * 4;
       c.rz.x = pk.rz.x;
       c.alpha = 1;
     });
@@ -375,8 +405,9 @@ export function openPack(o: OpeningOptions) {
   function surface() {
     const c = cards[top];
     c.s.x = reduced ? 1 : 0.94;
+    labelEl.querySelector('.pk-step')!.textContent = `${top + 1} / ${n}`;
     if (c === showpiece) {
-      hint(t.charge);
+      hint(t.charge, 'Enter');
       label(c, `★ ${t.showpiece}`);
       root.classList.add('is-waiting');
       return;
@@ -394,7 +425,7 @@ export function openPack(o: OpeningOptions) {
       }
     }
     if (rich) packSfx.deal(top + 4);
-    hint(top === 0 ? t.swipe : '');
+    hint(top === 0 ? t.swipe : '', '→');
     label(c, rich ? t.supporterTag : '');
     say(dict.edition[c.id]);
   }
@@ -430,18 +461,20 @@ export function openPack(o: OpeningOptions) {
   const haulLayout = () => {
     haulOrder = cards.slice(0, n - 1);
     haulOrder.splice(Math.floor(n / 2), 0, showpiece);
-    const gap = Math.max(12, vw * 0.02);
-    const h = Math.min(vh * 0.44, ((vw - 32 - gap * (n - 1)) / n) * 1.4, 400);
+    // On a narrow screen the cards overlap a little, like a dealt fan, so each stays big enough to see.
+    const overlap = vw < 600 ? 0.24 : 0;
+    const room = vw - 24;
+    const fit = (room - (vw < 600 ? 0 : Math.max(12, vw * 0.02) * (n - 1))) / (n - (n - 1) * overlap);
+    const h = Math.min(vh * 0.44, fit * 1.4, 400);
     const w = (h * 5) / 7;
+    const gap = overlap ? -w * overlap : Math.max(12, vw * 0.02);
     const total = n * w + (n - 1) * gap;
     const mid = (n - 1) / 2;
-    haulAt = haulOrder.map((_, i) => ({
-      x: vw / 2 - total / 2 + w / 2 + i * (w + gap),
-      y: vh * 0.44 + Math.abs(i - mid) * h * 0.04,
-      w,
-      h,
-      rz: (i - mid) * 0.05,
-    }));
+    // The showpiece takes the middle, a size up.
+    haulAt = haulOrder.map((c, i) => {
+      const k = c === showpiece ? 1.12 : 1;
+      return { x: vw / 2 - total / 2 + w / 2 + i * (w + gap), y: vh * 0.42 + Math.abs(i - mid) * h * 0.05, w: w * k, h: h * k, rz: (i - mid) * 0.05 };
+    });
   };
   let hoverHaul = -1;
 
@@ -490,7 +523,7 @@ export function openPack(o: OpeningOptions) {
       c.dealAt = (reduced ? 0.15 : 0.09) * i;
       c.dealt = false;
     });
-    say($('.pk-haul-title').textContent!);
+    say($('.pk-haul-title b').textContent!);
     $<HTMLButtonElement>('.pk-try').focus({ preventScroll: true });
   }
 
@@ -618,6 +651,7 @@ export function openPack(o: OpeningOptions) {
 
   openBtn.addEventListener('click', startAuto);
   skipBtn.addEventListener('click', skip);
+  $('.pk-x').addEventListener('click', () => close(null));
   $('.pk-try').addEventListener('click', () => close(showpiece.id));
   $('.pk-close').addEventListener('click', () => close(null));
   const onKey = (e: KeyboardEvent) => {
@@ -685,7 +719,7 @@ export function openPack(o: OpeningOptions) {
       r.begin();
       for (const c of cards) r.drawCard({ cx: -9999, cy: -9999, w: cardW, h: cardH, rx: 0, ry: 0, rz: 0, scale: 1, edition: c.shader, intensity: o.intensity, pixel: 0, tilt: [0, 0], light: [0.5, 0.5], alpha: 0, flash: 0, shadow: null }, 0);
       setPhase('pack');
-      hint(t.trace);
+      hint(t.trace, 'Enter');
       openBtn.hidden = false;
       if (!reduced) {
         pk.rz.v = 7;
@@ -703,7 +737,7 @@ export function openPack(o: OpeningOptions) {
     // Pack
     if (phase === 'pack' || phase === 'rip' || phase === 'draw') {
       pk.x.target = cx;
-      if (!pk.drop.on) pk.y.target = cy;
+      if (!pk.drop.on && phase !== 'draw') pk.y.target = cy;
       const pointing = time - pointer.at < 2.5 && !coarse;
       const lean = cut.active ? [clamp((cut.lastX - pk.x.x) / (packW / 2), -1, 1) * 0.5, -0.4] : pointing ? [clamp((pointer.x - pk.x.x) / (packW / 2), -1, 1), clamp((pointer.y - pk.y.x) / (packH / 2), -1, 1)] : gyro ?? [0, 0];
       pk.ry.target = lean[0] * 0.3 * motion;
@@ -735,7 +769,7 @@ export function openPack(o: OpeningOptions) {
         buzz(6);
       }
       const ty = pk.y.x - (packH * pk.s.x) / 2 + packH * pk.s.x * TEAR_Y;
-      spray(cut.lastX, ty, cut.speed > 2 || cut.auto ? 3 : 1, { speed: [80, 380], up: 160, palette: rich ? [GOLD, WHITE] : [WHITE, colors[2]], size: [4, 8] });
+      spray(cut.lastX, ty, cut.speed > 2 || cut.auto ? 3 : 1, { speed: [80, 380], up: 160 });
     }
     if (cut.draining) {
       cut.p = Math.max(0, cut.p - dt / 0.26);
@@ -786,7 +820,7 @@ export function openPack(o: OpeningOptions) {
           c.y.target = cy + k * 7;
           c.rz.target = k ? (k % 2 ? 0.035 : -0.03) : 0;
         }
-        c.s.target = (1 - k * 0.025) * (c === showpiece && hit === 'charge' ? 1.08 : 1);
+        c.s.target = (1 - k * 0.025) * (c === showpiece && hit === 'charge' ? 1.08 : c === showpiece && boomed ? 1.06 : 1);
       });
       if (cards[top] === showpiece) stepHit(dt);
     }
@@ -829,15 +863,18 @@ export function openPack(o: OpeningOptions) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.vy += p.g * dt;
-      p.vx *= 1 - dt * 1.5;
+      p.vx *= 1 - dt * p.drag;
+      p.vy *= 1 - dt * p.drag * 0.4;
+      if (p.sway) p.vx += Math.sin(p.ph + p.life * 9) * p.sway * dt * 6;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life -= p.decay * dt;
       if (p.life <= 0) particles.splice(i, 1);
     }
-    if (rich && !reduced && particles.length < 120 && Math.random() < dt * 14) {
+    // (Held back while the pack tears and the cards come out, so the tear stays the one thing to watch.)
+    if (rich && !reduced && phase !== 'rip' && phase !== 'draw' && particles.length < 80 && Math.random() < dt * 8) {
       // Gold dust drifting up through the room, the whole time.
-      particles.push({ x: Math.random() * vw, y: vh + 10, vx: (Math.random() - 0.5) * 20, vy: -40 - Math.random() * 60, size: Math.random() > 0.7 ? 6 : 4, life: 1, decay: 0.12 + Math.random() * 0.1, color: Math.random() > 0.3 ? GOLD : WHITE, g: -10 });
+      particles.push({ x: Math.random() * vw, y: vh + 10, vx: (Math.random() - 0.5) * 20, vy: -40 - Math.random() * 60, size: Math.random() > 0.7 ? 6 : 4, life: 1, decay: 0.12 + Math.random() * 0.1, color: Math.random() > 0.3 ? GOLD : WHITE, g: -10, drag: 0, sway: 0, ph: 0 });
     }
     shake.t += dt;
   }
@@ -850,7 +887,7 @@ export function openPack(o: OpeningOptions) {
       // Sparks rise off its edges while it waits to be turned over.
       if (Math.random() < dt * 10) {
         const side = Math.random() < 0.5 ? -1 : 1;
-        spray(c.x.x + side * cardW * 0.5, c.y.x + (Math.random() - 0.5) * cardH, 1, { speed: [10, 60], up: 60, g: -40, size: [4, 6], palette: rich ? [GOLD, WHITE] : [WHITE, colors[2]] });
+        spray(c.x.x + side * cardW * 0.5, c.y.x + (Math.random() - 0.5) * cardH, 1, { speed: [10, 60], up: 60, g: -40, size: [4, 6] });
       }
     }
     if (hit === 'charge') {
@@ -875,20 +912,25 @@ export function openPack(o: OpeningOptions) {
     }
     if (hit === 'up') {
       hitT += dt;
+      if (boomed) {
+        revealT += dt;
+        if (revealT > REVEAL) root.classList.remove('is-revealing');
+      }
       const p = clamp(hitT / (reduced ? 0.01 : 0.42), 0, 1);
       c.flip = Math.PI + Math.PI * easeOutBack(p);
       if (!boomed && (reduced || c.flip > Math.PI * 1.5)) {
         boomed = true;
+        revealT = 0;
+        root.classList.add('is-revealing');
         c.flash = 0.9;
         c.s.v += 3.2;
         quake(0.36, 16);
         raysEl.style.opacity = '';
-        spray(cx, cy, 70, { speed: [300, 900], up: 120, size: [6, 12], palette: rich ? [GOLD, GOLD, WHITE, colors[2]] : [WHITE, colors[2], colors[1], hexToRgb(editionById(c.id).color)] });
-        if (rich) spray(cx, cy - cardH * 0.5, 80, { speed: [200, 700], dir: -Math.PI / 2, spread: 2.2, size: [7, 11], palette: [GOLD, WHITE], g: 500 });
+        spray(cx, cy, rich ? 80 : 64, { speed: [300, 900], up: 120, palette: [...themed, WHITE, hexToRgb(editionById(c.id).color)] });
         packSfx.reveal(rich);
         buzz([40, 40, 80]);
         label(c, `★ ${t.showpiece}`);
-        hint(t.swipe);
+        hint(t.swipe, '→');
         say(`${t.showpiece}: ${dict.edition[c.id]}`);
       }
     }
@@ -905,7 +947,9 @@ export function openPack(o: OpeningOptions) {
     const sway = Math.sin(time * TAU * 0.5) * 6 * idle;
 
     // Cards behind the pack while they come out, otherwise from the bottom of the stack up.
-    const order = phase === 'haul' ? haulOrder.map((c, i) => [c, i] as const).sort((a, b) => (a[1] === hoverHaul ? 1 : b[1] === hoverHaul ? -1 : 0)) : [...cards].map((c, i) => [c, i] as const).reverse();
+    // In the haul the showpiece sits on top of its neighbours, and the hovered card on top of all.
+    const rank = (c: CardSim, i: number) => (i === hoverHaul ? 2 : c === showpiece ? 1 : 0);
+    const order = phase === 'haul' ? haulOrder.map((c, i) => [c, i] as const).sort((a, b) => rank(...a) - rank(...b)) : [...cards].map((c, i) => [c, i] as const).reverse();
     const cardLayer: CardDraw[] = [];
     for (const [c, i] of order) {
       if (c.alpha <= 0) continue;
@@ -915,6 +959,8 @@ export function openPack(o: OpeningOptions) {
       const lean = phase === 'haul' && i === hoverHaul && !reduced ? clamp((pointer.x - c.x.x) / (size.w / 2), -1, 1) * 0.3 : 0;
       // The turned-up showpiece rocks slowly so its finish keeps catching the light.
       const rock = c === showpiece && boomed && !c.flying ? Math.sin(time * 1.3) * (phase === 'haul' ? 0.12 : 0.24) * idle : 0;
+      // Right after it turns, the light sweeps across the showpiece once, so its finish is the climax.
+      const sweep = c === showpiece && phase === 'deck' && boomed && revealT < REVEAL ? easeInOut(revealT / REVEAL) : -1;
       const ry = c.flip + lean + rock + (phase === 'deck' && !c.flying ? Math.sin(time * 0.8 + i) * 0.04 * idle : 0);
       cardLayer.push({
         cx: c.x.x,
@@ -928,8 +974,8 @@ export function openPack(o: OpeningOptions) {
         edition: c.shader,
         intensity: o.intensity,
         pixel: 0,
-        tilt: [Math.sin(time * 0.6 + i) * 0.6 * idle + (lean + rock) * 3 + (c.x.x - cx) / vw, Math.cos(time * 0.5 + i) * 0.5 * idle],
-        light: [0.5 - (lean + rock) * 1.4, 0.35],
+        tilt: sweep >= 0 ? [-1.2 + sweep * 2.4, -0.6 + sweep * 1.2] : [Math.sin(time * 0.6 + i) * 0.6 * idle + (lean + rock) * 3 + (c.x.x - cx) / vw, Math.cos(time * 0.5 + i) * 0.5 * idle],
+        light: sweep >= 0 ? [-0.2 + sweep * 1.4, 0.2 + sweep * 0.4] : [0.5 - (lean + rock) * 1.4, 0.35],
         alpha: c.alpha,
         flash: c.flash,
         shadow: [8 + (s - 1) * 40, 12 + (s - 1) * 60],
@@ -1038,7 +1084,8 @@ export function openPack(o: OpeningOptions) {
         el.style.width = `${(a.w + 12).toFixed(0)}px`;
         el.classList.toggle('is-hot', i === hoverHaul);
       });
-      $('.pk-haul').style.setProperty('--below', `${((haulAt[0]?.y ?? 0) + (haulAt[0]?.h ?? 0) / 2).toFixed(0)}px`);
+      const below = Math.max(...haulAt.map((a) => a.y + a.h / 2));
+      $('.pk-haul').style.setProperty('--below', `${below.toFixed(0)}px`);
     }
   }
 

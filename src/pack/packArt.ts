@@ -272,3 +272,57 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
     ctx.restore();
   }
 }
+
+/**
+ * The back the showpiece arrives on: the card's own back with its middle printed in the pack's
+ * colors, stripes and emblem, so the one face-down card already looks like something.
+ */
+export function paintShowpieceBack(back: HTMLCanvasElement, base: HTMLCanvasElement, pack: Pack): void {
+  back.width = base.width;
+  back.height = base.height;
+  const ctx = back.getContext('2d')!;
+  const W = back.width;
+  const H = back.height;
+  const [dark, mid, light] = pack.colors;
+  ctx.drawImage(base, 0, 0);
+  // The inner panel, inset like the printed back's.
+  const inset = W * 0.062;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(inset, inset, W - inset * 2, H - inset * 2, W * 0.034);
+  ctx.clip();
+  const g = ctx.createRadialGradient(W / 2, H / 2, W * 0.05, W / 2, H / 2, H * 0.62);
+  g.addColorStop(0, mid);
+  g.addColorStop(1, dark);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = light;
+  for (let d = -H; d < W + H; d += 64) {
+    ctx.beginPath();
+    ctx.moveTo(d, 0);
+    ctx.lineTo(d + 26, 0);
+    ctx.lineTo(d + 26 - H * 0.6, H);
+    ctx.lineTo(d - H * 0.6, H);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = light;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(inset + 26, inset + 26, W - (inset + 26) * 2, H - (inset + 26) * 2);
+  ctx.restore();
+  // A seal with the theme's mark in the middle.
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(W / 2, H / 2, W * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(W / 2, H / 2, W * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(W / 2, H / 2, W * 0.155, 0, Math.PI * 2);
+  ctx.fill();
+  emblem(ctx, pack.id, W / 2, H / 2, W * 0.2, light, PAPER);
+}

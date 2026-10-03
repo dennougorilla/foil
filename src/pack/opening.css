@@ -43,7 +43,6 @@
   position: absolute;
   inset: 0;
   background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 4px),
     radial-gradient(ellipse at 50% 46%, rgba(3, 5, 6, 0.1) 20%, rgba(3, 5, 6, 0.8) 90%);
 }
 
@@ -186,6 +185,20 @@
   opacity: 1;
 }
 
+/* While the light sweeps across the turned showpiece, the rays hold back: the finish is the peak. */
+.pk.is-revealing .pk-rays {
+  opacity: 0.3;
+}
+
+/* The haul is for choosing: a calmer room and quieter rays. */
+.pk.is-haul .pk-rays {
+  opacity: 0.4;
+}
+
+.pk.is-haul .pk-room {
+  filter: brightness(0.7);
+}
+
 .pk-rays::before,
 .pk-rays::after {
   content: '';
@@ -224,9 +237,28 @@
   width: var(--w, 200px);
   height: var(--h, 280px);
   border-radius: 16px;
-  box-shadow: 0 0 30px 10px var(--c), 0 0 90px 30px color-mix(in srgb, var(--c) 50%, transparent);
+  /* A tight glow on the card's edge, and a soft round bloom around it (never a box). */
+  box-shadow: 0 0 22px 6px var(--c);
   opacity: 0;
   transition: opacity 0.3s;
+}
+
+.pk-aura::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--w, 200px) * -1.1);
+  top: calc(var(--h, 280px) * -0.9);
+  width: calc(var(--w, 200px) * 2.2);
+  height: calc(var(--h, 280px) * 1.8);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 55%, transparent), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.pk.is-waiting .pk-aura::after,
+.pk.is-charging .pk-aura::after,
+.pk.is-up .pk-aura::after {
+  opacity: 0.8;
 }
 
 .pk.is-waiting .pk-aura::before {
@@ -239,8 +271,9 @@
   animation: pk-pulse 0.22s ease-in-out infinite;
 }
 
+/* From the flip on only the round bloom stays: a card-shaped edge glow would not turn with the card. */
 .pk.is-up .pk-aura::before {
-  opacity: 0.85;
+  opacity: 0;
 }
 
 @keyframes pk-pulse {
@@ -307,7 +340,13 @@
   from { opacity: 0; transform: translateY(-10px); }
 }
 
-.pk-skip {
+.pk-tools {
+  display: flex;
+  gap: 8px;
+}
+
+.pk-skip,
+.pk-x {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -321,18 +360,26 @@
   box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
 }
 
-.pk-skip svg {
+.pk-skip svg,
+.pk-x svg {
   width: 14px;
   height: 14px;
   fill: currentColor;
 }
 
-.pk-skip:hover {
+.pk-x {
+  justify-content: center;
+  width: 44px;
+  padding: 0;
+}
+
+.pk-skip:hover,
+.pk-x:hover {
   background: var(--panel-hi);
 }
 
-.pk[data-phase='haul'] .pk-skip,
-.pk[data-phase='closing'] .pk-skip {
+.pk[data-phase='haul'] .pk-tools,
+.pk[data-phase='closing'] .pk-tools {
   visibility: hidden;
 }
 
@@ -356,6 +403,18 @@
   opacity: 0;
   transition: opacity 0.25s;
   pointer-events: none;
+}
+
+.pk-hint kbd {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  font: inherit;
+  font-size: 14px;
+  box-shadow: 0 2px 0 #a9a497;
+  text-shadow: none;
 }
 
 .pk-hint.is-on,
@@ -414,8 +473,19 @@
 }
 
 .pk-label small {
-  font-size: 15px;
-  color: var(--text-dim);
+  font-size: 16px;
+  color: rgba(245, 242, 234, 0.8);
+}
+
+.pk-tags {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pk-step {
+  font-size: 14px;
+  color: rgba(245, 242, 234, 0.8);
 }
 
 .pk-tag:empty {
@@ -444,17 +514,30 @@
   display: block;
 }
 
+/* The haul's own title names the pack, so the header steps aside for it. */
+.pk.is-haul .pk-title {
+  visibility: hidden;
+}
+
 .pk-haul-title {
   position: absolute;
   left: 50%;
-  top: max(76px, 9vh);
+  top: max(28px, 6vh);
+  display: grid;
+  gap: 4px;
   width: min(92vw, 560px);
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
+  line-height: 1.3;
   text-align: center;
   text-shadow: 0 3px 0 var(--edge);
   transform: translateX(-50%);
   animation: pk-drop 0.4s var(--ease-back) both;
+}
+
+.pk-haul-title small {
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.82);
 }
 
 .pk-names {
@@ -482,12 +565,12 @@
 
 .pk-name b {
   font-weight: 400;
-  font-size: 17px;
+  font-size: 19px;
 }
 
 .pk-name small {
-  font-size: 13px;
-  color: var(--text-dim);
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.78);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -503,17 +586,6 @@
   from { opacity: 0; transform: translateX(-50%) translateY(8px); }
 }
 
-.pk-haul-hint {
-  position: absolute;
-  left: 50%;
-  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 72px);
-  width: min(92vw, 520px);
-  margin: 0;
-  font-size: 15px;
-  color: var(--text-dim);
-  text-align: center;
-  transform: translateX(-50%);
-}
 
 .pk-actions {
   position: absolute;
