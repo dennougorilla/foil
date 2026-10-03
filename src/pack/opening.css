@@ -347,6 +347,7 @@
 
 .pk-skip,
 .pk-x {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -425,9 +426,10 @@
 .pk-open {
   position: absolute;
   left: 50%;
-  bottom: max(24px, env(safe-area-inset-bottom));
+  top: calc(var(--hint-y, 80%) + 44px);
   width: auto;
   min-width: 168px;
+  min-height: 46px;
   transform: translateX(-50%);
 }
 
@@ -522,7 +524,8 @@
 .pk-haul-title {
   position: absolute;
   left: 50%;
-  top: max(28px, 6vh);
+  top: max(16px, calc(var(--above, 30vh) - 20px));
+  translate: 0 -100%;
   display: grid;
   gap: 4px;
   width: min(92vw, 560px);
@@ -590,7 +593,7 @@
 .pk-actions {
   position: absolute;
   left: 50%;
-  bottom: max(24px, env(safe-area-inset-bottom));
+  top: calc(var(--after, 70vh) + 24px);
   display: grid;
   grid-template-columns: 1fr 1.6fr;
   gap: 12px;
@@ -637,5 +640,9 @@
   }
   .pk-title b {
     font-size: 20px;
+  }
+  /* The wrapper says it already; the header keeps to the pack's name beside the buttons. */
+  .pk-title small {
+    display: none;
   }
 }

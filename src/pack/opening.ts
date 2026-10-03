@@ -451,7 +451,7 @@ export function openPack(o: OpeningOptions) {
     nextBuzz = 0;
     root.classList.remove('is-waiting');
     root.classList.add('is-charging');
-    hint('');
+    hint(t.charging);
     packSfx.charge(reduced ? 0.4 : 0.9);
   }
 
@@ -470,10 +470,10 @@ export function openPack(o: OpeningOptions) {
     const gap = overlap ? -w * overlap : Math.max(12, vw * 0.02);
     const total = n * w + (n - 1) * gap;
     const mid = (n - 1) / 2;
-    // The showpiece takes the middle, a size up.
+    // The showpiece takes the middle, a size up; the block of title, cards, names and buttons sits mid-screen.
     haulAt = haulOrder.map((c, i) => {
       const k = c === showpiece ? 1.12 : 1;
-      return { x: vw / 2 - total / 2 + w / 2 + i * (w + gap), y: vh * 0.42 + Math.abs(i - mid) * h * 0.05, w: w * k, h: h * k, rz: (i - mid) * 0.05 };
+      return { x: vw / 2 - total / 2 + w / 2 + i * (w + gap), y: vh * 0.5 - (vw < 600 ? 0 : 30) + Math.abs(i - mid) * h * 0.05, w: w * k, h: h * k, rz: (i - mid) * 0.05 };
     });
   };
   let hoverHaul = -1;
@@ -974,8 +974,13 @@ export function openPack(o: OpeningOptions) {
         edition: c.shader,
         intensity: o.intensity,
         pixel: 0,
-        tilt: sweep >= 0 ? [-1.2 + sweep * 2.4, -0.6 + sweep * 1.2] : [Math.sin(time * 0.6 + i) * 0.6 * idle + (lean + rock) * 3 + (c.x.x - cx) / vw, Math.cos(time * 0.5 + i) * 0.5 * idle],
-        light: sweep >= 0 ? [-0.2 + sweep * 1.4, 0.2 + sweep * 0.4] : [0.5 - (lean + rock) * 1.4, 0.35],
+        tilt:
+          sweep >= 0
+            ? [-1.2 + sweep * 2.4, -0.6 + sweep * 1.2]
+            : rock
+              ? [Math.sin(time * 1.3) * 1.1 + lean * 3, Math.cos(time * 0.9) * 0.5]
+              : [Math.sin(time * 0.6 + i) * 0.6 * idle + lean * 3 + (c.x.x - cx) / vw, Math.cos(time * 0.5 + i) * 0.5 * idle],
+        light: sweep >= 0 ? [-0.2 + sweep * 1.4, 0.2 + sweep * 0.4] : rock ? [0.5 - Math.sin(time * 1.3) * 0.45, 0.3] : [0.5 - lean * 1.4, 0.35],
         alpha: c.alpha,
         flash: c.flash,
         shadow: [8 + (s - 1) * 40, 12 + (s - 1) * 60],
@@ -1084,8 +1089,12 @@ export function openPack(o: OpeningOptions) {
         el.style.width = `${(a.w + 12).toFixed(0)}px`;
         el.classList.toggle('is-hot', i === hoverHaul);
       });
-      const below = Math.max(...haulAt.map((a) => a.y + a.h / 2));
-      $('.pk-haul').style.setProperty('--below', `${below.toFixed(0)}px`);
+      // The title sits just above the cards and the buttons just under the names: one block.
+      const above = Math.min(...haulAt.map((a) => a.y - a.h / 2));
+      const after = Math.max(...[...names].map((el) => el.offsetTop + el.scrollHeight + 8));
+      const haulEl = $('.pk-haul');
+      haulEl.style.setProperty('--above', `${above.toFixed(0)}px`);
+      haulEl.style.setProperty('--after', `${Math.min(after, vh - 80).toFixed(0)}px`);
     }
   }
 

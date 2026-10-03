@@ -947,6 +947,17 @@ button {
   box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge), 0 0 0 5px color-mix(in srgb, var(--c) 70%, transparent);
 }
 
+.pk-chip:not([data-state='sealed']) small::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 9px;
+  margin-right: 4px;
+  border-radius: 1px;
+  background: currentColor;
+  vertical-align: -1px;
+}
+
 .pk-chip[data-state='active'] small {
   background: var(--paper-ink);
   color: var(--paper);
