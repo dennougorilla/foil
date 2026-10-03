@@ -10,6 +10,8 @@ export interface Anim {
 /** Keeps every decoded frame in memory, so cap the total pixel budget (~120 MB of RGBA). */
 const PIXEL_BUDGET = 30_000_000;
 const MAX_FRAMES = 180;
+/** Decompression expands every frame to RGBA at once, so cap the raw patch pixels (~400 MB) before it runs. */
+const RAW_PIXEL_BUDGET = 100_000_000;
 
 /**
  * Decodes an animated GIF into fully composited frames.
@@ -17,7 +19,18 @@ const MAX_FRAMES = 180;
  */
 export function decodeGif(buf: ArrayBuffer): Anim | null {
   const gif = parseGIF(buf);
-  const raw = decompressFrames(gif, true).slice(0, MAX_FRAMES);
+  // Keep only the frames we will use, and stop early on huge GIFs, before anything is decompressed.
+  const images = gif.frames.filter((f) => 'image' in f);
+  let px = 0;
+  let n = 0;
+  for (const f of images) {
+    const { width, height } = f.image.descriptor;
+    px += width * height;
+    if (n >= MAX_FRAMES || (n >= 2 && px > RAW_PIXEL_BUDGET)) break;
+    n++;
+  }
+  gif.frames = images.slice(0, n);
+  const raw = decompressFrames(gif, true);
   if (raw.length < 2) return null;
 
   const W = gif.lsd.width;

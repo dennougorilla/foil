@@ -608,10 +608,13 @@ function exportInput() {
 
 /** Lets GIF and video exports step through the person's animated GIF frame by frame. */
 function animatedExport(anim: Anim) {
+  // Settings are fixed when the export starts, so edits made meanwhile don't change it midway.
+  const spec = faceSpec(anim.frames[0]);
+  const crop = { ...spec.crop };
   return {
     loopMs: anim.duration,
     faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) =>
-      drawFace(f, m, faceSpec(anim.frames[frameAt(anim, ms)])),
+      drawFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] }),
   };
 }
 
@@ -624,7 +627,6 @@ async function busy(
 ) {
   const b = btn.querySelector('b')!;
   const small = btn.querySelector('small')!;
-  const prev = [b.textContent, small.textContent];
   // One export at a time: the other buttons rest while this one works.
   const all = [...document.querySelectorAll<HTMLButtonElement>('.export .btn')];
   all.forEach((x) => (x.disabled = true));
@@ -646,7 +648,8 @@ async function busy(
     all.forEach((x) => (x.disabled = false));
     btn.removeAttribute('aria-busy');
     btn.style.removeProperty('--p');
-    [b.textContent, small.textContent] = prev;
+    // From the current dictionary, in case the language changed mid-export.
+    for (const el of [b, small]) el.textContent = t[el.dataset.t as keyof Dict] as string;
   }
 }
 

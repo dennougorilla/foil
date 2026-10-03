@@ -213,17 +213,21 @@ export async function exportGif(
   result.catch(() => {});
 
   const scene = createScene(input, GIF_W, GIF_H, true);
-  // An animated source sets the loop length (within reason) so its motion and the orbit repeat together.
-  const loopMs = input.loopMs ? Math.min(Math.max(input.loopMs, 1200), 6000) : GIF_FRAMES * GIF_DELAY;
+  // An animated source sets the loop length so its motion and the orbit repeat together: short
+  // sources play whole cycles, and long ones are sped up to fit, so the GIF always loops seamlessly.
+  const src = input.loopMs ?? 0;
+  const loopMs = src ? Math.min(src * Math.ceil(1200 / src), 6000) : GIF_FRAMES * GIF_DELAY;
   const frames = Math.round(loopMs / GIF_DELAY);
   const DUR = (frames * GIF_DELAY) / 1000;
+  // Source time covered by one GIF loop: whole cycles, or the full source when sped up.
+  const sourceSpan = src > 6000 ? src : src ? loopMs : DUR * 1000;
   try {
     for (let i = 0; i < frames; i++) {
       await nextFrame();
       const p = i / frames;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
-      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * DUR, p * DUR * 1000);
+      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * DUR, p * sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, GIF_W, GIF_H);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
