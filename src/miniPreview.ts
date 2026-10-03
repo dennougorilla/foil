@@ -103,6 +103,8 @@ export class MiniPreview {
     this.update();
   }
 
+  private raf = 0;
+
   private update() {
     const show = this.narrow.matches && this.sectionSeen && !this.cardSeen && !this.dismissed && !this.o.isPainting();
     if (show === this.shown) return;
@@ -110,9 +112,11 @@ export class MiniPreview {
     this.el.hidden = !show;
     // Keyboard focus and scrollIntoView keep controls clear of the band.
     document.documentElement.style.scrollPaddingTop = show ? `${BAND + 16}px` : '';
+    // One loop at most: cancel the pending frame on hide, start a fresh one on show.
+    cancelAnimationFrame(this.raf);
     if (show) {
       this.ensureRenderer();
-      requestAnimationFrame(this.frame);
+      this.raf = requestAnimationFrame(this.frame);
     }
   }
 
@@ -158,6 +162,6 @@ export class MiniPreview {
       },
       t,
     );
-    requestAnimationFrame(this.frame);
+    this.raf = requestAnimationFrame(this.frame);
   };
 }

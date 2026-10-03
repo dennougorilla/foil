@@ -1,4 +1,5 @@
 // State for the Foil range and custom colours. Kept apart so state.ts only needs a one-line hook.
+import { BACKDROPS } from './palette';
 
 /** Narrowest brightness band, and the brush size limits (range-texture pixels). */
 export const MIN_BAND = 0.08;
@@ -69,7 +70,7 @@ export function sanitizeRangeColors(s: RangeColorState): RangeColorState {
     brushSize: num(s.brushSize, BRUSH_MIN, BRUSH_MAX) ? s.brushSize : d.brushSize,
     brushSoft: num(s.brushSoft, 0, 1) ? s.brushSoft : d.brushSoft,
     frameColor: s.frameColor === '' || (typeof s.frameColor === 'string' && HEX.test(s.frameColor)) ? s.frameColor : d.frameColor,
-    stageColor: typeof s.stageColor === 'string' && (s.stageColor === '' || /^[a-z]+$/.test(s.stageColor) || HEX.test(s.stageColor)) ? s.stageColor : d.stageColor,
+    stageColor: s.stageColor === '' || BACKDROPS.some((b) => b.id === s.stageColor) || (typeof s.stageColor === 'string' && HEX.test(s.stageColor)) ? s.stageColor : d.stageColor,
     frameSwatches: hexList(s.frameSwatches) ? s.frameSwatches : d.frameSwatches,
     stageSwatches: hexList(s.stageSwatches) ? s.stageSwatches : d.stageSwatches,
   };
