@@ -9,7 +9,7 @@ import { setSound, sfx } from './audio';
 import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
-import { animKind, decodeAnimated } from './anim/apngDecode';
+import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -417,8 +417,13 @@ async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null 
 
 async function loadFile(file: File) {
   if (!ACCEPT.test(file.type)) {
-    toast(t.errType, true, true);
-    return;
+    // A .apng with no MIME type is still welcome if its bytes say APNG.
+    const apng = file.type ? null : await asTypedApng(file);
+    if (!apng) {
+      toast(t.errType, true, true);
+      return;
+    }
+    file = apng;
   }
   store.set({ loading: true });
   document.body.classList.add('is-loading');

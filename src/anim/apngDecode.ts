@@ -36,6 +36,16 @@ export function sniffAnimated(bytes: Uint8Array): Exclude<AnimKind, 'GIF'> | nul
   return null;
 }
 
+/**
+ * Some systems hand over a .apng file with no MIME type. If the bytes are an APNG
+ * (PNG signature plus acTL), return the same file labelled image/png; otherwise null.
+ */
+export async function asTypedApng(file: File): Promise<File | null> {
+  // acTL sits right after IHDR, so the first few KB are plenty to tell.
+  const head = new Uint8Array(await file.slice(0, 64 * 1024).arrayBuffer());
+  return sniffAnimated(head) === 'APNG' ? new File([file], file.name, { type: 'image/png' }) : null;
+}
+
 function outputSize(w: number, h: number, frames: number) {
   const k = Math.min(1, MAX_SIDE / Math.max(w, h), Math.sqrt(PIXEL_BUDGET / (w * h * frames)));
   return { outW: Math.max(1, Math.round(w * k)), outH: Math.max(1, Math.round(h * k)) };

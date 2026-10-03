@@ -6,33 +6,35 @@ import { apngPlan, exportApng } from './apngExport';
 
 const TEXT = {
   ja: {
-    title: '透過ループ',
-    sub: 'ステッカー向け・フルカラー',
+    title: 'APNG',
+    badge: '高画質',
+    sub: 'フルカラー・背景透過',
     about: 'APNG で保存します。背景が透明で、色と影がそのまま残ります。Discord・Slack では動かないので、SNS には GIF を。',
     size: '約{n}',
-    meta: 'APNG · {s}秒',
-    working: '書き出し中… {p}%',
+    meta: '{s}秒ループ',
+    working: '書き出し中…',
     frames: '{i} / {n} コマ',
     stop: '中止',
     cancelLabel: 'APNG の書き出しを中止',
     cancelled: '書き出しを中止しました',
     saved: '保存しました: {file} ({size})。',
-    note: 'Discord・Slack では動かないので、共有は GIF で。',
+    note: 'Discord・Slack では静止します。',
     error: 'APNG を書き出せませんでした。もう一度お試しください。',
   },
   en: {
-    title: 'Transparent loop',
-    sub: 'Full colour stickers',
+    title: 'APNG',
+    badge: 'HQ',
+    sub: 'Full colour, clear bg',
     about: 'Saves an APNG: transparent background, every colour and the soft shadow kept. Discord and Slack won’t play it, so share a GIF there.',
     size: '~{n}',
-    meta: 'APNG · {s}s',
-    working: 'Saving… {p}%',
+    meta: '{s}s loop',
+    working: 'Saving…',
     frames: '{i} / {n} frames',
     stop: 'Stop',
     cancelLabel: 'Stop the APNG export',
     cancelled: 'Export stopped',
     saved: 'Saved: {file} ({size}). ',
-    note: 'Discord and Slack won’t play it, so share a GIF there.',
+    note: 'It won’t move on Discord or Slack.',
     error: "Couldn't make the APNG. Please try again.",
   },
 } satisfies Record<Lang, Record<string, string>>;
@@ -67,6 +69,7 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
     const size = fill(t.size, { n: formatBytes(plan.bytes) });
     const secs = plan.delays.reduce((a, d) => a + d, 0) / 1000;
     b.textContent = t.title;
+    b.appendChild(document.createElement('i')).textContent = t.badge;
     small.textContent = t.sub;
     mb.textContent = size;
     msmall.textContent = fill(t.meta, { s: +secs.toFixed(1) });
@@ -86,10 +89,10 @@ export function mountApngExport({ btn, lang, input, toast, sfx }: ApngUiOptions)
     mb.innerHTML = '<kbd>Esc</kbd><span></span>';
     mb.lastElementChild!.textContent = t.stop;
     msmall.textContent = '';
-    // One number drives the percentage, the frame count and the strip, so they always agree.
+    // One number drives the frame count and the strip, so they always agree.
     const progress = (p: number, total: number) => {
       const cells = Math.floor(p * total);
-      b.textContent = fill(t.working, { p: Math.round((cells / total) * 100) });
+      b.textContent = t.working;
       small.textContent = fill(t.frames, { i: cells, n: total });
       btn.style.setProperty('--p', (cells / total).toFixed(4));
       btn.style.setProperty('--n', String(total));

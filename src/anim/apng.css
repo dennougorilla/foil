@@ -1,8 +1,8 @@
-/* High-quality (APNG) export: a slim full-width row under PNG / GIF / Video. It reads as the
-   step-up option, so it is quieter than the three main buttons until it is working. */
+/* High-quality (APNG) export: a slim full-width row under PNG / GIF / Video. Same raised,
+   pressable build as its neighbours, in the panel's own colour so the three main ones still lead. */
 
 .export .btn-hq {
-  --c: var(--panel-hi);
+  --c: #3d5259;
   --lo: var(--edge);
   --fill: var(--green);
   grid-column: 1 / -1;
@@ -11,12 +11,43 @@
   align-items: center;
   gap: 10px;
   min-height: 40px;
+  position: relative;
+  overflow: hidden;
   padding: 3px 12px 3px 7px;
-  box-shadow: 0 4px 0 var(--lo), inset 0 0 0 2px rgba(63, 194, 143, 0.6);
+  background: linear-gradient(#465d65, var(--c));
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(63, 194, 143, 0.7);
+}
+
+/* A band of foil light sweeps across once on hover, the same sheen the cards wear. */
+.export .btn-hq::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.22) 43%,
+    rgba(242, 193, 78, 0.5) 50%,
+    rgba(125, 255, 198, 0.3) 57%,
+    transparent 68%
+  ) 0 0 / 250% 100% no-repeat;
+  mix-blend-mode: screen;
+  background-position: 100% 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.export .btn-hq:not([aria-busy]):hover::before {
+  animation: hq-glint 0.9s var(--ease-out) forwards;
+}
+
+@keyframes hq-glint {
+  from { background-position: 100% 0; opacity: 1; }
+  to { background-position: 0 0; opacity: 1; }
 }
 
 .export .btn-hq:active {
-  transform: translateY(4px);
+  transform: translateY(5px);
 }
 
 /* The tag is a tiny card on a pixel checkerboard: the usual sign for "stays transparent". */
@@ -40,10 +71,15 @@
   transition: transform 0.2s var(--ease-back);
 }
 
-/* Hover and focus: the edge lights up and the little clear card tips, like the thumbnails do. */
-.export .btn-hq:not([aria-busy]):hover,
-.export .btn-hq:not([aria-busy]):focus-visible {
-  box-shadow: 0 4px 0 var(--lo), inset 0 0 0 2px var(--green);
+/* Hover: the edge lights up and the little clear card tips, like the thumbnails do. */
+.export .btn-hq:not([aria-busy]):hover {
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px var(--green);
+}
+
+/* Keyboard focus: the gold ring alone marks it, so the green edge steps aside instead of doubling up. */
+.export .btn-hq:focus-visible,
+.export .btn-hq:focus-visible:hover {
+  box-shadow: 0 5px 0 var(--lo);
 }
 
 .export .btn-hq:not([aria-busy]):hover .hq-tag::before,
@@ -62,8 +98,23 @@
   font-size: 16px;
 }
 
-.export .btn-hq .btn-text small {
+/* What "high quality" buys, in one word, next to the format name. */
+.export .btn-hq .btn-text b i {
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-style: normal;
   font-size: 12px;
+  line-height: 16px;
+  vertical-align: 2px;
+  color: var(--paper-ink);
+  background: var(--gold);
+  text-shadow: none;
+}
+
+.export .btn-hq .btn-text small {
+  font-size: 13px;
+  opacity: 1;
 }
 
 .hq-meta {
@@ -76,21 +127,21 @@
 
 .hq-meta b {
   font-weight: 400;
-  font-size: 16px;
-  color: var(--green);
+  font-size: 18px;
+  color: color-mix(in srgb, var(--green) 55%, #fff);
   text-shadow: 0 2px 0 var(--edge);
 }
 
 .hq-meta small {
-  font-size: 12px;
-  color: var(--text-dim);
+  font-size: 13px;
+  color: var(--text);
 }
 
 /* Working: the face stays dark so every word reads, and a strip of cells, one per frame of the
    loop, fills under the label like frames coming off a reel. */
 .export .btn-hq[aria-busy] {
   background: var(--panel-lo);
-  box-shadow: 0 4px 0 var(--lo), inset 0 0 0 2px var(--green);
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px var(--green);
 }
 
 .export .btn-hq .btn-text::after {
@@ -162,5 +213,11 @@
 @media (prefers-reduced-motion: reduce) {
   .hq-tag::before {
     transition: none;
+  }
+  .export .btn-hq:not([aria-busy]):hover::before {
+    animation: none;
+  }
+  .export .btn-hq:not([aria-busy]):hover .hq-tag::before {
+    transform: none;
   }
 }
