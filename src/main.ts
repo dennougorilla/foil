@@ -702,6 +702,8 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
   void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
 });
 
+// Before the APNG tile: its first refresh already reads the export input, which includes the range.
+const rangeColors = initRangeColors({ store, stage, t: () => t, announce, redrawFace, rebuildFrames: buildSegments });
 const apngExport = mountApngExport({
   btn: $<HTMLButtonElement>('apngBtn'),
   lang: () => store.get().lang,
@@ -847,7 +849,6 @@ store.on((s, changed) => {
 
 // ---------- Boot ----------
 
-const rangeColors = initRangeColors({ store, stage, t: () => t, announce, redrawFace, rebuildFrames: buildSegments });
 setSound(store.get().sound);
 mountLettering({
   store,

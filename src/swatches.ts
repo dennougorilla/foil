@@ -220,7 +220,8 @@ export function initSwatches(host: SwatchHost) {
   const bdField = document.createElement('div');
   bdField.className = 'field field-backdrop';
   bdField.innerHTML = '<span class="field-label" id="backdropLabel"></span><div class="sw-strip sw-strip-stage" role="radiogroup" aria-labelledby="backdropLabel"></div>';
-  document.getElementById('frameSeg')!.closest('.field')!.after(bdField);
+  // After Pixelate, so frame, strength and pixelation stay together at the top of Tune.
+  document.getElementById('pixel')!.closest('.row')!.after(bdField);
   const bdGroup = bdField.querySelector<HTMLElement>('.sw-strip')!;
   bdGroup.addEventListener('keydown', (e) => {
     const items = [...bdGroup.querySelectorAll<HTMLElement>('[role=radio]')];
