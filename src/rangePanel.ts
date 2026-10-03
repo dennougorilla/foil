@@ -132,7 +132,7 @@ export function initRangePanel(host: RangeHost) {
     <div class="range-cover">
       <p class="cover-head" aria-live="polite"><span data-r="coverLabel"></span><b class="cover-val"></b></p>
       <i class="cover-bar" aria-hidden="true"><i></i></i>
-      <p class="cover-empty" hidden><span data-r="rangeNone"></span> <button class="link cover-fix" type="button"></button></p>
+      <p class="cover-empty" hidden><span></span> <button class="link cover-fix" type="button"></button></p>
       <p class="legend" aria-hidden="true"><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
     </div>
   `;
@@ -513,9 +513,11 @@ export function initRangePanel(host: RangeHost) {
       const f = model.coverage(s);
       const n = Math.round(f * 100);
       const none = f <= 0.0005;
+      const few = f < 0.02;
       q('.cover-val').textContent = none ? '0%' : n < 1 ? t.rangeTiny : `${n}%`;
-      cover.classList.toggle('is-none', none);
-      q('.cover-empty').hidden = !none;
+      cover.classList.toggle('is-none', few);
+      q('.cover-empty').hidden = !few;
+      q('.cover-empty > span').textContent = none ? t.rangeNone : t.rangeFew;
       // Offer the one change most likely to bring the finish back.
       q('.cover-fix').textContent = s.rangeInvert ? t.fixInvert : s.rangeRegion === 'none' ? t.fixPaint : t.fixTone;
       drawHistogram(model.histogram());
@@ -529,10 +531,18 @@ export function initRangePanel(host: RangeHost) {
     const x = hist.getContext('2d')!;
     x.clearRect(0, 0, hist.width, hist.height);
     const w = hist.width / h.length;
-    x.fillStyle = 'rgba(242, 193, 78, 0.85)';
+    // A stepped skyline: a faint baseline, then solid columns with a brighter cap.
+    x.fillStyle = 'rgba(242, 193, 78, 0.25)';
+    x.fillRect(0, hist.height - 1, hist.width, 1);
     h.forEach((v, i) => {
-      const bh = Math.round(Math.sqrt(v) * hist.height);
-      if (bh) x.fillRect(Math.round(i * w), hist.height - bh, Math.ceil(w) - 1, bh);
+      const bh = Math.max(v > 0 ? 2 : 0, Math.round(Math.sqrt(v) * hist.height));
+      if (!bh) return;
+      const x0 = Math.round(i * w);
+      const x1 = Math.round((i + 1) * w);
+      x.fillStyle = 'rgba(242, 193, 78, 0.7)';
+      x.fillRect(x0, hist.height - bh, x1 - x0, bh);
+      x.fillStyle = '#ffe9a8';
+      x.fillRect(x0, hist.height - bh, x1 - x0, 1);
     });
   }
 
@@ -553,12 +563,17 @@ export function initRangePanel(host: RangeHost) {
     tone.classList.toggle('is-full', s.rangeLo <= 0 && s.rangeHi >= 1);
     regionSeg.classList.toggle('is-invert', s.rangeInvert);
     const tt = host.t();
-    q('.region-hint').textContent = s.rangeInvert ? tt.invertHint.replace('{x}', tt.region[s.rangeRegion]) : tt.regionHint[s.rangeRegion];
+    // Invert flips region and brightness together, so name both when the band is narrowed.
+    const narrowed = s.rangeLo > 0 || s.rangeHi < 1;
+    const what = narrowed
+      ? tt.toneAt.replace('{r}', tt.region[s.rangeRegion]).replace('{lo}', String(Math.round(s.rangeLo * 100))).replace('{hi}', String(Math.round(s.rangeHi * 100)))
+      : tt.region[s.rangeRegion];
+    q('.region-hint').textContent = s.rangeInvert ? tt.invertHint.replace('{x}', what) : tt.regionHint[s.rangeRegion];
     q('.where-tag').hidden = !model.painted;
     paintBtn.querySelector('b')!.textContent = painting ? host.t().paintActive : host.t().paint;
     paintBtn.querySelector('small')!.textContent = painting ? host.t().paintActiveSub : host.t().paintSub;
     const pct = (v: number) => `${Math.round(v * 100)}%`;
-    toneOut.textContent = `${pct(s.rangeLo)}–${pct(s.rangeHi)}`;
+    toneOut.textContent = `${Math.round(s.rangeLo * 100)}${s.lang === 'ja' ? '〜' : '–'}${pct(s.rangeHi)}`;
     lo.setAttribute('aria-valuetext', pct(s.rangeLo));
     hi.setAttribute('aria-valuetext', pct(s.rangeHi));
     tonePresets.querySelectorAll<HTMLButtonElement>('.tone-chip').forEach((c) => {

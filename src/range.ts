@@ -164,8 +164,10 @@ export class RangeModel {
   histogram(bins = 40): number[] {
     const h = new Array<number>(bins).fill(0);
     for (let i = 0; i < N; i++) if (this.body[i]) h[Math.min(bins - 1, Math.floor((this.luma[i] / 256) * bins))]++;
-    const max = Math.max(1, ...h);
-    return h.map((v) => v / max);
+    // A light blur keeps pixel art (few exact tones) from reading as a comb of isolated spikes.
+    const soft = h.map((v, i) => (h[i - 1] ?? v) * 0.25 + v * 0.5 + (h[i + 1] ?? v) * 0.25);
+    const max = Math.max(1, ...soft);
+    return soft.map((v) => v / max);
   }
 
   get painted(): boolean {

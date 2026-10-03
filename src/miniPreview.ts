@@ -1,5 +1,5 @@
 // On phones the Finish area controls sit far below the card. While they are on screen and the card is not,
-// a small live copy of the card floats in the corner so every change can be seen as it happens.
+// a slim band across the top carries a small live copy of the card, so every change can be seen as it happens.
 import { CardRenderer } from './gl/renderers';
 import { editionById } from './editions';
 import type { RangeSnapshot } from './gl/range';
@@ -7,8 +7,10 @@ import type { Dict } from './i18n';
 import type { Store } from './state';
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
-const W = 104;
+const W = 72;
 const H = Math.round((W * 7) / 5);
+/** Height of the band, kept free at the top when the page scrolls a control into view. */
+const BAND = H + 20;
 
 export interface MiniPreviewOptions {
   store: Store;
@@ -29,18 +31,24 @@ export class MiniPreview {
   private shown = false;
   private narrow = matchMedia('(max-width: 900px)');
   private t0 = performance.now();
+  private dict: Dict | null = null;
 
   constructor(private o: MiniPreviewOptions) {
     this.el = document.createElement('div');
     this.el.className = 'mini';
     this.el.hidden = true;
     this.el.innerHTML = `
-      <button class="mini-card" type="button"><canvas width="${W * 2}" height="${H * 2}"></canvas></button>
-      <p class="mini-label"><span></span><button class="mini-hide" type="button">
+      <canvas class="mini-canvas" width="${W * 2}" height="${H * 2}" aria-hidden="true"></canvas>
+      <div class="mini-text">
+        <p class="mini-label"></p>
+        <p class="mini-finish"></p>
+        <button class="mini-jump link" type="button"></button>
+      </div>
+      <button class="mini-hide" type="button">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2H3zm2 2h2v2H5zm2 2h2v2H7zm2 2h2v2H9zm2 2h2v2h-2zM11 3h2v2h-2zM9 5h2v2H9zM5 9h2v2H5zM3 11h2v2H3z" /></svg>
-      </button></p>`;
+      </button>`;
     document.body.appendChild(this.el);
-    this.el.querySelector('.mini-card')!.addEventListener('click', () => {
+    this.el.querySelector('.mini-jump')!.addEventListener('click', () => {
       o.card.scrollIntoView({ block: 'center', behavior: o.reduced.matches ? 'auto' : 'smooth' });
     });
     this.el.querySelector('.mini-hide')!.addEventListener('click', () => {
@@ -52,20 +60,29 @@ export class MiniPreview {
         set(es[0].isIntersecting);
         this.update();
       }, { threshold }).observe(target);
-    watch(o.section, (v) => (this.sectionSeen = v), 0);
+    watch(o.section, (v) => {
+      this.sectionSeen = v;
+      // Closing it only lasts until the section is left; coming back offers it again.
+      if (!v) this.dismissed = false;
+    }, 0);
     // The card counts as visible only when most of it is on screen.
     watch(o.card, (v) => (this.cardSeen = v), 0.6);
     this.narrow.addEventListener('change', () => this.update());
+    o.store.on((_s, changed) => changed.has('edition') && this.label());
   }
 
   applyText(t: Dict) {
-    this.el.querySelector('.mini-label span')!.textContent = t.preview;
-    const card = this.el.querySelector('.mini-card')!;
-    card.setAttribute('aria-label', t.previewJump);
-    card.setAttribute('title', t.previewJump);
+    this.dict = t;
+    this.el.querySelector('.mini-label')!.textContent = t.preview;
+    this.el.querySelector('.mini-jump')!.textContent = t.previewJump;
     const hide = this.el.querySelector('.mini-hide')!;
     hide.setAttribute('aria-label', t.previewHide);
     hide.setAttribute('title', t.previewHide);
+    this.label();
+  }
+
+  private label() {
+    if (this.dict) this.el.querySelector('.mini-finish')!.textContent = this.dict.edition[this.o.store.get().edition];
   }
 
   setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement) {
@@ -78,6 +95,7 @@ export class MiniPreview {
     this.renderer?.range.set(s);
   }
 
+  /** Re-checks visibility, e.g. when brush mode starts or ends. */
   hide() {
     this.update();
   }
@@ -87,6 +105,8 @@ export class MiniPreview {
     if (show === this.shown) return;
     this.shown = show;
     this.el.hidden = !show;
+    // Keyboard focus and scrollIntoView keep controls clear of the band.
+    document.documentElement.style.scrollPaddingTop = show ? `${BAND + 16}px` : '';
     if (show) {
       this.ensureRenderer();
       requestAnimationFrame(this.frame);
@@ -99,7 +119,6 @@ export class MiniPreview {
     this.renderer = new CardRenderer(this.el.querySelector('canvas')!);
     if (this.face) this.renderer.setFace(this.face.face, this.face.mask);
     if (this.range) this.renderer.range.set(this.range);
-    this.renderer.range.motion = !this.o.reduced.matches;
   }
 
   private frame = (now: number) => {
@@ -117,8 +136,8 @@ export class MiniPreview {
       {
         cx: W / 2,
         cy: H / 2,
-        w: W - 8,
-        h: H - 8 * 1.4,
+        w: W - 6,
+        h: H - 6 * 1.4,
         rx,
         ry,
         rz: 0,

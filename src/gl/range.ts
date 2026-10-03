@@ -25,17 +25,20 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   // travelling sheen, and the edge is a gold die line with a glint running along it.
   vec2 cell = floor(uv * vec2(110.0, 154.0));
   float checker = mod(cell.x + cell.y, 2.0);
-  vec3 paper = mix(vec3(luma(col)), vec3(0.95, 0.93, 0.87), 0.45) * mix(0.62, 0.52, checker);
+  float grain = vnoise(uv * vec2(260.0, 30.0)) * 0.6 + vnoise(uv * vec2(40.0, 360.0)) * 0.4;
+  vec3 paper = mix(vec3(luma(col)), vec3(0.95, 0.93, 0.87), 0.5) * (mix(0.6, 0.53, checker) + (grain - 0.5) * 0.08);
   vec3 o = mix(col, paper, (1.0 - sel) * 0.92);
   float diag = uv.x * 0.714 + uv.y;
   float sweep = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(diag * 7.0 - uRangeAnts * 1.3));
   o += hsv2rgb(vec3(fract(diag * 0.8 + uRangeAnts * 0.05), 0.55, 1.0)) * sweep * 0.22 * sel;
   float w = max(fwidth(sel), 1e-4);
   float edge = 1.0 - smoothstep(0.8, 1.9, abs(sel - 0.5) / w);
-  float dash = step(0.35, fract(diag * 34.0));
+  // A solid gold die line on a dark keyline, with a glint that runs along it.
+  float keyline = 1.0 - smoothstep(1.6, 2.8, abs(sel - 0.5) / w);
   float glint = smoothstep(0.9, 1.0, 0.5 + 0.5 * sin(diag * 5.0 - uRangeAnts * 2.2));
-  vec3 die = mix(vec3(0.95, 0.76, 0.31), vec3(1.0), glint);
-  o = mix(o, mix(vec3(0.07, 0.1, 0.11), die, dash), edge);
+  vec3 die = mix(vec3(0.95, 0.76, 0.31), vec3(1.0, 0.97, 0.85), glint);
+  o = mix(o, vec3(0.07, 0.1, 0.11), keyline * 0.85);
+  o = mix(o, die, edge);
   return mix(col, o, uRangeView);
 }
 `;

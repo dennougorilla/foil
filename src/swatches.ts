@@ -194,6 +194,12 @@ export function initSwatches(host: SwatchHost) {
     });
     const strip = document.createElement('div');
     strip.className = 'sw-strip sw-strip-frame';
+    if (s.frameSwatches.length) {
+      const label = document.createElement('span');
+      label.className = 'sw-label';
+      label.textContent = host.t().myColors;
+      strip.appendChild(label);
+    }
     for (const hex of s.frameSwatches) strip.appendChild(chip(FRAME, hex, 'sw-frame', `--sw:${hex}`));
     strip.appendChild(addButton(FRAME, !s.frameSwatches.length));
     fs.appendChild(strip);
