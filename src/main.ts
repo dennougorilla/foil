@@ -1012,6 +1012,7 @@ const rangeColors = initRangeColors({
 const apngExport = mountApngExport({
   btn: saveBtn,
   active: () => store.get().exportFormat === 'apng',
+  loading: () => store.get().loading,
   lang: () => store.get().lang,
   input: exportInput,
   toast: (msg, error) => toast(msg, error),

@@ -51,6 +51,8 @@ export interface ApngUiOptions {
   /** The panel's Save button; this module drives it only while APNG is the chosen format. */
   btn: HTMLButtonElement;
   active: () => boolean;
+  /** A picture is still loading: no new export starts, and Save rests once this one ends. */
+  loading: () => boolean;
   lang: () => Lang;
   input: () => ExportInput;
   toast: (msg: string, error?: boolean) => void;
@@ -59,7 +61,7 @@ export interface ApngUiOptions {
   sfx: { coin(): void; error(): void; tick(): void };
 }
 
-export function mountApngExport({ btn, active, lang, input, toast, onSaved, sfx }: ApngUiOptions) {
+export function mountApngExport({ btn, active, loading, lang, input, toast, onSaved, sfx }: ApngUiOptions) {
   const [label, meta] = btn.querySelectorAll<HTMLElement>('.btn-text, .save-meta');
   const [b, small] = [label.querySelector('b')!, label.querySelector('small')!];
   const [mb, msmall] = [meta.querySelector('b')!, meta.querySelector('small')!];
@@ -126,6 +128,7 @@ export function mountApngExport({ btn, active, lang, input, toast, onSaved, sfx 
       job = null;
       others().forEach((x) => (x.disabled = false));
       btn.removeAttribute('aria-busy');
+      btn.disabled = loading();
       btn.style.removeProperty('--p');
       btn.style.removeProperty('--n');
       btn.removeAttribute('aria-label');
@@ -151,7 +154,7 @@ export function mountApngExport({ btn, active, lang, input, toast, onSaved, sfx 
     if (job) {
       sfx.tick();
       job.abort();
-    } else void run();
+    } else if (!loading()) void run();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && job) job.abort();
