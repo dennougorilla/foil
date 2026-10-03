@@ -1389,3 +1389,149 @@
     letter-spacing: -0.04em;
   }
 }
+
+/* ---------- Finishing pass ---------- */
+
+/* Handles travel exactly over the track, so at 0% and 100% they stay inside the window. */
+.tone input[type='range'] {
+  left: 4px;
+  right: 4px;
+}
+
+.tone .tone-lo::-webkit-slider-thumb,
+.tone .tone-hi::-webkit-slider-thumb {
+  translate: 0 0;
+}
+
+.tone .tone-lo::-moz-range-thumb,
+.tone .tone-hi::-moz-range-thumb {
+  translate: 0 0;
+}
+
+/* Keyboard focus: the handle grows, turns gold and gets a white-and-ink ring the gold window can't swallow. */
+.tone input[type='range']:focus-visible::-webkit-slider-thumb {
+  scale: 1.18;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 8px var(--edge);
+}
+
+.tone input[type='range']:focus-visible::-moz-range-thumb {
+  scale: 1.18;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 8px var(--edge);
+}
+
+/* Brush strokes make the area custom: the chosen preset shows as the base, outlined with a tab. */
+.where-tag {
+  padding: 0 7px;
+  border-radius: 4px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 20px;
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.seg-region.is-custom .region-btn[aria-checked='true'] {
+  background: var(--panel-lo);
+  color: var(--gold);
+  box-shadow: inset 0 0 0 2px var(--gold), 0 4px 0 var(--edge);
+}
+
+.seg-region.is-custom .region-btn[aria-checked='true'] .rgn .on {
+  fill: var(--gold);
+}
+
+.seg-region.is-custom .region-btn[aria-checked='true'] .rgn .off,
+.seg-region.is-custom .region-btn[aria-checked='true'] .rgn .line {
+  stroke: var(--gold);
+}
+
+.seg-region.is-custom .region-btn[aria-checked='true']::after {
+  content: attr(data-base);
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 16px;
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.legend b {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+/* Backdrop: a clear divider between presets and saved colours. */
+.sw-sep,
+.sw-strip-stage .sw-sep {
+  width: 3px;
+  height: 28px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background: var(--text-dim);
+  opacity: 0.55;
+}
+
+.field-backdrop {
+  container-type: inline-size;
+}
+
+@container (max-width: 340px) {
+  .sw-strip-stage {
+    gap: 8px 6px;
+  }
+  .sw-strip-stage .sw-chip:not(.sw-auto),
+  .sw-strip-stage .sw-add {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* The brush box wears the card tag's look: a paper nameplate on a dark body, with a pixel drop shadow. */
+.brush-box {
+  background: var(--panel-lo);
+  box-shadow:
+    0 0 0 3px var(--edge),
+    inset 0 0 0 2px var(--panel-hi),
+    0 8px 0 3px rgba(0, 0, 0, 0.45);
+}
+
+.brush-title {
+  margin: -6px -6px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  text-shadow: none;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), 0 0 0 2px var(--edge);
+}
+
+/* Coverage: a chunky game meter, foil segments on proof paper. */
+.cover-bar {
+  position: relative;
+  height: 16px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px var(--edge), 0 4px 0 3px rgba(0, 0, 0, 0.35);
+}
+
+.cover-bar i {
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.cover-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 10px, rgba(13, 19, 21, 0.55) 10px 12px);
+  pointer-events: none;
+}
+
+.range-cover {
+  gap: 8px;
+}

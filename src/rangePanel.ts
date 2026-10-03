@@ -134,7 +134,7 @@ export function initRangePanel(host: RangeHost) {
       <p class="cover-head" aria-live="polite"><span data-r="coverLabel"></span><b class="cover-val"></b></p>
       <i class="cover-bar" aria-hidden="true"><i></i></i>
       <p class="cover-empty" hidden><span></span> <button class="link cover-fix" type="button"></button></p>
-      <p class="legend" aria-hidden="true"><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
+      <p class="legend" aria-hidden="true"><b data-r="legendTitle"></b><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
     </div>
   `;
   const panel = document.getElementById('panel')!;
@@ -596,13 +596,20 @@ export function initRangePanel(host: RangeHost) {
     tone.classList.toggle('is-invert', s.rangeInvert);
     tone.classList.toggle('is-full', s.rangeLo <= 0 && s.rangeHi >= 1);
     regionSeg.classList.toggle('is-invert', s.rangeInvert);
+    // Brush strokes make the area custom: the chosen preset becomes its base, and the panel says so.
+    const custom = model.painted;
+    regionSeg.classList.toggle('is-custom', custom && !s.rangeInvert);
     const tt = host.t();
     // Invert flips region and brightness together, so name both when the band is narrowed.
     const narrowed = s.rangeLo > 0 || s.rangeHi < 1;
     const what = narrowed
       ? tt.toneAt.replace('{r}', tt.region[s.rangeRegion]).replace('{lo}', String(Math.round(s.rangeLo * 100))).replace('{hi}', String(Math.round(s.rangeHi * 100)))
       : tt.regionQ.replace('{r}', tt.region[s.rangeRegion]);
-    q('.region-hint').textContent = s.rangeInvert ? tt.invertHint.replace('{x}', what) : tt.regionHint[s.rangeRegion];
+    q('.region-hint').textContent = s.rangeInvert
+      ? tt.invertHint.replace('{x}', what)
+      : custom
+        ? tt.customHint.replace('{r}', tt.region[s.rangeRegion])
+        : tt.regionHint[s.rangeRegion];
     q('.where-tag').hidden = !model.painted;
     paintBtn.querySelector('b')!.textContent = painting ? host.t().paintActive : host.t().paint;
     paintBtn.querySelector('small')!.textContent = painting ? host.t().paintActiveSub : host.t().paintSub;
@@ -633,8 +640,8 @@ export function initRangePanel(host: RangeHost) {
     softOut.style.setProperty('--blur', `${(s.brushSoft * 5).toFixed(1)}px`);
     softOut.title = pct(s.brushSoft);
     soft.setAttribute('aria-valuetext', pct(s.brushSoft));
-    const custom = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
-    q<HTMLButtonElement>('.range-reset').hidden = !custom;
+    const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
+    q<HTMLButtonElement>('.range-reset').hidden = !changed;
   }
 
   function applyText() {
@@ -656,7 +663,10 @@ export function initRangePanel(host: RangeHost) {
       item.append(` ${label}`);
       keys.appendChild(item);
     }
-    regionSeg.querySelectorAll<HTMLElement>('[role=radio]').forEach((b) => (b.dataset.except = t.invertBadge));
+    regionSeg.querySelectorAll<HTMLElement>('[role=radio]').forEach((b) => {
+      b.dataset.except = t.invertBadge;
+      b.dataset.base = t.baseBadge;
+    });
     preview.applyText(t);
     lo.setAttribute('aria-label', t.rangeLo);
     hi.setAttribute('aria-label', t.rangeHi);

@@ -273,8 +273,9 @@ export function initSwatches(host: SwatchHost) {
     sep.className = 'sw-sep';
     sep.setAttribute('aria-hidden', 'true');
     bdGroup.appendChild(sep);
-    for (const hex of s.stageSwatches) bdGroup.appendChild(chip(STAGE, hex, 'sw-stage', swirlVars(swirlFrom(hex))));
+    // "+" sits right after the presets, so a long row wraps saved colours, never the button on its own.
     bdGroup.appendChild(addButton(STAGE, false));
+    for (const hex of s.stageSwatches) bdGroup.appendChild(chip(STAGE, hex, 'sw-stage', swirlVars(swirlFrom(hex))));
     // Previewing an unsaved colour: keep one radio reachable by Tab.
     if (!bdGroup.querySelector('[role=radio][tabindex="0"]')) auto.tabIndex = 0;
   }

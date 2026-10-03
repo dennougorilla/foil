@@ -28,7 +28,8 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   float grain = vnoise(uv * vec2(260.0, 30.0)) * 0.6 + vnoise(uv * vec2(40.0, 360.0)) * 0.4;
   // Cream stock with the picture printed faintly in ink: a blind proof, not a greyed-out mask.
   vec3 stock = vec3(0.93, 0.9, 0.82) * (0.96 + (grain - 0.5) * 0.1 - checker * 0.035);
-  vec3 paper = mix(stock, stock * vec3(0.36, 0.38, 0.42), 1.0 - luma(col));
+  // Light ink, so anything left out (by area, brightness or the eraser) reads as the same cream stock.
+  vec3 paper = mix(stock, stock * vec3(0.42, 0.44, 0.48), (1.0 - luma(col)) * 0.6);
   vec3 o = mix(col, paper, (1.0 - sel) * 0.92);
   float diag = uv.x * 0.714 + uv.y;
   float sweep = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(diag * 7.0 - uRangeAnts * 1.3));
@@ -41,15 +42,21 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   vec3 die = mix(vec3(0.95, 0.76, 0.31), vec3(1.0, 0.97, 0.85), glint);
   o = mix(o, vec3(0.07, 0.1, 0.11), keyline * 0.85);
   o = mix(o, die, edge);
-  // Registration marks in the corners, as on a printer's proof.
+  // Registration marks on the frame, where a printer puts them: middle of each side and top centre.
   vec2 q = vec2(uv.x * 0.714, uv.y);
-  for (int i = 0; i < 4; i++) {
-    vec2 c = vec2(i % 2 == 0 ? 0.045 : 0.714 - 0.045, i < 2 ? 0.032 : 0.968);
+  for (int i = 0; i < 3; i++) {
+    vec2 c = i == 0 ? vec2(0.022, 0.5) : i == 1 ? vec2(0.714 - 0.022, 0.5) : vec2(0.357, 0.022);
     vec2 d = q - c;
-    float ring = 1.0 - smoothstep(0.0015, 0.004, abs(length(d) - 0.012));
-    float cross = (1.0 - smoothstep(0.0012, 0.0035, abs(d.x))) * step(abs(d.y), 0.02)
-                + (1.0 - smoothstep(0.0012, 0.0035, abs(d.y))) * step(abs(d.x), 0.02);
-    o = mix(o, vec3(0.95, 0.76, 0.31), clamp(ring + cross, 0.0, 1.0) * 0.9);
+    float r = length(d);
+    float ring = 1.0 - smoothstep(0.0018, 0.0042, abs(r - 0.011));
+    float cross = (1.0 - smoothstep(0.0015, 0.0038, abs(d.x))) * step(abs(d.y), 0.018)
+                + (1.0 - smoothstep(0.0015, 0.0038, abs(d.y))) * step(abs(d.x), 0.018);
+    float mark = clamp(ring + cross, 0.0, 1.0);
+    float under = (1.0 - smoothstep(0.0035, 0.0065, abs(r - 0.011)))
+                + (1.0 - smoothstep(0.0035, 0.0065, abs(d.x))) * step(abs(d.y), 0.021)
+                + (1.0 - smoothstep(0.0035, 0.0065, abs(d.y))) * step(abs(d.x), 0.021);
+    o = mix(o, vec3(0.07, 0.1, 0.11), clamp(under, 0.0, 1.0) * 0.75);
+    o = mix(o, vec3(0.95, 0.76, 0.31), mark);
   }
   return mix(col, o, uRangeView);
 }
