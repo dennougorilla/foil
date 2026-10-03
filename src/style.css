@@ -923,12 +923,33 @@ button {
 
 .export {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .export .btn {
   justify-content: flex-start;
+  padding: 8px;
+  min-width: 0;
+}
+
+.export .btn-text {
+  min-width: 0;
+}
+
+.export .btn-text b {
+  font-variant-numeric: tabular-nums;
+}
+
+.export .btn-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Busy: the face of the button fills left to right as the export runs. */
+.export .btn[aria-busy] {
+  filter: none;
+  background: linear-gradient(90deg, var(--c) calc(var(--p, 0) * 100%), var(--lo) 0);
 }
 
 /* Thumbs */

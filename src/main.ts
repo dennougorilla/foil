@@ -6,7 +6,7 @@ import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face'
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
-import { exportPng, exportVideo, videoSupported } from './exporter';
+import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 
@@ -600,29 +600,55 @@ function exportInput() {
   };
 }
 
-async function busy(btn: HTMLButtonElement, label: string, job: () => Promise<void>) {
+/** While a job runs, the sub-label names the step and the title counts up; the button fills like a bar. */
+async function busy(
+  btn: HTMLButtonElement,
+  label: string,
+  job: (progress: (p: number) => void) => Promise<void>,
+  fail = t.errDecode,
+) {
   const b = btn.querySelector('b')!;
-  const prev = b.textContent;
+  const small = btn.querySelector('small')!;
+  const prev = [b.textContent, small.textContent];
   btn.disabled = true;
   btn.setAttribute('aria-busy', 'true');
-  b.textContent = label;
+  small.textContent = label;
+  const progress = (p: number) => {
+    b.textContent = `${Math.round(p * 100)}%`;
+    btn.style.setProperty('--p', p.toFixed(3));
+  };
   try {
-    await job();
+    await job(progress);
     sfx.coin();
     toast(t.saved);
   } catch (err) {
     console.error(err);
     sfx.error();
-    toast((err as Error).message === 'video-unsupported' ? t.errVideo : t.errDecode, true);
+    toast((err as Error).message === 'video-unsupported' ? t.errVideo : fail, true);
   } finally {
     btn.disabled = false;
     btn.removeAttribute('aria-busy');
-    b.textContent = prev;
+    btn.style.removeProperty('--p');
+    [b.textContent, small.textContent] = prev;
   }
 }
 
 $<HTMLButtonElement>('pngBtn').addEventListener('click', (e) => {
   void busy(e.currentTarget as HTMLButtonElement, t.saving, () => exportPng(exportInput()));
+});
+$<HTMLButtonElement>('gifBtn').addEventListener('click', (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  const small = btn.querySelector('small')!;
+  void busy(
+    btn,
+    t.saving,
+    (progress) =>
+      exportGif(exportInput(), (p, encoding) => {
+        small.textContent = encoding ? t.encoding : t.saving;
+        progress(p);
+      }),
+    t.errGif,
+  );
 });
 $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
@@ -631,12 +657,7 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
     toast(t.errVideo, true);
     return;
   }
-  const b = btn.querySelector('b')!;
-  void busy(btn, t.recording, () =>
-    exportVideo(exportInput(), (p) => {
-      b.textContent = `${t.recording} ${Math.round(p * 100)}%`;
-    }),
-  );
+  void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress));
 });
 
 // ---------- Logo ----------
