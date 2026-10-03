@@ -1,5 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { FoilTone, LetterStyle } from './lettering';
+import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
 
 export type Lang = 'ja' | 'en';
 
@@ -236,6 +237,7 @@ const ja = {
     jump: '文字の加工: {style} — クリックで変更',
     reset: '初期値に戻す',
   },
+  ...RANGE_COLOR_JA,
 };
 
 type Dict = typeof ja;
@@ -473,6 +475,7 @@ const en: Dict = {
     jump: 'Lettering: {style} — click to change',
     reset: 'Reset to default',
   },
+  ...RANGE_COLOR_EN,
 };
 
 export const DICTS: Record<Lang, Dict> = { ja, en };

@@ -3,8 +3,9 @@ import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
+import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, type RangeColorState } from './featureState';
 
-export interface State {
+export interface State extends RangeColorState {
   lang: Lang;
   sound: boolean;
   crt: boolean;
@@ -51,6 +52,7 @@ const PERSIST: (keyof State)[] = [
   'tune',
   'tuneOpen',
   'text',
+  ...RANGE_COLOR_PERSIST,
 ];
 
 
@@ -74,6 +76,7 @@ export function createStore() {
     tune: { ...TUNE_DEFAULTS },
     tuneOpen: false,
     text: { ...DEFAULT_LETTERING },
+    ...RANGE_COLOR_DEFAULTS,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;

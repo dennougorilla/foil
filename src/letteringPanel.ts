@@ -7,6 +7,7 @@ import type { Dict } from './i18n';
 import type { FrameId } from './editions';
 import { rarityById } from './editions';
 import { sfx } from './audio';
+import { customFrame, isHex, luminance } from './palette';
 import {
   DEFAULT_LETTERING,
   FOIL_RAMP,
@@ -43,7 +44,16 @@ type InkKey = 'auto' | 'none' | keyof typeof INKS | 'custom';
 const INK_KEYS: InkKey[] = ['auto', 'none', 'white', 'black', 'red', 'navy', 'custom'];
 
 /** Frame paper and ink, mirrored from card/face so the chips sit on the card's own stock. */
-function stock(frame: FrameId, rarity: Parameters<typeof rarityById>[0]): { paper: string; solid: string; ink: string } {
+function stock(
+  frame: FrameId,
+  rarity: Parameters<typeof rarityById>[0],
+  frameColor: string,
+): { paper: string; solid: string; ink: string } {
+  // A custom frame colour wins over the preset, as on the card itself.
+  if (isHex(frameColor)) {
+    const f = customFrame(frameColor);
+    return { paper: f.fill, solid: f.fill, ink: f.ink };
+  }
   switch (frame) {
     case 'ink':
       return { paper: '#252c30', solid: '#252c30', ink: '#f3eee2' };
@@ -391,7 +401,7 @@ export function mountLettering(o: Options): void {
     const l = s.text;
     const t = o.dict().lt;
     const c = STYLE_CONTROLS[l.style];
-    const { paper, solid, ink: frameInk } = stock(s.frame, s.rarity);
+    const { paper, solid, ink: frameInk } = stock(s.frame, s.rarity, s.frameColor);
     const glyph = Array.from(o.name().trim())[0]?.toLocaleUpperCase() || 'A';
     const [lo, hi] = foilRamp(l);
     const shown = letterFill(l, frameInk);
@@ -404,7 +414,7 @@ export function mountLettering(o: Options): void {
       host.style.setProperty('--lt-hi', hi);
       host.classList.toggle('is-blind', l.ink === 'none' && c.blind);
       host.classList.toggle('is-rainbow', l.foil === 'rainbow');
-      host.classList.toggle('is-dark-stock', s.frame === 'ink');
+      host.classList.toggle('is-dark-stock', isHex(s.frameColor) ? luminance(s.frameColor) <= 0.36 : s.frame === 'ink');
     }
     styleBtns.forEach((b) => {
       radio(b, b.dataset.style === l.style);
@@ -482,6 +492,6 @@ export function mountLettering(o: Options): void {
       return;
     }
     if (changed.has('lang')) labels();
-    if (['lang', 'frame', 'rarity', 'name', 'sample'].some((k) => changed.has(k as keyof typeof s))) sync();
+    if (['lang', 'frame', 'frameColor', 'rarity', 'name', 'sample'].some((k) => changed.has(k as keyof typeof s))) sync();
   });
 }
