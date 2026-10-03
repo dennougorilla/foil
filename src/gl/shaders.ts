@@ -390,6 +390,65 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   }
   return col;
 }
+
+// One rolling wave on a 0..1 phase: a broad glowing back that rises to a steep front at 0.95.
+float surgeWave(float f) {
+  return pow(f, 1.5) * smoothstep(1.0, 0.95, f);
+}
+
+vec3 surge(vec3 c, vec2 uv, vec2 t, float L) {
+  // Rainbow waves roll across the card in three overlapping sets. Each front carries a white
+  // crest that bleeds light around it, and one big swell (once every 2.4 s, so a GIF loops)
+  // lifts everything it passes to a peak. Tilting pushes the sets along and, near the limit,
+  // floods the whole card with colour.
+  vec2 p = (uv - 0.5) * vec2(1.0, 1.4);
+  // Smooth, rolling bends: the fronts swell and dip like water, never jitter like sparks.
+  float bend = sin(p.x * 2.4 + p.y * 1.1 + t.x * 1.2) * 0.32 + sin(p.x * 5.1 - p.y * 2.3 - t.y) * 0.1
+             + (vnoise(p * 2.2 + t * 0.15) - 0.5) * 0.6;
+  float loop = uTime / 2.4;
+  float flood = smoothstep(0.55, 1.05, length(t));
+  float big = surgeWave(fract(dot(p, vec2(0.55, 0.84)) * 0.62 + bend * 0.25 - (t.x + t.y) * 0.3 - loop));
+  float swell = 0.5 + 0.8 * big + 0.2 * flood;
+  vec3 light = vec3(0.0);
+  float crests = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float ang = 0.62 + fi * 0.42 + t.x * 0.2;
+    vec2 dir = vec2(cos(ang), sin(ang));
+    float s = dot(p, dir) * (1.4 + fi * 0.9) + bend * (0.7 + fi * 0.3)
+            - dot(t, vec2(0.9, 0.7)) * (0.8 + fi * 0.45) - loop - fi * 0.37;
+    float f = fract(s);
+    float body = surgeWave(f);
+    // Saturated rainbow swept along the wave's back, a different part of the spectrum per set.
+    float hue = fract(f * 0.5 + fi * 0.31 + dot(p, vec2(0.25, -0.18)) + t.y * 0.25);
+    vec3 tint = hsv2rgb(vec3(hue, 1.0, 1.0));
+    float foam = 0.7 + 0.3 * vnoise(vec2(s * 6.0, dot(p, vec2(-dir.y, dir.x)) * 14.0));
+    float crest = smoothstep(0.9, 0.948, f) * smoothstep(0.99, 0.952, f) * foam;
+    // Bloom: a falloff on both sides of the front, so light spills ahead of the wave too.
+    float d = abs(f - 0.95);
+    float glow = exp(-min(d, 1.0 - d) * 16.0);
+    float w = 1.0 - fi * 0.25;
+    light += tint * (body * 1.05 + glow * 0.3) * w;
+    light += mix(tint, vec3(1.0), 0.7) * crest * 1.2 * w;
+    crests += crest * w;
+  }
+  light *= swell;
+  // The art punches up under the light and sinks in the troughs, for contrast.
+  vec3 art = clamp(mix(vec3(L), c, 1.35), 0.0, 1.0);
+  vec3 col = art * (0.42 + 0.25 * swell) + light * (0.5 + 0.3 * L);
+  // Near the tilt limit the whole surface takes a deep gold-and-rainbow wash, still saturated.
+  vec3 sheen = hsv2rgb(vec3(fract(dot(p, vec2(0.6, 0.4)) + bend * 0.3 + t.x * 0.4), 1.0, 1.0));
+  col += mix(sheen, vec3(1.0, 0.7, 0.15), 0.3) * flood * (0.2 + 0.2 * L);
+  // Glints ride the crests.
+  vec2 cell = floor(uv * vec2(80.0, 112.0));
+  float g = hash12(cell);
+  float tw = pow(0.5 + 0.5 * sin(g * 60.0 + dot(t, vec2(6.0, -5.0)) + loop * 6.2831853), 4.0);
+  col += vec3(1.0) * step(0.9, g) * tw * min(crests * swell, 1.0) * 1.4;
+  // Overexposed crests blow out to white instead of clipping into a flat hue.
+  float peak = max(col.r, max(col.g, col.b));
+  col = mix(col, vec3(1.0), smoothstep(1.5, 2.8, peak) * 0.5);
+  return col;
+}
 ${LETTERING_GLSL}
 
 ${SPONSOR_GLSL}
@@ -442,6 +501,8 @@ void main() {
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
+  // Surge runs over the frame too, but softer there so the nameplate stays readable.
+  else if (e == 50) col = mix(c, surge(c, uv, uTilt, L), 0.45 + 0.55 * m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
