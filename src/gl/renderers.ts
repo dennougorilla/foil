@@ -2,6 +2,7 @@ import { BG_FS, CARD_FS, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './sh
 import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type Program } from './gl';
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
+import { RangeLayer } from './range';
 
 export type RGB = [number, number, number];
 
@@ -74,6 +75,8 @@ export interface CardDraw {
   shadow: [number, number];
   /** Draw the nameplate text; off for thumbnail-sized cards. */
   plate?: boolean;
+  /** 0..1: overlay showing where the finish lands. */
+  rangeView?: number;
 }
 
 export interface Particle {
@@ -101,6 +104,8 @@ export class CardRenderer {
   private back: WebGLTexture;
   private lettering: LetteringGL;
   private faceTexels = 1;
+  /** Where on the face the finish applies. */
+  readonly range: RangeLayer;
   cssW = 1;
   cssH = 1;
   dpr = 1;
@@ -144,6 +149,7 @@ export class CardRenderer {
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
+    this.range = new RangeLayer(gl);
   }
 
   setFace(face: TexImageSource & { width: number }, mask: TexImageSource): void {
@@ -209,6 +215,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uFaceTexels, this.faceTexels);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     applyTune(gl, p.u, this.tune);
+    this.range.bind(p, 4, d.rangeView ?? 0, time);
 
     // Hard pixel drop shadow first, then the card itself.
     gl.uniform1f(p.u.uShadow, 1);
