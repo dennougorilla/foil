@@ -14,7 +14,8 @@ summary is in `README.md`; this note is the design behind it.
 - An opened pack becomes a **folder** under the hand. Picking a folder deals its finishes into the
   hand after the seven, so the hand is always "the seven + one folder" and stays short on a phone.
   Picking the active folder again puts it away (the seven only). Each opened folder can replay its
-  opening (the ↻ button on the active folder).
+  opening (the Replay button beside the active folder). On the shelf a sealed pack shows how many
+  finishes it holds ("All 3 inside"), an opened folder its count, and the active one "3 in hand".
 - The **Supporter pack** replaces the old hidden-finish unlocks. It does not exist in the UI until
   one of the support links (GitHub Sponsors, Buy Me a Coffee) is opened once; then it joins the
   shelf, sealed, and opens like any pack, with a richer wrapper and opening. Honor system: no
@@ -23,13 +24,15 @@ summary is in `README.md`; this note is the design behind it.
 ## Themes
 
 Grouped by what the finish *is* (its material or source of light), so a new finish has an
-obvious home. Inside a pack the order is the reveal order; the last one is the showpiece.
+obvious home. Inside a pack the order is the reveal order; the last one is the showpiece, the
+finish that makes the strongest first impression on most pictures (so Crystal's facets close
+Metal, not Relief, which is subtle until it is tilted).
 
 | Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish | Room for (in progress elsewhere) |
 |---|---|---|---|---|
-| `metal` Metal & Gem | 金属 | Gold → Crystal → **Relief** | Gold | Platinum |
+| `metal` Metal & Gem | 金属 | Relief → Gold → **Crystal** | Gold | Platinum |
 | `light` Light | 光 | Galaxy → Aurora → **Shallows** | Holographic | Cosmo Holo, Phosphor (蓄光), Blacklight |
-| `nature` Nature | 自然 | Sakura → Frost → **Magma** | Frost | — |
+| `nature` Nature | 自然 | Sakura → Frost → **Magma** | Sakura | — |
 | `studio` Studio | 工房 | Halftone → Warmth → **Shadowbox** | Halftone | Stained Glass, Lenticular |
 | `supporter` Supporter | サポーター限定 | Opal → Raden → **Kintsugi** | Kintsugi (gold seams on black) | — |
 
@@ -130,7 +133,7 @@ follows the sound toggle.
 | 5 | **Swipe** (per card) | Face-up stack; the top card follows the finger (rubber band, leans rz = dx·0.0012). Past 28 % of its width or a flick > 800 px/s it flies off that way (260, ease-in); else it snaps back (spring 260/18). The next card pops (scale 0.94 → 1, spring 320/14). Tap / → / Enter sends it off automatically. | Name and line of the finish under the stack, swapped with a short pop; "1 / 3" above the name says how far along it is. Second-to-last card (rare): a light sweep across it and 18 sparkles when it surfaces. | Swish per card; pop on the next; rare: two-note chime | 8 (rare: 14) |
 | 6 | **Showpiece** | The last card comes face-down on a back printed in the pack's colors and emblem, edges glowing, trembling, sparks rising off it. Press (or →/Enter): "Revealing…" — it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. Then, held a little larger, a light sweeps across it once (1.6 s) while the rays hold back to a third, so its own finish is the peak; then the rays come up and it keeps rocking slowly. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
-| 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes", and that their folder is under the hand). Primary: "Try Magma" (the showpiece by name) — closes, picks this folder and puts it on the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: Close. | — | Select chime (existing) | — |
+| 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Try Magma" (the showpiece by name) — closes, picks this folder and puts it on the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "Back to my card". Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
 
 **Skip reveal** (top right, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
 A replay starts at beat 0 too. Escape closes from the haul and skips the reveal from anywhere else; the

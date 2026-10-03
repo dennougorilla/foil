@@ -829,13 +829,12 @@ button {
 
 .shelf {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: safe center;
+  justify-content: center;
   gap: 8px;
   max-width: 100%;
   padding: 4px 12px 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
 .shelf::-webkit-scrollbar {
@@ -984,13 +983,24 @@ button {
   animation: tile-glint 0.6s linear infinite;
 }
 
+/* Replay: a quiet link riding on its folder, not another chip. */
 .pk-replay {
   justify-content: center;
-  gap: 6px;
-  padding: 4px 12px 4px 10px;
-  margin-left: -2px;
+  gap: 4px;
+  min-height: 32px;
+  padding: 2px 8px;
+  margin-left: -6px;
+  background: transparent;
+  box-shadow: none;
   font-size: 13px;
   color: var(--text-dim);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.pk-replay:hover {
+  background: transparent;
+  color: var(--text);
 }
 
 .pk-replay svg {
@@ -2470,12 +2480,8 @@ input[type='range']:disabled {
   .stage {
     padding-bottom: 12px;
   }
-  /* Every pack in view on a phone: the shelf wraps instead of scrolling sideways. */
   .shelf {
-    flex-wrap: wrap;
-    justify-content: center;
     width: 100%;
-    overflow: visible;
   }
   .shelf-label {
     flex-basis: 100%;

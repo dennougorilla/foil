@@ -55,7 +55,8 @@ export function mountShelf(o: ShelfOptions) {
       b.style.setProperty('--c', p.colors[2]);
       if (opened) b.setAttribute('aria-pressed', String(active));
       b.setAttribute('aria-label', (opened ? t.folderChip : t.openChip).replace('{name}', name).replace('{n}', n));
-      b.innerHTML = `<i class="pk-glyph" aria-hidden="true"></i><b>${name}</b><small aria-hidden="true">${opened ? n : t.sealed}</small>`;
+      const note = active ? t.inHand : opened ? n : t.sealed;
+      b.innerHTML = `<i class="pk-glyph" aria-hidden="true"></i><b>${name}</b><small aria-hidden="true">${note.replace('{n}', n)}</small>`;
       if (!opened) for (const ev of ['pointerenter', 'focus', 'pointerdown']) b.addEventListener(ev, () => o.onPrefetch(p), { once: true });
       b.addEventListener('click', () => {
         if (!packs.isOpened(p.id)) return o.onOpen(p, b.getBoundingClientRect());

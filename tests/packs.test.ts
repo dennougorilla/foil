@@ -31,7 +31,7 @@ test('every other finish is in exactly one pack, and no pack holds an open one',
 test('the four theme packs and the supporter pack, showpiece last', () => {
   const packs = Object.fromEntries(PACKS.map((p) => [p.id, [...p.finishes]]));
   assert.deepEqual(packs, {
-    metal: ['gold', 'crystal', 'relief'],
+    metal: ['relief', 'gold', 'crystal'],
     light: ['galaxy', 'aurora', 'shallows'],
     nature: ['sakura', 'frost', 'magma'],
     studio: ['halftone', 'warmth', 'shadowbox'],
@@ -86,7 +86,7 @@ test('the shelf shows the supporter pack only after a support link was opened', 
 test('the hand is the seven plus the chosen folder, if that pack is opened', () => {
   const opened = { opened: ['metal' as const], supporter: false };
   assert.deepEqual(handOf(null, opened), [...OPEN_EDITIONS]);
-  assert.deepEqual(handOf('metal', opened), [...OPEN_EDITIONS, 'gold', 'crystal', 'relief']);
+  assert.deepEqual(handOf('metal', opened), [...OPEN_EDITIONS, 'relief', 'gold', 'crystal']);
   assert.deepEqual(handOf('light', opened), [...OPEN_EDITIONS]);
 });
 

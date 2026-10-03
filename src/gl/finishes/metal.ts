@@ -1,4 +1,4 @@
-// Metal & Gem pack: Gold, Crystal and Relief (the showpiece). See docs/packs.md.
+// Metal & Gem pack: Relief, Gold and Crystal (the showpiece). See docs/packs.md.
 import { RELIEF_GLSL, ReliefGL } from '../../relief';
 import type { FinishModule } from './types';
 

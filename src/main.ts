@@ -1086,7 +1086,10 @@ function openPack(pack: Pack, from: DOMRect) {
           // A pack just opened becomes the folder in the hand; a pick also goes on the card. Closed
           // before the tear, it stays sealed and nothing changes.
           if (packs.isOpened(pack.id) && (!replay || pick)) store.set({ folder: pack.id });
-          if (packs.isOpened(pack.id) && !replay) shelfUi.greet(pack.id);
+          if (packs.isOpened(pack.id) && !replay) {
+            shelfUi.greet(pack.id);
+            toast(t.pack.folded.replace('{name}', t.pack.name[pack.id]));
+          }
           if (pick && pick !== store.get().edition) stage.flipTo(() => selectEdition(pick));
           shelfUi.focus(pack.id);
         },

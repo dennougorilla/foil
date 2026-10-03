@@ -224,20 +224,20 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.up();
   await phase('deck');
   expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
-  for (const name of ['Gold', 'Crystal']) {
+  for (const name of ['Relief', 'Gold']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
   await page.waitForSelector('.pk.is-waiting', { timeout: 10000 });
   expect((await page.textContent('.pk-label b')) === '？？？', 'the showpiece showed its name before it was turned over');
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Relief', null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Crystal', null, { timeout: 15000 });
   await page.keyboard.press('ArrowRight');
   await phase('haul');
   expect((await page.locator('.pk-name').count()) === 3, 'the haul does not show all three');
   await page.click('.pk-try');
   await overlayGone();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'relief', null, { timeout: 10000 });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
   expect((await state()).folder === 'metal', 'the opened pack did not become the folder');
   expect((await handCount()) === 10, `the hand has ${await handCount()} cards, not the seven plus three`);
 });
@@ -250,7 +250,7 @@ await step('folders switch the hand; the number keys follow it', async () => {
   await page.locator('#cardSlot').focus();
   await page.keyboard.press('8');
   await page.waitForTimeout(300);
-  expect((await state()).edition === 'gold', 'key 8 did not pick the first card of the folder');
+  expect((await state()).edition === 'relief', 'key 8 did not pick the first card of the folder');
 });
 
 await step('a replay can be skipped straight to the haul and closed', async () => {
@@ -260,7 +260,7 @@ await step('a replay can be skipped straight to the haul and closed', async () =
   await phase('haul');
   await page.keyboard.press('Escape');
   await overlayGone();
-  expect((await state()).edition === 'gold', 'closing a replay changed the finish');
+  expect((await state()).edition === 'relief', 'closing a replay changed the finish');
 });
 
 await step('held still, the pack opens with a button and the haul fades in', async () => {

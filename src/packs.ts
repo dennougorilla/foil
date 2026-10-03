@@ -26,7 +26,7 @@ export interface Pack {
 export const PACKS: readonly Pack[] = [
   {
     id: 'metal',
-    finishes: ['gold', 'crystal', 'relief'],
+    finishes: ['relief', 'gold', 'crystal'],
     wrap: 'gold',
     colors: ['#1f1209', '#a86a22', '#f2c14e'],
     load: () => import('./gl/finishes/metal'),
@@ -41,7 +41,7 @@ export const PACKS: readonly Pack[] = [
   {
     id: 'nature',
     finishes: ['sakura', 'frost', 'magma'],
-    wrap: 'frost',
+    wrap: 'sakura',
     colors: ['#0f1a14', '#3f8a5c', '#ffa8c8'],
     load: () => import('./gl/finishes/nature'),
   },

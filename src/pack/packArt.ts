@@ -126,8 +126,6 @@ function tile(ctx: CanvasRenderingContext2D, x: number, y: number, ch: string, a
 export interface PackWords {
   /** The theme's name as printed big (Latin, upper case reads best in the pixel face). */
   big: string;
-  /** "Metal Pack" / "金属パック". */
-  title: string;
   /** "3 finishes" / "3枚入り". */
   count: string;
   /** Only on the Supporter pack. */
@@ -218,20 +216,21 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   emblem(ctx, pack.id, cx, cy - 34, 120, light, PAPER);
 
   // FOIL tiles under the seal.
-  const tiles: [string, string, string][] = [
-    ['F', '#ffd2cc', '#ff6b5f'],
-    ['O', '#ffe7b8', '#ffb341'],
-    ['I', '#c9f5e4', '#4fd3a3'],
-    ['L', '#cfe8ff', '#4ab0ff'],
-  ];
+  const tiles: [string, string, string][] = supporter
+    ? ['F', 'O', 'I', 'L'].map((c) => [c, '#fff1c9', '#d9a441'] as [string, string, string])
+    : [
+        ['F', '#ffd2cc', '#ff6b5f'],
+        ['O', '#ffe7b8', '#ffb341'],
+        ['I', '#c9f5e4', '#4fd3a3'],
+        ['L', '#cfe8ff', '#4ab0ff'],
+      ];
   tiles.forEach(([chr, a, b], i) => tile(ctx, cx + (i - 1.5) * 62, 196 + (i % 2 ? -4 : 2), chr, a, b, [-0.12, 0.05, -0.03, 0.1][i]));
   ctx.restore();
 
   // Words, in plain ink (kept out of the finish by the mask).
   const words2: [string, number, string, string][] = [
-    [words.big, 742, '700 76px Silkscreen, monospace', PAPER],
-    [words.title, 812, '40px DotGothic16, sans-serif', light],
-    [words.count, 864, '30px DotGothic16, sans-serif', PAPER],
+    [words.big, 760, '700 80px Silkscreen, monospace', PAPER],
+    [words.count, 836, '34px DotGothic16, sans-serif', light],
   ];
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

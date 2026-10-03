@@ -111,6 +111,7 @@ export function openPack(o: OpeningOptions) {
   root.style.setProperty('--c', pack.colors[2]);
   root.innerHTML = `
     <div class="pk-room" aria-hidden="true"><canvas class="pk-swirl"></canvas></div>
+    <div class="pk-flash" aria-hidden="true"></div>
     <div class="pk-stage" aria-hidden="true">
       <div class="pk-rays"></div>
       <div class="pk-aura"></div>
@@ -161,8 +162,8 @@ export function openPack(o: OpeningOptions) {
   openBtn.textContent = t.openBtn;
   hintEl.textContent = t.loading;
   $('.pk-haul-title b').textContent = (o.replay ? t.haulReplay : t.haul).replace('{name}', name).replace('{n}', String(n));
-  // One line under the title: where the finishes went (first time only), and what to do now.
-  $('.pk-haul-title small').textContent = (o.replay ? '' : t.haulSub.replace('{name}', name) + ' ') + t.haulHint;
+  // Under the title, the one thing to do now; where the folder went is said on the page afterwards.
+  $('.pk-haul-title small').textContent = t.haulHint;
   $('.pk-try').textContent = t.try.replace('{finish}', dict.edition[pack.finishes[n - 1]]);
   $('.pk-close').textContent = t.close;
   document.body.appendChild(root);
@@ -192,7 +193,6 @@ export function openPack(o: OpeningOptions) {
   const paint = () =>
     paintPack(packFace, packMask, pack, {
       big: PACK_EN.name[pack.id].toUpperCase(),
-      title: t.title.replace('{name}', name),
       count: t.count.replace('{n}', String(n)),
       ribbon: rich ? t.supporterTag : undefined,
     });
@@ -218,12 +218,12 @@ export function openPack(o: OpeningOptions) {
   const layout = () => {
     vw = innerWidth;
     vh = innerHeight;
-    cardH = Math.min(vh * 0.48, (vw - 32) * 0.62 * 1.4, 480);
+    cardH = Math.min(vh * 0.54, (vw - 32) * 0.62 * 1.4, 540);
     cardW = (cardH * 5) / 7;
     packW = cardW * 1.16;
     packH = (packW * PACK_H) / PACK_W;
     cx = vw / 2;
-    cy = vh * 0.47;
+    cy = vh * 0.45;
   };
   layout();
 
@@ -297,6 +297,15 @@ export function openPack(o: OpeningOptions) {
 
   const particles: (Particle & { g: number; drag: number; sway: number; ph: number })[] = [];
   const shake = { t: 0, dur: 0, amp: 0 };
+  /** A flash of light over the whole screen (not on a held-still screen). */
+  const flashEl = root.querySelector<HTMLElement>('.pk-flash')!;
+  const flashScreen = (strength: number) => {
+    if (reduced) return;
+    flashEl.style.setProperty('--f', String(strength));
+    flashEl.classList.remove('is-on');
+    void flashEl.offsetWidth;
+    flashEl.classList.add('is-on');
+  };
   const quake = (dur: number, amp: number) => {
     if (reduced) return;
     Object.assign(shake, { t: 0, dur, amp });
@@ -368,9 +377,10 @@ export function openPack(o: OpeningOptions) {
     buzz([18, 30, 40]);
     if (reduced) return toHaul();
     const ty = pk.y.x - packH / 2 + packH * TEAR_Y;
-    Object.assign(strip, { on: true, x: pk.x.x, y: pk.y.x - packH / 2 + (packH * TEAR_Y) / 2, vx: 300 * cut.autoDir, vy: -820, rot: 0, vr: 4 * cut.autoDir, alpha: 1 });
+    Object.assign(strip, { on: true, x: pk.x.x, y: pk.y.x - packH / 2 + (packH * TEAR_Y) / 2, vx: 520 * cut.autoDir, vy: -900, rot: 0, vr: 5 * cut.autoDir, alpha: 1 });
     pk.s.v += 1.6;
-    pk.flash = 0.6;
+    pk.flash = 0.25;
+    flashScreen(0.55);
     quake(0.22, 10);
     for (let i = 0; i < 36; i++) spray(pk.x.x + (Math.random() - 0.5) * packW, ty, 1, { speed: [200, 620], dir: -Math.PI / 2, spread: 1.4 });
     pourEl.classList.add('is-on');
@@ -425,7 +435,7 @@ export function openPack(o: OpeningOptions) {
       }
     }
     if (rich) packSfx.deal(top + 4);
-    hint(top === 0 ? t.swipe : '', '→');
+    hint(t.swipe, '→');
     label(c, rich ? t.supporterTag : '');
     say(dict.edition[c.id]);
   }
@@ -463,7 +473,7 @@ export function openPack(o: OpeningOptions) {
     haulOrder.splice(Math.floor(n / 2), 0, showpiece);
     // On a narrow screen the cards overlap a little, like a dealt fan, so each stays big enough to see.
     const overlap = vw < 600 ? 0.24 : 0;
-    const room = vw - 24;
+    const room = vw - 44;
     const fit = (room - (vw < 600 ? 0 : Math.max(12, vw * 0.02) * (n - 1))) / (n - (n - 1) * overlap);
     const h = Math.min(vh * 0.44, fit * 1.4, 400);
     const w = (h * 5) / 7;
@@ -498,6 +508,13 @@ export function openPack(o: OpeningOptions) {
         c.x.x = cx;
         c.y.x = cy + (reduced ? 0 : 60);
         c.s.x = reduced ? 1 : 0.6;
+      } else if (c !== showpiece || c.x.x < -cardW || c.x.x > vw + cardW) {
+        // Thrown off earlier: dealt back out of the middle, from behind the showpiece, to its slot.
+        c.x.x = cx;
+        c.y.x = cy;
+        c.x.v = c.y.v = 0;
+        c.rz.x = 0;
+        c.s.x = 0.7;
       }
     });
     const names = $('.pk-names');
@@ -508,9 +525,9 @@ export function openPack(o: OpeningOptions) {
       b.type = 'button';
       b.className = 'pk-name';
       if (c === showpiece) b.classList.add('is-showpiece');
-      b.innerHTML = `${c === showpiece ? `<i>★ ${t.showpiece}</i>` : ''}<b></b><small></small>`;
+      b.innerHTML = `${c === showpiece ? `<i>★ ${t.showpiece}</i>` : ''}<b></b>`;
       b.querySelector('b')!.textContent = dict.edition[c.id];
-      b.querySelector('small')!.textContent = dict.look[c.id];
+      b.title = dict.look[c.id];
       b.addEventListener('click', () => close(c.id));
       b.addEventListener('pointerenter', () => (hoverHaul = i));
       b.addEventListener('pointerleave', () => (hoverHaul = -1));
@@ -524,7 +541,9 @@ export function openPack(o: OpeningOptions) {
       c.dealt = false;
     });
     say($('.pk-haul-title b').textContent!);
-    $<HTMLButtonElement>('.pk-try').focus({ preventScroll: true });
+    // Keyboard users land on the main action; for touch and mouse the focus ring would only be noise.
+    if (keyboard) $<HTMLButtonElement>('.pk-try').focus({ preventScroll: true });
+    else root.focus({ preventScroll: true });
   }
 
   function skip() {
@@ -560,6 +579,7 @@ export function openPack(o: OpeningOptions) {
   function startAuto() {
     if (phase !== 'pack' || cut.done || cut.active) return;
     const pr = packRect();
+    root.classList.add('is-tracing');
     Object.assign(cut, { active: true, auto: true, draining: false, x0: pr.l + 10, min: pr.l + 10, max: pr.l + 10, p: 0, autoT: 0, autoDir: 1, grains: 0, buzzes: 0 });
   }
 
@@ -571,6 +591,7 @@ export function openPack(o: OpeningOptions) {
       const pr = packRect();
       if (e.clientX < pr.l - 30 || e.clientX > pr.r + 30 || e.clientY < pr.t - 50 || e.clientY > pr.b) return;
       canvas.setPointerCapture(e.pointerId);
+      root.classList.add('is-tracing');
       Object.assign(cut, { active: true, auto: false, draining: false, x0: e.clientX, min: e.clientX, max: e.clientX, p: 0, pid: e.pointerId, downT: time, moved: 0, lastX: e.clientX, grains: 0, buzzes: 0, speed: 0 });
       return;
     }
@@ -628,6 +649,7 @@ export function openPack(o: OpeningOptions) {
       } else {
         cut.active = false;
         cut.draining = true;
+        root.classList.remove('is-tracing');
         packSfx.fizzle();
       }
     }
@@ -654,7 +676,10 @@ export function openPack(o: OpeningOptions) {
   $('.pk-x').addEventListener('click', () => close(null));
   $('.pk-try').addEventListener('click', () => close(showpiece.id));
   $('.pk-close').addEventListener('click', () => close(null));
+  let keyboard = false;
+  root.addEventListener('pointerdown', () => (keyboard = false), true);
   const onKey = (e: KeyboardEvent) => {
+    keyboard = true;
     if (e.key === 'Escape') {
       e.preventDefault();
       return phase === 'haul' || phase === 'load' ? close(null) : skip();
@@ -687,6 +712,7 @@ export function openPack(o: OpeningOptions) {
   // ---------- Frame ----------
 
   let last = performance.now();
+  let swirlT = 0;
   let raf = 0;
   let ready = false;
   let failed = false;
@@ -707,7 +733,9 @@ export function openPack(o: OpeningOptions) {
     const dpr = Math.min(devicePixelRatio || 1, maxDpr);
     r.resize(vw, vh, dpr);
     swirl.resize(Math.ceil(vw / 4), Math.ceil(vh / 4));
-    swirl.render({ time: (reduced ? 0 : time) + 40, colors: room, pointer: [0.5, 0.5], focus: [0.5, 0.53] });
+    // The room's swirl winds up while the showpiece charges, then settles.
+    if (!reduced) swirlT += dt * (hit === 'charge' ? 1 + 6 * clamp(hitT / 0.9, 0, 1) : 1);
+    swirl.render({ time: swirlT + 40, colors: room, pointer: [0.5, 0.5], focus: [0.5, 0.5] });
 
     if (phase === 'load') {
       // Wait for the pack's finishes and every program this opening draws.
@@ -769,7 +797,7 @@ export function openPack(o: OpeningOptions) {
         buzz(6);
       }
       const ty = pk.y.x - (packH * pk.s.x) / 2 + packH * pk.s.x * TEAR_Y;
-      spray(cut.lastX, ty, cut.speed > 2 || cut.auto ? 3 : 1, { speed: [80, 380], up: 160 });
+      spray(cut.lastX, ty, cut.speed > 2 || cut.auto ? 5 : 2, { speed: [80, 420], up: 180 });
     }
     if (cut.draining) {
       cut.p = Math.max(0, cut.p - dt / 0.26);
@@ -791,7 +819,7 @@ export function openPack(o: OpeningOptions) {
       strip.x += strip.vx * dt;
       strip.y += strip.vy * dt;
       strip.rot += strip.vr * dt;
-      strip.alpha = Math.max(0, strip.alpha - dt / 0.7);
+      strip.alpha = Math.max(0, strip.alpha - dt / 0.45);
       if (strip.alpha <= 0) strip.on = false;
     }
     if (phase === 'rip' && phaseT > 0.35) draw();
@@ -817,8 +845,9 @@ export function openPack(o: OpeningOptions) {
         const k = i - top;
         if (i !== top || !drag.active) {
           c.x.target = cx;
-          c.y.target = cy + k * 7;
-          c.rz.target = k ? (k % 2 ? 0.035 : -0.03) : 0;
+          c.x.target = cx + (k ? (k % 2 ? 10 : -8) : 0);
+          c.y.target = cy + k * 10;
+          c.rz.target = k ? (k % 2 ? 0.05 : -0.045) : 0;
         }
         c.s.target = (1 - k * 0.025) * (c === showpiece && hit === 'charge' ? 1.08 : c === showpiece && boomed ? 1.06 : 1);
       });
@@ -872,7 +901,7 @@ export function openPack(o: OpeningOptions) {
       if (p.life <= 0) particles.splice(i, 1);
     }
     // (Held back while the pack tears and the cards come out, so the tear stays the one thing to watch.)
-    if (rich && !reduced && phase !== 'rip' && phase !== 'draw' && particles.length < 80 && Math.random() < dt * 8) {
+    if (rich && !reduced && (phase === 'pack' || boomed) && particles.length < 70 && Math.random() < dt * 7) {
       // Gold dust drifting up through the room, the whole time.
       particles.push({ x: Math.random() * vw, y: vh + 10, vx: (Math.random() - 0.5) * 20, vy: -40 - Math.random() * 60, size: Math.random() > 0.7 ? 6 : 4, life: 1, decay: 0.12 + Math.random() * 0.1, color: Math.random() > 0.3 ? GOLD : WHITE, g: -10, drag: 0, sway: 0, ph: 0 });
     }
@@ -922,7 +951,8 @@ export function openPack(o: OpeningOptions) {
         boomed = true;
         revealT = 0;
         root.classList.add('is-revealing');
-        c.flash = 0.9;
+        c.flash = 0.35;
+        flashScreen(0.7);
         c.s.v += 3.2;
         quake(0.36, 16);
         raysEl.style.opacity = '';
@@ -930,7 +960,7 @@ export function openPack(o: OpeningOptions) {
         packSfx.reveal(rich);
         buzz([40, 40, 80]);
         label(c, `★ ${t.showpiece}`);
-        hint(t.swipe, '→');
+        hint(t.seeAll.replace('{n}', String(n)), '→');
         say(`${t.showpiece}: ${dict.edition[c.id]}`);
       }
     }
