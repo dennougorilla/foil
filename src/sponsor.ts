@@ -175,6 +175,8 @@ export function initSponsor(o: SponsorOptions) {
     preview().setFace(f.face, f.mask);
     preview().setBack(f.back);
     started = performance.now();
+    seen.clear();
+    shown = '';
     dlg.showModal();
     // Land on the action, not the close button, so Enter does the obvious thing.
     q('.sp-cta').focus({ preventScroll: true });
@@ -235,31 +237,43 @@ export function initSponsor(o: SponsorOptions) {
   let started = 0;
 
   const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  // Face down for a beat on opening only; after that each flip shows the next finish
+  // right away and the card spends most of its time face up.
   const REST = 1.2;
-  const FLIP = 0.7;
-  const HOLD = 2.6;
-  const CYCLE = REST + FLIP + HOLD + FLIP;
+  const FLIP = 0.6;
+  const HOLD = 2.8;
+  const CYCLE = FLIP + HOLD + FLIP;
   function glimpse(s: number) {
-    const turn = Math.floor(s / CYCLE);
-    const c = s - turn * CYCLE;
-    let angle = Math.PI;
-    if (c >= REST + FLIP + HOLD) angle = Math.PI * (2 + ease((c - REST - FLIP - HOLD) / FLIP));
-    else if (c >= REST + FLIP) angle = Math.PI * 2;
-    else if (c >= REST) angle = Math.PI * (1 + ease((c - REST) / FLIP));
+    if (s < REST) return { angle: Math.PI, turn: 0 };
+    const k = s - REST;
+    const turn = Math.floor(k / CYCLE);
+    const c = k - turn * CYCLE;
+    let angle = Math.PI * 2;
+    if (c < FLIP) angle = Math.PI * (1 + ease(c / FLIP));
+    else if (c >= FLIP + HOLD) angle = Math.PI * (2 + ease((c - FLIP - HOLD) / FLIP));
     return { angle, turn };
   }
 
-  /** Names the finish on show and counts it, "2 of 4"; while face down it keeps the name back. */
+  /**
+   * Names the finish on show and counts it, "2 of 4". Face down it says so and the
+   * count holds still; the little card-shaped dots fill in as each finish is seen.
+   */
   let shown = '';
+  const seen = new Set<number>();
   function caption(n: number, faceUp: boolean) {
-    const key = `${n}:${faceUp}:${t.sponsorSecret}`;
+    const key = `${n}:${faceUp}:${t.sponsorFaceDown}`;
     if (key === shown) return;
     shown = key;
+    if (faceUp) seen.add(n);
     const cap = q('.sp-glimpse');
     cap.classList.toggle('is-down', !faceUp);
-    q('.sp-glimpse b').textContent = faceUp ? t.edition[SPONSOR_EDITIONS[n]] : '? ? ?';
-    q('.sp-count').textContent = t.sponsorGlimpse.replace('{n}', String(n + 1));
-    cap.querySelectorAll('.sp-dots i').forEach((d, i) => d.classList.toggle('is-on', i === n));
+    canvas.classList.toggle('is-down', !faceUp);
+    q('.sp-glimpse b').textContent = faceUp ? t.edition[SPONSOR_EDITIONS[n]] : t.sponsorFaceDown;
+    q('.sp-count').textContent = faceUp ? t.sponsorGlimpse.replace('{n}', String(n + 1)) : '';
+    cap.querySelectorAll('.sp-dots i').forEach((d, i) => {
+      d.classList.toggle('is-seen', seen.has(i));
+      d.classList.toggle('is-on', faceUp && i === n);
+    });
   }
 
   function draw(now: number) {

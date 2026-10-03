@@ -2,6 +2,8 @@
 // Shader indices start at 40 to stay clear of the regular editions.
 
 export const SPONSOR_GLSL = /* glsl */ `
+// Roughly the pixel size of the card art, so effects can land on the same grid.
+const vec2 PIXEL_GRID = vec2(64.0, 89.6);
 vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   // The picture stays the subject: a few fine seams of gold mend it, and the
   // light that runs along them softens over the bright parts so it never flares there.
@@ -26,22 +28,25 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   float run = smoothstep(0.75, 1.0, sin((uv.x * 0.8 + uv.y) * 6.0 - (t.x + t.y) * 3.4 - uTime * 0.7));
   gold += vec3(1.0, 0.93, 0.74) * run * 0.6 * (1.0 - keep * 0.8);
   vec3 col = glaze * (1.0 - rim * 0.3);
-  return mix(col, gold, vein * (0.9 - keep * 0.25));
+  // Over the bright subject the seams thin to a hairline trace, so the gold mends around it.
+  return mix(col, gold, vein * (0.9 - keep * 0.75));
 }
 
 vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
   // Play of colour inside the stone: soft patches deep in the picture warm to a
   // spectral hue when you look at them from their angle. The picture keeps its own colour.
-  vec2 p = uv * vec2(1.0, 1.4);
+  // Sampled on a coarse pixel grid so the colour sits in pixels, like the picture itself.
+  vec2 g = (floor(uv * PIXEL_GRID) + 0.5) / PIXEL_GRID;
+  vec2 p = g * vec2(1.0, 1.4);
   vec2 q = p * 6.0 + (vec2(vnoise(p * 3.0), vnoise(p * 3.0 + 5.2)) - 0.5) * 2.0;
   vec4 v = voronoi(q);
   vec2 id = v.zw;
   vec2 n = normalize(hash22(id) * 2.0 - 1.0 + 1e-3);
   float facing = sin(dot(n, t) * 2.6 + hash12(id + 2.0) * 6.28 + uTime * 0.2);
-  float fire = smoothstep(0.15, 1.0, facing);
+  float fire = smoothstep(-0.1, 0.9, facing);
   float hue = fract(hash12(id + 7.0) + dot(n, t) * 0.15 + v.x * 0.25);
   // No hard edges: each patch is a soft glow, strongest at its heart.
-  float body = smoothstep(0.85, 0.0, v.x);
+  float body = smoothstep(0.95, 0.1, v.x);
   vec3 spectral = hsv2rgb(vec3(hue, 0.8, 1.0));
   // The colour tints the picture from within (multiply), then a little glow on top.
   float k = fire * body;
@@ -95,10 +100,11 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // The picture stays the subject: its bright parts and centre keep their colour
   // under a thin pearl film, and only the shadows and edges turn to black lacquer
   // with cut shell inlaid.
-  vec2 p = uv * vec2(1.0, 1.4);
+  vec2 g = (floor(uv * PIXEL_GRID) + 0.5) / PIXEL_GRID;
+  vec2 p = g * vec2(1.0, 1.4);
   float keep = max(smoothstep(0.24, 0.55, L), smoothstep(0.5, 0.12, length(p - vec2(0.5, 0.7))) * 0.7);
   vec2 w = p + (vec2(vnoise(p * 6.0), vnoise(p * 6.0 + 9.0)) - 0.5) * 0.06;
-  vec4 v = voronoi(w * 24.0);
+  vec4 v = voronoi(w * 30.0);
   vec2 id = v.zw;
   float cut = smoothstep(0.015, 0.05, v.y - v.x);
   // Each chip of shell has growth lines running its own way, and its own lean.
@@ -111,7 +117,10 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   float lean = 0.55 + 0.45 * sin(dot(hash22(id + 4.0) * 2.0 - 1.0, t) * 3.0 + hash12(id + 5.0) * 6.28);
   // In the shadows: black lacquer that still shows the picture, with a sparse scatter of shell chips.
   vec3 lacquer = mix(c * 0.5, vec3(0.025, 0.01, 0.016), 0.55);
-  float chip = cut * step(0.78, hash12(id + 9.0)) * smoothstep(0.3, 0.12, L);
+  // Shell only sits low in the picture and along its edges, never across the open sky.
+  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+  float place = max(smoothstep(0.55, 0.8, uv.y), smoothstep(0.07, 0.02, edge));
+  float chip = cut * step(0.72, hash12(id + 9.0)) * smoothstep(0.3, 0.12, L) * place;
   vec3 dark = mix(lacquer, nacre * (0.4 + 0.6 * lean) * 0.7, chip);
   // In the light: the picture itself, with a pearl film that shifts as you tilt.
   vec3 lit = screen(c, nacre * 0.2 * (0.4 + 0.6 * lean));

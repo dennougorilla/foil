@@ -49,14 +49,15 @@
   box-shadow: inset 0 0 0 2px var(--gold);
 }
 
-/* Once unlocked, a tiny gold pip always marks the hidden finishes. */
+/* Once unlocked, a small gold diamond always marks the hidden finishes. It sits
+   top-left, the corner the next card in the fan never covers. */
 .hand-slot[data-hidden-finish]::after {
   content: '';
   position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 11px;
-  height: 11px;
+  left: 5px;
+  top: 5px;
+  width: 13px;
+  height: 13px;
   background: var(--gold);
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   filter: drop-shadow(0 0 1px var(--edge)) drop-shadow(0 1px 0 var(--edge));
@@ -166,6 +167,11 @@
   box-shadow: inset -3px 0 0 var(--edge);
 }
 
+/* Face down, the bright standard back is muted so the button stays the lead. */
+.sp-canvas.is-down {
+  filter: saturate(0.4) brightness(0.8);
+}
+
 .sp-glimpse {
   position: absolute;
   left: 0;
@@ -204,19 +210,28 @@
   gap: 4px;
 }
 
+/* The count is drawn as four tiny cards that fill in as each finish is seen. */
 .sp-dots i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 9px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.28);
-  transition: background 0.2s;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.sp-dots i.is-seen {
+  background: rgba(242, 193, 78, 0.45);
+  box-shadow: none;
 }
 
 .sp-dots i.is-on {
   background: var(--gold);
+  box-shadow: none;
+  transform: translateY(-2px);
 }
 
 .sp-canvas {
+  transition: filter 0.3s;
   position: absolute;
   inset: 0;
   width: 100%;
