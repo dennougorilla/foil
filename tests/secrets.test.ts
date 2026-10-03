@@ -6,8 +6,19 @@ import { EDITIONS } from '../src/editions.ts';
 
 const SECRETS = ['gold', 'relief', 'kintsugi'] as const;
 
-test('the hand opens with the five editions of the original game', () => {
-  assert.deepEqual(OPEN_EDITIONS, ['base', 'foil', 'holo', 'poly', 'negative']);
+test('the hand opens with the five editions of the original game plus Prism and Glitch', () => {
+  assert.deepEqual(OPEN_EDITIONS, ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch']);
+});
+
+test('open finishes come first in the hand, so unlocked secrets follow them', () => {
+  assert.deepEqual(EDITIONS.slice(0, OPEN_EDITIONS.length).map((e) => e.id), [...OPEN_EDITIONS]);
+});
+
+test('Prism and Glitch are no longer drawn, and a saved unlock of them does no harm', () => {
+  const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+  assert.ok(!(secrets as string[]).includes('prism') && !(secrets as string[]).includes('glitch'));
+  assert.deepEqual(parseUnlocked('["prism","glitch","opal"]', secrets), ['opal']);
+  for (let i = 0; i < 200; i++) assert.ok(!['prism', 'glitch'].includes(pickSecret(secrets, [], Math.random) as string));
 });
 
 test('saved unlocks keep only known secrets, once each', () => {

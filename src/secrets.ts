@@ -2,8 +2,11 @@
 
 import type { EditionId } from './editions';
 
-/** The finishes in the hand from the start: the editions of the game FOIL is modelled on. Every other one is a secret. */
-export const OPEN_EDITIONS: readonly EditionId[] = ['base', 'foil', 'holo', 'poly', 'negative'];
+/**
+ * The finishes in the hand from the start: the editions of the game FOIL is modelled on, plus
+ * Prism and Glitch. Every other one is a secret. Kept in hand order (see EDITIONS).
+ */
+export const OPEN_EDITIONS: readonly EditionId[] = ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'];
 
 /** The unlocked secrets saved as a JSON list; anything else (or a past format) counts as none. */
 export function parseUnlocked(raw: string | null, secrets: readonly EditionId[]): EditionId[] {

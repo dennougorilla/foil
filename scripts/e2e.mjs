@@ -195,9 +195,9 @@ await step('GIF with a clear background is really clear', async () => {
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
 });
 
-await step('the hand opens with five finishes; each support link unlocks one secret', async () => {
+await step('the hand opens with seven finishes; each support link unlocks one secret', async () => {
   const shown = () => page.locator('.hand-slot:not([hidden])').count();
-  expect((await shown()) === 5, `the hand opened with ${await shown()} finishes, not five`);
+  expect((await shown()) === 7, `the hand opened with ${await shown()} finishes, not seven`);
   for (let n = 1; n <= 2; n++) {
     await page.click('#supportBtn');
     const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click(`.support-link >> nth=${n - 1}`)]);
@@ -205,12 +205,12 @@ await step('the hand opens with five finishes; each support link unlocks one sec
     await page.waitForTimeout(600);
     const unlocked = await page.evaluate(() => JSON.parse(localStorage.getItem('foil:secrets') ?? '[]'));
     expect(unlocked.length === n, `expected ${n} secrets unlocked, got ${unlocked.length}`);
-    expect((await shown()) === 5 + n, 'the unlocked secret did not join the hand');
+    expect((await shown()) === 7 + n, 'the unlocked secret did not join the hand');
     await page.keyboard.press('Escape');
   }
-  // Secrets follow the five open finishes in the hand, so key 6 picks the first one unlocked.
-  const first = await page.locator('.hand-slot:not([hidden]) >> nth=5').getAttribute('data-id');
-  await page.keyboard.press('6');
+  // Secrets follow the seven open finishes in the hand, so key 8 picks the first one unlocked.
+  const first = await page.locator('.hand-slot:not([hidden]) >> nth=7').getAttribute('data-id');
+  await page.keyboard.press('8');
   await page.waitForTimeout(400);
   expect((await state()).edition === first, 'the unlocked secret could not be applied');
 });
