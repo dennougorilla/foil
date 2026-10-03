@@ -285,9 +285,12 @@ export function mountLettering(o: Options): void {
     const r = target.getBoundingClientRect();
     const floor = bar ? bar.getBoundingClientRect().top - 16 : innerHeight - 16;
     const ceil = (inPanel ? panel!.getBoundingClientRect().top : 0) + 16;
-    // Bring the bottom above the bar, but never push the top out of view.
-    const by = Math.min(r.bottom - floor, r.top - ceil);
-    if (by <= 0) return;
+    // Above the view: bring the top into it. Below: bring the bottom above the bar, but never
+    // push the top out of view.
+    let by = 0;
+    if (r.top < ceil) by = r.top - ceil;
+    else if (r.bottom > floor) by = Math.min(r.bottom - floor, r.top - ceil);
+    if (by === 0) return;
     const behavior: ScrollBehavior = smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
     (inPanel ? panel! : window).scrollBy({ top: by, behavior });
   };
