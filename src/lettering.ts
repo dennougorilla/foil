@@ -70,7 +70,7 @@ export const STYLE_CONTROLS: Record<LetterStyle, { ink: boolean; blind: boolean;
   deboss: { ink: true, blind: true, foil: false, depth: true, gloss: false },
   emboss: { ink: true, blind: true, foil: false, depth: true, gloss: true },
   foil: { ink: false, blind: false, foil: true, depth: true, gloss: true },
-  spot: { ink: true, blind: true, foil: false, depth: true, gloss: true },
+  spot: { ink: true, blind: true, foil: false, depth: true, gloss: false },
 };
 
 function mixHex(a: string, b: string, k: number): string {
@@ -304,8 +304,11 @@ export class LetteringGL {
     gl.uniform1f(p.u.uTextRainbow, l.style === 'foil' && l.foil === 'rainbow' ? 1 : 0);
     gl.uniform1f(p.u.uTextDepth, l.depth);
     gl.uniform1f(p.u.uTextGloss, l.gloss);
-    const pressed = l.style === 'deboss' || l.style === 'emboss';
+    // With no ink the die is the letter itself, so counters (the holes in a, e, o) stay open.
+    const blind = l.ink === 'none';
+    const pressed = (l.style === 'deboss' || l.style === 'emboss') && !blind;
     gl.uniform1f(p.u.uTextBevel, pressed ? plateBevel : bevel);
+    gl.uniform1f(p.u.uTextBlind, blind ? 1 : 0);
     gl.uniform1f(p.u.uTextStamp, Math.min(1, (performance.now() - stampAt) / STAMP_MS));
     gl.uniform2f(p.u.uTextSpan, nameSpan[0], nameSpan[1]);
     // Bare stock just above the name, for foil that hasn't been laid down yet.
@@ -325,12 +328,13 @@ uniform float uTextBevel;    // bevel radius in map texels
 uniform float uTextStamp;    // 0..1 progress of the stamp moment; 1 = at rest
 uniform vec2 uTextSpan;      // name's left and right edge in uv
 uniform float uTextStockY;   // a row of bare nameplate stock just above the name
+uniform float uTextBlind;    // 1 = no ink: presses use the letter itself as the die
 
 float letterLod;  // set per pixel in lettering()
 // Presses use the wider plate; foil and varnish follow the letter itself.
 float letterH(vec2 uv) {
   vec4 s = textureLod(uTextMap, uv, letterLod);
-  return (uTextStyle == 1 || uTextStyle == 2) ? s.b : s.g;
+  return ((uTextStyle == 1 || uTextStyle == 2) && uTextBlind < 0.5) ? s.b : s.g;
 }
 
 // The die's footprint: the plate height cut at half, with a sub-texel soft edge.
@@ -344,7 +348,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   vec2 e = max(texel, fwidth(uv));
   letterLod = max(log2(max(e.x / texel.x, e.y / texel.y)) - 0.5, 0.0);
   vec4 tm = textureLod(uTextMap, uv, letterLod);
-  float cover = tm.r, h = (uTextStyle == 1 || uTextStyle == 2) ? tm.b : tm.g;
+  float cover = tm.r, h = ((uTextStyle == 1 || uTextStyle == 2) && uTextBlind < 0.5) ? tm.b : tm.g;
   // Only an embossed rim casts a shadow past its own soft edge.
   if (h < 0.002 && cover < 0.002 && uTextStyle != 2) return col;
   float hx = letterH(uv + vec2(e.x, 0.0)) - letterH(uv - vec2(e.x, 0.0));
@@ -397,6 +401,8 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // Emboss: a raised plateau. Lit edge towards the light, a dark edge away
     // from it, and a hard drop shadow thrown onto the stock beyond.
     float thrown = (1.0 - d0) * die(uv + band * (1.6 + 1.2 * uTextDepth));
+    // The raised plateau catches more light than the flat stock around it.
+    col = mix(col, vec3(1.0), (0.18 + 0.14 * uTextDepth) * d0 * (1.0 - cover));
     col = mix(col, vec3(1.0), (0.4 + 0.2 * uTextDepth) * nearLight * (1.0 - farSide));
     col *= 1.0 - (0.25 + 0.2 * uTextDepth) * farSide * (1.0 - nearLight);
     col *= 1.0 - (0.22 + 0.2 * uTextDepth) * thrown;
@@ -442,13 +448,12 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // Spot UV: clear varnish exactly on the glyphs. Nearly invisible head-on,
     // a hard gloss when the angle is right.
     float glint = pow(ndh, mix(40.0, 260.0, uTextGloss));
-    float sweep = pow(0.5 + 0.5 * sin(dot(uv, vec2(5.0, 7.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 6.0);
+    float sweep = pow(0.5 + 0.5 * sin(dot(uv, vec2(5.0, 7.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 2.0);
     // Varnish deepens what's under it and leaves a faint gloss, so even clear varnish on bare stock reads.
     col = mix(col, col * 0.86, cover * 0.8);
     col += vec3(0.05) * cover;
     // The sweep fades across each glyph so the varnish reads as a reflection, not paint.
-    float across = 0.6 + 0.4 * sin(dot(uv, vec2(60.0, -40.0)) + dot(t, vec2(4.0)));
-    float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * across * (0.25 + 0.45 * uTextGloss);
+    float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * (0.12 + 0.18 * uTextGloss);
     col += vec3(0.95, 0.97, 1.0) * cover * (gloss + flare * 0.9);
     // The film's edge catches a hard one-pixel rim on the light side, even head-on.
     vec2 rimStep = dirL * max(texel * 1.5, e);

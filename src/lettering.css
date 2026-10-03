@@ -479,7 +479,7 @@
 }
 
 .lt-jump-text small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   opacity: 0.75;
 }
@@ -537,19 +537,12 @@
 /* A brief glow when the shortcut brings you here. */
 .lt.is-called {
   animation: lt-called 1.8s var(--ease-out);
+  outline-offset: 10px;
 }
 
 @keyframes lt-called {
-  0%, 40% {
-    background: color-mix(in srgb, var(--gold) 12%, transparent);
-    box-shadow: 0 0 0 10px color-mix(in srgb, var(--gold) 12%, transparent), 0 0 0 13px var(--gold);
-    border-radius: 6px;
-  }
-  100% {
-    background: transparent;
-    box-shadow: 0 0 0 10px transparent, 0 0 0 13px transparent;
-    border-radius: 6px;
-  }
+  0%, 40% { outline: 3px solid var(--gold); }
+  100% { outline: 3px solid transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -596,4 +589,19 @@
 
 .lt-target:empty {
   display: none;
+}
+
+/* Keyboard focus is white, so it never reads as the gold "selected" ring. */
+.lt-style:focus-visible,
+.lt-swatch:focus-visible,
+.lt-jump:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+}
+
+/* Value words: same column as the panel's other sliders, never wrapping. */
+.lt .lt-slider output {
+  font-family: var(--font);
+  font-size: 12px;
+  white-space: nowrap;
 }
