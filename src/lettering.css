@@ -32,7 +32,9 @@
 }
 
 .lt-reset[hidden] {
-  display: none;
+  /* Keep its space so the header never shifts. */
+  display: inline;
+  visibility: hidden;
 }
 
 /* Style chips: each one prints your card's first letter in that finish. */
@@ -122,7 +124,7 @@
 .lt-chip b {
   position: relative;
   font-family: 'DotGothic16', monospace;
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 400;
   line-height: 1;
   color: var(--lt-ink);
@@ -134,15 +136,15 @@
 [data-style='deboss'] .lt-chip b {
   color: color-mix(in srgb, var(--lt-ink) 88%, #000);
   text-shadow:
-    calc(var(--lx) * 2px) calc(var(--ly) * 2px) 0 rgba(0, 0, 0, 0.55),
-    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 rgba(255, 255, 255, 0.85);
+    calc(var(--lx) * 2.5px) calc(var(--ly) * 2.5px) 0 rgba(0, 0, 0, 0.6),
+    calc(var(--lx) * -2px) calc(var(--ly) * -2px) 0 rgba(255, 255, 255, 0.95);
 }
 
 /* Emboss: lit shoulder towards the light, a soft cast shadow away from it. */
 [data-style='emboss'] .lt-chip b {
   text-shadow:
-    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 rgba(255, 255, 255, 0.9),
-    calc(var(--lx) * -3px) calc(var(--ly) * -3px + 1px) 3px rgba(0, 0, 0, 0.5);
+    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 rgba(255, 255, 255, 0.95),
+    calc(var(--lx) * -4px) calc(var(--ly) * -4px + 2px) 3px rgba(0, 0, 0, 0.55);
 }
 
 .is-blind[data-style='deboss'] .lt-chip b,
@@ -194,7 +196,7 @@
   position: absolute;
   inset: 0;
   color: transparent;
-  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, transparent 58%);
+  background: linear-gradient(115deg, transparent 44%, rgba(255, 255, 255, 0.95) 48%, transparent 52%);
   background-size: 300% 100%;
   /* At rest the band crosses the glyph's right side; moving the pointer sweeps it across. */
   background-position: calc((var(--mx) * 0.6 + 0.2) * 100%) 0;
@@ -238,6 +240,11 @@
 .lt-picked {
   font-size: 13px;
   color: var(--text);
+}
+
+.lt-picked:not(:empty)::before {
+  content: '— ';
+  color: var(--text-dim);
 }
 
 .lt-row[hidden],
@@ -465,13 +472,13 @@
 @keyframes lt-called {
   0%, 40% {
     background: color-mix(in srgb, var(--gold) 12%, transparent);
-    box-shadow: 0 0 0 3px var(--gold), 0 4px 0 3px var(--edge);
-    border-radius: 10px;
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--gold) 12%, transparent), 0 0 0 13px var(--gold);
+    border-radius: 6px;
   }
   100% {
     background: transparent;
-    box-shadow: 0 0 0 3px transparent, 0 4px 0 3px transparent;
-    border-radius: 10px;
+    box-shadow: 0 0 0 10px transparent, 0 0 0 13px transparent;
+    border-radius: 6px;
   }
 }
 

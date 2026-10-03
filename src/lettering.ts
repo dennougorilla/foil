@@ -300,7 +300,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     float fine = 1.0 / (1.0 + 2.5 * letterLod);
     float grain = (vnoise(uv * vec2(1100.0, 1540.0)) - 0.5) * fine;
     float grain2 = (vnoise(uv * vec2(1540.0, 1100.0) + 7.0) - 0.5) * fine;
-    vec3 Nf = normalize(N + vec3(grain, grain2, 0.0) * (0.06 + 0.14 * (1.0 - uTextGloss)));
+    vec3 Nf = normalize(N + vec3(grain, grain2, 0.0) * (0.04 + 0.08 * (1.0 - uTextGloss)));
     float nd = max(dot(Nf, Hv), 0.0);
     // Sweeping reflection band: the foil mirrors a bright room edge that slides as the card tilts.
     float ph = dot(uv, vec2(9.0, 13.0)) + dot(t, vec2(3.2, 2.4)) + dot(Nf.xy, vec2(4.0));
@@ -314,7 +314,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
       lo = rb * 0.5 + vec3(0.04, 0.03, 0.08);
       hi = mix(rb, vec3(1.0), 0.3);
     }
-    float x = clamp(0.18 + sheen * 0.7 + lam * 1.4 + grain * 0.14, 0.0, 1.0);
+    float x = clamp(0.18 + sheen * 0.7 + lam * 1.4 + grain * 0.07, 0.0, 1.0);
     // Metal is never mid-grey: push the ramp towards its ends.
     vec3 metal = mix(lo, hi, smoothstep(0.0, 1.0, x));
     metal += hi * pow(nd, mix(14.0, 140.0, uTextGloss)) * (0.5 + 0.9 * uTextGloss);

@@ -187,6 +187,19 @@ export function mountLettering(o: Options): void {
     return b;
   });
   ink.group.append(inkPicker);
+  // Pointing at or focusing a swatch names it before you commit to it.
+  const peek = (row: { name: HTMLElement; group: HTMLElement }) => {
+    const show = (e: Event) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('.lt-swatch');
+      if (b) row.name.textContent = b.getAttribute('aria-label');
+    };
+    const back = () => sync();
+    row.group.addEventListener('pointerover', show);
+    row.group.addEventListener('focusin', show);
+    row.group.addEventListener('pointerleave', back);
+    row.group.addEventListener('focusout', back);
+  };
+  peek(ink);
 
   const foil = swatchRow('ltFoilLabel');
   const foilPicker = picker((hex) => set({ foil: 'custom', foilColor: hex }));
@@ -211,6 +224,7 @@ export function mountLettering(o: Options): void {
     return b;
   });
   foil.group.append(foilPicker);
+  peek(foil);
 
   const slider = (id: string, key: 'depth' | 'gloss') => {
     const row = el('div', 'row lt-slider');
