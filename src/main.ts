@@ -478,7 +478,8 @@ async function loadFile(file: File) {
   pickLabel.textContent = t.loading;
   $('thumbLabel').textContent = t.loading;
   $('pickBtn').setAttribute('aria-busy', 'true');
-  saveBtn.disabled = true;
+  // Save rests while the picture loads, unless an export owns the button (APNG uses it to stop).
+  if (!saveBtn.hasAttribute('aria-busy')) saveBtn.disabled = true;
   try {
     const { still, anim } = await decodeImage(file);
     userImage = still;
@@ -501,7 +502,7 @@ async function loadFile(file: File) {
     document.body.classList.remove('is-loading');
     pickLabel.textContent = t.pick;
     $('pickBtn').removeAttribute('aria-busy');
-    saveBtn.disabled = false;
+    if (!saveBtn.hasAttribute('aria-busy')) saveBtn.disabled = false;
   }
 }
 
@@ -913,10 +914,11 @@ rovingKeys($('matteSeg'));
 async function busy(label: string, job: (progress: (p: number) => void) => Promise<string>, fail = t.errDecode) {
   const b = saveBtn.querySelector('.btn-text b')!;
   const small = saveBtn.querySelector('.btn-text small')!;
-  // One export at a time: the button and the format choice rest while this one works.
-  const all = [saveBtn, ...$('formatSeg').querySelectorAll<HTMLButtonElement>('button')];
-  all.forEach((x) => (x.disabled = true));
+  // One export at a time: the button, the format choice and the APNG shortcut rest while this one works.
+  saveBtn.disabled = true;
   saveBtn.setAttribute('aria-busy', 'true');
+  $<HTMLButtonElement>('toApng').disabled = true;
+  buildFormats();
   small.textContent = label;
   const progress = (p: number) => {
     b.textContent = `${Math.round(p * 100)}%`;
@@ -933,8 +935,11 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     sfx.error();
     toast((err as Error).message === 'video-unsupported' ? t.errVideo : fail, true);
   } finally {
-    all.forEach((x) => (x.disabled = false));
     saveBtn.removeAttribute('aria-busy');
+    // A picture still loading keeps Save resting; the format buttons are rebuilt, not the old ones re-enabled.
+    saveBtn.disabled = store.get().loading;
+    $<HTMLButtonElement>('toApng').disabled = false;
+    buildFormats();
     saveBtn.style.removeProperty('--p');
     // From the current dictionary, in case the language changed mid-export.
     renderSave();
@@ -961,6 +966,8 @@ function celebrate(file: string) {
 
 saveBtn.addEventListener('click', () => {
   const f = store.get().exportFormat;
+  // One export at a time, and not while a picture is loading (APNG handles its own button, incl. stop).
+  if (f !== 'apng' && (saveBtn.hasAttribute('aria-busy') || store.get().loading)) return;
   if (f === 'png') void busy(t.saving, () => exportPng(exportInput()), t.errPng);
   else if (f === 'gif') {
     const small = saveBtn.querySelector('.btn-text small')!;

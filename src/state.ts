@@ -111,7 +111,7 @@ export function createStore() {
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;
     state.gifClear = state.gifClear === true;
-    if (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte)) state.gifMatte = 'auto';
+    if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
     Object.assign(state, sanitizeRangeColors(state));
   } catch {
     /* storage unavailable: defaults are fine */
