@@ -76,7 +76,7 @@ let browsing = false;
 /** Arrow keys move and select within a radiogroup, like the rest of the panel. */
 function roving(group: HTMLElement) {
   group.addEventListener('keydown', (e) => {
-    const items = [...group.querySelectorAll<HTMLButtonElement>('[role=radio]')].filter((b) => !b.hidden);
+    const items = [...group.querySelectorAll<HTMLButtonElement>('[role=radio]')].filter((b) => !b.hidden && !b.disabled);
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
     if (i < 0) return;
     let n = -1;
@@ -181,6 +181,8 @@ export function mountLettering(o: Options): void {
     b.type = 'button';
     b.setAttribute('role', 'radio');
     if (k in INKS) b.style.setProperty('--sw', INKS[k as keyof typeof INKS]);
+    // The two non-colour choices carry a word, not just a symbol.
+    if (k === 'auto' || k === 'none') b.append(el('span', 'lt-swatch-word'));
     b.addEventListener('click', () => {
       sfx.tick();
       if (k === 'custom') {
@@ -346,6 +348,8 @@ export function mountLettering(o: Options): void {
     INK_KEYS.forEach((k, i) => {
       inkBtns[i].setAttribute('aria-label', t.inkName[k]);
       inkBtns[i].title = t.inkName[k];
+      const w = inkBtns[i].querySelector('.lt-swatch-word');
+      if (w) w.textContent = t.inkShort[k as 'auto' | 'none'];
     });
     FOIL_TONES.forEach((k, i) => {
       foilBtns[i].setAttribute('aria-label', t.foilName[k]);
@@ -389,17 +393,21 @@ export function mountLettering(o: Options): void {
     const jg = jumpChip.querySelector('b')!;
     jg.textContent = jg.dataset.g = glyph;
 
+    // Ink and foil rows swap (same height); sliders that don't apply are greyed
+    // out rather than removed, so the panel never changes height.
     ink.row.hidden = !c.ink;
     foil.row.hidden = !c.foil;
-    depth.row.hidden = !c.depth;
-    gloss.row.hidden = !c.gloss;
-    tilt.hidden = l.style === 'ink';
+    for (const [sl, on] of [[depth, c.depth], [gloss, c.gloss]] as const) {
+      sl.input.disabled = !on;
+      sl.row.classList.toggle('is-off', !on);
+    }
+    tilt.classList.toggle('is-off', l.style === 'ink');
     detail.dataset.style = l.style;
 
     const ik = inkKeyOf(l.ink);
     INK_KEYS.forEach((k, i) => {
       const b = inkBtns[i];
-      b.hidden = k === 'none' && !c.blind;
+      b.disabled = k === 'none' && !c.blind;
       // Blind only exists for presses; ink style falls back to the frame's ink.
       radio(b, k === ik || (k === 'auto' && ik === 'none' && !c.blind));
     });
@@ -416,13 +424,13 @@ export function mountLettering(o: Options): void {
 
     // Values read as words (shallow…deep, matte…mirror); the percentage stays for screen readers.
     const word = (v: number, w: readonly string[]) => w[v < 0.34 ? 0 : v < 0.67 ? 1 : 2];
-    depth.label.textContent = t.depth[l.style];
+    depth.label.textContent = t.depth;
     depth.input.value = String(l.depth);
-    depth.out.textContent = word(l.depth, t.level[l.style]);
+    depth.out.textContent = c.depth ? word(l.depth, t.level) : '—';
     depth.input.setAttribute('aria-valuetext', `${depth.out.textContent} (${Math.round(l.depth * 100)}%)`);
     fill(depth.input);
     gloss.input.value = String(l.gloss);
-    gloss.out.textContent = word(l.gloss, t.glossLevel);
+    gloss.out.textContent = c.gloss ? word(l.gloss, t.glossLevel) : '—';
     gloss.input.setAttribute('aria-valuetext', `${gloss.out.textContent} (${Math.round(l.gloss * 100)}%)`);
     fill(gloss.input);
     reset.hidden = JSON.stringify(l) === JSON.stringify(DEFAULT_LETTERING);

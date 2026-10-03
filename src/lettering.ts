@@ -269,8 +269,7 @@ export function stillPose(tilt: [number, number], light: [number, number]): { ti
       best = tx;
     }
   }
-  // Light from just above the name so the varnish's own glint lands on it too.
-  return { tilt: [best, ty], light: s === 'spot' ? [cx, cy - 0.12] : light };
+  return { tilt: [best, ty], light };
 }
 
 // ---------- GL side ----------
@@ -387,6 +386,9 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   // At least ~2 screen pixels, so the bevel still reads when the card is small.
   float bite = 1.0 + 1.6 * sin(3.14159 * k) * (1.0 - k);
   vec2 band = dirL * max(texel * (1.0 + 2.0 * uTextDepth), e * (1.4 + 1.2 * uTextDepth)) * bite;
+  // With no ink the die is the bare letter, whose strokes are only a few pixels
+  // wide on screen: thinner bands keep its lit and dark edges from cancelling.
+  if (uTextBlind > 0.5) band *= 0.5;
   float d0 = die(uv);
   float nearLight = d0 * (1.0 - die(uv + band));  // die edge facing the light
   float farSide = d0 * (1.0 - die(uv - band));    // die edge facing away
@@ -398,14 +400,14 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     col *= 1.0 - (0.35 + 0.25 * uTextDepth) * nearLight;
     col = mix(col, vec3(1.0), (0.5 + 0.25 * uTextDepth) * farSide * (1.0 - nearLight));
   } else if (uTextStyle == 2) {
-    // Emboss: a raised plateau. Lit edge towards the light, a dark edge away
-    // from it, and a hard drop shadow thrown onto the stock beyond.
-    float thrown = (1.0 - d0) * die(uv + band * (1.6 + 1.2 * uTextDepth));
-    // The raised plateau catches more light than the flat stock around it.
-    col = mix(col, vec3(1.0), (0.18 + 0.14 * uTextDepth) * d0 * (1.0 - cover));
-    col = mix(col, vec3(1.0), (0.4 + 0.2 * uTextDepth) * nearLight * (1.0 - farSide));
-    col *= 1.0 - (0.25 + 0.2 * uTextDepth) * farSide * (1.0 - nearLight);
-    col *= 1.0 - (0.22 + 0.2 * uTextDepth) * thrown;
+    // Emboss: a raised plateau, told in steps of brightness on the die itself
+    // (lit edge > plateau > stock > far edge) plus only a one-band contact
+    // shadow, so dense letters like 焼 or 峠 never smear into an offset copy.
+    float contact = (1.0 - d0) * die(uv + band);
+    col = mix(col, vec3(1.0), (0.2 + 0.14 * uTextDepth) * d0 * (1.0 - cover));
+    col = mix(col, vec3(1.0), (0.45 + 0.2 * uTextDepth) * nearLight * (1.0 - farSide));
+    col *= 1.0 - (0.38 + 0.2 * uTextDepth) * farSide * (1.0 - nearLight);
+    col *= 1.0 - (0.18 + 0.1 * uTextDepth) * contact;
     col += pow(ndh, mix(10.0, 60.0, uTextGloss)) * uTextGloss * 0.25 * d0;
   } else if (uTextStyle == 3) {
     // Hot-foil: a mirror-like metal with a fine grain, pressed slightly into the card.
@@ -433,8 +435,12 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     metal += hi * pow(nd, mix(14.0, 140.0, uTextGloss)) * (0.5 + 0.9 * uTextGloss);
     // A bright glint along the band's crest reads as polished metal even on a small card.
     metal += hi * smoothstep(0.85, 1.0, sheen) * 0.35 * uTextGloss;
-    // The press leaves a dent: a thin shaded wall that keeps pale foils legible on pale stock.
-    col *= 1.0 - (0.18 + 0.3 * uTextDepth) * h * (1.0 - cover);
+    // The press leaves a dark dent round every letter: a hard rim at least a
+    // screen pixel wide, which keeps gold and silver legible on pale stock.
+    vec2 rs = max(texel * 2.0, e * 1.3);
+    float ring = max(max(textureLod(uTextMap, uv + vec2(rs.x, 0.0), letterLod).r, textureLod(uTextMap, uv - vec2(rs.x, 0.0), letterLod).r),
+                     max(textureLod(uTextMap, uv + vec2(0.0, rs.y), letterLod).r, textureLod(uTextMap, uv - vec2(0.0, rs.y), letterLod).r));
+    col *= 1.0 - (0.3 + 0.25 * uTextDepth) * ring * (1.0 - cover);
     col *= 1.0 + clamp(lam, -0.2, 0.15) * (1.0 - cover) * uTextDepth;
     metal += hi * flare * 1.6;
     if (laid < 1.0) {
@@ -454,11 +460,15 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     col += vec3(0.05) * cover;
     // The sweep fades across each glyph so the varnish reads as a reflection, not paint.
     float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * (0.12 + 0.18 * uTextGloss);
-    col += vec3(0.95, 0.97, 1.0) * cover * (gloss + flare * 0.9);
+    // Capped, so clear varnish on pale stock reads as a sheen, never a blown-out blob.
+    col = mix(col, vec3(0.97, 0.98, 1.0), min(cover * (gloss + flare * 0.9), 0.42));
     // The film's edge catches a hard one-pixel rim on the light side, even head-on.
     vec2 rimStep = dirL * max(texel * 1.5, e);
     float rim = cover * (1.0 - textureLod(uTextMap, uv + rimStep, letterLod).r);
-    col = mix(col, vec3(1.0), rim * (0.25 + 0.35 * uTextGloss + 0.4 * sweep));
+    col = mix(col, vec3(1.0), min(rim * (0.25 + 0.35 * uTextGloss + 0.4 * sweep), 0.55));
+    // The varnish's shadow-side rim: a faint dark line, so even clear varnish is findable head-on.
+    float rimDark = cover * (1.0 - textureLod(uTextMap, uv - rimStep, letterLod).r);
+    col *= 1.0 - 0.18 * rimDark;
   }
   return col;
 }

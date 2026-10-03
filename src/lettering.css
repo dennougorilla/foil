@@ -16,11 +16,6 @@
   gap: 8px;
 }
 
-.lt-head .field-label {
-  color: var(--text);
-  font-size: 16px;
-  text-shadow: 0 2px 0 var(--edge);
-}
 
 .lt-target {
   font-size: 13px;
@@ -96,9 +91,13 @@
   white-space: nowrap;
 }
 
+.lt-style-name {
+  padding-inline: 1px;
+}
+
 @container (max-width: 320px) {
   [data-style='spot'] .lt-style-name {
-    font-size: 10px;
+    letter-spacing: -0.09em;
   }
 }
 
@@ -319,27 +318,36 @@
 }
 
 /* Auto: the frame's own ink, shown as a letter on the card stock. */
-.lt-ink-auto {
+/* "Frame" and "None" are words on the card stock, not colour chips. */
+.lt-ink-auto,
+.lt-ink-none {
+  width: auto;
+  min-width: 26px;
+  padding: 0 8px;
   background: var(--lt-paper);
+  font-size: 12px;
+  line-height: 26px;
 }
 
-.lt-ink-auto::after {
-  content: 'A';
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-family: 'DotGothic16', monospace;
-  font-size: 17px;
-  line-height: 1;
+.lt-ink-auto {
   color: var(--sw);
 }
 
-/* None: blank stock with a strike. */
 .lt-ink-none {
+  color: #4f5a5e;
   background:
-    linear-gradient(135deg, transparent 44%, var(--red) 44% 56%, transparent 56%),
+    repeating-linear-gradient(135deg, transparent 0 5px, rgba(0, 0, 0, 0.08) 5px 7px),
     var(--lt-paper);
+}
+
+.is-dark-stock .lt-ink-none {
+  color: var(--text);
+}
+
+.lt-swatch:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Custom: a colour wheel with a plus, or the chosen colour as a dot once set. */
@@ -535,14 +543,29 @@
 }
 
 /* A brief glow when the shortcut brings you here. */
-.lt.is-called {
+.lt {
+  position: relative;
+}
+
+/* The jump highlight is a frame drawn inside the block's own padding, so it
+   never runs into the divider or the next control. */
+.lt::before {
+  content: '';
+  position: absolute;
+  inset: -8px -10px 6px;
+  border: 3px solid var(--gold);
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lt.is-called::before {
   animation: lt-called 1.8s var(--ease-out);
-  outline-offset: 10px;
 }
 
 @keyframes lt-called {
-  0%, 40% { outline: 3px solid var(--gold); }
-  100% { outline: 3px solid transparent; }
+  0%, 40% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -553,7 +576,7 @@
   .lt-jump:hover .lt-jump-arrow {
     transform: none;
   }
-  .lt.is-called {
+  .lt.is-called::before {
     animation-duration: 0.01s;
   }
 }
@@ -604,4 +627,17 @@
   font-family: var(--font);
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* Controls that don't apply to the chosen style stay in place, greyed out. */
+.lt-slider.is-off {
+  opacity: 0.38;
+}
+
+.lt-slider.is-off input {
+  cursor: not-allowed;
+}
+
+.lt-tilt.is-off {
+  visibility: hidden;
 }
