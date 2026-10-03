@@ -14,10 +14,12 @@ import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
 import { initRangeColors } from './features';
+import { handMode, initSponsor, isLocked, releaseLockedEdition } from './sponsor';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const store = createStore();
+releaseLockedEdition(store);
 let t: Dict = DICTS[store.get().lang];
 
 // ---------- Images ----------
@@ -54,6 +56,7 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
+    handMode,
   });
 } catch (err) {
   console.error(err);
@@ -132,7 +135,7 @@ function renderInfo() {
   const pe = $('pillEdition');
   pe.textContent = t.edition[s.edition];
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
-  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch'].includes(s.edition));
+  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
 }
 
@@ -147,7 +150,8 @@ function renderCaption(id: EditionId | null) {
   cap.querySelector('span')!.textContent = t.look[s.edition];
   const peek = $('handPeek');
   peek.hidden = !id || id === s.edition;
-  if (id) peek.textContent = t.edition[id];
+  if (id) peek.textContent = isLocked(id) ? t.sponsorSecret : t.edition[id];
+  peek.classList.toggle('is-secret', !!id && isLocked(id));
 }
 
 // ---------- Panel controls ----------
@@ -534,6 +538,7 @@ fileInput.addEventListener('change', () => {
 // ---------- Edition ----------
 
 function selectEdition(id: EditionId) {
+  if (sponsor.gate(id)) return;
   if (store.get().edition === id) {
     stage.juice(0.5);
     return;
@@ -568,8 +573,9 @@ window.addEventListener('keydown', (e) => {
   const free = document.activeElement === document.body || document.activeElement?.id === 'cardSlot';
   if (free && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     e.preventDefault();
-    const cur = EDITIONS.findIndex((x) => x.id === store.get().edition);
-    const next = (cur + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
+    let next = EDITIONS.findIndex((x) => x.id === store.get().edition);
+    do next = (next + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
+    while (isLocked(EDITIONS[next].id));
     selectEdition(EDITIONS[next].id);
   }
 });
@@ -725,7 +731,7 @@ const apngExport = mountApngExport({
     logo.classList.remove('is-flip');
     void logo.offsetWidth;
     logo.classList.add('is-flip');
-    const others = EDITIONS.filter((e) => e.id !== store.get().edition);
+    const others = EDITIONS.filter((e) => e.id !== store.get().edition && !isLocked(e.id));
     selectEdition(others[Math.floor(Math.random() * others.length)].id);
   });
   logo.addEventListener('animationend', (e) => {
@@ -860,6 +866,14 @@ mountLettering({
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
+const sponsor = initSponsor({
+  store,
+  stage,
+  dict: () => t,
+  apply: selectEdition,
+  toast: (msg) => toast(msg),
+  face: () => ({ face, mask, back }),
+});
 const boot = () => {
   redrawFace();
   drawCropPreview();
