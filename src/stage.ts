@@ -2,6 +2,8 @@ import { EDITIONS, type EditionId } from './editions';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
 import { sfx } from './audio';
 import type { Store } from './state';
+import { motion } from './tune/motion';
+import { tuneGl } from './tune/model';
 
 class Spring {
   v = 0;
@@ -78,6 +80,7 @@ export class Stage {
   private palette: [RGB, RGB, RGB];
   private bgPointer: [number, number] = [0.5, 0.5];
   private focus: [number, number] = [0.4, 0.55];
+  private lastTune: unknown = null;
 
   constructor(o: StageOptions) {
     this.o = o;
@@ -344,6 +347,11 @@ export class Stage {
     this.time += dt;
     if (this.motion) this.bgTime += dt;
     const state = this.o.store.get();
+    const tune = motion.view(state.tune);
+    if (tune !== this.lastTune) {
+      this.lastTune = tune;
+      this.cards.tune = tuneGl(tune);
+    }
 
     // Resize canvases to their boxes
     const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
@@ -380,6 +388,8 @@ export class Stage {
       const over = this.pointer.inside && Math.abs(nx) < 1.05 && Math.abs(ny) < 1.05;
       this.pointer.overCard = over || this.drag.active;
       const amp = this.motion ? 1 : 0.5;
+      const gyro = motion.gyroInput(tune);
+      motion.step(dt, tune, !this.motion, over || this.drag.active);
       if (this.drag.active) {
         this.ry.target = clamp(this.drag.vx * 0.00025, -0.5, 0.5) * amp;
         this.rx.target = clamp(-this.drag.vy * 0.00025, -0.5, 0.5) * amp;
@@ -387,6 +397,10 @@ export class Stage {
       } else if (over) {
         this.ry.target = clamp(nx, -1, 1) * 0.32 * amp;
         this.rx.target = -clamp(ny, -1, 1) * 0.28 * amp;
+        this.rz.target = 0;
+      } else if (gyro) {
+        this.ry.target = gyro[0] * 0.32 * amp;
+        this.rx.target = -gyro[1] * 0.28 * amp;
         this.rz.target = 0;
       } else if (this.pointer.inside) {
         this.ry.target = clamp(nx * 0.05, -0.12, 0.12) * amp;
@@ -398,7 +412,6 @@ export class Stage {
         this.rz.target = 0;
       }
       // Idle float
-      const t = this.time;
       const idle = this.motion && !this.drag.active ? 1 : 0;
       const sub = 4;
       for (let i = 0; i < sub; i++) {
@@ -422,21 +435,27 @@ export class Stage {
         }
       }
 
-      const fy = Math.sin(t * 1.3) * 6 * idle;
-      const rzIdle = Math.sin(t * 0.9) * 0.022 * idle;
-      const rxIdle = Math.sin(t * 0.7 + 1) * 0.05 * idle;
-      const ryIdle = Math.cos(t * 0.6) * 0.07 * idle;
-      const RX = this.rx.x + rxIdle;
-      const RY = this.ry.x + ryIdle + flipAngle;
-      const RZ = this.rz.x + rzIdle;
+      // Idle motion and the light come from the tune (sway and pointer-follow by default).
+      const pose = motion.idle(tune, idle > 0);
+      const fy = pose.fy;
+      const rzIdle = pose.rz;
+      const rxIdle = pose.rx;
+      const ryIdle = pose.ry;
+      const tk = motion.tiltScale(tune);
+      const RX = this.rx.x * tk + rxIdle;
+      const RY = this.ry.x * tk + ryIdle + pose.spin + flipAngle;
+      const RZ = this.rz.x * tk + rzIdle;
 
+      const orbit = motion.orbitSheen(tune);
       const tilt: [number, number] = [
-        (this.ry.x + ryIdle) / 0.32 + Math.sin(t * 0.45) * 0.3 * idle,
-        (this.rx.x + rxIdle) / 0.28 + Math.cos(t * 0.38) * 0.3 * idle,
+        (this.ry.x + ryIdle) / 0.32 + pose.sheen[0] + orbit[0],
+        (this.rx.x + rxIdle) / 0.28 + pose.sheen[1] + orbit[1],
       ];
       let light: [number, number];
       if (over && !this.drag.active) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
+      else if (gyro) light = [clamp(gyro[0] * 0.5 + 0.5, 0, 1), clamp(gyro[1] * 0.5 + 0.5, 0, 1)];
       else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
+      light = motion.light(tune, light);
 
       const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
       this.cards.drawCard(
@@ -448,7 +467,7 @@ export class Stage {
           rx: RX,
           ry: RY,
           rz: RZ,
-          scale: this.sc.x,
+          scale: this.sc.x * pose.scale,
           edition: ed.shader,
           intensity: state.intensity,
           pixel: PIXEL_STEPS[state.pixel] ?? 0,
@@ -456,9 +475,9 @@ export class Stage {
           light,
           alpha: 1,
           flash: this.flash,
-          shadow: [10 + lift * 0.3 - RY * 18, 16 + lift * 0.5 + RX * 10],
+          shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
         },
-        this.time,
+        motion.fx,
       );
       // Info box sways a little with the card, like a hanging tag.
       // ...but holds still while someone is pointing at it or typing in it.
@@ -542,7 +561,7 @@ export class Stage {
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],
           plate: false,
         },
-        this.time,
+        motion.fx,
       );
     }
   }
