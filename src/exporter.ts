@@ -22,11 +22,11 @@ export interface ExportInput {
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 
-const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
+export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
 
 const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
 
-function download(blob: Blob, name: string): string {
+export function download(blob: Blob, name: string): string {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -76,7 +76,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
   return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
 }
 
-interface Scene {
+export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   /** Draws loop position p∈[0,1): the card orbits once on the swirl backdrop. */
@@ -84,8 +84,11 @@ interface Scene {
   dispose(): void;
 }
 
-/** The shared stage for video and GIF: a pixel swirl upscaled nearest, with the card composited on top. */
-function createScene(input: ExportInput, W: number, H: number, readback = false): Scene {
+/**
+ * The shared stage for video and GIF: a pixel swirl upscaled nearest, with the card composited on top.
+ * `transparent` leaves the swirl out so only the card and its shadow are drawn (APNG).
+ */
+export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false): Scene {
   const out = document.createElement('canvas');
   out.width = W;
   out.height = H;
@@ -119,7 +122,7 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
-      bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
+      if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const { rx, ry } = pose;
       cards.drawCard(
@@ -144,7 +147,8 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
         cardTime * tune.speed,
       );
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(bgCanvas, 0, 0, W, H);
+      if (transparent) ctx.clearRect(0, 0, W, H);
+      else ctx.drawImage(bgCanvas, 0, 0, W, H);
       ctx.drawImage(cardCanvas, 0, 0);
     },
     dispose() {
@@ -190,6 +194,17 @@ export async function exportVideo(input: ExportInput, onProgress?: (p: number) =
   return download(new Blob(chunks, { type: mime.split(';')[0] }), `${fileSafe(input.name)}-${input.edition.id}.${ext}`);
 }
 
+/**
+ * Loop length for animated exports. An animated source sets it so its motion and the orbit
+ * repeat together: short sources play whole cycles, and long ones are sped up to fit, so the
+ * export always loops seamlessly. `sourceSpan` is the source time one loop covers.
+ */
+export function animLoop(sourceMs: number | undefined, fallbackMs: number): { loopMs: number; sourceSpan: number } {
+  if (!sourceMs) return { loopMs: fallbackMs, sourceSpan: fallbackMs };
+  const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
+  return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
+}
+
 const GIF_W = 480;
 const GIF_H = 600;
 const GIF_FRAMES = 48;
@@ -219,14 +234,9 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  // An animated source sets the loop length so its motion and the orbit repeat together: short
-  // sources play whole cycles, and long ones are sped up to fit, so the GIF always loops seamlessly.
-  const src = input.loopMs ?? 0;
-  const loopMs = src ? Math.min(src * Math.ceil(1200 / src), 6000) : GIF_FRAMES * GIF_DELAY;
+  const { loopMs, sourceSpan } = animLoop(input.loopMs, GIF_FRAMES * GIF_DELAY);
   const frames = Math.round(loopMs / GIF_DELAY);
   const DUR = (frames * GIF_DELAY) / 1000;
-  // Source time covered by one GIF loop: whole cycles, or the full source when sped up.
-  const sourceSpan = src > 6000 ? src : src ? loopMs : DUR * 1000;
   let scene: Scene | undefined;
   try {
     scene = createScene(input, GIF_W, GIF_H, true);

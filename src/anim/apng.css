@@ -1,0 +1,233 @@
+/* High-quality (APNG) export: a full-width tile under PNG / GIF / Video, built like its
+   neighbours but wearing a holographic face, like the rare finishes it saves. */
+
+.export .btn-hq {
+  --c: #4a7fd0;
+  --lo: #2c3f7a;
+  --fill: var(--green);
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  position: relative;
+  overflow: hidden;
+  padding: 3px 12px 3px 7px;
+  background: linear-gradient(110deg, #2fae84 0%, #3a8fd6 38%, #8a63d2 70%, #d0609a 100%);
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+/* A band of foil light sweeps across once on hover, the same sheen the cards wear. */
+.export .btn-hq::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.22) 43%,
+    rgba(242, 193, 78, 0.5) 50%,
+    rgba(125, 255, 198, 0.3) 57%,
+    transparent 68%
+  ) 0 0 / 250% 100% no-repeat;
+  mix-blend-mode: screen;
+  background-position: 100% 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.export .btn-hq:not([aria-busy]):hover::before {
+  animation: hq-glint 0.9s var(--ease-out) forwards;
+}
+
+@keyframes hq-glint {
+  from { background-position: 100% 0; opacity: 1; }
+  to { background-position: 0 0; opacity: 1; }
+}
+
+.export .btn-hq:active {
+  transform: translateY(5px);
+}
+
+/* The tag is a tiny card on a pixel checkerboard: the usual sign for "stays transparent". */
+.hq-tag {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--panel-lo);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.hq-tag::before {
+  content: '';
+  width: 16px;
+  height: 22px;
+  border-radius: 2px;
+  background: repeating-conic-gradient(#f3eee2 0 25%, #9fb0b3 0 50%) 0 0 / 7px 7px;
+  box-shadow: 0 0 0 1px var(--edge);
+  transition: transform 0.2s var(--ease-back);
+}
+
+/* Hover: the edge lights up and the little clear card tips, like the thumbnails do. */
+.export .btn-hq:not([aria-busy]):hover {
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+/* Keyboard focus: the gold ring alone marks it, so the green edge steps aside instead of doubling up. */
+.export .btn-hq:focus-visible,
+.export .btn-hq:focus-visible:hover {
+  box-shadow: 0 5px 0 var(--lo);
+}
+
+.export .btn-hq:not([aria-busy]):hover .hq-tag::before,
+.export .btn-hq:not([aria-busy]):focus-visible .hq-tag::before {
+  transform: rotate(-10deg) translateY(-1px);
+}
+
+.export .btn-hq .btn-text b,
+.export .btn-hq .btn-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export .btn-hq .btn-text b {
+  font-size: 16px;
+}
+
+/* What "high quality" buys, in one word, next to the format name. */
+.export .btn-hq .btn-text b i {
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  vertical-align: 2px;
+  color: var(--paper-ink);
+  background: var(--gold);
+  text-shadow: none;
+}
+
+.export .btn-hq .btn-text small {
+  font-size: 13px;
+  opacity: 1;
+}
+
+.hq-meta {
+  display: grid;
+  justify-items: end;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hq-meta b {
+  font-weight: 400;
+  font-size: 18px;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.hq-meta small {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Working: the face stays dark so every word reads, and a strip of cells, one per frame of the
+   loop, fills under the label like frames coming off a reel. */
+.export .btn-hq[aria-busy] {
+  background: var(--panel-lo);
+  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px var(--green);
+}
+
+.export .btn-hq .btn-text::after {
+  content: '';
+  height: 7px;
+  margin-top: 3px;
+  border-radius: 1px;
+}
+
+/* The strip's space is kept while idle too, so starting an export doesn't nudge the panel. */
+.export .btn-hq[aria-busy] .btn-text::after {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(100% / var(--n, 30) - 2px), var(--panel-lo) 0 calc(100% / var(--n, 30))),
+    linear-gradient(90deg, #7dffc6 calc(var(--p, 0) * 100%), rgba(255, 255, 255, 0.16) 0);
+}
+
+.export .btn-hq[aria-busy] .btn-text b {
+  color: var(--green);
+}
+
+/* Just stopped: a quiet beat on the dark face before the tile returns, unlike a finished save. */
+.export .btn-hq.is-stopped {
+  background: var(--panel-lo);
+  box-shadow: 0 5px 0 var(--edge), inset 0 0 0 2px var(--text-dim);
+}
+
+.export .btn-hq.is-stopped .btn-text b {
+  color: var(--text-dim);
+}
+
+/* The right side becomes the way out: a stop key that brightens on hover. */
+.export .btn-hq[aria-busy] .hq-meta {
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.export .btn-hq[aria-busy] .hq-meta b {
+  color: var(--text);
+}
+
+.hq-meta kbd {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-family: var(--display);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--paper-ink);
+  background: var(--paper);
+  box-shadow: 0 2px 0 var(--edge);
+  vertical-align: 1px;
+}
+
+.export .btn-hq[aria-busy]:hover .hq-meta b {
+  color: var(--gold);
+}
+
+/* Touch screens have no Esc key: the row itself is the stop button. */
+@media (hover: none) {
+  .hq-meta kbd {
+    display: none;
+  }
+}
+
+.export .btn-hq[aria-busy] .hq-meta small {
+  display: none;
+}
+
+@media (min-width: 901px) and (max-height: 820px) {
+  .export .btn-hq {
+    min-height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hq-tag::before {
+    transition: none;
+  }
+  .export .btn-hq:not([aria-busy]):hover::before {
+    animation: none;
+  }
+  .export .btn-hq:not([aria-busy]):hover .hq-tag::before {
+    transform: none;
+  }
+}

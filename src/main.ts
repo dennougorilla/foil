@@ -10,6 +10,8 @@ import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
+import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
+import { mountApngExport } from './anim/apngUi';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -225,7 +227,7 @@ function buildThumbs() {
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-label', label);
     b.style.backgroundImage = `url(${thumbUrl(img)})`;
-    if (idx < 0 && userAnim) b.dataset.badge = 'GIF';
+    if (idx < 0 && userAnim) b.dataset.badge = animKind(userAnim);
     radio(b, s.sample === idx);
     b.onclick = () => {
       if (store.get().sample === idx) return;
@@ -234,10 +236,11 @@ function buildThumbs() {
     th.appendChild(b);
   };
   samples.forEach((img, i) => add(img, t.samplesName[i], i));
-  if (userImage) add(userImage, userAnim ? `${t.yourImage} (GIF)` : t.yourImage, -1);
+  if (userImage) add(userImage, userAnim ? `${t.yourImage} (${animKind(userAnim)})` : t.yourImage, -1);
   const label = document.createElement('span');
   label.className = 'thumb-label';
-  label.textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif : t.yourImage;
+  label.textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif.replace('GIF', animKind(userAnim)) : t.yourImage;
+  apngExport.refresh();
   th.appendChild(label);
 }
 
@@ -395,13 +398,17 @@ function setCrop(c: Crop) {
 
 // ---------- Image loading ----------
 
-const ACCEPT = /^image\/(png|jpe?g|webp|gif|avif|bmp)$/;
+const ACCEPT = /^image\/(a?png|jpe?g|webp|gif|avif|bmp)$/;
 const MAX_SIDE = 2048;
 
-/** Decodes a still image (downscaled), or every frame of an animated GIF. */
+/** Decodes a still image (downscaled), or every frame of an animated GIF, PNG or WebP. */
 async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null }> {
   if (blob.type === 'image/gif') {
     const anim = decodeGif(await blob.arrayBuffer());
+    if (anim) return { still: anim.frames[0], anim };
+  }
+  if (/^image\/(a?png|webp)$/.test(blob.type)) {
+    const anim = await decodeAnimated(blob);
     if (anim) return { still: anim.frames[0], anim };
   }
   const bmp = await createImageBitmap(blob);
@@ -418,8 +425,13 @@ async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null 
 
 async function loadFile(file: File) {
   if (!ACCEPT.test(file.type)) {
-    toast(t.errType, true, true);
-    return;
+    // A .apng with no MIME type is still welcome if its bytes say APNG.
+    const apng = file.type ? null : await asTypedApng(file);
+    if (!apng) {
+      toast(t.errType, true, true);
+      return;
+    }
+    file = apng;
   }
   store.set({ loading: true });
   document.body.classList.add('is-loading');
@@ -684,6 +696,14 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
   void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
 });
 
+const apngExport = mountApngExport({
+  btn: $<HTMLButtonElement>('apngBtn'),
+  lang: () => store.get().lang,
+  input: exportInput,
+  toast: (msg, error) => toast(msg, error),
+  sfx,
+});
+
 // ---------- Logo ----------
 
 {
@@ -783,7 +803,8 @@ function toast(msg: string, error = false, pick = false) {
     close.addEventListener('click', () => dismissToast(el));
     el.appendChild(close);
   } else {
-    setTimeout(() => dismissToast(el), 2400);
+    // Longer messages stay up long enough to read.
+    setTimeout(() => dismissToast(el), Math.max(2400, msg.length * 70));
   }
   box.appendChild(el);
 }

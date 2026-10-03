@@ -1383,7 +1383,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
   /* Sits just above the Export section (title included), so it covers neither the header nor the hand. */
   left: auto;
   right: 36px;
-  bottom: 150px;
+  bottom: 198px;
   z-index: 70;
   display: grid;
   gap: 8px;
