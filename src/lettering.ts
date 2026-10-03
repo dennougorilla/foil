@@ -70,7 +70,7 @@ export const STYLE_CONTROLS: Record<LetterStyle, { ink: boolean; blind: boolean;
   deboss: { ink: true, blind: true, foil: false, depth: true, gloss: false },
   emboss: { ink: true, blind: true, foil: false, depth: true, gloss: true },
   foil: { ink: false, blind: false, foil: true, depth: true, gloss: true },
-  spot: { ink: true, blind: true, foil: false, depth: true, gloss: false },
+  spot: { ink: true, blind: true, foil: false, depth: true, gloss: true },
 };
 
 function mixHex(a: string, b: string, k: number): string {
@@ -155,7 +155,8 @@ function dilate(src: Float32Array, w: number, h: number, r: number): Float32Arra
 
 /** Separable box blur, run three times: close to a Gaussian, and works where ctx.filter doesn't (Safari). */
 function blur(src: Float32Array, w: number, h: number, r: number): Float32Array {
-  let a = src;
+  // Work on a copy: the passes ping-pong between two buffers, and the caller still needs src.
+  let a = src.slice();
   let b = new Float32Array(a.length);
   const pass = (from: Float32Array, to: Float32Array, horizontal: boolean) => {
     const n = horizontal ? w : h;
@@ -281,7 +282,8 @@ export class LetteringGL {
   private tex: WebGLTexture;
   private version = -1;
 
-  constructor(private gl: WebGL2RenderingContext) {
+  /** `settled` (exports) always draws the lettering at rest, never mid-stamp. */
+  constructor(private gl: WebGL2RenderingContext, private settled = false) {
     this.tex = createTexture(gl, true);
   }
 
@@ -308,7 +310,7 @@ export class LetteringGL {
     const pressed = (l.style === 'deboss' || l.style === 'emboss') && !blind;
     gl.uniform1f(p.u.uTextBevel, pressed ? plateBevel : bevel);
     gl.uniform1f(p.u.uTextBlind, blind ? 1 : 0);
-    gl.uniform1f(p.u.uTextStamp, Math.min(1, (performance.now() - stampAt) / STAMP_MS));
+    gl.uniform1f(p.u.uTextStamp, this.settled ? 1 : Math.min(1, (performance.now() - stampAt) / STAMP_MS));
     gl.uniform2f(p.u.uTextSpan, nameSpan[0], nameSpan[1]);
     // Bare stock just above the name, for foil that hasn't been laid down yet.
     gl.uniform1f(p.u.uTextStockY, nameCenter[1] - 0.042);
@@ -362,7 +364,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   relief *= 1.0 + 1.6 * sin(3.14159 * k) * (1.0 - k);
   // Where a sweep has reached across the name (foil goes down behind it).
   float sweepX = mix(uTextSpan.x - 0.04, uTextSpan.y + 0.04, smoothstep(0.0, 0.85, k));
-  float laid = k >= 1.0 ? 1.0 : smoothstep(sweepX + 0.012, sweepX - 0.012, uv.x);
+  float laid = k >= 1.0 ? 1.0 : 1.0 - smoothstep(sweepX - 0.012, sweepX + 0.012, uv.x);
   float flare = k >= 1.0 ? 0.0 : exp(-pow((uv.x - sweepX) / 0.018, 2.0)) * (1.0 - k);
   vec3 N = normalize(vec3(-grad * sgn * relief, 1.0));
   // A point light at the hotspot, nudged to the upper left so relief always reads.

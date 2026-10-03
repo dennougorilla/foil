@@ -1557,6 +1557,31 @@ input[type='range']:focus-visible::-moz-range-thumb {
 
 /* ---------- Responsive ---------- */
 
+/* Short laptop screens and 125% scaling: a smaller crop preview and no crop hint, so Pixelate
+   stays above Export (which carries the APNG row too). */
+@media (min-width: 901px) and (max-height: 820px) {
+  .panel .crop-view {
+    height: 56px;
+  }
+  .panel .thumb {
+    width: 36px;
+  }
+  /* The coloured export buttons speak for themselves; their heading gives its room to Pixelate. */
+  .sec-export .sec-title {
+    display: none;
+  }
+  .sec-export::before {
+    height: 12px;
+  }
+  .row-between .hint {
+    display: none;
+  }
+  .row-between {
+    justify-content: flex-end;
+    margin-top: 0;
+  }
+}
+
 /* The shortest laptop heights (720 at 125%): a little less air everywhere. */
 @media (min-width: 901px) and (max-height: 740px) {
   .panel .sec {
@@ -1566,27 +1591,11 @@ input[type='range']:focus-visible::-moz-range-thumb {
   .panel .btn-big {
     min-height: 44px;
   }
-}
-
-/* Short laptop screens and 125% scaling: a smaller crop preview and no crop hint, so Pixelate
-   stays above Export (which carries the APNG row too). */
-@media (min-width: 901px) and (max-height: 820px) {
   .panel .crop-view {
-    height: 64px;
+    height: 48px;
   }
   .panel .thumb {
-    width: 38px;
-  }
-  /* The coloured export buttons speak for themselves; their heading gives its room to Pixelate. */
-  .sec-export .sec-title {
-    display: none;
-  }
-  .row-between .hint {
-    display: none;
-  }
-  .row-between {
-    justify-content: flex-end;
-    margin-top: 0;
+    width: 32px;
   }
 }
 

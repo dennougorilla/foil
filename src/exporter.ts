@@ -43,7 +43,7 @@ export function download(blob: Blob, name: string): string {
 export async function exportPng(input: ExportInput): Promise<string> {
   const pad = 24;
   const canvas = document.createElement('canvas');
-  const r = new CardRenderer(canvas, { preserve: true });
+  const r = new CardRenderer(canvas, { preserve: true, settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
   r.tune = tuneGl(tune);
   r.setFace(input.face, input.mask);
@@ -98,7 +98,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   const bg = new BackgroundRenderer(bgCanvas);
   bg.resize(W / 4, H / 4);
   const cardCanvas = document.createElement('canvas');
-  const cards = new CardRenderer(cardCanvas);
+  const cards = new CardRenderer(cardCanvas, { settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
   cards.tune = tuneGl(tune);
   cards.setFace(input.face, input.mask);

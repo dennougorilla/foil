@@ -106,13 +106,25 @@ export function mountLettering(o: Options): void {
   root.setAttribute('role', 'group');
   root.setAttribute('aria-labelledby', 'ltTitle');
 
+  // Folded to one summary row by default, so the Tune section fits above Export; the row (or
+  // the name-tag chip) opens it.
   const head = el('div', 'lt-head');
+  const toggle = el('button', 'lt-toggle');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-controls', 'ltBody');
   const title = el('span', 'field-label');
   title.id = 'ltTitle';
+  const summary = el('b', 'lt-summary');
+  const chev = el('span', 'lt-chev');
+  chev.setAttribute('aria-hidden', 'true');
+  chev.textContent = '›';
+  toggle.append(title, summary, chev);
   const target = el('span', 'lt-target');
   const reset = el('button', 'link lt-reset');
   reset.type = 'button';
-  head.append(title, target, reset);
+  head.append(toggle, target, reset);
+  const body = el('div', 'lt-body');
+  body.id = 'ltBody';
 
   const styles = el('div', 'lt-styles');
   styles.setAttribute('role', 'radiogroup');
@@ -258,7 +270,8 @@ export function mountLettering(o: Options): void {
 
   const detail = el('div', 'lt-detail');
   detail.append(foil.row, ink.row, depth.row, gloss.row, tilt);
-  root.append(head, styles, help, detail);
+  body.append(styles, help, detail);
+  root.append(head, body);
   // Last in its section: frame, strength and pixelation stay in view, and the jump chip on the
   // name tag brings this block up when wanted.
   o.host.append(root);
@@ -279,6 +292,19 @@ export function mountLettering(o: Options): void {
     (inPanel ? panel! : window).scrollBy({ top: by, behavior });
   };
   root.addEventListener('focusin', (e) => reveal(e.target as HTMLElement));
+
+  const setOpen = (open: boolean) => {
+    body.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    root.classList.toggle('is-open', open);
+  };
+  setOpen(false);
+  toggle.addEventListener('click', () => {
+    sfx.tick();
+    const open = !root.classList.contains('is-open');
+    setOpen(open);
+    if (open) reveal(root, true);
+  });
 
   // Pointer over the chips moves their light together, like tilting the card.
   styles.addEventListener('pointermove', (e) => {
@@ -307,6 +333,7 @@ export function mountLettering(o: Options): void {
   o.tag?.after(jump);
   jump.addEventListener('click', () => {
     sfx.tick();
+    setOpen(true);
     const on = styles.querySelector<HTMLButtonElement>('[aria-checked=true]');
     // Off-screen (phones: the panel is far below) jump there first, then fit the whole block.
     const r = root.getBoundingClientRect();
@@ -383,6 +410,7 @@ export function mountLettering(o: Options): void {
       g.dataset.g = glyph;
     });
     help.textContent = t.help[l.style];
+    summary.textContent = t.style[l.style].replace('​', '');
     const jumpLabel = t.jump.replace('{style}', t.style[l.style].replace('​', ''));
     jump.setAttribute('aria-label', jumpLabel);
     jump.title = jumpLabel;
@@ -404,11 +432,12 @@ export function mountLettering(o: Options): void {
     detail.dataset.style = l.style;
 
     const ik = inkKeyOf(l.ink);
+    const shownInk = ik === 'none' && !c.blind ? 'auto' : ik;
     INK_KEYS.forEach((k, i) => {
       const b = inkBtns[i];
       b.disabled = k === 'none' && !c.blind;
-      // Blind only exists for presses; ink style falls back to the frame's ink.
-      radio(b, k === ik || (k === 'auto' && ik === 'none' && !c.blind));
+      // Blind only exists for presses; ink style falls back to the frame's ink, so one radio is on.
+      radio(b, k === shownInk);
     });
     inkBtns[INK_KEYS.indexOf('auto')].style.setProperty('--sw', frameInk);
     inkBtns[INK_KEYS.indexOf('custom')].style.setProperty('--sw', ik === 'custom' ? l.ink : 'transparent');

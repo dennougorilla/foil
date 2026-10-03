@@ -107,7 +107,8 @@ export class CardRenderer {
   /** Fine-tuning shared by every card this renderer draws. */
   tune: TuneGl = TUNE_GL_DEFAULT;
 
-  constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas, opts: { preserve?: boolean } = {}) {
+  /** `settled`: for exports, so passing moments (the lettering's stamp) are never captured. */
+  constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas, opts: { preserve?: boolean; settled?: boolean } = {}) {
     const gl = canvas.getContext('webgl2', {
       antialias: true,
       alpha: true,
@@ -142,7 +143,7 @@ export class CardRenderer {
     this.face = createTexture(gl, true);
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
-    this.lettering = new LetteringGL(gl);
+    this.lettering = new LetteringGL(gl, opts.settled);
   }
 
   setFace(face: TexImageSource & { width: number }, mask: TexImageSource): void {

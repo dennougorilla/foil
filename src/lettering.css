@@ -13,8 +13,52 @@
 
 .lt-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+}
+
+/* The folded row: "Lettering  Print ›". The chevron turns down while open. */
+.lt-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin: -6px 0 -6px -6px;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lt-toggle .field-label {
+  color: inherit;
+}
+
+.lt-toggle:hover {
+  background: var(--panel-lo);
+}
+
+.lt-summary {
+  font-weight: 400;
+  color: var(--gold);
+}
+
+.lt-chev {
+  display: inline-block;
+  color: var(--text-dim);
+  transition: transform 0.15s var(--ease-out);
+}
+
+.lt.is-open .lt-chev {
+  transform: rotate(90deg);
+}
+
+.lt-body {
+  margin-top: 10px;
 }
 
 
@@ -641,4 +685,19 @@
 
 .lt-tilt.is-off {
   visibility: hidden;
+}
+
+/* Short laptop screens: the folded row hugs the sliders so it stays above Export. */
+@media (min-width: 901px) and (max-height: 820px) {
+  .lt {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 740px) {
+  .lt {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
 }
