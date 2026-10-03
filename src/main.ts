@@ -573,11 +573,12 @@ function announce(msg: string) {
 window.addEventListener('keydown', (e) => {
   const tag = (e.target as HTMLElement).tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-  // 1–9 then 0 pick the first ten finishes, like a keyboard row.
+  // 1–9 then 0 pick the first ten finishes in the hand, like a keyboard row.
   const n = parseInt(e.key, 10);
   if (!Number.isNaN(n) && e.key.length === 1) {
+    const shown = EDITIONS.filter((x) => !isLocked(x.id));
     const i = n === 0 ? 9 : n - 1;
-    if (EDITIONS[i]) selectEdition(EDITIONS[i].id);
+    if (shown[i]) selectEdition(shown[i].id);
     return;
   }
   // Arrows step through finishes when nothing else on the page wants them.

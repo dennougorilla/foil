@@ -142,7 +142,6 @@ export class Stage {
       el.className = 'hand-slot';
       el.setAttribute('role', 'radio');
       el.dataset.id = e.id;
-      if (i < 10) el.innerHTML = `<span class="key" aria-hidden="true">${(i + 1) % 10}</span>`;
       el.addEventListener('click', () => this.o.onSelect(e.id));
       el.addEventListener('pointerenter', () => {
         this.hovered = i;
@@ -180,16 +179,23 @@ export class Stage {
         deal: new Spring(this.motion ? 1 : 0, this.motion ? 1 : 0, 120, 13),
         tiltX: new Spring(0, 0, 200, 16),
         tiltY: new Spring(0, 0, 200, 16),
-        dealAt: 0.35 + i * 0.04,
+        dealAt: 0,
       });
     });
     this.syncHandHidden();
     this.syncHandChecked();
   }
 
-  /** Re-reads which finishes are left out of the hand; the fan closes up around them. */
+  /** Re-reads which finishes are left out of the hand; the fan closes up around them and the number keys follow. */
   syncHandHidden() {
-    for (const h of this.hand) h.el.hidden = this.o.isHidden?.(h.id) ?? false;
+    let n = 0;
+    for (const h of this.hand) {
+      h.el.hidden = this.o.isHidden?.(h.id) ?? false;
+      if (h.el.hidden) continue;
+      h.dealAt = 0.35 + n * 0.04;
+      h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
+      n++;
+    }
   }
 
   syncHandChecked() {
@@ -363,8 +369,8 @@ export class Stage {
 
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
-    // A tall hand box (phones) deals two smaller fans so every card stays tappable.
-    const rows = hr.height > 240 ? 2 : 1;
+    // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
+    const rows = hr.height > 240 && count > 7 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
@@ -379,7 +385,9 @@ export class Stage {
       const inRow = Math.min(perRow, count - row * perRow);
       return { row, d: (i % perRow) - (inRow - 1) / 2 };
     };
-    return { hr, w, h, spacing, arcK, rowH, slot };
+    // A single fan in a tall box sits in its middle rather than along its top.
+    const top = rows === 1 && hr.height > 240 ? (rowH - h - 46) / 2 : 0;
+    return { hr, w, h, spacing, arcK, rowH, top, slot };
   }
 
   private frame = (now: number) => {
@@ -582,7 +590,7 @@ export class Stage {
     // Left-out cards take no room; everything else fans by its position among the shown ones.
     const pos = new Map<number, number>();
     this.hand.forEach((c, i) => !c.el.hidden && pos.set(i, pos.size));
-    const { hr, w, h, spacing, arcK, rowH, slot } = this.handLayout(pos.size);
+    const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(pos.size);
     const ox = hr.left - this.canvasRect.left;
     const oy = hr.top - this.canvasRect.top;
     const active = this.hovered >= 0 ? this.hovered : this.focused;
@@ -598,7 +606,7 @@ export class Stage {
       if (hot && this.hovered === i) {
         const { row, d } = slot(pos.get(i)!);
         const cx = hr.left + hr.width / 2 + d * spacing;
-        const cy = hr.top + row * rowH + 30 + h / 2;
+        const cy = hr.top + top + row * rowH + 30 + h / 2;
         card.tiltY.target = clamp((this.pointer.x - cx) / (w / 2), -1, 1) * 0.35;
         card.tiltX.target = -clamp((this.pointer.y - cy) / (h / 2), -1, 1) * 0.3;
       } else {
@@ -620,7 +628,7 @@ export class Stage {
       const fan = d * 0.045;
       const arc = d * d * arcK;
       const x = hr.width / 2 + d * spacing;
-      const y = row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
+      const y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
       const rot = fan * (1 - Math.min(card.lift.x / 40, 0.6));
       card.el.style.width = `${w}px`;
       card.el.style.height = `${h}px`;

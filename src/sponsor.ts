@@ -1,48 +1,54 @@
-// Hidden finishes for supporters.
+// Secret finishes for supporters.
 //
-// Until unlocked they leave no trace in the UI. Opening either of the app's existing
-// support links (GitHub Sponsors or Buy Me a Coffee, in the header's Support menu)
-// unlocks them quietly in this browser; from then on they sit in the hand like any
-// other finish. This is an honour system with no server: nothing checks that a payment
-// happened, and the flag lives in localStorage, so clearing site data locks them again.
+// The hand opens with the original game's editions only (see src/secrets.ts); every other
+// finish is a secret and leaves no trace in the UI until it is unlocked. Each time either of
+// the app's support links (GitHub Sponsors or Buy Me a Coffee, in the header's Support menu)
+// is opened, one secret still locked, picked at random, quietly joins the hand in this
+// browser; once all are out, nothing more happens. This is an honour system with no server:
+// nothing checks that a payment happened, and the list lives in localStorage, so clearing
+// site data locks them again.
 //
-// The flag is kept under its own key rather than in the State store so that undo,
-// resets or a store schema change can never take an unlock back.
+// The list is kept under its own key rather than in the State store so that undo, resets
+// or a store schema change can never take an unlock back.
 
-import type { EditionId } from './editions';
+import { EDITIONS, type EditionId } from './editions';
+import { OPEN_EDITIONS, parseUnlocked, pickSecret } from './secrets';
 import type { Stage } from './stage';
 import type { Store } from './state';
 
-export const SPONSOR_EDITIONS: EditionId[] = ['kintsugi', 'opal', 'eclipse', 'raden'];
+const SECRETS = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
 
-const KEY = 'foil:sponsor';
-/** Where a card restored from storage lands if its hidden finish is locked (the store's default). */
+const KEY = 'foil:secrets';
+/** Where a card restored from storage lands if its secret finish is locked (the store's default). */
 const FALLBACK: EditionId = 'holo';
 
 const readUnlocked = () => {
   try {
-    return localStorage.getItem(KEY) !== null;
+    return parseUnlocked(localStorage.getItem(KEY), SECRETS);
   } catch {
-    return false;
+    return [];
   }
 };
 
 let unlocked = readUnlocked();
 
-export const isLocked = (id: EditionId) => !unlocked && SPONSOR_EDITIONS.includes(id);
+export const isLocked = (id: EditionId) => SECRETS.includes(id) && !unlocked.includes(id);
 
 /** Run before anything reads the edition: a locked finish restored from a past visit falls back quietly. */
 export function releaseLockedEdition(store: Store) {
   if (isLocked(store.get().edition)) store.set({ edition: FALLBACK });
 }
 
-/** Opening either support link unlocks the hidden finishes, without a word. */
+/** Opening either support link unlocks one more secret, without a word. */
 export function initSponsor(stage: Stage, store: Store) {
   const unlock = () => {
-    if (unlocked) return;
-    unlocked = true;
+    // Another tab may have unlocked some since this one last looked.
+    const saved = readUnlocked();
+    const id = pickSecret(SECRETS, [...unlocked, ...saved], Math.random);
+    if (!id) return;
+    unlocked = SECRETS.filter((s) => s === id || unlocked.includes(s) || saved.includes(s));
     try {
-      localStorage.setItem(KEY, new Date().toISOString());
+      localStorage.setItem(KEY, JSON.stringify(unlocked));
     } catch {
       /* storage unavailable: unlocked for this visit only */
     }
@@ -57,7 +63,7 @@ export function initSponsor(stage: Stage, store: Store) {
   addEventListener('storage', (e) => {
     if (e.key !== KEY && e.key !== null) return;
     const now = readUnlocked();
-    if (now === unlocked) return;
+    if (now.join() === unlocked.join()) return;
     unlocked = now;
     stage.syncHandHidden();
     releaseLockedEdition(store);
