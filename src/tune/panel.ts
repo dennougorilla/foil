@@ -53,7 +53,11 @@ const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICO
 
 const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 
+/** Amounts read as a multiple of the finish's own look (×1.0); the notch under the track marks it. */
+const RELATIVE = new Set<NumKey>(['scale', 'sharp', 'sparkleSize', 'sat', 'glare']);
+
 function format(k: NumKey, v: number, t: Dict['tune']): string {
+  if (RELATIVE.has(k)) return `×${(v / (TUNE_DEFAULTS[k] || 1)).toFixed(1)}`;
   switch (k) {
     case 'scale':
     case 'sharp':
@@ -362,8 +366,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
   function sampleRow() {
     const row = document.createElement('div');
     row.className = 'tune-sample-row';
-    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div><p class="tune-help"></p>';
-    row.querySelector('p')!.textContent = t.swatch;
+    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div>';
     return row;
   }
 

@@ -58,6 +58,15 @@ await step('fine-tune opens with four tabs and is remembered', async () => {
   expect(!(await page.isVisible('#panelTabs')), 'fine-tune did not close');
 });
 
+await step('an unreadable file is explained beside the pick button', async () => {
+  await page.setInputFiles('#fileInput', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+  await page.waitForTimeout(400);
+  expect(await page.isVisible('#imageError'), 'no error under the pick button');
+  expect((await page.textContent('#imageError p')).includes('notes.txt'), 'the error does not name the file');
+  await page.click('#imageErrorClose');
+  expect(!(await page.isVisible('#imageError')), 'the error did not close');
+});
+
 await step('load an image', async () => {
   const png = await page.evaluate(() => {
     const c = document.createElement('canvas');
@@ -87,6 +96,9 @@ await step('switch finish', async () => {
   await page.keyboard.press('2');
   await page.waitForTimeout(300);
   expect((await state()).edition === 'foil', 'key 2 did not pick Foil');
+  expect((await page.textContent('#finishName')) === 'Foil', 'the panel does not name the finish on the card');
+  await page.click('#finishPick');
+  expect(await page.evaluate(() => document.activeElement?.matches('.hand-slot[aria-checked=true]')), 'Pick from the hand did not lead to the hand');
 });
 
 await step('card tab: strength, pixelate, frame', async () => {
@@ -96,6 +108,11 @@ await step('card tab: strength, pixelate, frame', async () => {
   await page.click('#frameSeg [role=radio]:nth-child(2)');
   const s = await state();
   expect(s.intensity === 0.5 && s.pixel === 2 && s.frame === 'ink', `got ${s.intensity}/${s.pixel}/${s.frame}`);
+  await page.click('#cardReset');
+  const r = await state();
+  expect(r.intensity === 1 && r.pixel === 0 && r.frame === 'paper', 'card reset failed');
+  await page.click('#adjustToggle');
+  expect(!(await page.isVisible('#panelTabs')), 'the pinned Fine-tune row did not close it');
 });
 
 await step('add a frame color', async () => {

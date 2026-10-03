@@ -54,14 +54,17 @@ export interface ApngUiOptions {
   lang: () => Lang;
   input: () => ExportInput;
   toast: (msg: string, error?: boolean) => void;
+  /** After a file is written, for the panel's saved moment. */
+  onSaved: (file: string) => void;
   sfx: { coin(): void; error(): void; tick(): void };
 }
 
-export function mountApngExport({ btn, active, lang, input, toast, sfx }: ApngUiOptions) {
+export function mountApngExport({ btn, active, lang, input, toast, onSaved, sfx }: ApngUiOptions) {
   const [label, meta] = btn.querySelectorAll<HTMLElement>('.btn-text, .save-meta');
   const [b, small] = [label.querySelector('b')!, label.querySelector('small')!];
   const [mb, msmall] = [meta.querySelector('b')!, meta.querySelector('small')!];
   let job: AbortController | null = null;
+  let saved = '';
   /** After a stop, the row says so for a moment, so a stop never looks like a finished save. */
   let hold = 0;
 
@@ -109,6 +112,7 @@ export function mountApngExport({ btn, active, lang, input, toast, sfx }: ApngUi
       const { file, bytes } = await exportApng(input(), progress, ctl.signal);
       sfx.coin();
       toast(fill(t.saved, { file, size: formatBytes(bytes) }) + t.note);
+      saved = file;
     } catch (err) {
       if ((err as DOMException).name === 'AbortError') {
         stopped = true;
@@ -137,6 +141,8 @@ export function mountApngExport({ btn, active, lang, input, toast, sfx }: ApngUi
           refresh();
         }, 1600);
       } else refresh();
+      if (saved) onSaved(saved);
+      saved = '';
     }
   }
 

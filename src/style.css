@@ -847,9 +847,10 @@ button {
 
 /*
  * One rhythm for the whole panel: 24px around and between sections, 16px between fields,
- * 8px inside a field. One look per part: a quiet label (dim) over its control, the value on
- * the right; chosen things turn paper-white like a card face; gold is only for keyboard focus;
- * red is only for Save.
+ * 8px inside a field. One face: DotGothic16 for words and numbers alike, at 16px (its own
+ * pixel grid) for everything you read or press, 13px only for side notes. One look per part:
+ * a quiet label (dim) over its control, the value on the right; chosen settings turn
+ * paper-white like a card face; gold is only for keyboard focus; red is only for Save.
  */
 .panel {
   grid-area: panel;
@@ -879,21 +880,32 @@ button {
   padding: 24px;
 }
 
+/* A soft shadow under the panel's top edge says more sits above when scrolled. */
+.panel::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: block;
+  height: 0;
+  box-shadow: 0 0 14px 10px var(--panel);
+  pointer-events: none;
+}
+
 .sec + .sec {
   border-top: 2px solid var(--panel-lo);
 }
 
 .sec-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  gap: 2px;
   margin-bottom: 16px;
+  line-height: 1.35;
 }
 
 .sec-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 400;
   text-shadow: 0 2px 0 var(--edge);
 }
@@ -901,7 +913,6 @@ button {
 .sec-note {
   font-size: 13px;
   color: var(--text-dim);
-  text-align: right;
 }
 
 /* Buttons */
@@ -916,7 +927,7 @@ button {
   min-height: 52px;
   padding: 8px 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--c);
   color: #fff;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
@@ -956,7 +967,7 @@ button {
 
 .btn-text b {
   font-weight: 400;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .btn-text small {
@@ -972,8 +983,9 @@ button {
 }
 
 .btn-primary:not([aria-busy]):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 7px 0 var(--lo);
+  transform: translateY(-3px);
+  filter: brightness(1.1);
+  box-shadow: 0 8px 0 var(--lo), 0 0 0 3px var(--paper);
 }
 
 .btn-primary:not([aria-busy]):active {
@@ -1007,11 +1019,11 @@ button {
 
 .thumb {
   position: relative;
-  width: 44px;
-  aspect-ratio: 3 / 4;
+  width: 46px;
+  aspect-ratio: 5 / 7;
   padding: 0;
-  border: 0;
-  border-radius: 6px;
+  border: 3px solid var(--paper);
+  border-radius: 5px;
   background: var(--panel-lo) center / cover no-repeat;
   box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
   transition: transform 0.2s var(--ease-back), box-shadow 0.15s;
@@ -1037,9 +1049,14 @@ button {
   transform: translateY(-3px) rotate(-2deg);
 }
 
+.thumb:not([aria-checked='true']) {
+  filter: saturate(0.6) brightness(0.8);
+}
+
+/* The chosen one is pulled up out of the row, like a card drawn from the hand. */
 .thumb[aria-checked='true'] {
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--paper), 0 6px 0 5px var(--edge);
-  transform: translateY(-3px);
+  box-shadow: 0 0 0 2px var(--edge), 0 8px 0 2px var(--edge), 0 0 18px var(--accent);
+  transform: translateY(-6px) rotate(-3deg);
 }
 
 .pick {
@@ -1057,7 +1074,7 @@ button {
   display: grid;
   place-items: center;
   /* Taller where the screen allows: a bigger window is easier to frame with. */
-  height: clamp(96px, 18vh, 168px);
+  height: clamp(96px, 15vh, 140px);
   border-radius: 8px;
   background:
     repeating-conic-gradient(var(--panel-lo) 0 25%, #1f2a30 0 50%) 0 0 / 16px 16px;
@@ -1109,29 +1126,189 @@ button {
   margin-top: 4px;
 }
 
-/* Fine-tune: one row that opens the detailed controls */
-.sec-adjust {
+/* A picture that couldn't be read: said right here, with the way forward. */
+.image-error[hidden] {
+  display: none;
+}
+
+.image-error {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px 14px 20px;
+  border-radius: 4px;
+  background: rgba(255, 90, 79, 0.1);
+  box-shadow: inset 4px 0 0 var(--red), inset 0 0 0 2px rgba(255, 90, 79, 0.45);
+}
+
+.image-error p {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  word-break: auto-phrase;
+  text-wrap: pretty;
+}
+
+.image-error p::before {
+  content: '!';
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: var(--red);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.image-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.image-error .btn {
+  width: auto;
+  min-height: 40px;
+}
+
+.image-error .btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+#pickBtn[aria-busy] {
+  cursor: progress;
+  filter: saturate(0.6);
+}
+
+/* Finish: names what is on the card and points to the hand where it is picked. */
+.sec-finish {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
   padding-top: 16px;
   padding-bottom: 16px;
 }
 
+/* A tiny foil card in the finish's own colour, with the sheen sliding across it. */
+.finish-chip {
+  --c: var(--accent);
+  position: relative;
+  width: 22px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0) 0 4px, rgba(255, 255, 255, 0.35) 4px 6px),
+    linear-gradient(135deg, #ff6b8b55, #59f2b055 50%, #5fb4ff55),
+    linear-gradient(160deg, var(--a, #333), var(--b, var(--c)) 50%, var(--c3, #eee));
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--paper);
+}
+
+.finish-chip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.85) 50%, transparent 70%) 0 0 / 300% 100% no-repeat;
+  animation: chip-sheen 3.2s ease-in-out infinite;
+}
+
+@keyframes chip-sheen {
+  from { background-position: 100% 0; }
+  to { background-position: -50% 0; }
+}
+
+.finish-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.finish-text small {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.finish-text b {
+  font-weight: 400;
+  font-size: 16px;
+  text-shadow: 0 2px 0 var(--edge);
+}
+
+/* The main flow reads down the panel: 1 picture, 2 finish, then the Save button. */
+.step {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-size: 13px;
+  line-height: 1;
+  text-shadow: none;
+  vertical-align: 1px;
+}
+
+.finish-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  box-shadow: inset 0 0 0 2px #4b6068;
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.finish-pick:hover {
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--text-dim);
+}
+
+.finish-pick svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* Fine-tune: one row that opens the detailed controls */
+.sec-adjust {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 .adjust-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   width: 100%;
-  min-height: 56px;
-  padding: 8px 4px;
+  min-height: 52px;
+  padding: 6px 4px;
   border: 0;
-  border-radius: 10px;
-  background: none;
+  border-radius: 0;
+  background: var(--panel);
   text-align: left;
-  transition: background 0.15s;
 }
 
 .adjust-toggle:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #2a3940;
 }
 
 .adjust-icon {
@@ -1147,16 +1324,13 @@ button {
 
 .adjust-text b {
   font-weight: 400;
-  font-size: 18px;
+  font-size: 16px;
   text-shadow: 0 2px 0 var(--edge);
 }
 
 .adjust-text small {
-  overflow: hidden;
   font-size: 13px;
   color: var(--text-dim);
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .adjust-text small.is-changed {
@@ -1167,7 +1341,6 @@ button {
   width: 16px;
   height: 16px;
   fill: var(--text-dim);
-  transition: transform 0.2s var(--ease-out);
 }
 
 .sec-adjust.is-open .adjust-chev {
@@ -1175,32 +1348,38 @@ button {
 }
 
 .adjust-body {
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
-/* Tabs stay in reach while their content scrolls under them. */
-.tabs {
+/* Tabs, and the way to close them, stay in reach while their content scrolls under them. */
+.tabs-bar {
   position: sticky;
-  top: 0;
+  top: var(--adjust-row-h, 64px);
   z-index: 3;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
   margin: 0 -24px;
   padding: 8px 24px;
   background: var(--panel);
   box-shadow: 0 2px 0 var(--panel-lo);
 }
 
+/* Each tab is as wide as its word, so long English names never run together. */
+.tabs {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+
 .tab {
   position: relative;
+  flex: 1 1 auto;
   min-height: 40px;
-  padding: 4px 2px;
+  padding: 4px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 8px 8px 4px 4px;
   background: none;
   color: var(--text-dim);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -1211,9 +1390,9 @@ button {
 }
 
 .tab[aria-selected='true'] {
-  background: var(--paper);
-  color: var(--paper-ink);
-  box-shadow: 0 3px 0 var(--edge);
+  background: var(--panel-hi);
+  color: var(--text);
+  box-shadow: inset 0 -3px 0 var(--paper);
 }
 
 /* Something in the tab differs from the defaults: a small rarity diamond, like the card's own. */
@@ -1229,7 +1408,7 @@ button {
 }
 
 .tab[aria-selected='true'] .tab-dot {
-  box-shadow: 0 0 0 2px var(--paper);
+  box-shadow: 0 0 0 2px var(--panel-hi);
 }
 
 .pane {
@@ -1253,16 +1432,31 @@ button {
 }
 
 /* Export: format, then the one Save button */
+/* Format and its options sit in the flow; only Save is pinned to the bottom. */
+.sec-format {
+  display: grid;
+  gap: 16px;
+  margin-top: auto;
+}
+
+
 .sec-export {
   position: sticky;
   bottom: 0;
   z-index: 4;
   display: grid;
-  gap: 16px;
-  margin-top: auto;
-  padding-top: 20px;
+  gap: 12px;
+  padding-top: 16px;
   background: var(--panel);
   box-shadow: 0 -2px 0 var(--panel-lo);
+}
+
+.sec.sec-export {
+  border-top: 0;
+}
+
+.sec-format:not(:has(.save-opts:not([hidden]))) {
+  display: none;
 }
 
 .sec-export::before {
@@ -1271,7 +1465,7 @@ button {
   left: 0;
   right: 0;
   bottom: 100%;
-  height: 24px;
+  height: 16px;
   background: linear-gradient(transparent, var(--panel));
   pointer-events: none;
 }
@@ -1283,15 +1477,8 @@ button {
 
 .seg-format .seg-btn {
   min-height: 36px;
-  font-size: 14px;
 }
 
-/* On phones, with its options open, the bar is too tall to pin: it rests at the end of the panel. */
-@media (max-width: 900px) {
-  .sec-export:has(.save-opts.is-open) {
-    position: relative;
-  }
-}
 
 /* Save options: one quiet row under the formats; opened only by those who want them. */
 .save-opts[hidden],
@@ -1304,7 +1491,7 @@ button {
 .save-opts {
   display: grid;
   gap: 16px;
-  margin: -6px 0 -4px;
+  margin: -8px 0 -8px;
 }
 
 .save-opts-toggle {
@@ -1317,7 +1504,7 @@ button {
   border: 0;
   background: none;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 16px;
   text-align: left;
 }
 
@@ -1335,7 +1522,6 @@ button {
   height: 14px;
   flex: none;
   fill: currentColor;
-  transition: transform 0.2s var(--ease-out);
 }
 
 .save-opts.is-open .save-opts-toggle svg {
@@ -1343,6 +1529,7 @@ button {
 }
 
 .save-opts-body {
+  scroll-margin-bottom: calc(var(--export-h, 90px) + 16px);
   display: grid;
   gap: 16px;
   padding-bottom: 4px;
@@ -1466,8 +1653,29 @@ button {
   to { background-position: 0 0; opacity: 1; }
 }
 
+/* Saved: the button turns to foil for a moment. */
+#saveBtn.is-saved {
+  background: linear-gradient(110deg, #ff6b8b, #f2c14e 25%, #59f2b0 50%, #5fb4ff 75%, #c58bff) 0 0 / 200% 100%;
+  color: var(--paper-ink);
+  text-shadow: none;
+  animation: saved-foil 2.4s var(--ease-out);
+}
+
+#saveBtn.is-saved .btn-text small {
+  opacity: 1;
+  color: var(--paper-ink);
+}
+
+@keyframes saved-foil {
+  from { background-position: 100% 0; transform: translateY(-4px) scale(1.02); }
+  15% { transform: translateY(0) scale(1); }
+  to { background-position: 0 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  #saveBtn:not([aria-busy]):hover::before {
+  #saveBtn:not([aria-busy]):hover::before,
+  #saveBtn.is-saved,
+  .finish-chip::after {
     animation: none;
   }
 }
@@ -1541,13 +1749,14 @@ button {
 }
 
 .field-label {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-dim);
 }
 
+/* Values in the same face as their labels, a step brighter. */
 output {
-  font-family: var(--display);
-  font-size: 13px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
   color: var(--text);
   text-align: right;
 }
@@ -1606,7 +1815,7 @@ input[type='range'] {
 
 input[type='range']::-webkit-slider-runnable-track {
   height: 8px;
-  border-radius: 4px;
+  border-radius: 0;
   background:
     linear-gradient(var(--slider-fill), var(--slider-fill)) 0 0 / var(--fill, 50%) 100% no-repeat,
     var(--panel-lo);
@@ -1615,14 +1824,14 @@ input[type='range']::-webkit-slider-runnable-track {
 
 input[type='range']::-moz-range-track {
   height: 8px;
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--panel-lo);
   box-shadow: inset 0 0 0 2px var(--edge);
 }
 
 input[type='range']::-moz-range-progress {
   height: 8px;
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--slider-fill);
 }
 
@@ -1631,7 +1840,7 @@ input[type='range']::-webkit-slider-thumb {
   width: 18px;
   height: 22px;
   margin-top: -7px;
-  border-radius: 5px;
+  border-radius: 2px;
   background: var(--paper);
   box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
 }
@@ -1640,7 +1849,7 @@ input[type='range']::-moz-range-thumb {
   width: 18px;
   height: 22px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 2px;
   background: var(--paper);
   box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
 }
@@ -1673,11 +1882,11 @@ input[type='range']:disabled {
   min-height: 40px;
   padding: 4px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--panel-lo);
   box-shadow: inset 0 0 0 2px var(--panel-hi), 0 4px 0 var(--edge);
   color: var(--text-dim);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.2;
   white-space: nowrap;
   /* The chosen state switches at once; only the press moves. */
@@ -1709,6 +1918,8 @@ input[type='range']:disabled {
   justify-items: center;
   gap: 6px;
   padding: 10px 4px 8px;
+  font-size: 14px;
+  white-space: normal;
 }
 
 .swatch {
@@ -1967,26 +2178,45 @@ input[type='range']:disabled {
 
 /* ---------- Responsive ---------- */
 
-/* Short laptop screens and 125% scaling: a smaller crop preview keeps Fine-tune above Export. */
-@media (min-width: 901px) and (max-height: 760px) {
+/* Short laptop screens and 125% scaling: a smaller crop preview keeps Fine-tune above Save. */
+@media (min-width: 901px) and (max-height: 800px) {
   .sec {
-    padding: 20px;
+    padding: 16px 20px;
+  }
+  .sec-head {
+    margin-bottom: 10px;
   }
   .crop-view {
-    height: 80px;
+    height: 64px;
   }
   .crop {
-    margin-top: 16px;
+    margin-top: 12px;
   }
-  .tabs {
+  .crop .row {
+    margin-top: 8px;
+  }
+  .thumbs {
+    margin-bottom: 14px;
+  }
+  .thumb {
+    width: 36px;
+  }
+  .pick {
+    min-height: 48px;
+  }
+  .tabs-bar {
     margin: 0 -20px;
-    padding: 8px 20px;
+    padding: 8px 12px 8px 20px;
   }
 }
 
 @media (max-width: 1180px) {
   .toasts {
     width: 304px;
+  }
+  .tab {
+    padding: 4px 4px;
+    font-size: 14px;
   }
   .app {
     grid-template-columns: minmax(0, 1fr) 344px;
@@ -2071,15 +2301,26 @@ input[type='range']:disabled {
   .sec {
     padding: 20px;
   }
-  .tabs {
+  .tabs-bar {
     margin: 0 -20px;
-    padding: 8px 20px;
+    padding: 8px 12px 8px 20px;
   }
+  /* Save rides along the bottom of the screen from the start, so the main action is always one tap away. */
   .sec-export {
-    gap: 12px;
-    border-radius: 0 0 14px 14px;
-    padding-top: 12px;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 0;
+    z-index: 30;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 0 0 3px var(--edge), 0 -8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .sec-export::before {
+    display: none;
+  }
+  .app {
+    padding-bottom: calc(var(--export-h, 90px) + 8px);
   }
 }
 

@@ -61,7 +61,7 @@
 /* Names wrap only between words onto a second line rather than shrink ("Spot / UV"). */
 .lt-style-name {
   display: grid;
-  place-items: center;
+  place-items: start center;
   min-height: 2.5em;
   max-width: 100%;
   padding-inline: 1px;
@@ -223,7 +223,7 @@
 }
 
 .lt-picked:not(:empty)::before {
-  content: '— ';
+  content: '：';
   color: var(--text-dim);
 }
 
@@ -484,7 +484,7 @@
 .lt button,
 .lt input,
 .lt {
-  scroll-margin-block: 72px 180px;
+  scroll-margin-block: 130px 120px;
 }
 
 /* A brief glow when the shortcut brings you here. */

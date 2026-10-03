@@ -122,7 +122,11 @@ function applyText() {
   stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
   $('cropView').title = t.cropHint;
-  $('pickBtn').title = t.pickSub;
+  // Paste is ⌘V on Apple keyboards; taps, not clicks, on touch screens.
+  const pasteKey = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘V' : 'Ctrl+V';
+  $('pickBtn').querySelector('small')!.textContent = t.pickSub.replace('Ctrl+V', pasteKey);
+  $('pickBtn').title = t.pickSub.replace('Ctrl+V', pasteKey);
+  if (matchMedia('(pointer: coarse)').matches) document.querySelector('#info .card-hint')!.textContent = t.cardHintTouch;
   buildSegments();
   buildThumbs();
   buildTabs();
@@ -145,7 +149,25 @@ function renderInfo() {
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
   pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
+  // The panel names the finish on the card and points to the hand where it is picked.
+  $('finishName').textContent = t.edition[s.edition];
+  const chip = $('finishChip');
+  chip.style.setProperty('--c', s.edition === 'base' ? '#c9c2b2' : ed.color);
+  chip.style.setProperty('--a', ed.swirl[0]);
+  chip.style.setProperty('--b', ed.swirl[1]);
+  chip.style.setProperty('--c3', ed.swirl[2]);
+  $('finishPick').setAttribute('aria-label', t.finishPick);
+  $('finishPick').title = matchMedia('(max-width: 900px)').matches ? t.finishPickHintPhone : t.finishPickHint;
 }
+
+$('finishPick').addEventListener('click', () => {
+  sfx.tick();
+  const slot = document.querySelector<HTMLElement>('.hand-slot[aria-checked=true]');
+  if (!slot) return;
+  slot.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  slot.focus({ preventScroll: true });
+  stage.juice(0.3);
+});
 
 /**
  * The caption always names the finish that is applied. A finish you are only
@@ -444,13 +466,20 @@ async function loadFile(file: File) {
     // A .apng with no MIME type is still welcome if its bytes say APNG.
     const apng = file.type ? null : await asTypedApng(file);
     if (!apng) {
-      toast(t.errType, true, true);
+      toast(t.errType.replace('{name}', file.name), true, true);
       return;
     }
     file = apng;
   }
   store.set({ loading: true });
   document.body.classList.add('is-loading');
+  hideImageError();
+  // The pick button says what is happening, and Save rests until the new picture is on the card.
+  const pickLabel = $('pickBtn').querySelector('b')!;
+  pickLabel.textContent = t.loading;
+  $('thumbLabel').textContent = t.loading;
+  $('pickBtn').setAttribute('aria-busy', 'true');
+  saveBtn.disabled = true;
   try {
     const { still, anim } = await decodeImage(file);
     userImage = still;
@@ -471,6 +500,9 @@ async function loadFile(file: File) {
   } finally {
     store.set({ loading: false });
     document.body.classList.remove('is-loading');
+    pickLabel.textContent = t.pick;
+    $('pickBtn').removeAttribute('aria-busy');
+    saveBtn.disabled = false;
   }
 }
 
@@ -675,12 +707,12 @@ tabBar.addEventListener('keydown', (e) => {
   revealTabs();
 });
 
-/** Scrolls so the tabs sit at the top and their tab gets the panel's whole height. */
+/** Scrolls so the Fine-tune row and its tabs sit at the top, giving the tab the panel's whole height. */
 function revealTabs() {
   const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   requestAnimationFrame(() => {
     const panel = $('panel');
-    const top = $('adjustBody').getBoundingClientRect().top;
+    const top = $('adjust').getBoundingClientRect().top;
     // The panel scrolls on its own beside the stage; on phones the page does.
     if (getComputedStyle(panel).overflowY === 'visible') window.scrollBy({ top, behavior });
     else panel.scrollBy({ top: top - panel.getBoundingClientRect().top, behavior });
@@ -704,12 +736,23 @@ function syncAdjust() {
     b.title = changed.includes(id) ? t.adjustChanged.replace('{list}', t.tabs[id]) : '';
     $(`pane-${id}`).hidden = !on;
   }
+  $('cardTools').hidden = !changed.includes('card');
   const summary = $('adjustSummary');
   summary.textContent = changed.length
     ? t.adjustChanged.replace('{list}', changed.map((id) => t.tabs[id]).join(s.lang === 'ja' ? '・' : ', '))
     : t.adjustSub;
   summary.classList.toggle('is-changed', changed.length > 0);
 }
+
+$('cardReset').addEventListener('click', () => {
+  sfx.tick();
+  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '' });
+});
+
+// The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
+new ResizeObserver(([e]) =>
+  document.documentElement.style.setProperty('--adjust-row-h', `${Math.round(e.borderBoxSize[0].blockSize)}px`),
+).observe(adjustToggle);
 
 adjustToggle.addEventListener('click', () => {
   sfx.tick();
@@ -808,6 +851,7 @@ function buildSaveOpts() {
       if (store.get().gifClear === clear) return;
       sfx.tick();
       store.set({ gifClear: clear });
+      revealSaveOpts();
     };
     bg.appendChild(b);
   }
@@ -848,8 +892,16 @@ function buildSaveOpts() {
 
 $('saveOptsToggle').addEventListener('click', () => {
   sfx.tick();
-  store.set({ saveOptsOpen: !store.get().saveOptsOpen });
+  const open = !store.get().saveOptsOpen;
+  store.set({ saveOptsOpen: open });
+  if (open) revealSaveOpts();
 });
+
+/** The options open under the pinned Save button; bring all of them up above it. */
+function revealSaveOpts() {
+  const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  requestAnimationFrame(() => $('saveOptsBody').scrollIntoView({ block: 'nearest', behavior }));
+}
 $<HTMLInputElement>('mattePicker').addEventListener('input', (e) => store.set({ gifMatte: (e.target as HTMLInputElement).value }));
 $('toApng').addEventListener('click', () => {
   sfx.tick();
@@ -872,10 +924,12 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     b.textContent = `${Math.round(p * 100)}%`;
     saveBtn.style.setProperty('--p', p.toFixed(3));
   };
+  let saved = '';
   try {
     const file = await job(progress);
     sfx.coin();
-    toast(`${t.saved}: ${file}`);
+    announce(`${t.saved}: ${file}`);
+    saved = file;
   } catch (err) {
     console.error(err);
     sfx.error();
@@ -886,7 +940,25 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     saveBtn.style.removeProperty('--p');
     // From the current dictionary, in case the language changed mid-export.
     renderSave();
+    if (saved) celebrate(saved);
   }
+}
+
+/** A saved card is a pulled card: it hops, sheds sparks in its finish's colour, and Save shines once. */
+let celebrateTimer = 0;
+function celebrate(file: string) {
+  stage.juice(0.6);
+  stage.burst(editionById(store.get().edition).color);
+  saveBtn.classList.remove('is-saved');
+  void saveBtn.offsetWidth;
+  saveBtn.classList.add('is-saved');
+  saveBtn.querySelector('.btn-text b')!.textContent = `${t.savedShort} ✓`;
+  saveBtn.querySelector('.btn-text small')!.textContent = file;
+  clearTimeout(celebrateTimer);
+  celebrateTimer = window.setTimeout(() => {
+    saveBtn.classList.remove('is-saved');
+    renderSave();
+  }, 2400);
 }
 
 saveBtn.addEventListener('click', () => {
@@ -938,6 +1010,7 @@ const apngExport = mountApngExport({
   lang: () => store.get().lang,
   input: exportInput,
   toast: (msg, error) => toast(msg, error),
+  onSaved: (file) => celebrate(file),
   sfx,
 });
 
@@ -1024,7 +1097,34 @@ function dismissToast(el: HTMLElement) {
 }
 
 /** Success toasts fade on their own; errors stay until dismissed, offering a way forward. */
+// A picture that can't be read is said right under the pick button (beside the stage); phones,
+// whose panel is far below, get a toast instead.
+function showImageError(msg: string) {
+  const box = $('imageError');
+  box.querySelector('p')!.textContent = msg;
+  box.hidden = false;
+  $('imageErrorPick').focus({ preventScroll: true });
+}
+function hideImageError() {
+  const box = $('imageError');
+  if (box.hidden) return;
+  box.hidden = true;
+  if (box.contains(document.activeElement)) $('pickBtn').focus({ preventScroll: true });
+}
+$('imageErrorPick').addEventListener('click', () => {
+  sfx.tick();
+  fileInput.click();
+});
+$('imageErrorClose').addEventListener('click', () => {
+  sfx.tick();
+  hideImageError();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideImageError();
+});
+
 function toast(msg: string, error = false, pick = false) {
+  if (pick && !matchMedia('(max-width: 900px)').matches) return showImageError(msg);
   const box = $('toasts');
   if (error) box.querySelectorAll<HTMLElement>('.toast.is-error').forEach(dismissToast);
   const el = document.createElement('div');

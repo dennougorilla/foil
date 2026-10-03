@@ -117,14 +117,8 @@ export function initRangePanel(host: RangeHost) {
       <div class="tone-presets" role="group" aria-labelledby="rangeToneLabel"></div>
     </div>
     <div class="range-row">
-      <button class="chip range-chip" type="button" data-k="rangeInvert" aria-pressed="false">
-        ${svg('<path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z" /><path class="solid" d="M8 2a6 6 0 0 1 0 12z" />')}
-        <span data-r="rangeInvert"></span>
-      </button>
-      <button class="chip range-chip" type="button" data-k="rangeShow" aria-pressed="false">
-        ${svg('<path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" /><path d="M6 8a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" />')}
-        <span data-r="rangeShow"></span>
-      </button>
+      <button class="chip range-chip" type="button" data-k="rangeInvert" aria-pressed="false"><span data-r="rangeInvert"></span></button>
+      <button class="chip range-chip" type="button" data-k="rangeShow" aria-pressed="false"><span data-r="rangeShow"></span></button>
     </div>
     <button class="btn btn-quiet range-paint" type="button">
       ${svg(ICON.brush)}
@@ -134,7 +128,7 @@ export function initRangePanel(host: RangeHost) {
       <p class="cover-head" aria-live="polite"><span data-r="coverLabel"></span><b class="cover-val"></b></p>
       <i class="cover-bar" aria-hidden="true"><i></i></i>
       <p class="cover-empty" hidden><span></span> <button class="link cover-fix" type="button"></button></p>
-      <p class="legend" aria-hidden="true"><b data-r="legendTitle"></b><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
+      <p class="legend" aria-hidden="true"><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
     </div>
   `;
 

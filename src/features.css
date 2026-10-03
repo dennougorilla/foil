@@ -317,8 +317,8 @@
   border: 0;
   border-radius: 8px;
   background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 4px 0 var(--edge);
-  color: var(--text-dim);
+  box-shadow: inset 0 0 0 2px #4b6068, 0 4px 0 var(--edge);
+  color: var(--text);
   font-size: 13px;
   line-height: 1.2;
   white-space: nowrap;
@@ -355,14 +355,29 @@
 .chip.range-chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 10px 2px 12px;
   height: auto;
 }
 
-/* The header's lamp and its dimmed "off" are for its own toggles; here the paper face says "on". */
+/* A small switch at the end says on or off in shape as well as colour. */
 .chip.range-chip::after {
-  display: none;
+  content: '';
+  position: static;
+  display: block;
+  flex: none;
+  width: 22px;
+  height: 12px;
+  margin-left: 2px;
+  border-radius: 6px;
+  background: radial-gradient(circle at 6px 6px, var(--text-dim) 0 4px, transparent 4.5px), var(--panel);
+  box-shadow: inset 0 0 0 1.5px var(--panel-hi);
+}
+
+.chip.range-chip[aria-pressed='true']::after {
+  background: radial-gradient(circle at 16px 6px, var(--paper) 0 4px, transparent 4.5px), var(--paper-ink);
+  box-shadow: none;
 }
 
 .chip.range-chip[aria-pressed] {
@@ -370,18 +385,6 @@
   text-decoration: none;
 }
 
-.chip.range-chip svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-}
-
-.chip.range-chip svg .solid {
-  fill: currentColor;
-  stroke: none;
-}
 
 .range-paint {
   justify-content: flex-start;
@@ -426,9 +429,8 @@
 }
 
 .cover-val {
-  font-family: var(--display);
   font-weight: 400;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text);
 }
 
@@ -854,10 +856,10 @@
   height: 36px;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 4px;
   background: none;
-  box-shadow: inset 0 0 0 2px var(--panel-hi);
-  color: var(--text-dim);
+  box-shadow: inset 0 0 0 2px #4b6068;
+  color: var(--text);
   font-size: 13px;
   transition: color 0.15s, box-shadow 0.15s, transform 0.08s;
 }
@@ -1102,6 +1104,10 @@
   }
   .stage.is-painting {
     padding-bottom: 320px;
+  }
+  /* The brush sheet takes the bottom of the screen while painting. */
+  body:has(.stage.is-painting) .sec-export {
+    display: none;
   }
 }
 

@@ -110,14 +110,24 @@
       <aside class="panel" id="panel">
         <section class="sec sec-image" aria-labelledby="imageTitle">
           <div class="sec-head">
-            <h2 class="sec-title" id="imageTitle" data-t="secImage"></h2>
-            <span class="sec-note" id="thumbLabel"></span>
+            <h2 class="sec-title"><i class="step" aria-hidden="true">1</i><span id="imageTitle" data-t="secImage"></span></h2>
+            <small class="sec-note" id="thumbLabel"></small>
           </div>
           <div class="thumbs" id="thumbs" role="radiogroup"></div>
           <button class="btn btn-quiet pick" id="pickBtn" type="button">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg>
             <span class="btn-text"><b data-t="pick"></b><small data-t="pickSub"></small></span>
           </button>
+          <div class="image-error" id="imageError" hidden>
+            <p role="alert"></p>
+            <div class="image-error-actions">
+              <button class="btn btn-paper" id="imageErrorPick" type="button">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg>
+                <span class="btn-text"><b data-t="pickAnother"></b></span>
+              </button>
+              <button class="link" id="imageErrorClose" type="button" data-t="close"></button>
+            </div>
+          </div>
           <input type="file" id="fileInput" accept="image/png,image/apng,.apng,image/jpeg,image/webp,image/gif,image/avif,image/bmp" hidden />
           <div class="crop" id="crop">
             <div class="crop-view" id="cropView" tabindex="0" role="application">
@@ -133,6 +143,15 @@
           </div>
         </section>
 
+        <section class="sec sec-finish" aria-labelledby="finishTitle">
+          <span class="finish-chip" id="finishChip" aria-hidden="true"></span>
+          <span class="finish-text"><b><i class="step" aria-hidden="true">2</i><span id="finishName"></span></b><small id="finishTitle" data-t="finishLabel"></small></span>
+          <button class="finish-pick" id="finishPick" type="button">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5h4v8H1zm4-2h4v1H6v9H4V4h1zm5-1h4v8h-4zM9 3h1v9H9z" /></svg>
+            <span data-t="finishPick"></span>
+          </button>
+        </section>
+
         <section class="sec sec-adjust" id="adjust">
           <button class="adjust-toggle" id="adjustToggle" type="button" aria-controls="adjustBody" aria-expanded="false">
             <svg class="adjust-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h7v2H2zm10 0h2v2h-2zM9 2h3v4H9zM2 11h2v2H2zm5 0h7v2H7zM4 10h3v4H4zM2 7h4v2H2zm7 0h5v2H9zM6 6h3v4H6z" /></svg>
@@ -140,8 +159,11 @@
             <svg class="adjust-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5h2v2h2v2h2V7h2V5h2v2h-2v2H9v2H7V9H5V7H3z" /></svg>
           </button>
           <div class="adjust-body" id="adjustBody" hidden>
-            <div class="tabs" id="panelTabs" role="tablist"></div>
+            <div class="tabs-bar">
+              <div class="tabs" id="panelTabs" role="tablist"></div>
+            </div>
             <div class="pane" id="pane-card" role="tabpanel">
+              <div class="pane-tools" id="cardTools" hidden><button class="link" id="cardReset" type="button" data-t="cardReset"></button></div>
               <div class="row">
                 <label class="field-label" for="intensity" data-t="intensity"></label>
                 <output id="intensityOut" for="intensity"></output>
@@ -163,9 +185,8 @@
           </div>
         </section>
 
-        <section class="sec sec-export" aria-labelledby="exportTitle">
+        <section class="sec sec-format" aria-labelledby="exportTitle">
           <h2 class="sr-only" id="exportTitle" data-t="secExport"></h2>
-          <div class="seg seg-format" id="formatSeg" role="radiogroup" aria-labelledby="exportTitle"></div>
           <div class="save-opts" id="saveOpts">
             <button class="save-opts-toggle" id="saveOptsToggle" type="button" aria-controls="saveOptsBody" aria-expanded="false">
               <span data-t="gifOpts"></span><small id="saveOptsSummary"></small>
@@ -184,6 +205,10 @@
               <p class="hint save-note" id="gifClearNote"><span data-t="gifClearNote"></span> <button class="link" id="toApng" type="button" data-t="toApng"></button></p>
             </div>
           </div>
+        </section>
+
+        <section class="sec sec-export">
+          <div class="seg seg-format" id="formatSeg" role="radiogroup" aria-labelledby="exportTitle"></div>
           <button class="btn btn-primary" id="saveBtn" type="button">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M2 10v3.5h12V10" /></svg>
             <span class="btn-text"><b></b><small></small></span>

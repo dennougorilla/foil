@@ -415,7 +415,8 @@ export function mountLettering(o: Options): void {
     const shownInk = ik === 'none' && !c.blind ? 'auto' : ik;
     INK_KEYS.forEach((k, i) => {
       const b = inkBtns[i];
-      b.disabled = k === 'none' && !c.blind;
+      // "No ink" only exists for presses; elsewhere it isn't offered at all.
+      b.hidden = k === 'none' && !c.blind;
       // Blind only exists for presses; ink style falls back to the frame's ink, so one radio is on.
       radio(b, k === shownInk);
     });
