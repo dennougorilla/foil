@@ -14,5 +14,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "gifuct-js": "^2.1.2"
+  }
 }
