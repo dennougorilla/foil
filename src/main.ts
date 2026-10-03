@@ -14,7 +14,7 @@ import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
 import { initRangeColors } from './features';
-import { handMode, initSponsor, isLocked, releaseLockedEdition } from './sponsor';
+import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -56,7 +56,7 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
-    handMode,
+    isHidden: isLocked,
   });
 } catch (err) {
   console.error(err);
@@ -150,8 +150,7 @@ function renderCaption(id: EditionId | null) {
   cap.querySelector('span')!.textContent = t.look[s.edition];
   const peek = $('handPeek');
   peek.hidden = !id || id === s.edition;
-  if (id) peek.textContent = isLocked(id) ? t.sponsorSecret : t.edition[id];
-  peek.classList.toggle('is-secret', !!id && isLocked(id));
+  if (id) peek.textContent = t.edition[id];
 }
 
 // ---------- Panel controls ----------
@@ -538,7 +537,6 @@ fileInput.addEventListener('change', () => {
 // ---------- Edition ----------
 
 function selectEdition(id: EditionId) {
-  if (sponsor.gate(id)) return;
   if (store.get().edition === id) {
     stage.juice(0.5);
     return;
@@ -866,14 +864,7 @@ mountLettering({
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
-const sponsor = initSponsor({
-  store,
-  stage,
-  dict: () => t,
-  apply: selectEdition,
-  toast: (msg) => toast(msg),
-  face: () => ({ face, mask, back }),
-});
+initSponsor(stage);
 const boot = () => {
   redrawFace();
   drawCropPreview();
