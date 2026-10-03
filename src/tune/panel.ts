@@ -153,7 +153,10 @@ export function mountTune(store: Store, after: Element): void {
       <span class="tune-chev">${svg('chevron')}</span>`;
     root.innerHTML = `
       <div class="tune-body" id="tuneBody">
-        <div class="tune-tabs" role="tablist"></div>
+        <div class="tune-tabbar">
+          <div class="tune-tabs" role="tablist"></div>
+          <button class="tune-close" type="button"><span></span>${svg('chevron')}</button>
+        </div>
         <div class="tune-panes"></div>
         <div class="tune-dock">
           <p class="tune-hint"></p>
@@ -177,6 +180,15 @@ export function mountTune(store: Store, after: Element): void {
     peek.setLabel(t.peek, t.peekCap);
     root.querySelector('.tune-dock-peek')!.replaceWith(peek.el);
     bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
+    // A way to close the drawer that stays in reach once the section title has scrolled away.
+    const close = root.querySelector<HTMLButtonElement>('.tune-close')!;
+    close.querySelector('span')!.textContent = t.close;
+    close.addEventListener('click', () => {
+      sfx.tick();
+      store.set({ tuneOpen: false });
+      toggle.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
+      toggle.focus({ preventScroll: true });
+    });
     const tabs = root.querySelector<HTMLElement>('.tune-tabs')!;
     tabs.setAttribute('aria-label', t.toggle);
     const panes = root.querySelector<HTMLElement>('.tune-panes')!;
@@ -198,7 +210,9 @@ export function mountTune(store: Store, after: Element): void {
       pane.id = `tunePane-${def.id}`;
       pane.setAttribute('role', 'tabpanel');
       pane.setAttribute('aria-labelledby', b.id);
-      for (const k of def.keys) pane.appendChild(k === 'light' || k === 'idle' ? choiceRow(k) : rangeRow(k));
+      if (def.id === 'pattern') pane.appendChild(sampleRow());
+      for (const k of def.keys)
+        pane.appendChild(k === 'light' || k === 'idle' ? choiceRow(k) : k === 'lightAngle' ? dialRow(k) : rangeRow(k));
       if (def.id === 'motion') {
         const note = document.createElement('p');
         note.className = 'tune-note';
@@ -310,8 +324,7 @@ export function mountTune(store: Store, after: Element): void {
     h.querySelector('.tune-reset')!.addEventListener('click', () => {
       reset(k);
       // Stay on the control rather than losing focus to the hidden reset button.
-      (root.querySelector<HTMLElement>(`[data-key="${k}"] input`) ??
-        root.querySelector<HTMLElement>(`[data-key="${k}"] [aria-checked="true"]`))?.focus();
+      root.querySelector<HTMLElement>(`[data-key="${k}"] :is(input, [role=slider], [aria-checked="true"])`)?.focus();
     });
     h.querySelector('.tune-out')!.addEventListener('dblclick', () => reset(k));
     return h;
@@ -353,24 +366,80 @@ export function mountTune(store: Store, after: Element): void {
     ghost.className = 'tune-ghost';
     ghost.setAttribute('aria-hidden', 'true');
     wrap.append(ghost);
-    const ends = (t.ends as Partial<Record<NumKey, string[]>>)[k];
-    if (ends) {
-      // Plain words for the two ends of a multiplier, so ×2.20 has something to mean.
-      const cap = document.createElement('div');
-      cap.className = 'tune-ends';
-      cap.setAttribute('aria-hidden', 'true');
-      for (const word of ends) cap.appendChild(document.createElement('span')).textContent = word;
-      wrap.append(cap);
-    }
+    // Plain words for the two ends. Every slider row keeps this line (empty where the track
+    // already says it, like Hue), so all rows share one height.
+    const ends = (t.ends as Partial<Record<NumKey, string[]>>)[k] ?? ['', ''];
+    const cap = document.createElement('div');
+    cap.className = 'tune-ends';
+    cap.setAttribute('aria-hidden', 'true');
+    for (const word of ends) cap.appendChild(document.createElement('span')).textContent = word;
+    wrap.append(cap);
     row.appendChild(wrap);
-    if (k === 'lightAngle') {
-      const help = document.createElement('p');
-      help.className = 'tune-help';
-      help.textContent = t.sunHelp;
-      row.appendChild(help);
-    }
     // Reset comes after the control in tab order; CSS still shows it beside the value.
     row.appendChild(row.querySelector('.tune-reset')!);
+    return row;
+  }
+
+  /**
+   * Light direction is a circle, so it gets a dial that wraps round: drag the sun on its rim,
+   * or focus it and use the arrow keys. A mini card in the middle shows which way is up.
+   */
+  function dialRow(k: 'lightAngle') {
+    const row = document.createElement('div');
+    row.className = 'tune-row tune-row-dial';
+    row.dataset.key = k;
+    row.appendChild(head(k, null));
+    const body = document.createElement('div');
+    body.className = 'tune-dial-body';
+    const dial = document.createElement('div');
+    dial.className = 'tune-dial';
+    dial.tabIndex = 0;
+    dial.setAttribute('role', 'slider');
+    dial.setAttribute('aria-labelledby', `tuneLabel-${k}`);
+    dial.setAttribute('aria-valuemin', '0');
+    dial.setAttribute('aria-valuemax', '359');
+    dial.innerHTML = `<i class="tune-dial-card" aria-hidden="true"></i><i class="tune-dial-knob" aria-hidden="true">${svg('light')}</i>`;
+    const turn = (deg: number) => set({ lightAngle: ((Math.round(deg) % 360) + 360) % 360 });
+    const aim = (e: PointerEvent) => {
+      const r = dial.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2);
+      const dy = e.clientY - (r.top + r.height / 2);
+      if (Math.hypot(dx, dy) < 4) return;
+      turn((Math.atan2(dx, -dy) * 180) / Math.PI);
+    };
+    dial.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      dial.setPointerCapture(e.pointerId);
+      dial.focus({ preventScroll: true });
+      dial.classList.add('is-dragging');
+      aim(e);
+    });
+    dial.addEventListener('pointermove', (e) => dial.hasPointerCapture(e.pointerId) && aim(e));
+    for (const ev of ['pointerup', 'pointercancel'] as const) dial.addEventListener(ev, () => dial.classList.remove('is-dragging'));
+    dial.addEventListener('dblclick', () => reset(k));
+    dial.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 15 : 5;
+      const map: Record<string, number> = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step };
+      if (e.key in map) turn(tuneNow().lightAngle + map[e.key]);
+      else if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Home') reset(k);
+      else return;
+      e.preventDefault();
+    });
+    const help = document.createElement('p');
+    help.className = 'tune-help';
+    help.textContent = t.sunHelp;
+    body.append(dial, help);
+    row.appendChild(body);
+    row.appendChild(row.querySelector('.tune-reset')!);
+    return row;
+  }
+
+  /** A little holo swatch at the top of the Pattern tab that zooms, turns and tints live. */
+  function sampleRow() {
+    const row = document.createElement('div');
+    row.className = 'tune-sample-row';
+    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div><p class="tune-help"></p>';
+    row.querySelector('p')!.textContent = t.swatch;
     return row;
   }
 
@@ -514,6 +583,14 @@ export function mountTune(store: Store, after: Element): void {
         const help = row.querySelector('.tune-help')!;
         help.textContent = k === 'light' ? t.lightHelp[tune.light] : t.idleHelp[tune.idle];
         btn.setAttribute('aria-label', t.reset.replace('{name}', label).replace('{value}', formatChoice(k, TUNE_DEFAULTS[k], t)));
+      } else if (k === 'lightAngle') {
+        const v = tune[k];
+        const dial = row.querySelector<HTMLElement>('.tune-dial')!;
+        dial.style.setProperty('--a', `${v}deg`);
+        out.textContent = format(k, v, t);
+        dial.setAttribute('aria-valuenow', String(v));
+        dial.setAttribute('aria-valuetext', format(k, v, t));
+        btn.setAttribute('aria-label', t.reset.replace('{name}', label).replace('{value}', format(k, TUNE_DEFAULTS[k], t)));
       } else {
         const v = tune[k];
         const input = row.querySelector<HTMLInputElement>('input')!;
@@ -529,6 +606,14 @@ export function mountTune(store: Store, after: Element): void {
       btn.title = btn.getAttribute('aria-label')!;
       btn.disabled = !isChanged;
     });
+
+    const sample = root.querySelector<HTMLElement>('.tune-sample');
+    if (sample) {
+      sample.style.setProperty('--s', String(tune.scale));
+      sample.style.setProperty('--a', `${tune.angle}deg`);
+      sample.style.setProperty('--h', `${tune.hue}deg`);
+      sample.style.setProperty('--sat', String(tune.sat));
+    }
 
     // The direction only matters for a fixed light; the others are dimmed with a reason when
     // the current finish or mode makes them do nothing.
@@ -553,7 +638,7 @@ export function mountTune(store: Store, after: Element): void {
         const own = reason && reason !== shared ? reason : null;
         why.textContent = own ?? '';
         why.hidden = !own;
-        const control = r.querySelector('input, [role=radiogroup]')!;
+        const control = r.querySelector('input, [role=radiogroup], [role=slider]')!;
         if (reason) control.setAttribute('aria-describedby', own ? why.id : banner.id);
         else control.removeAttribute('aria-describedby');
       }

@@ -129,17 +129,52 @@
 }
 
 /* Tabs */
-.tune-tabs {
-  /* Tabs stay in reach while a long tab scrolls under them. */
+/* Tabs (and Close) stay in reach while a long tab scrolls under them. */
+.tune-tabbar {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--panel-lo);
-  border-radius: 10px 10px 0 0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  align-items: stretch;
   margin: 0 -12px 4px;
   border-bottom: 2px solid var(--edge);
+  border-radius: 10px 10px 0 0;
+  background: var(--panel-lo);
+}
+
+.tune-close {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-left: 2px solid var(--edge);
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tune-close svg {
+  transform: rotate(-90deg);
+  color: var(--gold);
+}
+
+.tune-close:hover {
+  color: var(--text);
+}
+
+.tune-close:focus-visible {
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+
+.tune-tabs {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .tune-tab {
@@ -195,13 +230,18 @@
 .tune-panes {
   /* Scrolling a tab into view keeps its first row clear of the sticky tab bar. */
   scroll-margin-top: 52px;
+  /* As tall as the dock's fade and shadow, so the last row can always scroll fully clear. */
+  padding-bottom: 32px;
 }
 
 .tune-dot {
-  width: 6px;
-  height: 6px;
+  align-self: flex-start;
+  width: 5px;
+  height: 5px;
+  margin: 3px 0 0 -2px;
+  border-radius: 50%;
   background: var(--tune-changed);
-  box-shadow: 0 0 0 2px var(--edge);
+  opacity: 0.8;
 }
 
 .tune-dot[hidden] {
@@ -390,6 +430,7 @@
 .tune-ends {
   display: flex;
   justify-content: space-between;
+  min-height: 11px;
   margin-top: 6px;
   font-size: 11px;
   line-height: 1;
@@ -964,5 +1005,137 @@
   .tune-chev,
   .tune-tab::after {
     transition: none;
+  }
+}
+
+/* Light direction dial: a ring round a mini card, with the sun as the knob. */
+.tune-row-dial .tune-out {
+  display: block;
+}
+
+.tune-dial-body {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.tune-dial-body .tune-help {
+  margin: 0;
+}
+
+.tune-dial {
+  --a: 0deg;
+  position: relative;
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--panel) 0 56%, transparent 57%), var(--panel-hi);
+  box-shadow: inset 0 0 0 2px var(--edge), 0 0 0 2px var(--edge);
+  cursor: grab;
+  touch-action: none;
+}
+
+.tune-dial.is-dragging {
+  cursor: grabbing;
+}
+
+.tune-dial:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.tune-dial-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 31px;
+  margin: -15.5px 0 0 -11px;
+  border-radius: 3px;
+  background: var(--paper);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.tune-dial-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: var(--edge);
+  box-shadow: 0 0 0 2px var(--gold);
+  color: var(--gold);
+  transform: rotate(var(--a)) translateY(-29px) rotate(calc(var(--a) * -1));
+}
+
+.tune-dial-knob svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Pattern sample: a holo lattice that zooms, turns and tints with the Pattern controls. */
+.tune-sample-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0 4px;
+}
+
+.tune-sample-row .tune-help {
+  margin: 0;
+}
+
+.tune-sample {
+  --s: 1;
+  --a: 0deg;
+  --h: 0deg;
+  --sat: 1;
+  position: relative;
+  flex: none;
+  width: 54px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: 5px;
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 3px var(--paper);
+}
+
+.tune-sample i {
+  position: absolute;
+  inset: -60%;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.35) 25%, transparent 25% 75%, rgba(255, 255, 255, 0.35) 75%) 0 0 / calc(10px * var(--s)) calc(10px * var(--s)),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.25) 25%, transparent 25% 75%, rgba(255, 255, 255, 0.25) 75%) 0 0 / calc(10px * var(--s)) calc(10px * var(--s)),
+    linear-gradient(115deg, #ff6b8b, #ffd84a 25%, #59f2b0 45%, #5fb4ff 65%, #c58bff 85%, #ff6b8b);
+  filter: hue-rotate(var(--h)) saturate(var(--sat));
+  transform: rotate(var(--a));
+  image-rendering: pixelated;
+  animation: tune-sample 6s linear infinite;
+}
+
+.tune-sample::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 3px var(--paper);
+  pointer-events: none;
+}
+
+@keyframes tune-sample {
+  to {
+    background-position: calc(40px * var(--s)) calc(40px * var(--s)), calc(-40px * var(--s)) calc(40px * var(--s)), 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tune-sample i {
+    animation: none;
   }
 }
