@@ -6,34 +6,53 @@ export interface Program {
   attr: (name: string) => number;
 }
 
-export function createProgram(gl: WebGL2RenderingContext, vs: string, fs: string): Program {
-  const compile = (type: number, src: string) => {
+/** A program being compiled and linked; with KHR_parallel_shader_compile the driver works on it in the background. */
+export interface PendingProgram {
+  /** True once the program can be used without stalling (always true without the extension). */
+  done(): boolean;
+  /** The program, waiting for it if needed. Throws if it failed to compile. */
+  get(): Program;
+}
+
+/** `attrib0`: an attribute pinned to location 0, so programs built from the same vertex shader share a VAO. */
+export function startProgram(gl: WebGL2RenderingContext, vs: string, fs: string, attrib0?: string): PendingProgram {
+  const shader = (type: number, src: string) => {
     const s = gl.createShader(type)!;
     gl.shaderSource(s, src);
     gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      const log = gl.getShaderInfoLog(s);
-      gl.deleteShader(s);
-      throw new Error(`Shader compile failed: ${log}`);
-    }
     return s;
   };
+  const v = shader(gl.VERTEX_SHADER, vs);
+  const f = shader(gl.FRAGMENT_SHADER, fs);
   const prog = gl.createProgram()!;
-  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vs));
-  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fs));
+  gl.attachShader(prog, v);
+  gl.attachShader(prog, f);
+  if (attrib0) gl.bindAttribLocation(prog, 0, attrib0);
   gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    throw new Error(`Program link failed: ${gl.getProgramInfoLog(prog)}`);
-  }
-  const cache: Uniforms = {};
-  const u = new Proxy(cache, {
-    get(target, key: string) {
-      if (!(key in target)) target[key] = gl.getUniformLocation(prog, key);
-      return target[key];
+  const parallel = gl.getExtension('KHR_parallel_shader_compile');
+  let built: Program | null = null;
+  return {
+    done: () => !!built || !parallel || gl.getProgramParameter(prog, parallel.COMPLETION_STATUS_KHR) === true,
+    get() {
+      if (built) return built;
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        for (const s of [v, f]) if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(`Shader compile failed: ${gl.getShaderInfoLog(s)}`);
+        throw new Error(`Program link failed: ${gl.getProgramInfoLog(prog)}`);
+      }
+      const cache: Uniforms = {};
+      const u = new Proxy(cache, {
+        get(target, key: string) {
+          if (!(key in target)) target[key] = gl.getUniformLocation(prog, key);
+          return target[key];
+        },
+      });
+      built = { prog, u, attr: (name) => gl.getAttribLocation(prog, name) };
+      return built;
     },
-  });
-  return { prog, u, attr: (name) => gl.getAttribLocation(prog, name) };
+  };
 }
+
+export const createProgram = (gl: WebGL2RenderingContext, vs: string, fs: string): Program => startProgram(gl, vs, fs).get();
 
 export function quadBuffer(gl: WebGL2RenderingContext, half = 1): WebGLBuffer {
   const b = gl.createBuffer()!;

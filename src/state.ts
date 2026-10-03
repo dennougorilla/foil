@@ -3,6 +3,7 @@ import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
+import { PACKS, type PackId } from './packs';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 /** Tabs of the Fine-tune area in the side panel. */
@@ -16,6 +17,8 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
+  /** The opened pack whose finishes follow the open ones in the hand, or none. */
+  folder: PackId | null;
   rarity: RarityId;
   frame: FrameId;
   intensity: number;
@@ -53,6 +56,7 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
+  'folder',
   'rarity',
   'frame',
   'intensity',
@@ -81,6 +85,7 @@ export function createStore() {
     sound: true,
     crt: true,
     edition: 'holo',
+    folder: null,
     rarity: 'rare',
     frame: 'paper',
     intensity: 1,
@@ -109,6 +114,7 @@ export function createStore() {
     state.adjustOpen = state.adjustOpen === true;
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
+    if (!PACKS.some((p) => p.id === state.folder)) state.folder = null;
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;

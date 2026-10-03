@@ -1,17 +1,21 @@
-import { BG_FS, CARD_FS, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './shaders';
-import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type Program } from './gl';
+import { BG_FS, cardFs, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './shaders';
+import { createProgram, createTexture, hexToRgb, quadBuffer, startProgram, uploadTexture, type PendingProgram, type Program } from './gl';
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { RangeLayer } from './range';
-import { ReliefGL } from '../relief';
-import { editionById } from '../editions';
-import { HeatLayer } from '../touch/layer';
 import type { HeatSource } from '../touch/heat';
 import type { LayerMap } from '../depth/layers';
+import type { PackId } from '../packs';
+import { packModule, packOfShader } from './finishes/registry';
+import type { FinishLayer } from './finishes/types';
 
 export type RGB = [number, number, number];
 
-const RELIEF = editionById('relief').shader;
+/** One card program: the core with the open finishes, or the core with one pack's. */
+interface CardProgram {
+  pending: PendingProgram;
+  layers: FinishLayer[];
+}
 
 export interface BackgroundFrame {
   time: number;
@@ -89,6 +93,10 @@ export interface CardDraw {
   loop?: number;
   /** Where the card was touched, for finishes that react to it. */
   heat?: HeatSource;
+  /** Which face to draw (see setFace); the card's own when absent. */
+  face?: string;
+  /** The part of the face on this quad, x0, y0, x1, y1; the whole face when absent. */
+  uv?: [number, number, number, number];
 }
 
 export interface Particle {
@@ -105,19 +113,18 @@ export interface Particle {
 /** Draws cards (front, back, shadow) and pixel particles into a transparent canvas. */
 export class CardRenderer {
   readonly gl: WebGL2RenderingContext;
-  private card: Program;
+  private programs = new Map<PackId | 'open', CardProgram>();
   private parts: Program;
   private cardVao: WebGLVertexArrayObject;
   private partVao: WebGLVertexArrayObject;
   private partBuf: WebGLBuffer;
   private partData = new Float32Array(7 * 512);
-  private face: WebGLTexture;
-  private mask: WebGLTexture;
+  /** Faces by name: the card's own ('card') and any other drawn with the same shader (a pack's wrapper). */
+  private faces = new Map<string, { face: WebGLTexture; mask: WebGLTexture; texels: number }>();
+  private cardFace: HTMLCanvasElement | null = null;
   private back: WebGLTexture;
   private lettering: LetteringGL;
-  private heat: HeatLayer;
-  private faceTexels = 1;
-  private relief: ReliefGL;
+  private live: boolean;
   private layers: WebGLTexture;
   private plate: WebGLTexture;
   private layerCuts = 0;
@@ -142,15 +149,17 @@ export class CardRenderer {
     }) as WebGL2RenderingContext | null;
     if (!gl) throw new Error('webgl2');
     this.gl = gl;
-    this.card = createProgram(gl, CARD_VS, CARD_FS);
+    this.live = !opts.settled;
+    // The open finishes' program starts compiling now; a pack's when it is first asked for.
+    this.program('open');
     this.parts = createProgram(gl, PARTICLE_VS, PARTICLE_FS);
 
+    // Every card program pins aPos to location 0, so they share this VAO.
     this.cardVao = gl.createVertexArray()!;
     gl.bindVertexArray(this.cardVao);
     quadBuffer(gl, 0.5);
-    const a = this.card.attr('aPos');
-    gl.enableVertexAttribArray(a);
-    gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
     this.partVao = gl.createVertexArray()!;
     gl.bindVertexArray(this.partVao);
@@ -165,22 +174,47 @@ export class CardRenderer {
     gl.vertexAttribPointer(ac, 3, gl.FLOAT, false, 28, 16);
     gl.bindVertexArray(null);
 
-    this.face = createTexture(gl, true);
-    this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
     this.layers = createTexture(gl, true);
     this.plate = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
-    this.relief = new ReliefGL(gl, !opts.settled);
     this.range = new RangeLayer(gl);
-    this.heat = new HeatLayer(gl);
   }
 
-  setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement): void {
-    uploadTexture(this.gl, this.face, face, true);
-    uploadTexture(this.gl, this.mask, mask, false);
-    this.relief.setFace(face);
-    this.faceTexels = face.width;
+  /** The program for a pack (or the open finishes), started on first ask; null until that pack's module has arrived. */
+  private program(key: PackId | 'open'): CardProgram | null {
+    let cp = this.programs.get(key);
+    if (cp) return cp;
+    const mod = key === 'open' ? undefined : packModule(key);
+    if (key !== 'open' && !mod) return null;
+    cp = { pending: startProgram(this.gl, CARD_VS, cardFs(mod), 'aPos'), layers: mod?.layers?.(this.gl, this.live) ?? [] };
+    if (this.cardFace) for (const l of cp.layers) l.setFace?.(this.cardFace);
+    this.programs.set(key, cp);
+    return cp;
+  }
+
+  /**
+   * Whether a card with this shader index can be drawn without stalling the frame. Asking starts
+   * its program compiling (once its pack has arrived). Exports don't wait: they compile on the spot.
+   */
+  ready(shader: number): boolean {
+    const cp = this.program(packOfShader(shader) ?? 'open');
+    return !!cp && (!this.live || cp.pending.done());
+  }
+
+  /** `key`: 'card' is the card's own face; other names hold extra faces drawn with the same shader. */
+  setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, key = 'card'): void {
+    let f = this.faces.get(key);
+    if (!f) {
+      f = { face: createTexture(this.gl, true), mask: createTexture(this.gl, false), texels: 1 };
+      this.faces.set(key, f);
+    }
+    uploadTexture(this.gl, f.face, face, true);
+    uploadTexture(this.gl, f.mask, mask, false);
+    f.texels = face.width;
+    if (key !== 'card') return;
+    this.cardFace = face;
+    for (const cp of this.programs.values()) for (const l of cp.layers) l.setFace?.(face);
   }
 
   /**
@@ -226,14 +260,19 @@ export class CardRenderer {
     gl.frontFace(gl.CW);
   }
 
-  drawCard(d: CardDraw, time: number): void {
-    const { gl, card: p } = this;
+  /** Draws one card; returns false, drawing nothing, while its program is not ready (see ready). */
+  drawCard(d: CardDraw, time: number): boolean {
+    const { gl } = this;
+    if (!this.ready(d.edition)) return false;
+    const cp = this.program(packOfShader(d.edition) ?? 'open')!;
+    const p = cp.pending.get();
+    const f = this.faces.get(d.face ?? 'card');
     gl.useProgram(p.prog);
     gl.bindVertexArray(this.cardVao);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.face);
+    gl.bindTexture(gl.TEXTURE_2D, f?.face ?? null);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.mask);
+    gl.bindTexture(gl.TEXTURE_2D, f?.mask ?? null);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.back);
     gl.uniform1i(p.u.uFace, 0);
@@ -253,13 +292,14 @@ export class CardRenderer {
     gl.uniform2f(p.u.uLight, d.light[0], d.light[1]);
     gl.uniform1f(p.u.uAlpha, d.alpha);
     gl.uniform1f(p.u.uFlash, d.flash);
-    gl.uniform1f(p.u.uFaceTexels, this.faceTexels);
+    gl.uniform1f(p.u.uFaceTexels, f?.texels ?? 1);
+    const uv = d.uv ?? [0, 0, 1, 1];
+    gl.uniform4f(p.u.uUvRect, uv[0], uv[1], uv[2], uv[3]);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     applyTune(gl, p.u, this.tune);
-    this.relief.bind(p, 5, d.edition === RELIEF);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
-    this.heat.bind(p, 6, d.heat);
+    for (const l of cp.layers) l.bind(p, d);
     gl.activeTexture(gl.TEXTURE7);
     gl.bindTexture(gl.TEXTURE_2D, this.layers);
     gl.uniform1i(p.u.uLayers, 7);
@@ -279,6 +319,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uShadow, 0);
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    return true;
   }
 
   drawParticles(list: Particle[]): void {

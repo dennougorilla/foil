@@ -1,0 +1,154 @@
+# Packs
+
+How finishes beyond the first seven reach the hand, and how a pack is opened. The product
+summary is in `README.md`; this note is the design behind it.
+
+## Shape
+
+- The hand always starts with seven hand-picked finishes (`OPEN_EDITIONS` in `src/packs.ts`):
+  Base, Foil, Holographic, Polychrome, Negative, Glitch and Prism. Someone who only wants a quick
+  try never downloads or compiles anything else.
+- Every other finish sits in a **theme pack**. A pack holds every finish of its theme, so its size
+  is the size of the theme. It is opened **once**, and opening it shows everything inside — there
+  is no random draw. The excitement comes from the order: the rarest finish waits until last.
+- An opened pack becomes a **folder** under the hand. Picking a folder deals its finishes into the
+  hand after the seven, so the hand is always "the seven + one folder" and stays short on a phone.
+  Picking the active folder again puts it away (the seven only). Each opened folder can replay its
+  opening (the ↻ button on the active folder).
+- The **Supporter pack** replaces the old hidden-finish unlocks. It does not exist in the UI until
+  one of the support links (GitHub Sponsors, Buy Me a Coffee) is opened once; then it joins the
+  shelf, sealed, and opens like any pack, with a richer wrapper and opening. Honor system: no
+  server, nothing checks a payment.
+
+## Themes
+
+Grouped by what the finish *is* (its material or source of light), so a new finish has an
+obvious home. Inside a pack the order is the reveal order; the last one is the showpiece.
+
+| Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish | Room for (in progress elsewhere) |
+|---|---|---|---|---|
+| `metal` Metal & Gem | 金属 | Gold → Crystal → **Relief** | Gold | Platinum |
+| `light` Light | 光 | Galaxy → Aurora → **Shallows** | Holographic | Cosmo Holo, Phosphor (蓄光), Blacklight |
+| `nature` Nature | 自然 | Sakura → Frost → **Magma** | Frost | — |
+| `studio` Studio | 工房 | Halftone → Warmth → **Shadowbox** | Halftone | Stained Glass, Lenticular |
+| `supporter` Supporter | サポーター限定 | Opal → Raden → **Kintsugi** | Kintsugi (gold seams on black) | — |
+
+Why not a separate 和 (Japanese) pack: today only Sakura would be in it (Kintsugi and Raden are
+supporter finishes), and a one-card pack has no build-up. Sakura sits with the other seasons and
+elements in Nature; a 和 pack can be split off once it has three finishes.
+
+### Adding a finish or a pack
+
+1. Write the finish's GLSL in its pack's module under `src/gl/finishes/` (the module's `glsl`
+   and one `dispatch` line), add the edition to `src/editions.ts`, its names to `src/i18n.ts`,
+   and its id to the pack's `finishes` in `src/packs.ts` (before the showpiece, or as the new
+   showpiece).
+2. A new pack is one more entry in `PACKS` (id, finishes, wrapper, colors, `load`) plus a module
+   file and its two names in `src/i18n.ts`. Nothing else lists packs.
+3. Someone who already opened a pack finds a finish added to it later straight in the folder.
+
+## Storage
+
+- `localStorage['foil:packs']` = `{"opened": ["metal", …], "supporter": true}`. Anything that
+  does not parse, or unknown ids, counts as nothing opened. Other tabs follow through the
+  `storage` event; two tabs opening at once keep the union.
+- The active folder is part of the main store (`foil:v1` → `folder`); a folder that is not opened
+  falls back to none.
+- A saved card on a finish whose pack is sealed (site data cleared) goes back to Holographic.
+- **From the old unlocks** (`foil:secrets`, the list of finishes unlocked by support links, v0.9.0
+  to v0.9.3): every pack holding an unlocked finish counts as opened, and any unlock at all means a
+  support link was opened, so the Supporter pack shows (opened if one of its finishes was
+  unlocked). The old key is then removed. Nobody loses a finish they had. This one conversion is
+  the only migration and goes once v0.9 saves are no longer around.
+
+## Loading (weight budget)
+
+Nothing of a pack loads before it is opened or its folder picked:
+
+- `src/packs.ts` is plain data (ids, order, colors, a `load()` that dynamic-imports the module).
+- Each pack module (`src/gl/finishes/<pack>.ts`) carries its finishes' GLSL and their helpers
+  (Relief's map, Warmth's heat texture). The card shader is assembled per program: the core
+  (common helpers, tune, range, lettering, the seven open finishes) plus one pack's finishes, so
+  a pack's program is compiled only when that pack is needed, with `KHR_parallel_shader_compile`
+  when available so the frame never stalls. Cards whose program is still compiling wait (hand
+  cards deal in when ready; the main card arrives with its deal-in).
+- Shadowbox's depth code (worker, model, pill) loads when Shadowbox is first put on the card.
+- The opening itself (`src/pack/`: overlay, pack art, motion, sounds, CSS) is its own chunk,
+  fetched when a sealed pack is tapped or a replay is asked for, in parallel with the pack module.
+- The support links only flip a flag; the Supporter pack module loads on opening.
+
+Measured in the PR: the first-load JS (gzip) and the time to the first card frame must not be
+worse than v0.9.3.
+
+## Opening — what makes the references feel good
+
+Studied: Pokémon TCG Pocket's pack opening (phone) and Balatro's booster packs (PC/phone).
+
+**Pokémon TCG Pocket, beat by beat**
+
+1. The chosen pack grows to the middle and hangs there, swaying a little; its foil catches the
+   light as the phone tilts. Nothing happens until you act — the pack waits for you.
+2. A thin guide across the top: you trace it with a finger. A line of light follows the finger
+   exactly, with a spark at the tip and a rising "riiip" that you produce yourself. Lift early
+   and the line fades; nothing is lost.
+3. Finish the line and the top tears away; light spills out of the opening.
+4. The pack drops away and the cards rise out as a face-up stack.
+5. You swipe the top card off; it follows the finger, leans, and flies off past a small
+   threshold (or snaps back). The next card pops forward. Rhythm: one swipe per card, quick.
+6. The rare slot breaks the rhythm: a glow, a pause, a flip with a burst and a shake that grows
+   with rarity — the build-up is longer than the reveal.
+7. Finally all cards are laid out together, dealt in one by one, so you see the whole haul.
+
+**Balatro**
+
+1. The pack jiggles (a decaying rotational wobble) and pops; the background swirl changes to the
+   pack's color — the room changes, not just the object.
+2. Cards are dealt along an arc with springy overshoot, staggered, each with a click whose pitch
+   rises (C, D, E, G…).
+3. Flips are a squash on one axis with a bounce at the end; every impact gets a small shake, a
+   flash and chunky pixel particles.
+4. Everything idles: cards float and lean toward the pointer, so the scene never freezes.
+5. All of it can be turned down (shake, CRT), and nothing ever blocks input for long.
+
+What we take: the **self-made tear** (Pocket 2), the **swipe rhythm broken by a charged
+showpiece** (Pocket 5–6), the **haul shown together** (Pocket 7), and Balatro's **springs,
+wobble, rising pitch, pixel particles and the room changing color**. Skippable everywhere.
+
+## Opening — our beats
+
+Times in ms. Springs are `k / d` (stiffness / damping, as in `src/stage.ts`). Sounds are
+synthesised (`src/audio.ts` primitives); vibration only where `navigator.vibrate` exists and
+follows the sound toggle.
+
+| # | Beat | Motion | Light / particles | Sound | Vibrate |
+|---|---|---|---|---|---|
+| 0 | **Summon** (0–520) | Overlay fades in (220, ease-out). The pack flies from its shelf chip to the centre: scale 0.3 → 1 on a spring 170/13 (one overshoot), a decaying wobble ±0.22 rad. Title drops in (200, delay 220). | The room becomes FOIL's swirl in the pack's colors. | Whoosh (noise 400 → 2400 Hz, 280) | 8 |
+| 1 | **Invite** (until touched) | Pack floats (±6 px, 0.5 Hz) and leans to the pointer or gyro (spring 210/17, ±0.3 rad); its foil follows the tilt. | A bead of light runs along the dotted cut guide every 1.6 s; after 2.2 s of nothing, a ghost finger traces it once. | — | — |
+| 2 | **Trace** (finger) | Press in the top band (top 24 % of the pack, generous) and slide: progress = furthest x reached, never goes back. The pack leans toward the finger (≤0.1 rad) and trembles with finger speed. Release before 82 % → the line drains back (260, ease-in). Tap, Enter/Space or the Open button → an automatic trace (480, ease-in-out). | A white-hot line from the left edge to the finger, with bloom; 2–3 sparks per frame from the tip (gravity). | A noise tick every 4 % with pitch rising with progress ("riiip"); a fizzle on cancel. | 6 every 12 % |
+| 3 | **Rip** (0–350) | The top strip flies off (up and to the side, spin, gravity, fades by 700). The body punches 1 → 1.06 → 1 (spring 320/14). Screen shake 220, 10 px, exponential decay. | White flash on the pack (0.6, gone in about 0.12 s), light pours from the opening, 40 sparks upward. | Rip (noise 700 → 5000 Hz, 320) + low thump (90 Hz) | 18, 30, 40 |
+| 4 | **Draw** (350–1250) | The stack rises out of the pack (spring 150/14); at 420 the pack lets go and falls away under gravity with a little spin, and 100 later the stack settles where it was, landing at 900. | Pack flash fades; background deepens. | Slide + thock (140 Hz) | 10 |
+| 5 | **Swipe** (per card) | Face-up stack; the top card follows the finger (rubber band, leans rz = dx·0.0012). Past 28 % of its width or a flick > 800 px/s it flies off that way (260, ease-in); else it snaps back (spring 260/18). The next card pops (scale 0.94 → 1, spring 320/14). Tap / → / Enter sends it off automatically. | Name and line of the finish under the stack, swapped with a short slide. Second-to-last card (rare): a light sweep across it and 18 sparkles when it surfaces. | Swish per card; pop on the next; rare: two-note chime | 8 (rare: 14) |
+| 6 | **Showpiece** | The last card comes face-down, edges glowing, trembling. Press (or →/Enter): it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
+| 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
+| 8 | **Try it** | Primary: "Try in the hand" — closes, picks this folder and puts the showpiece on the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: Close. | — | Select chime (existing) | — |
+
+**Skip** (top right, from beat 0): jumps to the haul (a 250 ms crossfade, then the deal). A replay
+starts at beat 0 too, but its Skip is the same single tap. Escape closes from the haul and skips
+from anywhere else; the pack counts as opened from the rip (or the skip) on, so closing early
+before the rip leaves it sealed.
+
+**Supporter pack** — everything above, one step richer: a black wrapper mended with Kintsugi's gold
+seams, a gold frame and ribbon, gold dust drifting in the room the whole time, a golden shower at the rip, every card
+gets the next tier's entrance (the first already chimes), the showpiece gets a double ray set, gold
+confetti and a lower boom, and the room takes Kintsugi's colors.
+
+**Reduced motion** — a different, still opening: the overlay fades; the pack stands still (no
+float, no lean, no shake, no particles). Tracing still works and draws the line, Open is a button.
+After the tear the haul appears directly: the cards fade in one after another (200 each, 150
+apart), the showpiece last with a steady glow ring and its ★ banner. Sound and vibration stay
+(they are not motion).
+
+**Frame budget** — 60 fps on a mid-range phone: the stage underneath stops drawing while the
+overlay is open, the overlay's canvas caps its pixel ratio like the stage (1.5 on phones), at most
+6 cards are drawn at once, particles are capped at 512, and the overlay's WebGL context is let go
+when it closes.

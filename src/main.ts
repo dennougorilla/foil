@@ -1,9 +1,9 @@
 import './style.css';
 import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
-import { EDITIONS, FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
+import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face';
-import { mountShadowDepth } from './depth/shadowDepth';
+import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
@@ -17,12 +17,17 @@ import { mountLettering } from './letteringPanel';
 import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
-import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
+import { initPackStore, packs, releaseSealedEdition } from './packStore';
+import { handOf, packOf, type Pack } from './packs';
+import { loadPack } from './gl/finishes/registry';
+import { mountShelf } from './shelf';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const store = createStore();
-releaseLockedEdition(store);
+releaseSealedEdition(store);
+/** The hand: the seven open finishes, then the chosen folder's. */
+const hand = () => handOf(store.get().folder, packs.get());
 let t: Dict = DICTS[store.get().lang];
 
 // ---------- Images ----------
@@ -59,7 +64,7 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
-    isHidden: isLocked,
+    handIds: hand,
   });
 } catch (err) {
   console.error(err);
@@ -69,14 +74,30 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
-// The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
-const depth = mountShadowDepth({
-  store,
-  cards: stage.cards,
-  slot: $('cardSlot'),
-  dict: () => t,
-  animated: () => !!userAnim && store.get().sample < 0,
-});
+// The Shadowbox finish cuts the art into sheets by depth; its code loads the first time it is chosen.
+let depth: ShadowDepth | null = null;
+let depthLoading = false;
+function wakeDepth() {
+  if (depth || depthLoading || store.get().edition !== 'shadowbox') return;
+  depthLoading = true;
+  void import('./depth/shadowDepth').then((m) => {
+    depth = m.mountShadowDepth({
+      store,
+      cards: stage.cards,
+      slot: $('cardSlot'),
+      dict: () => t,
+      animated: () => !!userAnim && store.get().sample < 0,
+    });
+    depth.update(face, artKey());
+  });
+}
+
+/** Fetches the pack of the finish on the card and of the chosen folder; their cards deal in once ready. */
+function wakePacks() {
+  const s = store.get();
+  for (const id of [packOf(s.edition)?.id, s.folder]) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
+  wakeDepth();
+}
 const artIds = new WeakMap<object, number>();
 let artCount = 0;
 /** Names the art in the window (picture and crop), so depth is read once per art. */
@@ -97,7 +118,7 @@ function redrawFace() {
   drawFace(face, mask, spec);
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
-  depth.update(face, artKey());
+  depth?.update(face, artKey());
 }
 
 // ---------- Text ----------
@@ -138,6 +159,7 @@ function applyText() {
   $('versionLink').setAttribute('aria-label', $('versionLink').title);
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
+  $('hand').title = t.handHint;
   stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
   $('cropView').title = t.cropHint;
@@ -600,7 +622,7 @@ function selectEdition(id: EditionId) {
     stage.juice(0.5);
     return;
   }
-  const i = EDITIONS.findIndex((e) => e.id === id);
+  const i = Math.max(0, hand().indexOf(id));
   store.set({ edition: id });
   announce(t.applied.replace('{name}', t.edition[id]));
   sfx.select(i);
@@ -622,19 +644,18 @@ window.addEventListener('keydown', (e) => {
   // 1–9 then 0 pick the first ten finishes in the hand, like a keyboard row.
   const n = parseInt(e.key, 10);
   if (!Number.isNaN(n) && e.key.length === 1) {
-    const shown = EDITIONS.filter((x) => !isLocked(x.id));
+    const shown = hand();
     const i = n === 0 ? 9 : n - 1;
-    if (shown[i]) selectEdition(shown[i].id);
+    if (shown[i]) selectEdition(shown[i]);
     return;
   }
   // Arrows step through finishes when nothing else on the page wants them.
   const free = document.activeElement === document.body || document.activeElement?.id === 'cardSlot';
   if (free && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     e.preventDefault();
-    let next = EDITIONS.findIndex((x) => x.id === store.get().edition);
-    do next = (next + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
-    while (isLocked(EDITIONS[next].id));
-    selectEdition(EDITIONS[next].id);
+    const shown = hand();
+    const at = shown.indexOf(store.get().edition);
+    selectEdition(shown[(at + (e.key === 'ArrowRight' ? 1 : -1) + shown.length) % shown.length]);
   }
 });
 
@@ -795,7 +816,7 @@ function exportInput() {
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
-    layers: depth.current(),
+    layers: depth?.current(),
   };
 }
 
@@ -1034,6 +1055,49 @@ const apngExport = mountApngExport({
   sfx,
 });
 
+// ---------- Packs ----------
+
+/** Opens a sealed pack, or replays an opened one. The opening's code and the pack's finishes load now. */
+let opening = false;
+function openPack(pack: Pack, from: DOMRect) {
+  if (opening) return;
+  opening = true;
+  const chip = document.querySelector<HTMLElement>(`.pk-chip[data-pack="${pack.id}"]`);
+  chip?.setAttribute('aria-busy', 'true');
+  const replay = packs.isOpened(pack.id);
+  const finishes = loadPack(pack.id);
+  void import('./pack/opening')
+    .then((m) =>
+      m.openPack({
+        pack,
+        from,
+        replay,
+        dict: t,
+        face,
+        mask,
+        back,
+        tune: store.get().tune,
+        intensity: store.get().intensity,
+        sound: store.get().sound,
+        finishes,
+        pause: (on) => stage.pause(on),
+        onOpened: () => packs.open(pack.id),
+        onClose: (pick) => {
+          opening = false;
+          // A pack just opened becomes the folder in the hand; a pick also goes on the card.
+          if (!replay || pick) store.set({ folder: pack.id });
+          if (pick && pick !== store.get().edition) stage.flipTo(() => selectEdition(pick));
+          shelfUi.focus(pack.id);
+        },
+      }),
+    )
+    .catch(() => {
+      opening = false;
+      toast(t.pack.failed, true);
+    })
+    .finally(() => chip?.removeAttribute('aria-busy'));
+}
+
 // ---------- Logo ----------
 
 {
@@ -1047,8 +1111,8 @@ const apngExport = mountApngExport({
     logo.classList.remove('is-flip');
     void logo.offsetWidth;
     logo.classList.add('is-flip');
-    const others = EDITIONS.filter((e) => e.id !== store.get().edition && !isLocked(e.id));
-    selectEdition(others[Math.floor(Math.random() * others.length)].id);
+    const others = hand().filter((id) => id !== store.get().edition);
+    selectEdition(others[Math.floor(Math.random() * others.length)]);
   });
   logo.addEventListener('animationend', (e) => {
     if ((e.target as HTMLElement).matches('.tile:last-of-type')) logo.classList.remove('is-flip');
@@ -1198,7 +1262,12 @@ store.on((s, changed) => {
   if (changed.has('edition')) {
     stage.syncHandChecked();
     renderCaption(null);
-    depth.update(face, artKey());
+    wakePacks();
+    depth?.update(face, artKey());
+  }
+  if (changed.has('folder')) {
+    wakePacks();
+    stage.syncHand();
   }
   if (changed.has('rarity') || changed.has('frame')) buildSegments();
   if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
@@ -1234,7 +1303,19 @@ mountLettering({
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
-initSponsor(stage, store);
+initPackStore(store);
+packs.on(() => stage.syncHand());
+wakePacks();
+const shelfUi = mountShelf({
+  host: $('shelf'),
+  store,
+  dict: () => t,
+  onOpen: (p, from) => openPack(p, from),
+  onPrefetch: (p) => {
+    loadPack(p.id).catch(() => {});
+    void import('./pack/opening');
+  },
+});
 const boot = () => {
   redrawFace();
   drawCropPreview();

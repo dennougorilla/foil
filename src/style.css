@@ -822,25 +822,175 @@ button {
   opacity: 1;
 }
 
-.hand-wrap:hover .hand-hint,
-.hand-wrap:focus-within .hand-hint {
-  opacity: 0;
-}
-
 .hand-slot[aria-checked='true'] .key {
   background: var(--accent);
   color: #fff;
 }
 
-.hand-hint {
-  margin: 0;
-  padding: 2px 10px;
-  border-radius: 6px;
-  background: rgba(13, 19, 21, 0.7);
-  transition: opacity 0.2s;
-  font-size: 14px;
+.shelf {
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 12px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+
+.shelf-label {
+  flex: none;
+  font-size: 13px;
   color: var(--text-dim);
   text-shadow: 0 2px 0 var(--edge);
+}
+
+/* A pack on the shelf: sealed (shining, waiting to be opened) or opened (a folder for the hand). */
+.pk-chip,
+.pk-replay {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 12px 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(13, 19, 21, 0.86);
+  color: var(--text);
+  font-size: 15px;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
+  transition: transform 0.15s var(--ease-out), background 0.15s;
+}
+
+.pk-chip b {
+  font-weight: 400;
+}
+
+.pk-chip small {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--panel-lo);
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.pk-chip:hover,
+.pk-replay:hover {
+  transform: translateY(-2px);
+  background: var(--panel);
+}
+
+.pk-chip:focus-visible,
+.pk-replay:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 3px;
+}
+
+/* The little bag: crimped at both ends, in the pack's colors, with a glint running over it. */
+.pk-glyph {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 26px;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--c), var(--b) 55%, var(--a));
+  clip-path: polygon(0 3px, 3px 0, 6px 3px, 9px 0, 12px 3px, 15px 0, 18px 3px, 18px 23px, 15px 26px, 12px 23px, 9px 26px, 6px 23px, 3px 26px, 0 23px);
+}
+
+.pk-glyph::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.95) 50%, transparent 70%) 0 0 / 300% 100% no-repeat;
+  background-position: 150% 0;
+}
+
+.pk-chip[data-state='sealed'] .pk-glyph::after {
+  animation: tile-glint 3.2s ease-in-out infinite;
+}
+
+.pk-chip[data-state='sealed'] small {
+  background: var(--gold);
+  color: var(--paper-ink);
+}
+
+.pk-chip[data-state='sealed']:hover .pk-glyph {
+  animation: pk-jiggle 0.45s ease-out;
+}
+
+/* Opened: the top is torn off. */
+.pk-chip:not([data-state='sealed']) .pk-glyph {
+  clip-path: polygon(0 7px, 4px 5px, 8px 7px, 12px 5px, 18px 7px, 18px 23px, 15px 26px, 12px 23px, 9px 26px, 6px 23px, 3px 26px, 0 23px);
+}
+
+.pk-chip[data-state='active'] {
+  background: var(--paper);
+  color: var(--paper-ink);
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge), 0 0 0 5px color-mix(in srgb, var(--c) 70%, transparent);
+}
+
+.pk-chip[data-state='active'] small {
+  background: var(--paper-ink);
+  color: var(--paper);
+}
+
+.pk-chip.is-supporter {
+  box-shadow: 0 0 0 2px #e9b955, 0 3px 0 2px var(--edge);
+}
+
+.pk-chip.is-new {
+  animation: pk-chip-in 0.7s var(--ease-back), pk-chip-glow 1.2s 0.7s ease-in-out 3;
+}
+
+.pk-chip[aria-busy='true'] {
+  cursor: progress;
+}
+
+.pk-chip[aria-busy='true'] .pk-glyph::after {
+  animation: tile-glint 0.6s linear infinite;
+}
+
+.pk-replay {
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+  margin-left: -2px;
+}
+
+.pk-replay svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+@keyframes pk-jiggle {
+  25% { transform: rotate(-12deg) scale(1.15); }
+  55% { transform: rotate(9deg) scale(1.1); }
+  80% { transform: rotate(-4deg); }
+}
+
+@keyframes pk-chip-in {
+  from { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+}
+
+@keyframes pk-chip-glow {
+  50% { box-shadow: 0 0 0 2px #e9b955, 0 3px 0 2px var(--edge), 0 0 22px 6px rgba(233, 185, 85, 0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-chip,
+  .pk-chip .pk-glyph,
+  .pk-chip .pk-glyph::after {
+    animation: none !important;
+  }
 }
 
 /* ---------- Panel ---------- */
@@ -2291,8 +2441,9 @@ input[type='range']:disabled {
   .stage {
     padding-bottom: 12px;
   }
-  .hand-hint {
-    display: none;
+  .shelf {
+    justify-content: flex-start;
+    width: 100%;
   }
   .panel {
     max-height: none;

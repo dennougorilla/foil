@@ -1,4 +1,4 @@
-// End-to-end check of the side panel and exports: node scripts/e2e.mjs (with the dev server running)
+// End-to-end check of the side panel, exports, packs and folders: node scripts/e2e.mjs (with the dev server running)
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { decompressFrames, parseGIF } from 'gifuct-js';
@@ -44,6 +44,14 @@ await step('first visit shows only the main flow', async () => {
   expect(!(await page.isVisible('#panelTabs')), 'fine-tuning is open on a first visit');
   expect(!(await page.isVisible('#intensity')), 'a fine control shows before Fine-tune is opened');
   expect(!(await page.isVisible('.sw-strip-stage')), 'the backdrop row should be gone');
+});
+
+await step('nothing of a pack loads before one is opened', async () => {
+  const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth/.test(n));
+  expect(pack.length === 0, `loaded early: ${pack.join(', ')}`);
+  expect((await page.locator('.hand-slot').count()) === 7, 'the hand does not start with seven');
+  expect((await page.locator('.pk-chip[data-state=sealed]').count()) === 4, 'expected four sealed packs on the shelf');
 });
 
 await step('fine-tune opens with four tabs and is remembered', async () => {
@@ -195,24 +203,115 @@ await step('GIF with a clear background is really clear', async () => {
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
 });
 
-await step('the hand opens with seven finishes; each support link unlocks one secret', async () => {
-  const shown = () => page.locator('.hand-slot:not([hidden])').count();
-  expect((await shown()) === 7, `the hand opened with ${await shown()} finishes, not seven`);
-  for (let n = 1; n <= 2; n++) {
-    await page.click('#supportBtn');
-    const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click(`.support-link >> nth=${n - 1}`)]);
-    await popup.close();
-    await page.waitForTimeout(600);
-    const unlocked = await page.evaluate(() => JSON.parse(localStorage.getItem('foil:secrets') ?? '[]'));
-    expect(unlocked.length === n, `expected ${n} secrets unlocked, got ${unlocked.length}`);
-    expect((await shown()) === 7 + n, 'the unlocked secret did not join the hand');
-    await page.keyboard.press('Escape');
+const handCount = () => page.locator('.hand-slot').count();
+const packsSaved = () => page.evaluate(() => JSON.parse(localStorage.getItem('foil:packs') ?? 'null'));
+const phase = (p) => page.waitForSelector(`.pk[data-phase=${p}]`, { timeout: 30000 });
+const overlayGone = () => page.waitForSelector('.pk', { state: 'detached', timeout: 15000 });
+
+await step('open a pack: trace the top, swipe through, the showpiece last, then try it', async () => {
+  await page.click('.pk-chip[data-pack=metal]');
+  await phase('pack');
+  const g = await page.locator('.pk-guide').boundingBox();
+  await page.mouse.move(g.x + 4, g.y);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width * 0.5, g.y, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  expect(!(await packsSaved())?.opened?.length, 'a trace stopped halfway opened the pack');
+  await page.mouse.move(g.x + 4, g.y);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width, g.y, { steps: 12 });
+  await page.mouse.up();
+  await phase('deck');
+  expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
+  for (const name of ['Gold', 'Crystal']) {
+    await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
+    await page.keyboard.press('ArrowRight');
   }
-  // Secrets follow the seven open finishes in the hand, so key 8 picks the first one unlocked.
-  const first = await page.locator('.hand-slot:not([hidden]) >> nth=7').getAttribute('data-id');
+  await page.waitForSelector('.pk.is-waiting', { timeout: 10000 });
+  expect((await page.textContent('.pk-label b')) === '？？？', 'the showpiece showed its name before it was turned over');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Relief', null, { timeout: 15000 });
+  await page.keyboard.press('ArrowRight');
+  await phase('haul');
+  expect((await page.locator('.pk-name').count()) === 3, 'the haul does not show all three');
+  await page.click('.pk-try');
+  await overlayGone();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'relief', null, { timeout: 10000 });
+  expect((await state()).folder === 'metal', 'the opened pack did not become the folder');
+  expect((await handCount()) === 10, `the hand has ${await handCount()} cards, not the seven plus three`);
+});
+
+await step('folders switch the hand; the number keys follow it', async () => {
+  await page.click('.pk-chip[data-pack=metal]');
+  expect((await state()).folder === null && (await handCount()) === 7, 'picking the active folder did not put it away');
+  await page.click('.pk-chip[data-pack=metal]');
+  expect((await handCount()) === 10, 'the folder did not come back');
+  await page.locator('#cardSlot').focus();
   await page.keyboard.press('8');
-  await page.waitForTimeout(400);
-  expect((await state()).edition === first, 'the unlocked secret could not be applied');
+  await page.waitForTimeout(300);
+  expect((await state()).edition === 'gold', 'key 8 did not pick the first card of the folder');
+});
+
+await step('a replay can be skipped straight to the haul and closed', async () => {
+  await page.click('.pk-replay');
+  await phase('pack');
+  await page.click('.pk-skip');
+  await phase('haul');
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  expect((await state()).edition === 'gold', 'closing a replay changed the finish');
+});
+
+await step('held still, the pack opens with a button and the haul fades in', async () => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.click('.pk-chip[data-pack=nature]');
+  await phase('pack');
+  await page.click('.pk-open');
+  await phase('haul');
+  await page.click('.pk-name >> nth=0');
+  await overlayGone();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).folder === 'nature', null, { timeout: 10000 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+});
+
+await step('a support link puts the Supporter pack on the shelf, and only then', async () => {
+  expect((await page.locator('.pk-chip[data-pack=supporter]').count()) === 0, 'the Supporter pack shows before a support link was opened');
+  await page.click('#supportBtn');
+  const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
+  await popup.close();
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.pk-chip[data-pack=supporter][data-state=sealed]', { timeout: 5000 });
+  expect((await packsSaved()).supporter === true, 'the support link was not remembered');
+});
+
+await step('finishes unlocked by the old support links carry over as opened packs', async () => {
+  await page.evaluate(() => {
+    localStorage.removeItem('foil:packs');
+    localStorage.setItem('foil:secrets', '["shallows","kintsugi"]');
+    const s = JSON.parse(localStorage.getItem('foil:v1'));
+    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'shallows', folder: null }));
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const saved = await packsSaved();
+  expect(saved.opened.join() === 'light,supporter' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
+  expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
+  expect((await state()).edition === 'shallows', 'the carried-over finish was taken off the card');
+  expect((await page.locator('.pk-chip[data-state=open], .pk-chip[data-state=active]').count()) === 2, 'the carried-over packs are not folders');
+});
+
+await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {
+  await page.evaluate(() => {
+    localStorage.setItem('foil:packs', '{"opened":[],"supporter":false}');
+    const s = JSON.parse(localStorage.getItem('foil:v1'));
+    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'magma', folder: 'nature' }));
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const s = await state();
+  expect(s.edition === 'holo' && s.folder === null, `got ${s.edition} / ${s.folder}`);
+  expect((await handCount()) === 7, 'a sealed folder dealt into the hand');
 });
 
 await browser.close();

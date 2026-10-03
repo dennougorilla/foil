@@ -4,6 +4,9 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let enabled = true;
 
+/** Sound effects are on; the pack opening's vibration follows the same switch. */
+export const soundOn = () => enabled;
+
 function ac(): AudioContext | null {
   if (!enabled) return null;
   if (!ctx) {
@@ -25,7 +28,8 @@ export function setSound(on: boolean): void {
   if (master) master.gain.value = on ? 0.22 : 0;
 }
 
-function blip(freq: number, dur: number, type: OscillatorType, vol: number, glide = 0, delay = 0): void {
+/** One enveloped oscillator note; `glide` multiplies the pitch by the end. Also used by the pack opening. */
+export function blip(freq: number, dur: number, type: OscillatorType, vol: number, glide = 0, delay = 0): void {
   const c = ac();
   if (!c || !master) return;
   const t = c.currentTime + delay;
@@ -42,10 +46,11 @@ function blip(freq: number, dur: number, type: OscillatorType, vol: number, glid
   o.stop(t + dur + 0.02);
 }
 
-function noise(dur: number, vol: number, from: number, to: number): void {
+/** A band-passed noise burst sweeping from one frequency to another. */
+export function noise(dur: number, vol: number, from: number, to: number, delay = 0): void {
   const c = ac();
   if (!c || !master) return;
-  const t = c.currentTime;
+  const t = c.currentTime + delay;
   const len = Math.floor(c.sampleRate * dur);
   const buf = c.createBuffer(1, len, c.sampleRate);
   const d = buf.getChannelData(0);
@@ -66,7 +71,7 @@ function noise(dur: number, vol: number, from: number, to: number): void {
 
 // Pentatonic so that sweeping across the hand always sounds musical.
 const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-const note = (i: number) => 440 * Math.pow(2, (SCALE[i % SCALE.length] - 9) / 12);
+export const note = (i: number) => 440 * Math.pow(2, (SCALE[i % SCALE.length] - 9) / 12);
 
 export const sfx = {
   hover(i: number) {

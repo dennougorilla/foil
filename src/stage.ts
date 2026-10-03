@@ -6,7 +6,7 @@ import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
 
-class Spring {
+export class Spring {
   v = 0;
   constructor(
     public x: number,
@@ -46,8 +46,8 @@ export interface StageOptions {
   info: HTMLElement;
   onSelect: (id: EditionId) => void;
   onHover: (id: EditionId | null) => void;
-  /** Finishes left out of the hand (the hidden finishes until they are unlocked). */
-  isHidden?: (id: EditionId) => boolean;
+  /** The finishes in the hand, in order: the open ones, then the chosen folder's. */
+  handIds: () => EditionId[];
 }
 
 export class Stage {
@@ -107,7 +107,7 @@ export class Stage {
     this.bg = new BackgroundRenderer(o.bgCanvas);
     const ed = EDITIONS.find((e) => e.id === o.store.get().edition) ?? EDITIONS[0];
     this.palette = ed.swirl.map(hexToRgb) as [RGB, RGB, RGB];
-    this.buildHand();
+    this.syncHand();
     this.bindPointer();
     // Deal-in: the card rises from below while spinning, the hand follows one by one.
     if (!this.reduced.matches) {
@@ -120,8 +120,16 @@ export class Stage {
     document.addEventListener('visibilitychange', () => this.resume());
   }
 
+  /** While a pack is being opened over the page, the stage stops drawing so the opening keeps its frames. */
+  private paused = false;
+
+  pause(on: boolean) {
+    this.paused = on;
+    this.resume();
+  }
+
   private resume() {
-    if (this.running || document.hidden) return;
+    if (this.running || document.hidden || this.paused) return;
     this.running = true;
     this.last = performance.now();
     requestAnimationFrame(this.frame);
@@ -131,69 +139,79 @@ export class Stage {
     return !this.reduced.matches;
   }
 
-  private buildHand() {
+  /**
+   * Re-reads the hand. Cards already in it keep their place and motion; new ones (a folder just
+   * picked) are dealt in one after another once their shader is ready; cards no longer in it go.
+   * The number keys follow the order.
+   */
+  syncHand() {
     const { hand } = this.o;
-    hand.querySelectorAll('.hand-slot').forEach((el) => el.remove());
-    EDITIONS.forEach((e, i) => {
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'hand-slot';
-      el.setAttribute('role', 'radio');
-      el.dataset.id = e.id;
-      el.addEventListener('click', () => this.o.onSelect(e.id));
-      el.addEventListener('pointerenter', () => {
-        this.hovered = i;
-        sfx.hover(i);
-        this.o.onHover(e.id);
-      });
-      el.addEventListener('pointerleave', () => {
-        if (this.hovered === i) this.hovered = -1;
-        this.o.onHover(this.focused >= 0 ? EDITIONS[this.focused].id : null);
-      });
-      el.addEventListener('focus', () => {
-        this.focused = i;
-        this.o.onHover(e.id);
-      });
-      el.addEventListener('blur', () => {
-        if (this.focused === i) this.focused = -1;
-        this.o.onHover(this.hovered >= 0 ? EDITIONS[this.hovered].id : null);
-      });
-      el.addEventListener('keydown', (ev) => {
-        const dir = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0;
-        if (!dir) return;
-        ev.preventDefault();
-        let next = i;
-        do next = (next + dir + EDITIONS.length) % EDITIONS.length;
-        while (this.hand[next].el.hidden);
-        this.o.onSelect(EDITIONS[next].id);
-        this.hand[next].el.focus();
-      });
-      hand.appendChild(el);
-      this.hand.push({
-        id: e.id,
-        el,
-        lift: new Spring(0, 0, 260, 18),
-        scale: new Spring(1, 1, 260, 16),
-        deal: new Spring(this.motion ? 1 : 0, this.motion ? 1 : 0, 120, 13),
-        tiltX: new Spring(0, 0, 200, 16),
-        tiltY: new Spring(0, 0, 200, 16),
-        dealAt: 0,
-      });
+    const ids = this.o.handIds();
+    const old = new Map(this.hand.map((h) => [h.id, h]));
+    const fresh = this.hand.length > 0;
+    let dealt = 0;
+    this.hand = ids.map((id, n) => {
+      let h = old.get(id);
+      old.delete(id);
+      if (!h) {
+        h = this.handCard(id);
+        // On boot the whole hand deals in after the card; later, only the newcomers.
+        h.dealAt = fresh ? this.time + 0.05 + dealt++ * 0.07 : 0.35 + n * 0.04;
+      }
+      h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
+      hand.appendChild(h.el);
+      return h;
     });
-    this.syncHandHidden();
+    for (const h of old.values()) h.el.remove();
+    this.hovered = this.focused = -1;
     this.syncHandChecked();
+    this.applyHandLabels();
   }
 
-  /** Re-reads which finishes are left out of the hand; the fan closes up around them and the number keys follow. */
-  syncHandHidden() {
-    let n = 0;
-    for (const h of this.hand) {
-      h.el.hidden = this.o.isHidden?.(h.id) ?? false;
-      if (h.el.hidden) continue;
-      h.dealAt = 0.35 + n * 0.04;
-      h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
-      n++;
-    }
+  private handCard(id: EditionId): HandCard {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'hand-slot';
+    el.setAttribute('role', 'radio');
+    el.dataset.id = id;
+    const at = () => this.hand.findIndex((h) => h.id === id);
+    el.addEventListener('click', () => this.o.onSelect(id));
+    el.addEventListener('pointerenter', () => {
+      this.hovered = at();
+      sfx.hover(this.hovered);
+      this.o.onHover(id);
+    });
+    el.addEventListener('pointerleave', () => {
+      if (this.hovered === at()) this.hovered = -1;
+      this.o.onHover(this.focused >= 0 ? this.hand[this.focused].id : null);
+    });
+    el.addEventListener('focus', () => {
+      this.focused = at();
+      this.o.onHover(id);
+    });
+    el.addEventListener('blur', () => {
+      if (this.focused === at()) this.focused = -1;
+      this.o.onHover(this.hovered >= 0 ? this.hand[this.hovered].id : null);
+    });
+    el.addEventListener('keydown', (ev) => {
+      const dir = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      ev.preventDefault();
+      const next = this.hand[(at() + dir + this.hand.length) % this.hand.length];
+      this.o.onSelect(next.id);
+      next.el.focus();
+    });
+    const m = this.motion ? 1 : 0;
+    return {
+      id,
+      el,
+      lift: new Spring(0, 0, 260, 18),
+      scale: new Spring(1, 1, 260, 16),
+      deal: new Spring(m, m, 120, 13),
+      tiltX: new Spring(0, 0, 200, 16),
+      tiltY: new Spring(0, 0, 200, 16),
+      dealAt: 0,
+    };
   }
 
   syncHandChecked() {
@@ -205,10 +223,18 @@ export class Stage {
     }
   }
 
+  private labels: { names: Record<EditionId, string>; looks: Record<EditionId, string> } | null = null;
+
   setHandLabels(names: Record<EditionId, string>, looks: Record<EditionId, string>) {
+    this.labels = { names, looks };
+    this.applyHandLabels();
+  }
+
+  private applyHandLabels() {
+    if (!this.labels) return;
     for (const h of this.hand) {
-      h.el.setAttribute('aria-label', names[h.id]);
-      h.el.setAttribute('aria-description', looks[h.id]);
+      h.el.setAttribute('aria-label', this.labels.names[h.id]);
+      h.el.setAttribute('aria-description', this.labels.looks[h.id]);
     }
   }
 
@@ -389,7 +415,7 @@ export class Stage {
   }
 
   private frame = (now: number) => {
-    if (document.hidden) {
+    if (document.hidden || this.paused) {
       this.running = false;
       return;
     }
@@ -585,24 +611,21 @@ export class Stage {
   }
 
   private stepHand(dt: number, state: ReturnType<Store['get']>) {
-    // Left-out cards take no room; everything else fans by its position among the shown ones.
-    const pos = new Map<number, number>();
-    this.hand.forEach((c, i) => !c.el.hidden && pos.set(i, pos.size));
-    const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(pos.size);
+    const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(this.hand.length);
     const ox = hr.left - this.canvasRect.left;
     const oy = hr.top - this.canvasRect.top;
     const active = this.hovered >= 0 ? this.hovered : this.focused;
     const order: number[] = [];
     this.hand.forEach((card, i) => {
-      if (card.el.hidden) return;
       const sel = card.id === state.edition;
       const hot = i === active;
-      if (this.time > card.dealAt) card.deal.target = 0;
+      // A folder's cards wait below until their pack's shader is ready, then deal in.
+      if (this.time > card.dealAt && this.cards.ready(editionById(card.id).shader)) card.deal.target = 0;
       card.lift.target = (sel ? 20 : 0) + (hot ? 12 : 0);
       card.scale.target = hot ? 1.1 : sel ? 1.04 : 1;
       // Hovered card leans toward the pointer
       if (hot && this.hovered === i) {
-        const { row, d } = slot(pos.get(i)!);
+        const { row, d } = slot(i);
         const cx = hr.left + hr.width / 2 + d * spacing;
         const cy = hr.top + top + row * rowH + 30 + h / 2;
         card.tiltY.target = clamp((this.pointer.x - cx) / (w / 2), -1, 1) * 0.35;
@@ -621,8 +644,8 @@ export class Stage {
     });
     for (const i of order) {
       const card = this.hand[i];
-      const e = EDITIONS[i];
-      const { row, d } = slot(pos.get(i)!);
+      const e = editionById(card.id);
+      const { row, d } = slot(i);
       const fan = d * 0.045;
       const arc = d * d * arcK;
       const x = hr.width / 2 + d * spacing;
