@@ -230,7 +230,7 @@ function flipTurn(a: number): number {
 export const loopCycles = (t: Tune) => (t.speed <= 0 ? 0 : Math.max(1, Math.round(t.speed)));
 
 /**
- * The card's pose at loop position p∈[0,1) for GIF and video. With the defaults this is the
+ * The card's pose at loop position p∈[0,1) for GIF and APNG. With the defaults this is the
  * orbit FOIL always exported: one gentle sway with the light sweeping round.
  */
 export function loopPose(t: Tune, p: number): LoopPose {
