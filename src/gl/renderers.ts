@@ -1,6 +1,7 @@
 import { BG_FS, CARD_FS, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './shaders';
 import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type Program } from './gl';
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
+import { LetteringGL } from '../lettering';
 
 export type RGB = [number, number, number];
 
@@ -98,6 +99,7 @@ export class CardRenderer {
   private face: WebGLTexture;
   private mask: WebGLTexture;
   private back: WebGLTexture;
+  private lettering: LetteringGL;
   private faceTexels = 1;
   cssW = 1;
   cssH = 1;
@@ -105,7 +107,8 @@ export class CardRenderer {
   /** Fine-tuning shared by every card this renderer draws. */
   tune: TuneGl = TUNE_GL_DEFAULT;
 
-  constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas, opts: { preserve?: boolean } = {}) {
+  /** `settled`: for exports, so passing moments (the lettering's stamp) are never captured. */
+  constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas, opts: { preserve?: boolean; settled?: boolean } = {}) {
     const gl = canvas.getContext('webgl2', {
       antialias: true,
       alpha: true,
@@ -140,6 +143,7 @@ export class CardRenderer {
     this.face = createTexture(gl, true);
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
+    this.lettering = new LetteringGL(gl, opts.settled);
   }
 
   setFace(face: TexImageSource & { width: number }, mask: TexImageSource): void {
@@ -188,6 +192,7 @@ export class CardRenderer {
     gl.uniform1i(p.u.uFace, 0);
     gl.uniform1i(p.u.uMask, 1);
     gl.uniform1i(p.u.uBack, 2);
+    this.lettering.bind(p, 3);
     gl.uniform2f(p.u.uRes, this.cssW, this.cssH);
     gl.uniform2f(p.u.uCenter, d.cx, d.cy);
     gl.uniform2f(p.u.uSize, d.w, d.h);

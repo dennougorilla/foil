@@ -7,6 +7,7 @@ Turn any picture into a collectible card and give it a rare finish.
 - Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). Animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
 - Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura. Keys 1–9 and 0 pick the first ten, ← → step through them all.
 - Edit the name, line and rarity right in the tag beside the card. Tune the frame, effect strength and pixelation.
+- Print the name in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and jumps to its controls (last in Tune). The relief and shine follow the card's tilt and light, in exports too.
 - The card tilts with your pointer, can be tossed around, and bounces when clicked. Press the logo to shuffle the finish.
 - **Light & motion** (in Tune) fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe). Defaults keep the original look; exports follow the same settings.
 - Save a transparent PNG (900×1260), a looping GIF, a full-color transparent APNG loop, or a 4-second clip (MP4/WebM). With an animated picture, the loop follows its timing.
