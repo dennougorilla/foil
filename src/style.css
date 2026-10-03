@@ -206,19 +206,20 @@ button {
 /* Pixel sparkles that twinkle around the logo. */
 .spark {
   position: absolute;
-  width: 10px;
-  height: 10px;
-  background: #fff8d6;
-  clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
+  width: 12px;
+  height: 12px;
+  background: #fffbe6;
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  filter: drop-shadow(0 0 3px rgba(255, 240, 180, 0.9));
   pointer-events: none;
   opacity: 0;
   animation: spark 2.8s steps(4) infinite;
 }
 
-.spark:nth-of-type(1) { left: -6px; top: -4px; animation-delay: 0.2s; }
-.spark:nth-of-type(2) { left: 52px; top: -8px; width: 8px; height: 8px; animation-delay: 1.1s; }
-.spark:nth-of-type(3) { right: -8px; top: 18px; animation-delay: 1.9s; background: #bfe6ff; }
-.spark:nth-of-type(4) { left: 30px; bottom: -8px; width: 8px; height: 8px; animation-delay: 2.4s; background: #ffd1e6; }
+.spark:nth-of-type(1) { left: 22px; top: -2px; animation-delay: 0.2s; }
+.spark:nth-of-type(2) { left: 82px; top: 0; width: 10px; height: 10px; animation-delay: 1.1s; }
+.spark:nth-of-type(3) { left: 118px; top: 28px; animation-delay: 1.9s; background: #e3f4ff; }
+.spark:nth-of-type(4) { left: 52px; top: 34px; width: 10px; height: 10px; animation-delay: 2.4s; background: #ffe3f0; }
 
 .logo-word:hover .spark {
   animation-duration: 1.2s;
@@ -604,6 +605,7 @@ button {
 }
 
 .card-hint {
+  width: fit-content;
   margin: 14px 0 0;
   padding: 6px 10px;
   border-radius: 8px;
@@ -720,6 +722,25 @@ button {
   display: none;
 }
 
+.hand-slot:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 5px;
+}
+
+/* A small gold pointer marks the finish that is applied, whatever is hovered. */
+.hand-slot[aria-checked='true']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 0;
+  height: 0;
+  translate: -50% 0;
+  border: 7px solid transparent;
+  border-bottom-color: var(--gold);
+  filter: drop-shadow(0 2px 0 var(--edge));
+}
+
 .hand-slot {
   position: absolute;
   left: 0;
@@ -750,8 +771,8 @@ button {
   transition: opacity 0.2s;
 }
 
-.hand:hover .key,
-.hand:focus-within .key {
+.hand-slot:hover .key,
+.hand-slot:focus-visible .key {
   opacity: 1;
 }
 
@@ -908,7 +929,8 @@ button {
 }
 
 .btn-text small {
-  font-size: 12px;
+  font-size: 13px;
+  opacity: 1;
   white-space: nowrap;
   opacity: 0.85;
 }
@@ -1583,6 +1605,9 @@ input[type='range']:focus-visible::-moz-range-thumb {
     width: min(62vw, 300px);
   }
   /* On phones the panel is far below, so the first action sits right under the card. */
+  #pickBtn {
+    display: none;
+  }
   .btn.stage-pick {
     display: flex;
     width: auto;

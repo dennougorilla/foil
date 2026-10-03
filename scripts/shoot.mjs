@@ -91,7 +91,7 @@ for (const s of shots) {
       return c.toDataURL('image/jpeg', 0.9).split(',')[1];
     });
     await page.setInputFiles('#fileInput', { name: '旅の写真.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(b64, 'base64') });
-    await page.waitForTimeout(1600);
+    await page.waitForTimeout(3000);
   } else if (s.act === 'pixel') {
     await page.keyboard.press('7');
     await page.locator('#pixel').fill('3');

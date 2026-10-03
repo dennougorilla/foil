@@ -23,7 +23,7 @@ const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice
 
 const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
 
-function download(blob: Blob, name: string) {
+function download(blob: Blob, name: string): string {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -32,10 +32,11 @@ function download(blob: Blob, name: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return name;
 }
 
 /** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
-export async function exportPng(input: ExportInput): Promise<void> {
+export async function exportPng(input: ExportInput): Promise<string> {
   const pad = 24;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true });
@@ -67,7 +68,7 @@ export async function exportPng(input: ExportInput): Promise<void> {
   const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
   r.gl.getExtension('WEBGL_lose_context')?.loseContext();
   if (!blob) throw new Error('png');
-  download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
+  return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
 }
 
 interface Scene {
@@ -153,7 +154,7 @@ export function videoSupported(): string | null {
 }
 
 /** Records a 4-second loop: the card orbits once on the swirl backdrop. */
-export async function exportVideo(input: ExportInput, onProgress?: (p: number) => void): Promise<void> {
+export async function exportVideo(input: ExportInput, onProgress?: (p: number) => void): Promise<string> {
   const mime = videoSupported();
   if (!mime) throw new Error('video-unsupported');
   const scene = createScene(input, 720, 900);
@@ -177,7 +178,7 @@ export async function exportVideo(input: ExportInput, onProgress?: (p: number) =
   await done;
   scene.dispose();
   const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-  download(new Blob(chunks, { type: mime.split(';')[0] }), `${fileSafe(input.name)}-${input.edition.id}.${ext}`);
+  return download(new Blob(chunks, { type: mime.split(';')[0] }), `${fileSafe(input.name)}-${input.edition.id}.${ext}`);
 }
 
 const GIF_W = 480;
@@ -194,7 +195,7 @@ const GIF_DRAW_SHARE = 0.35;
 export async function exportGif(
   input: ExportInput,
   onProgress?: (p: number, encoding: boolean) => void,
-): Promise<void> {
+): Promise<string> {
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   const result = new Promise<ArrayBuffer>((resolve, reject) => {
@@ -227,7 +228,7 @@ export async function exportGif(
     }
     send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY });
     const bytes = await result;
-    download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
+    return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {
     scene.dispose();
     worker.terminate();

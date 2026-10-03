@@ -272,7 +272,7 @@ function syncInputs() {
   setRangeFill(inten);
   const px = $<HTMLInputElement>('pixel');
   px.value = String(s.pixel);
-  $('pixelOut').textContent = s.pixel ? `${s.pixel}` : t.off;
+  $('pixelOut').textContent = s.pixel ? `${s.pixel}/6` : t.off;
   px.setAttribute('aria-valuetext', s.pixel ? String(s.pixel) : t.off);
   setRangeFill(px);
   const zoom = $<HTMLInputElement>('zoom');
@@ -612,13 +612,15 @@ function animatedExport(anim: Anim) {
 async function busy(
   btn: HTMLButtonElement,
   label: string,
-  job: (progress: (p: number) => void) => Promise<void>,
+  job: (progress: (p: number) => void) => Promise<string>,
   fail = t.errDecode,
 ) {
   const b = btn.querySelector('b')!;
   const small = btn.querySelector('small')!;
   const prev = [b.textContent, small.textContent];
-  btn.disabled = true;
+  // One export at a time: the other buttons rest while this one works.
+  const all = [...document.querySelectorAll<HTMLButtonElement>('.export .btn')];
+  all.forEach((x) => (x.disabled = true));
   btn.setAttribute('aria-busy', 'true');
   small.textContent = label;
   const progress = (p: number) => {
@@ -626,15 +628,15 @@ async function busy(
     btn.style.setProperty('--p', p.toFixed(3));
   };
   try {
-    await job(progress);
+    const file = await job(progress);
     sfx.coin();
-    toast(t.saved);
+    toast(`${t.saved}: ${file}`);
   } catch (err) {
     console.error(err);
     sfx.error();
     toast((err as Error).message === 'video-unsupported' ? t.errVideo : fail, true);
   } finally {
-    btn.disabled = false;
+    all.forEach((x) => (x.disabled = false));
     btn.removeAttribute('aria-busy');
     btn.style.removeProperty('--p');
     [b.textContent, small.textContent] = prev;

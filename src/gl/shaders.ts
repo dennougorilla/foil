@@ -189,6 +189,7 @@ vec3 negative(vec3 c, vec2 uv, vec2 t, float L) {
   vec3 col = hsv2rgb(vec3(h.x, h.y * 0.85, 1.0)) * v;
   col = mix(col, vec3(v) * vec3(0.55, 0.45, 0.85), 0.15);
   col *= vec3(0.9, 0.82, 1.1);
+  col = clamp((col - 0.5) * 1.25 + 0.55, 0.0, 1.0); // more contrast so it reads as a rare, not a faded print
   float sweep = smoothstep(0.86, 1.0, 0.5 + 0.5 * sin((uv.x * 1.2 - uv.y) * 6.0 + (t.x + t.y) * 4.5));
   col += vec3(0.55, 0.4, 1.0) * sweep * 0.35;
   return col;
@@ -254,7 +255,8 @@ vec3 glitch(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   col = mix(col, col * vec3(0.55, 1.15, 0.7), 0.35);
   col *= 0.9 + 0.1 * step(0.5, fract(uv.y * 140.0));
   float blk = step(0.94, hash12(floor(uv * vec2(8.0, 18.0)) + tick));
-  col = mix(col, vec3(0.36, 1.0, 0.55) * L + vec3(0.1, 0.0, 0.2), blk * 0.7);
+  vec3 neon = hash12(floor(uv * vec2(8.0, 18.0)) + tick + 5.0) > 0.5 ? vec3(0.25, 1.0, 0.55) : vec3(1.0, 0.25, 0.85);
+  col = mix(col, neon * (0.55 + 0.45 * L), blk * 0.75);
   return col;
 }
 

@@ -161,7 +161,7 @@ const en: Dict = {
   pixel: 'Pixelate',
   off: 'Off',
   png: 'PNG',
-  pngSub: 'Transparent',
+  pngSub: 'Clear bg',
   gif: 'GIF',
   gifSub: 'Social loop',
   video: 'Video',
@@ -226,7 +226,7 @@ const en: Dict = {
     paper: 'Paper',
     ink: 'Ink',
     gilt: 'Brass',
-    rarity: 'Tinted',
+    rarity: 'Rare tint',
   },
   samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts'],
   samplesDesc: [
