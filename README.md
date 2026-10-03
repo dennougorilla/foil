@@ -4,12 +4,12 @@ Turn any picture into a collectible card and give it a rare finish.
 
 **Live:** https://dennougorilla.github.io/foil/
 
-- Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). It never leaves your browser.
-- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch. Keys 1–9 work too.
+- Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). Animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
+- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura. Keys 1–9 and 0 pick the first ten, ← → step through them all.
 - Edit the name, line and rarity right in the tag beside the card. Tune the frame, effect strength and pixelation.
 - The card tilts with your pointer, can be tossed around, and bounces when clicked. Press the logo to shuffle the finish.
-- **Light & motion** (in Tune) fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light colour, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe). Defaults keep the original look; exports follow the same settings.
-- Save a transparent PNG (900×1260) or a 4-second looping clip (MP4/WebM).
+- **Light & motion** (in Tune) fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe). Defaults keep the original look; exports follow the same settings.
+- Save a transparent PNG (900×1260), a looping GIF, a full-color transparent APNG loop, or a 4-second clip (MP4/WebM). With an animated picture, the loop follows its timing.
 - English / 日本語, sound effects and a CRT filter can be toggled. Respects `prefers-reduced-motion`.
 
 ## Development
