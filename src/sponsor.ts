@@ -321,7 +321,8 @@ export function initSponsor(o: SponsorOptions) {
         flash: 0,
         shadow: [8 - Math.sin(ry) * 14, 12 + rx * 8],
       },
-      time,
+      // Reduced motion keeps the finish itself still too, not only the card.
+      motion ? time : 0,
     );
     raf = requestAnimationFrame(draw);
   }
