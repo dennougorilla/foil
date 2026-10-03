@@ -448,7 +448,7 @@ void main() {
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
-  if (e != 0) col = tuneColor(col, c);
+  if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;

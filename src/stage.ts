@@ -4,7 +4,7 @@ import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
-import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField } from './touch/heat';
+import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
 
 class Spring {
   v = 0;
@@ -82,6 +82,8 @@ export class Stage {
   private lastPointer: [number, number] = [0, 0];
   /** The finish on the main card last frame, to greet a touch finish as it arrives. */
   private shown: EditionId | null = null;
+  /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
+  private greet: Swipe | null = null;
   /** Heat left on the main card by touch, and the stroke the hand's preview card draws itself. */
   readonly heat = new HeatField();
   private demo = new AutoTouch();
@@ -412,10 +414,12 @@ export class Stage {
     });
     if (ed.id !== this.shown) {
       this.shown = ed.id;
-      // A touch finish arrives with a thumbprint still warm on it, cooling as you watch: a hint to touch.
-      if (ed.touch) {
-        this.heat.press(0.66, 0.6, 0.6);
-        this.heat.lift();
+      // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
+      this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
+      // Held still, the swipe is simply there, and fades.
+      if (this.greet && !this.motion) {
+        while (this.greet.step(1 / 30)) this.heat.step(1 / 30);
+        this.greet = null;
       }
     }
     const r = this.cardRect();
@@ -549,6 +553,12 @@ export class Stage {
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
   private warm(at: [number, number] | null, dt: number) {
     const on = at && at[0] > -0.02 && at[0] < 1.02 && at[1] > -0.02 && at[1] < 1.02;
+    if (on && this.greet) {
+      // A real touch takes over from the hint.
+      this.greet = null;
+      this.heat.lift();
+    }
+    if (this.greet && !this.greet.step(dt)) this.greet = null;
     if (on) {
       const from = this.lastTouch ?? at;
       const firm = this.rub.active;
@@ -561,7 +571,7 @@ export class Stage {
       }
       this.lastTouch = at;
       this.lastPointer = [this.pointer.x, this.pointer.y];
-    } else {
+    } else if (this.lastTouch) {
       this.lastTouch = null;
       this.heat.lift();
     }

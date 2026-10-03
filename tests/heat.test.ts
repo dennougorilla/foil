@@ -1,7 +1,7 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AutoTouch, cardPoint, cardUv, HEAT_H, HEAT_W, HeatField } from '../src/touch/heat.ts';
+import { AutoTouch, cardPoint, cardUv, HEAT_H, HEAT_W, HeatField, pickSwipe, Swipe, SWIPES, swipeAt } from '../src/touch/heat.ts';
 
 const at = (f: { data: Float32Array }, u: number, v: number) =>
   f.data[Math.min(HEAT_H - 1, Math.floor(v * HEAT_H)) * HEAT_W + Math.min(HEAT_W - 1, Math.floor(u * HEAT_W))];
@@ -112,4 +112,61 @@ test('a point on the screen maps back to the spot of the tilted card under it', 
   }
   const flat = { ...pose, rx: 0, ry: 0, rz: 0, scale: 1 };
   assert.deepEqual(cardPoint(0, 0, flat), [400 - 180, 300 - 252]);
+});
+
+test('a swipe plays out on its own: a warm line, then a print, then it is done', () => {
+  const f = new HeatField();
+  const swipe = new Swipe(f, SWIPES[0]);
+  let t = 0;
+  while (swipe.step(1 / 60)) {
+    f.step(1 / 60);
+    t += 1 / 60;
+    assert.ok(t < 5, 'ends');
+  }
+  const [u, v] = swipeAt(SWIPES[0], 0.5);
+  assert.ok(at(f, u, v) > 0.1, 'warm along the line');
+  assert.equal(f.prints.length, 1, 'one print');
+  assert.ok(f.prints[0].heat > 0.3);
+});
+
+test('the automatic loop starts and ends on a card that has all but cooled', () => {
+  const a = new AutoTouch();
+  a.at(3);
+  assert.ok(Math.max(...a.data) < 0.12, `peak ${Math.max(...a.data)}`);
+  a.at(3.3);
+  assert.ok(Math.max(...a.data) > 0.5, 'warm mid-loop');
+});
+
+test('the swipe goes where the picture is busiest', () => {
+  const W = 20;
+  const H = 28;
+  const busy = (cu: number, cv: number) => {
+    const d = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) d[y * W + x] = Math.exp(-((x / W - cu) ** 2 + ((y / H - cv) * 1.4) ** 2) * 30);
+    return d;
+  };
+  const passes = (shape: (typeof SWIPES)[number], cu: number, cv: number) => {
+    let best = 9;
+    for (let s = 0; s <= 1; s += 0.02) {
+      const [u, v] = swipeAt(shape, s);
+      best = Math.min(best, Math.hypot(u - cu, (v - cv) * 1.4));
+    }
+    return best;
+  };
+  for (const [cu, cv] of [
+    [0.25, 0.25],
+    [0.75, 0.25],
+    [0.5, 0.65],
+  ]) {
+    const shape = pickSwipe(busy(cu, cv), W, H);
+    assert.ok(passes(shape, cu, cv) < 0.12, `${cu},${cv}`);
+  }
+  // Every swipe and its press stay on the art.
+  for (const shape of SWIPES) {
+    for (let s = 0; s <= 1; s += 0.1) {
+      const [u, v] = swipeAt(shape, s);
+      assert.ok(u > 0.06 && u < 0.94 && v > 0.05 && v < 0.86, `${u},${v}`);
+    }
+    assert.ok(shape.press[0] > 0.12 && shape.press[0] < 0.88 && shape.press[1] > 0.1 && shape.press[1] < 0.8);
+  }
 });
