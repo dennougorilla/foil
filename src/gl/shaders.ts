@@ -1,4 +1,5 @@
 // GLSL sources. Every effect is written from scratch for this project.
+import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -383,6 +384,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 
+${SPONSOR_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -428,6 +430,7 @@ void main() {
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
+  ${SPONSOR_DISPATCH}
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;
