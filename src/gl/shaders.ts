@@ -4,6 +4,7 @@ import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
 import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
+import { COSMOHOLO_GLSL } from './cosmoholo';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
@@ -395,6 +396,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${SHALLOWS_GLSL}
+${COSMOHOLO_GLSL}
 ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
@@ -453,6 +455,7 @@ void main() {
   else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
+  else if (e == 18) col = cosmoholo(c, uv, uTilt, L);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
@@ -461,7 +464,7 @@ void main() {
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;
-  if (e == 13) amt *= m.r; // facets only cut the art, never the nameplate
+  if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
   amt *= sel;

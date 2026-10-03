@@ -4,9 +4,16 @@ import type { EditionId } from './editions';
 
 /**
  * The finishes in the hand from the start: the editions of the game FOIL is modelled on, plus
- * Prism and Glitch. Every other one is a secret. Kept in hand order (see EDITIONS).
+ * Prism and Glitch. Every other one is a secret or beta. Kept in hand order (see EDITIONS).
  */
 export const OPEN_EDITIONS: readonly EditionId[] = ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'];
+
+/** Beta finishes, still being tried: never in the hand nor in the secret draw until promoted to a secret. */
+export const BETA_EDITIONS: readonly EditionId[] = ['cosmoholo'];
+
+/** Every other finish of `all` (the hand order), the ones a support link can unlock. */
+export const secretEditions = (all: readonly EditionId[]): EditionId[] =>
+  all.filter((id) => !OPEN_EDITIONS.includes(id) && !BETA_EDITIONS.includes(id));
 
 /** The unlocked secrets saved as a JSON list; anything else (or a past format) counts as none. */
 export function parseUnlocked(raw: string | null, secrets: readonly EditionId[]): EditionId[] {

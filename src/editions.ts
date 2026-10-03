@@ -18,6 +18,7 @@ export type EditionId =
   | 'warmth'
   | 'shadowbox'
   | 'shallows'
+  | 'cosmoholo'
   // Shaders in src/gl/sponsorShaders.ts
   | 'kintsugi'
   | 'opal'
@@ -38,7 +39,7 @@ export interface Edition {
   touch?: boolean;
 }
 
-/** Hand order. Only the first seven are out from the start; the rest are secrets (src/secrets.ts, src/sponsor.ts). */
+/** Hand order. Only the first seven are out from the start; the rest are secrets or beta (src/secrets.ts, src/sponsor.ts). */
 export const EDITIONS: Edition[] = [
   { id: 'base', shader: 0, color: '#c9d3d4', swirl: ['#142024', '#a83a33', '#25706b'], value: 0 },
   { id: 'foil', shader: 1, color: '#5fb4ff', swirl: ['#0f1c33', '#2d6fd6', '#9cc8ff'], value: 2 },
@@ -59,6 +60,8 @@ export const EDITIONS: Edition[] = [
   { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: true },
   { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6 },
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
+  // Beta (src/secrets.ts): out of the hand until promoted.
+  { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
   // Shaders in src/gl/sponsorShaders.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
