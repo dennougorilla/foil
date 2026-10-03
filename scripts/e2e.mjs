@@ -84,8 +84,9 @@ await step('an unreadable file is explained beside the pick button', async () =>
   await page.waitForTimeout(400);
   expect(await page.isVisible('#imageError'), 'no error under the pick button');
   expect((await page.textContent('#imageError p')).includes('notes.txt'), 'the error does not name the file');
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => document.getElementById('panel').classList.contains('has-more')), 'the steps pushed under the stub are not marked as more below');
+  await page
+    .waitForFunction(() => document.getElementById('panel').classList.contains('has-more'), null, { timeout: 3000 })
+    .catch(() => expect(false, 'the steps pushed under the stub are not marked as more below'));
   await page.click('#imageErrorClose');
   expect(!(await page.isVisible('#imageError')), 'the error did not close');
 });
