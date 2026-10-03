@@ -544,6 +544,15 @@ export function mountTune(store: Store, after: Element): void {
   }
 
   build();
+  if (tuneNow().light === 'gyro') {
+    // A gyro light saved last visit needs its sensor again. Where that takes a tap (iOS),
+    // fall back to the pointer and say why.
+    void motion.enableGyro().then((r) => {
+      if (r === 'ok') return;
+      gyroNote = 'denied';
+      set({ light: 'pointer' });
+    });
+  }
   store.on((_s, changed) => {
     if (changed.has('lang')) build();
     else if (changed.has('tune') || changed.has('tuneOpen')) sync();
