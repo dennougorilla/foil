@@ -1133,7 +1133,12 @@ function trackExportBar() {
   panel.classList.toggle('is-scrolled', panel.scrollTop > 2);
   panel.classList.toggle('has-more', panel.scrollHeight - panel.scrollTop - panel.clientHeight > 8);
 }
-new ResizeObserver(trackExportBar).observe($('panel'));
+// The sheet keeps its height while its steps grow and shrink, so watch the steps as well.
+{
+  const ro = new ResizeObserver(trackExportBar);
+  ro.observe($('panel'));
+  $('panel').querySelectorAll('.sec').forEach((s) => ro.observe(s));
+}
 $('panel').addEventListener('scroll', trackExportBar, { passive: true });
 addEventListener('scroll', trackExportBar, { passive: true });
 addEventListener('resize', trackExportBar);
