@@ -3,50 +3,53 @@
 
 export const SPONSOR_GLSL = /* glsl */ `
 vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
-  // Glazed ceramic: the art goes a little chalky and warm, as if fired.
-  vec3 glaze = mix(c, vec3(L) * vec3(1.04, 0.98, 0.9), 0.28) * 0.88;
-  // Breaks: warped cell borders, a few wide seams that branch into hairlines.
+  // The picture stays the subject: a few fine seams of gold mend it, and the
+  // light that runs along them softens over the bright parts so it never flares there.
+  float keep = smoothstep(0.45, 0.85, L);
+  // Glazed ceramic: the art goes a touch warm, as if fired.
+  vec3 glaze = mix(c, c * vec3(1.03, 0.99, 0.92), 0.5);
+  // Breaks: warped cell borders, a handful of seams that branch into hairlines.
   vec2 w = uv * vec2(1.0, 1.4);
-  w += (vec2(fbm(uv * 3.5), fbm(uv * 3.5 + 7.3)) - 0.5) * 0.22;
-  vec4 v1 = voronoi(w * 3.6);
-  vec4 v2 = voronoi(w * 9.0 + 3.1);
+  w += (vec2(fbm(uv * 3.0), fbm(uv * 3.0 + 7.3)) - 0.5) * 0.24;
+  vec4 v1 = voronoi(w * 2.6);
+  vec4 v2 = voronoi(w * 8.0 + 3.1);
   float d1 = v1.y - v1.x;
   float d2 = v2.y - v2.x;
-  float wide = 0.028 + 0.03 * vnoise(uv * 24.0);
-  float seam = smoothstep(wide, wide * 0.35, d1);
-  float hair = smoothstep(0.022, 0.006, d2) * step(0.5, hash12(v2.zw)) * smoothstep(0.35, 0.0, d1);
-  float vein = max(seam, hair * 0.9);
-  // The lacquer rim around each seam sits a touch darker, so the gold reads as raised.
-  float rim = smoothstep(wide * 2.6, wide, d1) * (1.0 - seam);
+  float wide = 0.014 + 0.018 * vnoise(uv * 24.0);
+  float seam = smoothstep(wide, wide * 0.3, d1);
+  float hair = smoothstep(0.014, 0.004, d2) * step(0.65, hash12(v2.zw)) * smoothstep(0.25, 0.0, d1);
+  float vein = max(seam, hair * 0.8);
+  // A thin darker rim on each seam, so the gold reads as raised.
+  float rim = smoothstep(wide * 2.4, wide, d1) * (1.0 - seam);
   // Gold: a warm ramp along the seam, and a bead of light that runs along it as you tilt.
-  vec3 gold = mix(vec3(0.62, 0.36, 0.08), vec3(1.0, 0.84, 0.42), 0.5 + 0.5 * sin(d1 * 70.0 + uv.y * 9.0 + t.x * 2.0));
-  float run = smoothstep(0.72, 1.0, sin((uv.x * 0.8 + uv.y) * 6.0 - (t.x + t.y) * 3.4 - uTime * 0.7));
-  gold += vec3(1.0, 0.95, 0.78) * run * 0.95;
-  vec3 col = glaze * (1.0 - rim * 0.4);
-  float sheen = smoothstep(0.84, 1.0, 0.5 + 0.5 * sin((uv.x - uv.y * 0.7) * 4.0 + (t.x - t.y) * 2.5));
-  col += vec3(1.0, 0.97, 0.9) * sheen * 0.12;
-  return mix(col, gold, vein);
+  vec3 gold = mix(vec3(0.62, 0.38, 0.1), vec3(0.98, 0.8, 0.4), 0.5 + 0.5 * sin(d1 * 70.0 + uv.y * 9.0 + t.x * 2.0));
+  float run = smoothstep(0.75, 1.0, sin((uv.x * 0.8 + uv.y) * 6.0 - (t.x + t.y) * 3.4 - uTime * 0.7));
+  gold += vec3(1.0, 0.93, 0.74) * run * 0.6 * (1.0 - keep * 0.8);
+  vec3 col = glaze * (1.0 - rim * 0.3);
+  return mix(col, gold, vein * (0.9 - keep * 0.25));
 }
 
 vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
-  // Play of colour: small flecks, each a tiny grating with its own grain. A fleck
-  // only fires when you look at it from its angle, and its hue rolls across it.
+  // Play of colour inside the stone: soft patches deep in the picture warm to a
+  // spectral hue when you look at them from their angle. The picture keeps its own colour.
   vec2 p = uv * vec2(1.0, 1.4);
-  vec2 q = p * 9.0 + (vec2(vnoise(p * 4.0), vnoise(p * 4.0 + 5.2)) - 0.5) * 1.6;
+  vec2 q = p * 6.0 + (vec2(vnoise(p * 3.0), vnoise(p * 3.0 + 5.2)) - 0.5) * 2.0;
   vec4 v = voronoi(q);
   vec2 id = v.zw;
   vec2 n = normalize(hash22(id) * 2.0 - 1.0 + 1e-3);
-  vec2 local = (hash22(id + 3.0) - 0.5) * 0.3;
   float facing = sin(dot(n, t) * 2.6 + hash12(id + 2.0) * 6.28 + uTime * 0.2);
-  float fire = smoothstep(0.3, 1.0, facing);
-  float hue = fract(hash12(id + 7.0) + dot(q - floor(q) - local, n) * 0.22 + dot(n, t) * 0.12);
-  // Soft-edged flecks that glow brightest at their heart, so the colour sits inside the stone.
-  float body = smoothstep(0.75, 0.05, v.x) * smoothstep(0.0, 0.2, v.y - v.x);
-  vec3 flash = hsv2rgb(vec3(hue, 0.72, 1.0)) * fire * (0.25 + 0.75 * body);
-  // A milky, slightly blue body with a slow opalescent bloom that the fire glows through.
-  vec3 milk = mix(c, vec3(0.8, 0.86, 0.95) * (0.5 + 0.55 * L), 0.42) * 0.92;
-  milk += vec3(0.45, 0.6, 0.85) * (fbm(p * 2.5 + t * 0.15) - 0.4) * 0.22;
-  return screen(milk, flash * 0.78);
+  float fire = smoothstep(0.15, 1.0, facing);
+  float hue = fract(hash12(id + 7.0) + dot(n, t) * 0.15 + v.x * 0.25);
+  // No hard edges: each patch is a soft glow, strongest at its heart.
+  float body = smoothstep(0.85, 0.0, v.x);
+  vec3 spectral = hsv2rgb(vec3(hue, 0.8, 1.0));
+  // The colour tints the picture from within (multiply), then a little glow on top.
+  float k = fire * body;
+  vec3 col = mix(c, c * (0.35 + spectral * 1.1), k * 0.85);
+  col += spectral * k * k * 0.4;
+  // A faint milky bloom drifting over the darker parts only.
+  col += vec3(0.5, 0.62, 0.85) * (fbm(p * 2.5 + t * 0.15) - 0.45) * 0.12 * (1.0 - L);
+  return col;
 }
 
 vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
@@ -106,9 +109,9 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Shell only shifts through teal, blue, violet and pink, never orange.
   vec3 nacre = hsv2rgb(vec3(mix(0.42, 0.98, film), 0.5, 1.0)) * (0.7 + 0.3 * sin(s * 2.2));
   float lean = 0.55 + 0.45 * sin(dot(hash22(id + 4.0) * 2.0 - 1.0, t) * 3.0 + hash12(id + 5.0) * 6.28);
-  // In the shadows: lacquer that still shows the picture, with a scatter of shell chips.
-  vec3 lacquer = mix(c * 0.6, vec3(0.03, 0.012, 0.018), 0.4);
-  float chip = cut * step(0.68, hash12(id + 9.0));
+  // In the shadows: black lacquer that still shows the picture, with a sparse scatter of shell chips.
+  vec3 lacquer = mix(c * 0.5, vec3(0.025, 0.01, 0.016), 0.55);
+  float chip = cut * step(0.78, hash12(id + 9.0)) * smoothstep(0.3, 0.12, L);
   vec3 dark = mix(lacquer, nacre * (0.4 + 0.6 * lean) * 0.7, chip);
   // In the light: the picture itself, with a pearl film that shifts as you tilt.
   vec3 lit = screen(c, nacre * 0.2 * (0.4 + 0.6 * lean));
@@ -122,7 +125,8 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
 
 /** Continues the edition if/else chain in CARD_FS. */
 export const SPONSOR_DISPATCH = /* glsl */ `
-  else if (e == 40) col = kintsugi(c, uv, uTilt, L);
+  // Gold seams stay off the nameplate so the title reads cleanly.
+  else if (e == 40) col = mix(c, kintsugi(c, uv, uTilt, L), 0.25 + 0.75 * m.r);
   else if (e == 41) col = opal(c, uv, uTilt, L);
   else if (e == 42) col = eclipse(c, uv, uTilt, L);
   // Raden inlays the art; the frame only takes a light coat so the nameplate stays readable.

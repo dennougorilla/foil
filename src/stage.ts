@@ -188,8 +188,9 @@ export class Stage {
       h.turn.target = m === 'back' ? Math.PI : 0;
       if (!animate || !this.motion) h.turn.x = h.turn.target;
       if (animate && this.motion && wasHidden && !h.el.hidden) {
-        h.deal.x = 1;
-        h.deal.target = 1;
+        // A shorter rise than the opening deal, so nothing pokes out below the hand.
+        h.deal.x = 0.5;
+        h.deal.target = 0.5;
         h.dealAt = this.time + 0.25 + n++ * 0.12;
       }
     }

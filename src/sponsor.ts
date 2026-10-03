@@ -130,7 +130,7 @@ export function initSponsor(o: SponsorOptions) {
     <div class="sp-copy">
       <p class="sp-eyebrow">${STAR_SVG}<span></span></p>
       <h2 class="sp-title" id="spTitle"></h2>
-      <p class="sp-body" id="spBody"><span></span> <span></span></p>
+      <p class="sp-body" id="spBody"></p>
       <div class="sp-actions">
         <button class="btn sp-cta" type="button">${HEART_SVG}<span class="btn-text"><b></b><small></small></span></button>
         <button class="sp-later" type="button"></button>
@@ -156,9 +156,7 @@ export function initSponsor(o: SponsorOptions) {
     t = o.dict();
     q('.sp-eyebrow span').textContent = t.sponsorSecret;
     q('.sp-title').textContent = t.sponsorTitle;
-    const body = q('.sp-body').children;
-    body[0].textContent = t.sponsorBody;
-    body[1].textContent = t.sponsorThanks;
+    q('.sp-body').textContent = t.sponsorBody;
     q('.sp-cta b').textContent = t.sponsorCta;
     q('.sp-cta small').textContent = t.sponsorCtaSub;
     q('.sp-later').textContent = t.sponsorLater;
@@ -206,6 +204,8 @@ export function initSponsor(o: SponsorOptions) {
       if (menu?.hidden) {
         hinting = true;
         syncMenu(true);
+        // On a scrolled phone page the header may be out of view; bring it back first.
+        btn?.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
         btn?.click();
       } else {
         menu?.querySelector<HTMLAnchorElement>('a')?.focus();
@@ -235,7 +235,7 @@ export function initSponsor(o: SponsorOptions) {
   let started = 0;
 
   const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-  const REST = 0.6;
+  const REST = 1.2;
   const FLIP = 0.7;
   const HOLD = 2.6;
   const CYCLE = REST + FLIP + HOLD + FLIP;
@@ -275,7 +275,8 @@ export function initSponsor(o: SponsorOptions) {
     const motion = !reduced.matches;
     // Rests face down, flips to give a glimpse, holds, flips back; each time it
     // comes round, the next hidden finish is on the front. Reduced motion holds one still glimpse.
-    const { angle, turn } = motion ? glimpse((now - started) / 1000) : { angle: 0.3, turn: 0 };
+    // The first frame's timestamp can predate opening, so never run the clock backwards.
+    const { angle, turn } = motion ? glimpse(Math.max(0, now - started) / 1000) : { angle: 0.3, turn: 0 };
     const n = turn % SPONSOR_EDITIONS.length;
     const id = SPONSOR_EDITIONS[n];
     caption(n, Math.cos(angle) > 0.2);
@@ -400,8 +401,12 @@ export function initSponsor(o: SponsorOptions) {
     tip.textContent = t.sponsorTapHint;
     tip.hidden = false;
     const w = tip.offsetWidth;
-    tip.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
-    tip.style.top = `${Math.max(8, r.top - tip.offsetHeight - 10)}px`;
+    const cx = r.left + r.width / 2;
+    const left = Math.max(8, Math.min(innerWidth - w - 8, cx - w / 2));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${Math.max(8, r.top - tip.offsetHeight - 12)}px`;
+    // The little pointer always aims at the card, even when the bubble is pushed in from the edge.
+    tip.style.setProperty('--ax', `${Math.max(14, Math.min(w - 14, cx - left))}px`);
     armedUntil = performance.now() + 4000;
     clearTimeout(tipTimer);
     tipTimer = window.setTimeout(hideTip, 4000);
