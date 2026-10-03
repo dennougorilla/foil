@@ -9,6 +9,7 @@ import { setSound, sfx } from './audio';
 import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
+import { mountTune } from './tune/panel';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -589,6 +590,8 @@ $('crtBtn').addEventListener('click', () => {
 rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('thumbs'));
+// Fine-tuning drawer for light and motion, right under the Tune section's sliders.
+mountTune(store, $('pixel').closest('.row')!);
 
 // ---------- Export ----------
 
@@ -601,6 +604,7 @@ function exportInput() {
     edition: editionById(s.edition),
     intensity: s.intensity,
     pixel: s.pixel,
+    tune: s.tune,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
   };
