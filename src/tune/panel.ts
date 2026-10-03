@@ -70,7 +70,7 @@ function format(k: NumKey, v: number, t: Dict['tune']): string {
     case 'glare':
       return `${Math.round(v * 100)}%`;
     case 'sparkle':
-      return v <= 0 ? t.off : `${Math.round(v * 100)}%`;
+      return `${Math.round(v * 100)}%`;
     case 'temp':
       return `${Math.round(v)}K`;
     case 'speed':
@@ -93,6 +93,8 @@ function trackFor(k: NumKey, v: number): string {
   }
   if (k === 'temp') return 'linear-gradient(90deg, #ff9a3c, #ffd6a0 38%, #ffffff 53%, #bcd6ff 76%, #7fb0ff)';
   if (k === 'sat') return 'linear-gradient(90deg, #7d8486, var(--accent))';
+  // A direction, not an amount: no fill, just the thumb on its position round the card.
+  if (k === 'lightAngle') return base;
   const at = pct(k, v);
   if (RANGES[k].bipolar) {
     const d = pct(k, TUNE_DEFAULTS[k]);
@@ -112,8 +114,8 @@ export function mountTune(store: Store, after: Element): void {
   let undo: Tune | null = null;
   let undoTimer = 0;
   const touch = matchMedia('(pointer: coarse)').matches;
-  const peek = mountPeek();
-  const sun = mountSunHandle((deg) => set({ lightAngle: deg }));
+  const peek = mountPeek(() => sync());
+  const sun = mountSunHandle((deg) => set({ lightAngle: deg }), () => Math.cos(motion.spinAngle));
   // A stamp on the card while "Hold to compare" shows the defaults.
   const stamp = document.createElement('span');
   stamp.className = 'tune-stamp';
@@ -156,6 +158,7 @@ export function mountTune(store: Store, after: Element): void {
           <p class="tune-hint"></p>
         </div>
         <div class="tune-dock">
+          <span class="tune-dock-peek"></span>
           <div class="tune-actions">
             <button class="tune-compare" type="button" aria-pressed="false"><span></span></button>
             <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
@@ -170,6 +173,7 @@ export function mountTune(store: Store, after: Element): void {
     root.querySelector('.tune-undo span')!.textContent = t.undo;
     stamp.textContent = t.stamp;
     peek.setLabel(t.peek);
+    root.querySelector('.tune-dock-peek')!.replaceWith(peek.el);
     bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
     const tabs = root.querySelector<HTMLElement>('.tune-tabs')!;
     tabs.setAttribute('aria-label', t.toggle);
@@ -339,6 +343,15 @@ export function mountTune(store: Store, after: Element): void {
     notch.className = 'tune-notch';
     notch.setAttribute('aria-hidden', 'true');
     wrap.append(notch);
+    const ends = (t.ends as Partial<Record<NumKey, string[]>>)[k];
+    if (ends) {
+      // Plain words for the two ends of a multiplier, so ×2.20 has something to mean.
+      const cap = document.createElement('div');
+      cap.className = 'tune-ends';
+      cap.setAttribute('aria-hidden', 'true');
+      for (const word of ends) cap.appendChild(document.createElement('span')).textContent = word;
+      wrap.append(cap);
+    }
     row.appendChild(wrap);
     if (k === 'lightAngle') {
       const help = document.createElement('p');
@@ -460,7 +473,7 @@ export function mountTune(store: Store, after: Element): void {
     // Right after a reset, the hint says what happened next to the Undo it offers.
     root.querySelector('.tune-hint')!.textContent = undo ? t.resetDone : touch ? t.hintTouch : t.hint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
-    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo;
+    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo && !peek.shown;
     peek.setActive(s.tuneOpen);
 
     for (const def of TABS) {
@@ -556,7 +569,7 @@ export function mountTune(store: Store, after: Element): void {
     const tune = s.tune;
     const finish = ['scale', 'angle', 'hue', 'sat', 'sparkle', 'sparkleSize'].includes(k);
     if (finish && s.edition === 'base') return t.why.base;
-    if ((finish || k === 'glare' || k === 'sharp') && s.intensity <= 0 && s.edition !== 'base') return t.why.strength;
+    if ((finish || k === 'glare' || k === 'sharp' || k === 'temp') && s.intensity <= 0 && s.edition !== 'base') return t.why.strength;
     if (k === 'sparkleSize' && tune.sparkle <= 0) return t.why.sparkle;
     if (k === 'sharp' && tune.glare <= 0) return t.why.glare;
     if (k === 'temp' && tune.glare <= 0 && (tune.sparkle <= 0 || s.edition === 'base')) return t.why.temp;

@@ -33,6 +33,10 @@ class LiveMotion {
   private idleT = 0;
   private orbit = 0;
   private spin = 0;
+  /** Current turntable angle of the spin idle (0 when not spinning). */
+  get spinAngle() {
+    return this.spin;
+  }
   private gyro = { listening: false, x: 0, y: 0, sx: 0, sy: 0, base: null as null | [number, number], last: 0 };
 
   step(dt: number, t: Tune, still: boolean, holding: boolean) {

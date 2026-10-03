@@ -6,7 +6,7 @@ export type LightMode = 'pointer' | 'orbit' | 'fixed' | 'gyro';
 export type IdleMode = 'none' | 'sway' | 'spin' | 'breathe';
 
 export interface Tune {
-  /** Pattern zoom: 2 makes every finish's pattern twice as fine. */
+  /** Pattern zoom: 2 draws every finish's pattern twice as large. */
   scale: number;
   /** Pattern rotation, degrees. */
   angle: number;
@@ -196,6 +196,26 @@ export interface LoopPose {
   light: [number, number];
 }
 
+const smooth = (u: number) => u * u * (3 - 2 * u);
+
+/**
+ * One full turn per 2π of `a`, holding on each face and flipping quickly between them. A
+ * weightless card vanishes edge-on, so poses within ~17° of edge-on are skipped: at flip speed
+ * the jump is invisible, and no exported frame ever comes out empty.
+ */
+function flipTurn(a: number): number {
+  const turns = Math.floor(a / (Math.PI * 2));
+  const t = a / (Math.PI * 2) - turns;
+  const half = t < 0.5 ? 0 : 1;
+  const u = (t - half * 0.5) * 2;
+  const e = smooth(Math.min(1, Math.max(0, (u - 0.3) / 0.4)));
+  let ry = Math.PI * (half + e);
+  const EDGE = 0.3;
+  const m = ry % Math.PI;
+  if (Math.abs(m - Math.PI / 2) < EDGE) ry += (m < Math.PI / 2 ? -EDGE : EDGE) - (m - Math.PI / 2);
+  return ry + turns * Math.PI * 2;
+}
+
 /** How many motion cycles fit in one loop: whole numbers only, so the clip loops seamlessly. */
 export const loopCycles = (t: Tune) => (t.speed <= 0 ? 0 : Math.max(1, Math.round(t.speed)));
 
@@ -217,8 +237,8 @@ export function loopPose(t: Tune, p: number): LoopPose {
     rz = Math.sin(a) * 0.03;
     dy = Math.sin(a * 2) * 8;
   } else if (t.idle === 'spin') {
-    // Linger on the face and the back, pass quickly through edge-on.
-    ry = a - Math.sin(a * 2) * 0.4;
+    // Hold on the face, flip to the back, hold, flip home.
+    ry = flipTurn(a);
     rx = Math.sin(a) * 0.08 * k;
   } else if (t.idle === 'breathe') {
     scale = 1 + Math.sin(a) * 0.035;

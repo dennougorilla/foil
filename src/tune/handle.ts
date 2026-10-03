@@ -9,7 +9,8 @@ export interface SunHandle {
 const ICON =
   '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 0h2v3H7zm0 13h2v3H7zM0 7h3v2H0zm13 0h3v2h-3zM2 2h2v1h1v1H4v1H3V4H2zm10 0h2v2h-1v1h-1V4h-1V3h1zM3 11h1v1h1v1H4v1H2v-2h1zm9 0h1v1h1v2h-2v-1h-1v-1h1zM5 4h6v1h1v6h-1v1H5v-1H4V5h1z"/></svg>';
 
-export function mountSunHandle(onAngle: (deg: number) => void): SunHandle {
+/** `facing` reports how squarely the card face looks at us (1 = straight on, ≤0 = back). */
+export function mountSunHandle(onAngle: (deg: number) => void, facing: () => number): SunHandle {
   const slot = document.getElementById('cardSlot');
   const aim = document.createElement('div');
   aim.className = 'tune-aim';
@@ -29,6 +30,10 @@ export function mountSunHandle(onAngle: (deg: number) => void): SunHandle {
     aim.style.transform = `translate(${r.left.toFixed(1)}px, ${r.top.toFixed(1)}px)`;
     aim.style.width = `${r.width}px`;
     aim.style.height = `${r.height}px`;
+    // The light lives on the face: fade the sun out while a spin shows the back.
+    const f = Math.min(1, Math.max(0, facing() * 3 - 1));
+    aim.style.opacity = f.toFixed(2);
+    aim.classList.toggle('is-away', f < 0.5);
   };
 
   const set = (deg: number) => onAngle(((Math.round(deg) % 360) + 360) % 360);

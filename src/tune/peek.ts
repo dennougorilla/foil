@@ -1,13 +1,15 @@
 // On phones the panel sits far below the card, so tuning would happen blind. While the drawer
-// is open and the card has scrolled away, a small live window shows it, copied each frame
-// from the stage canvas. Tapping it scrolls back up to the card.
+// is open and the card has scrolled away, a small live window shows it inside the drawer's
+// sticky action bar, copied each frame from the stage canvas. Tapping it scrolls back up.
 
 export interface Peek {
+  readonly el: HTMLElement;
+  readonly shown: boolean;
   setActive(on: boolean): void;
   setLabel(text: string): void;
 }
 
-export function mountPeek(): Peek {
+export function mountPeek(onShow: (shown: boolean) => void): Peek {
   const slot = document.getElementById('cardSlot');
   const source = document.getElementById('cards') as HTMLCanvasElement | null;
   const btn = document.createElement('button');
@@ -16,8 +18,7 @@ export function mountPeek(): Peek {
   btn.hidden = true;
   const view = document.createElement('canvas');
   btn.appendChild(view);
-  document.body.appendChild(btn);
-  if (!slot || !source) return { setActive() {}, setLabel() {} };
+  if (!slot || !source) return { el: btn, shown: false, setActive() {}, setLabel() {} };
 
   const narrow = matchMedia('(max-width: 900px)');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -42,7 +43,10 @@ export function mountPeek(): Peek {
 
   function update() {
     const show = active && offscreen && narrow.matches;
-    btn.hidden = !show;
+    if (show !== !btn.hidden) {
+      btn.hidden = !show;
+      onShow(show);
+    }
     if (show && !raf) raf = requestAnimationFrame(draw);
     if (!show && raf) {
       cancelAnimationFrame(raf);
@@ -75,6 +79,10 @@ export function mountPeek(): Peek {
   }
 
   return {
+    el: btn,
+    get shown() {
+      return !btn.hidden;
+    },
     setActive(on) {
       active = on;
       update();
