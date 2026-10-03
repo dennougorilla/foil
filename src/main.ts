@@ -59,15 +59,13 @@ try {
 }
 stage.cards.setBack(back);
 
-function redrawFace() {
+function faceSpec(image: Img) {
   const s = store.get();
-  drawFace(face, mask, {
-    image: currentImage(),
-    crop: s.crop,
-    frame: s.frame,
-    rarity: s.rarity,
-    name: s.name || fallback().name,
-  });
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name };
+}
+
+function redrawFace() {
+  drawFace(face, mask, faceSpec(currentImage()));
   stage.cards.setFace(face, mask);
 }
 
@@ -597,6 +595,16 @@ function exportInput() {
     intensity: s.intensity,
     pixel: s.pixel,
     name: s.name || fallback().name,
+    ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
+  };
+}
+
+/** Lets GIF and video exports step through the person's animated GIF frame by frame. */
+function animatedExport(anim: Anim) {
+  return {
+    loopMs: anim.duration,
+    faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) =>
+      drawFace(f, m, faceSpec(anim.frames[frameAt(anim, ms)])),
   };
 }
 

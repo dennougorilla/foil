@@ -11,6 +11,10 @@ export interface ExportInput {
   intensity: number;
   pixel: number;
   name: string;
+  /** For animated sources: paints the card face as it looks `ms` into the animation. */
+  faceAt?: (ms: number, face: HTMLCanvasElement, mask: HTMLCanvasElement) => void;
+  /** Length of one loop of the animated source, in ms. */
+  loopMs?: number;
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -70,7 +74,7 @@ interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   /** Draws loop position p∈[0,1): the card orbits once on the swirl backdrop. */
-  draw(p: number, bgTime: number, cardTime: number): void;
+  draw(p: number, bgTime: number, cardTime: number, sourceMs?: number): void;
   dispose(): void;
 }
 
@@ -89,6 +93,9 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
   cards.setBack(input.back);
   cards.resize(W, H, 1);
   const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
+  // Animated sources repaint their own face canvases so the live card is left alone.
+  const animFace = input.faceAt ? document.createElement('canvas') : null;
+  const animMask = input.faceAt ? document.createElement('canvas') : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
   const ch = 640 * k;
@@ -97,8 +104,12 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
   return {
     out,
     ctx,
-    draw(p, bgTime, cardTime) {
+    draw(p, bgTime, cardTime, sourceMs) {
       const a = p * Math.PI * 2;
+      if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
+        input.faceAt(sourceMs, animFace, animMask);
+        cards.setFace(animFace, animMask);
+      }
       bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const rx = Math.sin(a) * 0.22;
@@ -159,7 +170,7 @@ export async function exportVideo(input: ExportInput, onProgress?: (p: number) =
   for (let p = 0; p < 1; ) {
     await nextFrame();
     p = Math.min((performance.now() - t0) / 1000 / DUR, 1);
-    scene.draw(p, 40 + p * 6, p * DUR);
+    scene.draw(p, 40 + p * 6, p * DUR, p * DUR * 1000);
     onProgress?.(p);
   }
   rec.stop();
@@ -199,17 +210,20 @@ export async function exportGif(
   result.catch(() => {});
 
   const scene = createScene(input, GIF_W, GIF_H, true);
-  const DUR = (GIF_FRAMES * GIF_DELAY) / 1000;
+  // An animated source sets the loop length (within reason) so its motion and the orbit repeat together.
+  const loopMs = input.loopMs ? Math.min(Math.max(input.loopMs, 1200), 6000) : GIF_FRAMES * GIF_DELAY;
+  const frames = Math.round(loopMs / GIF_DELAY);
+  const DUR = (frames * GIF_DELAY) / 1000;
   try {
-    for (let i = 0; i < GIF_FRAMES; i++) {
+    for (let i = 0; i < frames; i++) {
       await nextFrame();
-      const p = i / GIF_FRAMES;
+      const p = i / frames;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
-      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * DUR);
+      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * DUR, p * DUR * 1000);
       const { data } = scene.ctx.getImageData(0, 0, GIF_W, GIF_H);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
-      onProgress?.(((i + 1) / GIF_FRAMES) * GIF_DRAW_SHARE, false);
+      onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY });
     const bytes = await result;
