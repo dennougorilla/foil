@@ -32,6 +32,8 @@ interface Options {
   repaint: () => void;
   /** A small bounce on the card when a style is picked. */
   onPick: () => void;
+  /** Where to put the shortcut button that jumps to these controls (the card's name tag). */
+  tag?: HTMLElement;
 }
 
 /** Named inks, in swatch order. 'auto' and 'none' sit in front of these. */
@@ -122,6 +124,8 @@ export function mountLettering(o: Options): void {
       sfx.tick();
       set({ style: id });
       o.onPick();
+      // The style's own tuning appears below; keep it in view.
+      requestAnimationFrame(() => reveal(detail, true));
     });
     styles.append(b);
     return b;
@@ -137,12 +141,16 @@ export function mountLettering(o: Options): void {
     const row = el('div', 'lt-row');
     const label = el('span', 'field-label');
     label.id = id;
+    const name = el('span', 'lt-picked');
+    name.setAttribute('aria-hidden', 'true');
     const group = el('div', 'lt-swatches');
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', id);
-    row.append(label, group);
+    const top = el('div', 'lt-row-head');
+    top.append(label, name);
+    row.append(top, group);
     roving(group);
-    return { row, label, group };
+    return { row, label, name, group };
   };
 
   const picker = (onInput: (hex: string) => void) => {
@@ -226,6 +234,22 @@ export function mountLettering(o: Options): void {
   o.host.append(root);
   roving(styles);
 
+  // The panel's export bar is sticky; never leave a control hidden behind it.
+  const reveal = (target: HTMLElement, smooth = false) => {
+    const bar = document.querySelector('.sec-export');
+    const panel = root.closest<HTMLElement>('.panel');
+    const inPanel = !!panel && panel.scrollHeight > panel.clientHeight && getComputedStyle(panel).overflowY !== 'visible';
+    const r = target.getBoundingClientRect();
+    const floor = bar ? bar.getBoundingClientRect().top - 16 : innerHeight - 16;
+    const ceil = (inPanel ? panel!.getBoundingClientRect().top : 0) + 16;
+    // Bring the bottom above the bar, but never push the top out of view.
+    const by = Math.min(r.bottom - floor, r.top - ceil);
+    if (by <= 0) return;
+    const behavior: ScrollBehavior = smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
+    (inPanel ? panel! : window).scrollBy({ top: by, behavior });
+  };
+  root.addEventListener('focusin', (e) => reveal(e.target as HTMLElement));
+
   // Pointer over the chips moves their light together, like tilting the card.
   styles.addEventListener('pointermove', (e) => {
     const r = styles.getBoundingClientRect();
@@ -235,6 +259,33 @@ export function mountLettering(o: Options): void {
   styles.addEventListener('pointerleave', () => {
     styles.style.removeProperty('--mx');
     styles.style.removeProperty('--my');
+  });
+
+  // Shortcut on the name tag: shows the current lettering and jumps to the controls.
+  const jump = el('button', 'lt-jump');
+  jump.type = 'button';
+  const jumpChip = el('span', 'lt-chip');
+  jumpChip.setAttribute('aria-hidden', 'true');
+  jumpChip.append(el('b'));
+  jump.append(jumpChip);
+  if (o.tag) {
+    o.tag.classList.add('has-lt-jump');
+    o.tag.append(jump);
+  }
+  jump.addEventListener('click', () => {
+    sfx.tick();
+    const on = styles.querySelector<HTMLButtonElement>('[aria-checked=true]');
+    // Off-screen (phones: the panel is far below) jump there first, then fit the whole block.
+    const r = root.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight) root.scrollIntoView({ block: 'start' });
+    on?.focus({ preventScroll: true });
+    reveal(root, true);
+    root.classList.remove('is-called');
+    void root.offsetWidth;
+    root.classList.add('is-called');
+  });
+  root.addEventListener('animationend', (e) => {
+    if (e.target === root) root.classList.remove('is-called');
   });
 
   reset.addEventListener('click', () => {
@@ -280,13 +331,14 @@ export function mountLettering(o: Options): void {
     const [lo, hi] = foilRamp(l);
     const shown = letterFill(l, frameInk);
     // Chips preview each style in your current colours on your current frame.
-    root.style.setProperty('--lt-paper', paper);
-    root.style.setProperty('--lt-ink', l.ink === 'auto' || l.ink === 'none' ? frameInk : l.ink);
-    root.style.setProperty('--lt-lo', lo);
-    root.style.setProperty('--lt-hi', hi);
-    root.classList.toggle('is-dark-stock', s.frame === 'ink');
-    root.classList.toggle('is-blind', l.ink === 'none');
-    root.classList.toggle('is-rainbow', l.foil === 'rainbow');
+    for (const host of [root, jump]) {
+      host.style.setProperty('--lt-paper', paper);
+      host.style.setProperty('--lt-ink', l.ink === 'auto' || l.ink === 'none' ? frameInk : l.ink);
+      host.style.setProperty('--lt-lo', lo);
+      host.style.setProperty('--lt-hi', hi);
+      host.classList.toggle('is-blind', l.ink === 'none' && c.blind);
+      host.classList.toggle('is-rainbow', l.foil === 'rainbow');
+    }
     styleBtns.forEach((b) => {
       radio(b, b.dataset.style === l.style);
       const g = b.querySelector('b')!;
@@ -294,6 +346,12 @@ export function mountLettering(o: Options): void {
       g.dataset.g = glyph;
     });
     help.textContent = t.help[l.style];
+    const jumpLabel = t.jump.replace('{style}', t.style[l.style].replace('​', ''));
+    jump.setAttribute('aria-label', jumpLabel);
+    jump.title = jumpLabel;
+    jump.dataset.style = l.style;
+    const jg = jump.querySelector('b')!;
+    jg.textContent = jg.dataset.g = glyph;
 
     ink.row.hidden = !c.ink;
     foil.row.hidden = !c.foil;
@@ -313,6 +371,9 @@ export function mountLettering(o: Options): void {
     inkBtns[INK_KEYS.indexOf('custom')].style.setProperty('--sw', ik === 'custom' ? l.ink : 'transparent');
     inkBtns[INK_KEYS.indexOf('custom')].classList.toggle('is-set', ik === 'custom');
     FOIL_TONES.forEach((k, i) => radio(foilBtns[i], k === l.foil));
+    // Name the picked swatch in words; colour alone isn't enough.
+    ink.name.textContent = c.blind || ik !== 'none' ? t.inkName[ik] : t.inkName.auto;
+    foil.name.textContent = t.foilName[l.foil];
     const cf = foilBtns[FOIL_TONES.indexOf('custom')];
     cf.style.setProperty('--lo', foilRamp({ ...l, foil: 'custom' })[0]);
     cf.style.setProperty('--hi', foilRamp({ ...l, foil: 'custom' })[1]);

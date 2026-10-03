@@ -809,6 +809,7 @@ mountLettering({
   name: () => store.get().name || fallback().name,
   repaint: () => redrawFace(),
   onPick: () => stage.juice(0.35),
+  tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
 const boot = () => {

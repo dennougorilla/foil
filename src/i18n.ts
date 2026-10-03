@@ -121,7 +121,7 @@ const ja = {
     title: '文字の加工',
     target: 'カードの名前に',
     styles: 'カードの名前の刷り方',
-    style: { ink: 'インク', deboss: '掘り込み', emboss: '浮き出し', foil: '箔押し', spot: 'スポットUV' } satisfies Record<LetterStyle, string>,
+    style: { ink: 'インク', deboss: '掘り込み', emboss: '浮き出し', foil: '箔押し', spot: 'スポット​UV' } satisfies Record<LetterStyle, string>,
     help: {
       ink: '平らに刷った、いつもの文字。',
       deboss: '紙に彫り込んだ、くぼんだ文字。縁に影が落ちます。',
@@ -143,6 +143,7 @@ const ja = {
       custom: '好きな色',
     } satisfies Record<FoilTone, string>,
     tilt: 'カードを傾けると光が動きます',
+    jump: '{style} — 名前の加工を変える',
     reset: '元に戻す',
   },
 };
@@ -289,6 +290,7 @@ const en: Dict = {
       custom: 'Any colour',
     },
     tilt: 'Tilt the card to move the light',
+    jump: '{style} — change how the name is printed',
     reset: 'Reset',
   },
 };

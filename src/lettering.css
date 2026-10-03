@@ -3,6 +3,7 @@
 .lt {
   --mx: 0.28;
   --my: 0.22;
+  container-type: inline-size;
   margin-top: 18px;
   padding-top: 16px;
   border-top: 2px dashed var(--panel-lo);
@@ -78,7 +79,17 @@
   max-width: 100%;
   text-align: center;
   word-break: keep-all;
-  overflow-wrap: anywhere;
+}
+
+/* Narrow panels (1024px and down to phones): tighter labels so words never split. */
+@container (max-width: 320px) {
+  .lt-style {
+    font-size: 11px;
+    letter-spacing: -0.03em;
+  }
+  .lt-chip {
+    height: 40px;
+  }
 }
 
 .lt-chip {
@@ -109,17 +120,19 @@
 [data-style='deboss'] .lt-chip b {
   color: color-mix(in srgb, var(--lt-ink) 88%, #000);
   text-shadow:
-    calc(var(--lx) * 1.6px) calc(var(--ly) * 1.6px) 0 rgba(0, 0, 0, 0.5),
-    calc(var(--lx) * -1.2px) calc(var(--ly) * -1.2px) 0 rgba(255, 255, 255, 0.55);
+    calc(var(--lx) * 2px) calc(var(--ly) * 2px) 0 rgba(0, 0, 0, 0.55),
+    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 rgba(255, 255, 255, 0.85);
 }
 
 /* Emboss: lit shoulder towards the light, a soft cast shadow away from it. */
 [data-style='emboss'] .lt-chip b {
   text-shadow:
-    calc(var(--lx) * 1.2px) calc(var(--ly) * 1.2px) 0 rgba(255, 255, 255, 0.7),
-    calc(var(--lx) * -2.5px) calc(var(--ly) * -2.5px + 1px) 2px rgba(0, 0, 0, 0.45);
+    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 rgba(255, 255, 255, 0.9),
+    calc(var(--lx) * -3px) calc(var(--ly) * -3px + 1px) 3px rgba(0, 0, 0, 0.5);
 }
 
+.is-blind[data-style='deboss'] .lt-chip b,
+.is-blind[data-style='emboss'] .lt-chip b,
 .is-blind [data-style='deboss'] .lt-chip b,
 .is-blind [data-style='emboss'] .lt-chip b {
   color: transparent;
@@ -136,6 +149,7 @@
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
 }
 
+.is-rainbow[data-style='foil'] .lt-chip b,
 .is-rainbow [data-style='foil'] .lt-chip b {
   background-image: linear-gradient(115deg, #ff8aa8, #ffe28a 18%, #9cf7c8 34%, #8ad4ff 50%, #c99cff 66%, #ff8aa8 84%, #ffe28a);
 }
@@ -153,6 +167,7 @@
   background-clip: text;
 }
 
+.is-blind[data-style='spot'] .lt-chip b,
 .is-blind [data-style='spot'] .lt-chip b {
   color: color-mix(in srgb, var(--lt-ink) 10%, transparent);
 }
@@ -168,8 +183,25 @@
   margin-top: 10px;
 }
 
+.lt-detail > :first-child {
+  margin-top: 4px;
+}
+
 .lt-row {
-  align-items: center;
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lt-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lt-picked {
+  font-size: 13px;
+  color: var(--text);
 }
 
 .lt-row[hidden],
@@ -180,7 +212,6 @@
 
 .lt-swatches {
   position: relative;
-  grid-column: 2 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -307,5 +338,78 @@
   }
   .lt-tilt::before {
     animation: none;
+  }
+}
+
+/* ---------- Shortcut on the card's name tag ---------- */
+
+.has-lt-jump {
+  position: relative;
+}
+
+.has-lt-jump .info-name {
+  padding-inline: 44px;
+}
+
+.lt-jump {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  transition: transform 0.12s var(--ease-back);
+}
+
+.lt-jump .lt-chip {
+  height: 100%;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lt-jump .lt-chip b {
+  font-size: 20px;
+}
+
+.lt-jump:hover {
+  transform: translateY(-2px) rotate(-4deg);
+}
+
+.lt-jump:active {
+  transform: translateY(2px);
+}
+
+/* Focus and scroll targets clear the sticky export bar at the bottom of the panel. */
+.lt button,
+.lt input {
+  scroll-margin-block: 24px 170px;
+}
+
+.lt {
+  scroll-margin-block: 24px 170px;
+}
+
+/* A brief glow when the shortcut brings you here. */
+.lt.is-called {
+  animation: lt-called 1.1s var(--ease-out);
+}
+
+@keyframes lt-called {
+  0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 70%, transparent); border-radius: 8px; }
+  100% { box-shadow: 0 0 0 3px transparent; border-radius: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-jump {
+    transition: none;
+  }
+  .lt-jump:hover {
+    transform: none;
+  }
+  .lt.is-called {
+    animation-duration: 0.01s;
   }
 }
