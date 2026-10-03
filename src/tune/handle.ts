@@ -34,6 +34,8 @@ export function mountSunHandle(onAngle: (deg: number) => void, facing: () => num
     const f = Math.min(1, Math.max(0, facing() * 3 - 1));
     aim.style.opacity = f.toFixed(2);
     aim.classList.toggle('is-away', f < 0.5);
+    // Out of the tab order while it is turned away, so focus never lands on an invisible control.
+    sun.tabIndex = f < 0.5 ? -1 : 0;
   };
 
   const set = (deg: number) => onAngle(((Math.round(deg) % 360) + 360) % 360);

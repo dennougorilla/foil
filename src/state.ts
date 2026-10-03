@@ -74,6 +74,7 @@ export function createStore() {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
+    state.tuneOpen = state.tuneOpen === true;
   } catch {
     /* storage unavailable: defaults are fine */
   }

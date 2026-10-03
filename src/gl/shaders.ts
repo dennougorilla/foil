@@ -258,8 +258,7 @@ vec3 glitch(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   col = mix(col, col * vec3(0.55, 1.15, 0.7), 0.35);
   col *= 0.9 + 0.1 * step(0.5, fract(uv.y * 140.0));
   float blk = step(0.94, hash12(floor(uv * vec2(8.0, 18.0)) + tick));
-  vec3 neon = hash12(floor(uv * vec2(8.0, 18.0)) + tick + 5.0) > 0.5 ? vec3(0.25, 1.0, 0.55) : vec3(1.0, 0.25, 0.85);
-  col = mix(col, neon * (0.55 + 0.45 * L), blk * 0.75);
+  col = mix(col, vec3(0.36, 1.0, 0.55) * L + vec3(0.1, 0.0, 0.2), blk * 0.7);
   return col;
 }
 

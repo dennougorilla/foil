@@ -1419,6 +1419,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
 .toast-msg {
   margin: 0;
   line-break: strict;
+  text-wrap: pretty;
 }
 
 /* Errors stay put and offer a way out: message, then actions; close sits top-right. */

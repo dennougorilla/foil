@@ -674,7 +674,9 @@ export function mountTune(store: Store, after: Element): void {
     if (k === 'sharp' && tune.glare <= 0) return t.why.glare;
     if (k === 'temp' && tune.glare <= 0 && (tune.sparkle <= 0 || s.edition === 'base')) return t.why.temp;
     if (reduced.matches && (k === 'speed' || k === 'idle' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
-    if (k === 'speed' && tune.light !== 'orbit' && tune.idle === 'none' && !ANIMATED.has(s.edition)) return t.why.still;
+    // Glitter twinkles on its own clock, so Speed matters whenever it shows.
+    const glitter = tune.sparkle > 0 && s.edition !== 'base' && s.intensity > 0;
+    if (k === 'speed' && tune.light !== 'orbit' && tune.idle === 'none' && !ANIMATED.has(s.edition) && !glitter) return t.why.still;
     return null;
   }
 
@@ -710,7 +712,8 @@ export function mountTune(store: Store, after: Element): void {
       set({ light: 'pointer' });
     });
   }
-  store.on((_s, changed) => {
+  store.on((s, changed) => {
+    if (changed.has('tune') && s.tune.light !== 'gyro') motion.disableGyro();
     if (changed.has('lang')) build();
     else if (changed.has('tune') || changed.has('tuneOpen') || changed.has('edition') || changed.has('intensity')) sync();
   });

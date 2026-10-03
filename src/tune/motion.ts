@@ -116,6 +116,15 @@ class LiveMotion {
     return 'ok';
   }
 
+  /** Stops listening to the sensor once another light source is chosen. */
+  disableGyro() {
+    if (!this.gyro.listening) return;
+    this.gyro.listening = false;
+    window.removeEventListener('deviceorientation', this.onOrient);
+    this.gyro.base = null;
+    this.gyro.last = 0;
+  }
+
   /** True once the sensor has sent anything since it was enabled. */
   gyroLive = () => performance.now() - this.gyro.last < 1000;
 
@@ -127,6 +136,7 @@ class LiveMotion {
     let y = e.beta;
     if (turn === 90) [x, y] = [e.beta, -e.gamma];
     else if (turn === 270 || turn === -90) [x, y] = [-e.beta, e.gamma];
+    else if (turn === 180 || turn === -180) [x, y] = [-e.gamma, -e.beta];
     const g = this.gyro;
     if (!g.base) g.base = [x, y];
     // The rest pose slowly follows how the phone is held, so any grip feels centred.
