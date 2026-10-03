@@ -1380,10 +1380,10 @@ input[type='range']:focus-visible::-moz-range-thumb {
 
 .toasts {
   position: fixed;
-  /* Sits just above the export row, so it covers neither the header nor the hand. */
+  /* Sits just above the Export section (title included), so it covers neither the header nor the hand. */
   left: auto;
   right: 36px;
-  bottom: 124px;
+  bottom: 150px;
   z-index: 70;
   display: grid;
   gap: 8px;
