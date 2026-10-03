@@ -436,7 +436,7 @@ export function openPack(o: OpeningOptions) {
     }
     if (rich) packSfx.deal(top + 4);
     hint(t.swipe, '→');
-    label(c, rich ? t.supporterTag : '');
+    label(c);
     say(dict.edition[c.id]);
   }
 

@@ -211,6 +211,12 @@ const overlayGone = () => page.waitForSelector('.pk', { state: 'detached', timeo
 await step('open a pack: trace the top, swipe through, the showpiece last, then try it', async () => {
   await page.click('.pk-chip[data-pack=metal]');
   await phase('pack');
+  // Wait for the pack to settle from its flight (the guide lies level across its top).
+  await page.waitForFunction(() => {
+    const r = document.querySelector('.pk-guide').getBoundingClientRect();
+    return r.height < 3 && r.top < innerHeight * 0.4;
+  }, null, { timeout: 20000 });
+  await page.waitForTimeout(500);
   const g = await page.locator('.pk-guide').boundingBox();
   await page.mouse.move(g.x + 4, g.y);
   await page.mouse.down();
