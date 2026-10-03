@@ -726,6 +726,15 @@ button {
   text-shadow: 0 3px 0 var(--edge);
 }
 
+/* Steps beside the finish's name show on phones only (stage-phone.css). */
+.hand-bar {
+  display: contents;
+}
+
+.hand-step {
+  display: none;
+}
+
 .hand-caption i {
   align-self: center;
   padding: 1px 6px;

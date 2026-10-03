@@ -18,6 +18,7 @@ import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
+import { stepIn } from './handStep';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -59,6 +60,7 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
+    onFlick: (dir) => stepEdition(dir),
     isHidden: isLocked,
   });
 } catch (err) {
@@ -138,6 +140,10 @@ function applyText() {
   $('versionLink').setAttribute('aria-label', $('versionLink').title);
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
+  for (const [id, label] of [['handPrev', t.prevFinish], ['handNext', t.nextFinish]]) {
+    $(id).setAttribute('aria-label', label);
+    $(id).title = label;
+  }
   stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
   $('cropView').title = t.cropHint;
@@ -608,6 +614,16 @@ function selectEdition(id: EditionId) {
   stage.burst(editionById(id).color);
 }
 
+/** Steps to the next (1) or previous (-1) card the hand holds, whatever it holds right now. */
+function stepEdition(dir: 1 | -1) {
+  const id = stepIn(stage.shownIds(), store.get().edition, dir);
+  if (id) selectEdition(id);
+}
+
+// Phones step through the hand from beside the finish's name too (see stage-phone.css).
+$('handPrev').addEventListener('click', () => stepEdition(-1));
+$('handNext').addEventListener('click', () => stepEdition(1));
+
 /** Tell screen readers which finish is on the card now. */
 function announce(msg: string) {
   const live = $('announcer');
@@ -622,19 +638,16 @@ window.addEventListener('keydown', (e) => {
   // 1–9 then 0 pick the first ten finishes in the hand, like a keyboard row.
   const n = parseInt(e.key, 10);
   if (!Number.isNaN(n) && e.key.length === 1) {
-    const shown = EDITIONS.filter((x) => !isLocked(x.id));
+    const shown = stage.shownIds();
     const i = n === 0 ? 9 : n - 1;
-    if (shown[i]) selectEdition(shown[i].id);
+    if (shown[i]) selectEdition(shown[i]);
     return;
   }
   // Arrows step through finishes when nothing else on the page wants them.
   const free = document.activeElement === document.body || document.activeElement?.id === 'cardSlot';
   if (free && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     e.preventDefault();
-    let next = EDITIONS.findIndex((x) => x.id === store.get().edition);
-    do next = (next + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
-    while (isLocked(EDITIONS[next].id));
-    selectEdition(EDITIONS[next].id);
+    stepEdition(e.key === 'ArrowRight' ? 1 : -1);
   }
 });
 
