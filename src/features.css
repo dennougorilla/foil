@@ -130,13 +130,34 @@
   border-radius: 0 2px 2px 0;
 }
 
+/* Inverted, the band is what gets left out; a full band then leaves nothing to show. */
 .tone.is-invert .tone-track::before,
 .tone.is-invert .tone-track::after {
   display: none;
 }
 
-.tone.is-invert .tone-band {
+.tone.is-invert:not(.is-full) .tone-band {
   background: repeating-linear-gradient(135deg, rgba(13, 19, 21, 0.78) 0 3px, rgba(242, 193, 78, 0.35) 3px 5px);
+}
+
+.tone.is-invert .tone-band {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--edge);
+  border-radius: 4px;
+  outline: 2px dashed var(--edge);
+  outline-offset: -2px;
+}
+
+/* The card's own tones, as a pixel histogram sitting on the track. */
+.tone-hist {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  width: calc(100% - 4px);
+  height: 12px;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+  opacity: 0.7;
 }
 
 .tone input[type='range'] {
@@ -178,11 +199,13 @@
 }
 
 .tone input[type='range']:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--gold);
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 7px var(--edge);
 }
 
 .tone input[type='range']:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--gold);
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 7px var(--edge);
 }
 
 .tone-presets {
@@ -236,6 +259,30 @@
   text-decoration: none;
 }
 
+.chip.range-chip[aria-pressed='true'] {
+  color: var(--gold);
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--edge), inset 0 0 0 2px var(--gold);
+}
+
+.where-tag {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--panel-lo);
+  color: var(--gold);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.where-tag[hidden] {
+  display: none;
+}
+
+.region-hint {
+  margin-top: 2px;
+  min-height: 1.5em;
+}
+
 .chip.range-chip svg path:first-child {
   fill: none;
 }
@@ -261,16 +308,14 @@
 
 .range-cover {
   display: grid;
-  grid-template-columns: 56px 1fr;
-  align-items: center;
-  gap: 10px;
+  gap: 6px;
   margin: 12px 0 0;
   font-size: 13px;
   color: var(--text-dim);
 }
 
 .cover-bar {
-  height: 8px;
+  height: 10px;
   border-radius: 2px;
   background: var(--panel-lo);
   box-shadow: inset 0 0 0 2px var(--edge);
@@ -287,7 +332,7 @@
 }
 
 .range-cover.is-none {
-  color: var(--red);
+  color: var(--gold);
 }
 
 /* ---------- Brush mode ---------- */
@@ -318,6 +363,32 @@
 
 .paint-layer.has-ring .paint-ring {
   opacity: 1;
+}
+
+/* Adding: the ring wears a little holo rim, the finish it is about to lay down. */
+.paint-layer[data-mode='add'] .paint-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from var(--spin, 0deg), #ff6b8b, #f2c14e, #59f2b0, #5fb4ff, #c58bff, #ff6b8b);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ring-spin 2.4s linear infinite;
+}
+
+@property --spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes ring-spin {
+  to {
+    --spin: 360deg;
+  }
 }
 
 .paint-ring::after {
@@ -509,7 +580,14 @@
 }
 
 .brush-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
   font-size: 12px;
+}
+
+.brush-keys span {
+  white-space: nowrap;
 }
 
 /* ---------- Custom colours ---------- */
@@ -610,8 +688,8 @@
 
 .sw-del {
   position: absolute;
-  top: -9px;
-  right: -9px;
+  top: -8px;
+  right: -7px;
   z-index: 2;
   display: grid;
   place-items: center;
@@ -748,7 +826,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brush {
+  .brush,
+  .paint-layer[data-mode='add'] .paint-ring::before {
     animation: none;
   }
   .tone-band,
@@ -759,7 +838,7 @@
 
 /* The backdrop row holds the most chips, so it runs a size smaller to stay on one line. */
 .sw-strip-stage {
-  gap: 10px 9px;
+  gap: 10px 7px;
 }
 
 .sw-strip-stage .sw-chip:not(.sw-auto),

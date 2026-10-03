@@ -94,8 +94,12 @@ export function initRangePanel(host: RangeHost) {
     <h3 class="sec-title"><i></i><span data-r="secRange"></span>
       <button class="link range-reset" type="button" data-r="rangeReset"></button></h3>
     <div class="field">
-      <span class="field-label" id="rangeWhereLabel" data-r="rangeWhere"></span>
-      <div class="seg seg-region" role="radiogroup" aria-labelledby="rangeWhereLabel"></div>
+      <div class="field-head">
+        <span class="field-label" id="rangeWhereLabel" data-r="rangeWhere"></span>
+        <span class="where-tag" data-r="whereBrushed" hidden></span>
+      </div>
+      <div class="seg seg-region" role="radiogroup" aria-labelledby="rangeWhereLabel" aria-describedby="rangeRegionHint"></div>
+      <p class="hint region-hint" id="rangeRegionHint"></p>
     </div>
     <div class="field tone-field">
       <div class="field-head">
@@ -103,7 +107,7 @@ export function initRangePanel(host: RangeHost) {
         <output class="tone-out" aria-hidden="true"></output>
       </div>
       <div class="tone">
-        <div class="tone-track" aria-hidden="true"><i class="tone-band"></i></div>
+        <div class="tone-track" aria-hidden="true"><canvas class="tone-hist" width="160" height="12"></canvas><i class="tone-band"></i></div>
         <input type="range" class="tone-lo" min="0" max="1" step="0.01" />
         <input type="range" class="tone-hi" min="0" max="1" step="0.01" />
       </div>
@@ -123,7 +127,7 @@ export function initRangePanel(host: RangeHost) {
       ${svg(ICON.brush)}
       <span class="btn-text"><b data-r="paint"></b><small data-r="paintSub"></small></span>
     </button>
-    <p class="range-cover" aria-live="polite"><i class="cover-bar" aria-hidden="true"><i></i></i><span></span></p>
+    <p class="range-cover" aria-live="polite"><span></span><i class="cover-bar" aria-hidden="true"><i></i></i></p>
   `;
   const panel = document.getElementById('panel')!;
   panel.insertBefore(sec, panel.querySelector('.sec-export'));
@@ -270,7 +274,7 @@ export function initRangePanel(host: RangeHost) {
       </div>
       <button class="btn btn-green brush-done" type="button"><span class="btn-text"><b data-r="brushDone"></b></span></button>
     </div>
-    <p class="card-hint brush-keys" data-r="brushKeys"></p>
+    <p class="card-hint brush-keys"></p>
   `;
   showcase.appendChild(bar);
   const modeSeg = q('.seg-brush', bar);
@@ -297,6 +301,7 @@ export function initRangePanel(host: RangeHost) {
     layer.hidden = false;
     bar.hidden = false;
     paintBtn.setAttribute('aria-pressed', 'true');
+    sync();
     // With everything already covered, adding can't show anything: start with the eraser.
     if (store.get().brushMode === 'add' && model.coverage(store.get()) > 0.995) store.set({ brushMode: 'erase' });
     placeLayer();
@@ -314,6 +319,7 @@ export function initRangePanel(host: RangeHost) {
     layer.hidden = true;
     bar.hidden = true;
     paintBtn.setAttribute('aria-pressed', 'false');
+    sync();
     sfx.tick();
     host.announce(host.t().brushOff);
     paintBtn.focus({ preventScroll: true });
@@ -427,6 +433,7 @@ export function initRangePanel(host: RangeHost) {
       pending = 0;
       stage.cards.range.set(model.snapshot(store.get()));
       syncBrush();
+      sync();
       measure();
     });
   }
@@ -437,11 +444,27 @@ export function initRangePanel(host: RangeHost) {
     coverTimer = window.setTimeout(() => {
       coverTimer = 0;
       const t = host.t();
-      const n = Math.round(model.coverage(store.get()) * 100);
-      cover.querySelector('span')!.textContent = n >= 100 ? t.rangeAllCover : n <= 0 ? t.rangeNone : t.rangeCover.replace('{n}', String(n));
-      cover.classList.toggle('is-none', n <= 0);
+      const f = model.coverage(store.get());
+      const n = Math.round(f * 100);
+      cover.querySelector('span')!.textContent =
+        f >= 0.995 ? t.rangeAllCover : f <= 0.0005 ? t.rangeNone : n < 1 ? t.rangeTiny : t.rangeCover.replace('{n}', String(n));
+      cover.classList.toggle('is-none', f <= 0.0005);
+      drawHistogram(model.histogram());
       cover.style.setProperty('--cover', `${n}%`);
     }, 140);
+  }
+
+  const hist = q<HTMLCanvasElement>('.tone-hist');
+  /** The card's own tones, drawn as pixel bars along the brightness track. */
+  function drawHistogram(h: number[]) {
+    const x = hist.getContext('2d')!;
+    x.clearRect(0, 0, hist.width, hist.height);
+    const w = hist.width / h.length;
+    x.fillStyle = 'rgba(242, 193, 78, 0.85)';
+    h.forEach((v, i) => {
+      const bh = Math.round(Math.sqrt(v) * hist.height);
+      if (bh) x.fillRect(Math.round(i * w), hist.height - bh, Math.ceil(w) - 1, bh);
+    });
   }
 
   function syncBrush() {
@@ -458,6 +481,12 @@ export function initRangePanel(host: RangeHost) {
     tone.style.setProperty('--lo', String(s.rangeLo));
     tone.style.setProperty('--hi', String(s.rangeHi));
     tone.classList.toggle('is-invert', s.rangeInvert);
+    tone.classList.toggle('is-full', s.rangeLo <= 0 && s.rangeHi >= 1);
+    const tt = host.t();
+    q('.region-hint').textContent = s.rangeInvert ? tt.invertHint.replace('{x}', tt.region[s.rangeRegion]) : tt.regionHint[s.rangeRegion];
+    q('.where-tag').hidden = !model.painted;
+    paintBtn.querySelector('b')!.textContent = painting ? host.t().paintActive : host.t().paint;
+    paintBtn.querySelector('small')!.textContent = painting ? host.t().paintActiveSub : host.t().paintSub;
     const pct = (v: number) => `${Math.round(v * 100)}%`;
     toneOut.textContent = `${pct(s.rangeLo)}–${pct(s.rangeHi)}`;
     lo.setAttribute('aria-valuetext', pct(s.rangeLo));
@@ -475,7 +504,9 @@ export function initRangePanel(host: RangeHost) {
     soft.value = String(s.brushSoft);
     fill(size);
     fill(soft);
-    size.nextElementSibling!.textContent = String(s.brushSize);
+    const sizePct = Math.round(((s.brushSize * 2) / RANGE_W) * 100);
+    size.nextElementSibling!.textContent = `${sizePct}%`;
+    size.setAttribute('aria-valuetext', host.t().sizeOf.replace('{n}', String(sizePct)));
     soft.nextElementSibling!.textContent = pct(s.brushSoft);
     const custom = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
     q<HTMLButtonElement>('.range-reset').hidden = !custom;
@@ -492,6 +523,9 @@ export function initRangePanel(host: RangeHost) {
       b.lastElementChild!.textContent = t.region[b.dataset.v as RangeRegion];
     });
     tonePresets.querySelectorAll<HTMLButtonElement>('.tone-chip').forEach((c) => (c.textContent = t.tonePresets[+c.dataset.i!]));
+    const keys = q('.brush-keys', bar);
+    keys.textContent = '';
+    for (const k of t.brushKeys) keys.appendChild(el('span', '', '')).textContent = k;
     lo.setAttribute('aria-label', t.rangeLo);
     hi.setAttribute('aria-label', t.rangeHi);
     modeSeg.setAttribute('aria-label', t.brushMode);

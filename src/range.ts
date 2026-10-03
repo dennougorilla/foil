@@ -160,6 +160,14 @@ export class RangeModel {
     return n ? sum / n : 0;
   }
 
+  /** Brightness distribution of the card body, normalised to its tallest bin. Valid after coverage(). */
+  histogram(bins = 40): number[] {
+    const h = new Array<number>(bins).fill(0);
+    for (let i = 0; i < N; i++) if (this.body[i]) h[Math.min(bins - 1, Math.floor((this.luma[i] / 256) * bins))]++;
+    const max = Math.max(1, ...h);
+    return h.map((v) => v / max);
+  }
+
   get painted(): boolean {
     return this.layers.add.some((v) => v) || this.layers.erase.some((v) => v);
   }
