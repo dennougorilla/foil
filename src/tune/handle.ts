@@ -31,7 +31,8 @@ export function mountSunHandle(onAngle: (deg: number) => void, facing: () => num
     aim.style.width = `${r.width}px`;
     aim.style.height = `${r.height}px`;
     // The light lives on the face: fade the sun out while a spin shows the back.
-    const f = Math.min(1, Math.max(0, facing() * 3 - 1));
+    // Keyboard focus keeps it in view, so a focused control never fades out under the user.
+    const f = document.activeElement === sun ? 1 : Math.min(1, Math.max(0, facing() * 3 - 1));
     aim.style.opacity = f.toFixed(2);
     aim.classList.toggle('is-away', f < 0.5);
     // Out of the tab order while it is turned away, so focus never lands on an invisible control.

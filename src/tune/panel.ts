@@ -494,18 +494,9 @@ export function mountTune(store: Store, after: Element): void {
   function choose(k: ChoiceKey, v: string) {
     if (tuneNow()[k] === v) return;
     sfx.tick();
-    if (k === 'light' && v === 'gyro') {
-      gyroNote = 'wait';
-      set({ light: 'gyro' });
-      void motion.enableGyro().then((r) => {
-        if (r !== 'ok') {
-          gyroNote = 'denied';
-          set({ light: 'pointer' });
-        } else sync();
-      });
-      return;
-    }
-    if (k === 'light') gyroNote = null;
+    // Picking Gyro starts the sensor from the store listener below (still inside this tap,
+    // which iOS needs for its permission prompt).
+    if (k === 'light') gyroNote = v === 'gyro' ? 'wait' : null;
     set({ [k]: v } as Partial<Tune>);
   }
 
@@ -712,8 +703,20 @@ export function mountTune(store: Store, after: Element): void {
       set({ light: 'pointer' });
     });
   }
+  // The sensor runs only while Gyro is the light, however it got there (a pick, Reset all, Undo).
+  let lightWas = tuneNow().light;
   store.on((s, changed) => {
-    if (changed.has('tune') && s.tune.light !== 'gyro') motion.disableGyro();
+    if (changed.has('tune') && s.tune.light !== lightWas) {
+      lightWas = s.tune.light;
+      if (lightWas !== 'gyro') motion.disableGyro();
+      else
+        void motion.enableGyro().then((r) => {
+          if (r !== 'ok') {
+            gyroNote = 'denied';
+            set({ light: 'pointer' });
+          } else sync();
+        });
+    }
     if (changed.has('lang')) build();
     else if (changed.has('tune') || changed.has('tuneOpen') || changed.has('edition') || changed.has('intensity')) sync();
   });
