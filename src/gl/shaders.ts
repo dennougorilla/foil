@@ -88,7 +88,8 @@ void main() {
   col = mix(col, uC1, smoothstep(0.46, 0.5, v));
   col = mix(col, uC2, smoothstep(0.78, 0.81, v) * 0.85);
   // Darken towards the edges so the UI always sits on a calm field.
-  col *= mix(0.42, 0.9, smoothstep(1.15, 0.1, r));
+  // Calmer overall, so the card and labels always win against the backdrop.
+  col *= mix(0.36, 0.78, smoothstep(1.15, 0.1, r));
   o = vec4(col, 1.0);
 }
 `;

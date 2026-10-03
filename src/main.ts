@@ -272,8 +272,8 @@ function syncInputs() {
   setRangeFill(inten);
   const px = $<HTMLInputElement>('pixel');
   px.value = String(s.pixel);
-  $('pixelOut').textContent = s.pixel ? `${s.pixel}/6` : t.off;
-  px.setAttribute('aria-valuetext', s.pixel ? String(s.pixel) : t.off);
+  $('pixelOut').textContent = t.pixelLevels[s.pixel] ?? t.off;
+  px.setAttribute('aria-valuetext', t.pixelLevels[s.pixel] ?? t.off);
   setRangeFill(px);
   const zoom = $<HTMLInputElement>('zoom');
   zoom.value = String(s.crop.zoom);

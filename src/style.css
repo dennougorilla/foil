@@ -45,6 +45,8 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: none;
+  /* The pixel face fuses "fi" into one glyph; keep letters separate. */
+  font-variant-ligatures: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -590,7 +592,7 @@ button {
 }
 
 .pill {
-  padding: 2px 12px 3px;
+  padding: 2px 10px 3px;
   border-radius: 999px;
   background: var(--c, var(--panel-hi));
   color: #fff;
@@ -631,6 +633,7 @@ button {
 }
 
 .rpip {
+  cursor: pointer;
   width: 16px;
   height: 20px;
   padding: 0;
@@ -689,6 +692,17 @@ button {
   min-height: 28px;
   font-size: 20px;
   text-shadow: 0 3px 0 var(--edge);
+}
+
+.hand-caption i {
+  align-self: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-style: normal;
+  font-size: 13px;
+  text-shadow: none;
 }
 
 .hand-caption span {
@@ -1074,7 +1088,7 @@ button {
 /* Fields */
 .row {
   display: grid;
-  grid-template-columns: 116px 1fr 44px;
+  grid-template-columns: 116px 1fr 60px;
   align-items: center;
   gap: 12px;
   margin-top: 14px;
@@ -1329,15 +1343,14 @@ input[type='range']:focus-visible::-moz-range-thumb {
 
 .toasts {
   position: fixed;
-  /* Centred over the stage, near the bottom, so header controls stay reachable. */
-  left: calc((100% - 400px) / 2);
-  bottom: 24px;
+  /* Sits just above the export row, so it covers neither the header nor the hand. */
+  left: auto;
+  right: 36px;
+  bottom: 124px;
   z-index: 70;
   display: grid;
   gap: 8px;
-  translate: -50% 0;
-  width: max-content;
-  max-width: calc(100vw - 32px);
+  width: 344px;
   pointer-events: none;
 }
 
@@ -1368,7 +1381,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
 
 .toast-msg {
   margin: 0;
-  word-break: auto-phrase;
+  line-break: strict;
 }
 
 /* Errors stay put and offer a way out: message, then actions; close sits top-right. */
@@ -1377,7 +1390,6 @@ input[type='range']:focus-visible::-moz-range-thumb {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px 12px;
-  width: min(460px, calc(100vw - 32px));
   padding: 12px 10px 14px 16px;
   box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px rgba(255, 90, 79, 0.35), 0 6px 0 3px rgba(0, 0, 0, 0.45);
   line-height: 1.45;
@@ -1560,6 +1572,9 @@ input[type='range']:focus-visible::-moz-range-thumb {
 }
 
 @media (max-width: 1180px) {
+  .toasts {
+    width: 304px;
+  }
   .app {
     grid-template-columns: minmax(0, 1fr) 344px;
   }
@@ -1567,7 +1582,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
     width: 232px;
   }
   .row {
-    grid-template-columns: 100px 1fr 40px;
+    grid-template-columns: 100px 1fr 56px;
   }
 }
 
@@ -1655,6 +1670,9 @@ input[type='range']:focus-visible::-moz-range-thumb {
 @media (max-width: 900px) {
   .toasts {
     left: 50%;
+    right: auto;
+    translate: -50% 0;
+    width: min(420px, calc(100vw - 32px));
     bottom: calc(96px + env(safe-area-inset-bottom));
   }
 }
@@ -1688,7 +1706,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
     width: auto;
   }
   .row {
-    grid-template-columns: 88px 1fr 36px;
+    grid-template-columns: 84px 1fr 54px;
     gap: 8px;
   }
   #raritySeg {
