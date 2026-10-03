@@ -27,3 +27,7 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 ## Support
 
 If FOIL made you smile: [GitHub Sponsors](https://github.com/sponsors/dennougorilla) · [Buy Me a Coffee](https://buymeacoffee.com/dennougorip)
+
+## License
+
+MIT
