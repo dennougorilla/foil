@@ -72,6 +72,11 @@ const ja = {
   errVideoFail: '動画を書き出せませんでした。もう一度お試しください。',
   errPng: 'PNGを書き出せませんでした。もう一度お試しください。',
   errGl: 'このブラウザでは WebGL2 が使えないため、カードを描画できません。Chrome・Edge・Safari・Firefox の最新版で開いてください。',
+  depthFetch: '奥行きモデルを準備中',
+  depthRead: '奥行きを読み取り中…',
+  depthDone: '奥行きを読み取りました',
+  depthGuess: '色から奥行きを推定中',
+  depthAsk: '奥行きを詳しく読む',
   myCard: 'マイ・カード',
   myDesc: 'ここに説明を書けます',
   edition: {
@@ -320,6 +325,11 @@ const en: Dict = {
   errVideoFail: "Couldn't record the video. Please try again.",
   errPng: "Couldn't make the PNG. Please try again.",
   errGl: "WebGL2 isn't available in this browser, so the card can't be drawn. Open this page in a current Chrome, Edge, Safari or Firefox.",
+  depthFetch: 'Fetching the depth model',
+  depthRead: 'Reading the depth…',
+  depthDone: 'Depth read',
+  depthGuess: 'Guessing depth from color',
+  depthAsk: 'Read the depth properly',
   myCard: 'My Card',
   myDesc: 'Write a line about it here',
   edition: {

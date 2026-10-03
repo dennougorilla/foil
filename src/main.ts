@@ -3,6 +3,7 @@ import { createStore, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { EDITIONS, FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face';
+import { mountShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
@@ -66,6 +67,17 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
+// The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
+const depth = mountShadowDepth({ store, cards: stage.cards, slot: $('cardSlot'), dict: () => t });
+const artIds = new WeakMap<object, number>();
+let artCount = 0;
+/** Names the art in the window (picture and crop), so depth is read once per art. */
+function artKey() {
+  const s = store.get();
+  const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
+  if (!artIds.has(src)) artIds.set(src, ++artCount);
+  return `${artIds.get(src)}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
+}
 
 function faceSpec(image: Img) {
   const s = store.get();
@@ -77,6 +89,7 @@ function redrawFace() {
   drawFace(face, mask, spec);
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
+  depth.update(face, artKey());
 }
 
 // ---------- Text ----------
@@ -629,6 +642,7 @@ function exportInput() {
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
+    layers: depth.current(),
   };
 }
 
@@ -836,6 +850,7 @@ store.on((s, changed) => {
   if (changed.has('edition')) {
     stage.syncHandChecked();
     renderCaption(null);
+    depth.update(face, artKey());
   }
   if (changed.has('rarity') || changed.has('frame')) buildSegments();
   if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {

@@ -1,0 +1,120 @@
+/* Status chip for the Shadowbox depth reader, pinned to the middle of the card's top edge. */
+.depth-pill {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 12px 8px 10px;
+  border-radius: 8px;
+  background: var(--ink-900);
+  color: var(--text);
+  box-shadow: 0 0 0 3px var(--edge), 0 5px 0 3px rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  translate: -50% -50%;
+  opacity: 0;
+  scale: 0.9;
+  transition: opacity 0.2s, scale 0.3s var(--ease-back);
+}
+
+.depth-pill.is-in {
+  opacity: 1;
+  scale: 1;
+}
+
+.depth-pill[hidden] {
+  display: none;
+}
+
+.depth-pill-icon {
+  width: 14px;
+  height: 14px;
+  fill: #f0d9a8;
+}
+
+.depth-pill[data-mode='done'] .depth-pill-icon {
+  fill: var(--green);
+}
+
+.depth-pill[data-mode='note'] .depth-pill-icon,
+.depth-pill[data-mode='ask'] .depth-pill-icon {
+  fill: var(--text-dim);
+}
+
+/* Progress: a thin line under the text, sharp-edged like the rest of the pixel UI. */
+.depth-pill-bar {
+  grid-column: 2;
+  position: relative;
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.depth-pill-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #f0d9a8;
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
+  transition: transform 0.2s linear;
+}
+
+.depth-pill[data-mode='done'] .depth-pill-bar::after {
+  background: var(--green);
+}
+
+.depth-pill[data-mode='note'] .depth-pill-bar,
+.depth-pill[data-mode='ask'] .depth-pill-bar {
+  display: none;
+}
+
+.depth-pill-bar.is-indeterminate::after {
+  width: 35%;
+  transform: none;
+  animation: depth-pill-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes depth-pill-sweep {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 290% 0;
+  }
+}
+
+.depth-pill-ask {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 3px 10px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--panel-hi);
+  color: var(--text);
+  font: inherit;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.depth-pill-ask:hover,
+.depth-pill-ask:focus-visible {
+  background: #4a5f68;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .depth-pill {
+    scale: 1;
+    transition: opacity 0.2s;
+  }
+  .depth-pill-bar.is-indeterminate::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}

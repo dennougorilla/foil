@@ -5,6 +5,7 @@ import type { GifRequest, GifResponse } from './gifWorker';
 import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
+import type { LayerMap } from './depth/layers';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -24,6 +25,8 @@ export interface ExportInput {
   range?: RangeSnapshot;
   /** Backdrop swirl for clips; the finish's own when absent. */
   swirl?: [string, string, string];
+  /** The Shadowbox sheets cut from the picture. */
+  layers?: LayerMap;
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -54,6 +57,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
+  if (input.layers) r.setLayers(input.layers);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
   r.begin();
   r.drawCard(
@@ -110,6 +114,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
+  if (input.layers) cards.setLayers(input.layers);
   cards.resize(W, H, 1);
   const colors = (input.swirl ?? input.edition.swirl).map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.
