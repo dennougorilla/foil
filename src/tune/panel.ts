@@ -513,6 +513,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
     // the current finish or mode makes them do nothing.
     const row = (k: Key) => root.querySelector<HTMLElement>(`.tune-row[data-key="${k}"]`)!;
     row('lightAngle').hidden = tune.light !== 'fixed';
+    // The metal only shows on Relief, so a locked secret leaves no trace here.
+    row('metal').hidden = s.edition !== 'relief';
     for (const def of GROUPS) {
       const reasons = new Map(def.keys.map((k) => [k, whyIdle(k, s)]));
       // A reason shared by several rows is said once at the top of the group, not on each row.
@@ -561,7 +563,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
   /** Why a control has no visible effect right now, or null when it does. */
   function whyIdle(k: Key, s: State): string | null {
     const tune = s.tune;
-    if (k === 'metal' && s.edition !== 'relief') return t.why.relief;
+    if (k === 'metal' && s.edition !== 'relief') return null;
     const finish = ['scale', 'angle', 'hue', 'sat', 'metal', 'sparkle', 'sparkleSize'].includes(k);
     if (finish && s.edition === 'base') return t.why.base;
     if ((finish || k === 'glare' || k === 'sharp' || k === 'temp') && s.intensity <= 0 && s.edition !== 'base') return t.why.strength;
