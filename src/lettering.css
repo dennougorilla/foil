@@ -5,9 +5,10 @@
   --mx: 0.15;
   --my: 0.1;
   container-type: inline-size;
-  margin-bottom: 18px;
-  padding-bottom: 18px;
-  border-bottom: 2px dashed var(--panel-lo);
+  /* Last in the Tune section: a dashed rule sets it apart from the sliders above. */
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 2px dashed var(--panel-lo);
 }
 
 .lt-head {
@@ -548,11 +549,11 @@
 }
 
 /* The jump highlight is a frame drawn inside the block's own padding, so it
-   never runs into the divider or the next control. */
+   never runs into the divider or the control above. */
 .lt::before {
   content: '';
   position: absolute;
-  inset: -8px -10px 6px;
+  inset: 6px -10px -8px;
   border: 3px solid var(--gold);
   border-radius: 8px;
   opacity: 0;
