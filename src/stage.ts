@@ -569,7 +569,8 @@ export class Stage {
           h,
           rx: card.tiltX.x + Math.sin(t * 0.8) * 0.06 * idle,
           ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle + card.turn.x,
-          rz: rot + card.deal.x * 0.6 * (d >= 0 ? 1 : -1),
+          // Turning a card over mirrors its lean; undo that so a face-down card fans like the rest.
+          rz: (rot + card.deal.x * 0.6 * (d >= 0 ? 1 : -1)) * Math.cos(card.turn.x),
           scale: card.scale.x,
           edition: e.shader,
           intensity: state.intensity,

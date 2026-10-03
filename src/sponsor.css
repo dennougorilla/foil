@@ -199,9 +199,8 @@
   margin: 0;
   text-wrap: pretty;
   word-break: auto-phrase;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
-  opacity: 0.8;
 }
 
 .sp-close {
@@ -254,7 +253,7 @@
 }
 
 @keyframes sp-nudge {
-  30% { box-shadow: inset 0 0 0 2px var(--gold), 0 3px 0 var(--edge), 0 0 14px rgba(242, 193, 78, 0.45); }
+  30% { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55), 0 3px 0 var(--edge), 0 0 14px rgba(255, 255, 255, 0.25); }
 }
 
 .sp-menu-note[hidden] {

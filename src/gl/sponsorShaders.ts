@@ -57,7 +57,7 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
   vec2 d = (uv - ctr) * vec2(1.0, 1.4);
   float r = length(d);
   float a = atan(d.y, d.x);
-  float R = 0.165;
+  float R = 0.14;
   float stream = fbm(vec2(a * 2.6, r * 3.0 - uTime * 0.12)) + 0.55 * fbm(vec2(a * 7.0 + 3.0, r * 8.0 - uTime * 0.22));
   float corona = exp(-max(r - R, 0.0) * 10.0 / (0.35 + stream)) * step(R, r);
   vec3 hot = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.94, 0.84), smoothstep(0.35, 1.0, corona));
@@ -72,7 +72,7 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
   float disc = smoothstep(R + 0.003, R - 0.003, r);
   float limb = smoothstep(R * 0.35, R, r);
   float side = 0.5 + 0.5 * dot(d / max(r, 1e-4), bead / R);
-  vec3 moon = c * 0.08 + vec3(0.008, 0.008, 0.02) + vec3(0.16, 0.12, 0.1) * limb * limb * side * side;
+  vec3 moon = c * 0.16 + vec3(0.008, 0.008, 0.02) + vec3(0.16, 0.12, 0.1) * limb * limb * side * side;
   col = mix(col, moon, disc);
   vec2 bd = d - bead;
   float glow = exp(-length(bd) * 38.0);
@@ -84,7 +84,7 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
 
 vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Black lacquer with crushed shell inlaid wherever the picture is bright.
-  vec3 lacquer = vec3(0.03, 0.012, 0.018) + c * 0.32;
+  vec3 lacquer = mix(c, vec3(0.03, 0.012, 0.018), 0.5);
   vec2 p = uv * vec2(1.0, 1.4);
   vec2 w = p + (vec2(vnoise(p * 6.0), vnoise(p * 6.0 + 9.0)) - 0.5) * 0.06;
   vec4 v = voronoi(w * 15.0);
@@ -98,7 +98,7 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Shell only shifts through teal, blue, violet and pink, never orange.
   vec3 nacre = hsv2rgb(vec3(mix(0.42, 0.98, film), 0.5, 1.0)) * (0.7 + 0.3 * sin(s * 2.2));
   float lean = 0.55 + 0.45 * sin(dot(hash22(id + 4.0) * 2.0 - 1.0, t) * 3.0 + hash12(id + 5.0) * 6.28);
-  float shell = smoothstep(0.2, 0.55, L) * cut;
+  float shell = smoothstep(0.24, 0.6, L) * cut * 0.9;
   vec3 inlay = nacre * (0.45 + 0.7 * L) * (0.55 + 0.6 * lean);
   vec3 col = mix(lacquer, inlay, shell);
   // One long wet highlight across the lacquer.
