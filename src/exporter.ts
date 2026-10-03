@@ -258,7 +258,7 @@ export async function exportGif(
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY });
+    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, dither: !!input.edition.dither });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {
