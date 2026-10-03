@@ -273,12 +273,6 @@ export function initSwatches(host: SwatchHost) {
     sep.className = 'sw-sep';
     sep.setAttribute('aria-hidden', 'true');
     bdGroup.appendChild(sep);
-    if (s.stageSwatches.length) {
-      const label = document.createElement('span');
-      label.className = 'sw-label';
-      label.textContent = t.myColors;
-      bdGroup.appendChild(label);
-    }
     for (const hex of s.stageSwatches) bdGroup.appendChild(chip(STAGE, hex, 'sw-stage', swirlVars(swirlFrom(hex))));
     bdGroup.appendChild(addButton(STAGE, false));
     // Previewing an unsaved colour: keep one radio reachable by Tab.
