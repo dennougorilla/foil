@@ -206,10 +206,9 @@ const smooth = (u: number) => u * u * (3 - 2 * u);
 function flipTurn(a: number): number {
   const turns = Math.floor(a / (Math.PI * 2));
   const t = a / (Math.PI * 2) - turns;
-  const half = t < 0.5 ? 0 : 1;
-  const u = (t - half * 0.5) * 2;
-  const e = smooth(Math.min(1, Math.max(0, (u - 0.3) / 0.4)));
-  let ry = Math.PI * (half + e);
+  // Most of the loop on the face (the picture is what people share), a short visit to the back.
+  const step = (from: number) => smooth(Math.min(1, Math.max(0, (t - from) / 0.14)));
+  let ry = Math.PI * (step(0.42) + step(0.7));
   const EDGE = 0.3;
   const m = ry % Math.PI;
   if (Math.abs(m - Math.PI / 2) < EDGE) ry += (m < Math.PI / 2 ? -EDGE : EDGE) - (m - Math.PI / 2);

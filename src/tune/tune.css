@@ -473,10 +473,11 @@
 }
 
 .tune-opt[aria-checked='true'] {
-  --c: var(--accent);
-  --lo: var(--edge);
-  color: #12181a;
-  text-shadow: none;
+  /* A fixed red (the slider fill), so "selected" never takes on the finish's colour or the
+     blue of the notes. */
+  --c: var(--red);
+  --lo: var(--red-lo);
+  color: #fff;
 }
 
 .tune-help,
@@ -541,6 +542,13 @@
 .tune-dock .tune-actions {
   flex: 1;
   min-width: 0;
+  /* On the narrowest phones Compare and Reset all stack instead of clipping. */
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.tune-compare {
+  flex: none;
 }
 
 .tune-hint {
@@ -573,6 +581,52 @@
   user-select: none;
   -webkit-user-select: none;
   transition: transform 0.08s, background 0.15s;
+}
+
+.tune-compare {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* Fills while held, so "press and hold" explains itself the first time. */
+.tune-compare::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.25);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s var(--ease-out);
+  pointer-events: none;
+}
+
+.tune-compare[aria-pressed='true']::before {
+  transform: scaleX(1);
+}
+
+.tune-compare > * {
+  position: relative;
+}
+
+.tune-undo-msg {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.tune-undo-msg small {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.tune-undo-msg[hidden] {
+  display: none;
 }
 
 .tune-compare:hover {
@@ -721,8 +775,9 @@
   right: 16%;
   top: 14%;
   bottom: 14%;
-  border: 2px dashed rgba(242, 193, 78, 0.55);
+  border: 2px dashed rgba(255, 226, 140, 0.9);
   border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(13, 19, 21, 0.45), inset 0 0 0 2px rgba(13, 19, 21, 0.45);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -741,18 +796,19 @@
   height: 40px;
   margin: -20px 0 0 -20px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 236, 170, 0.55), rgba(242, 193, 78, 0) 70%);
+  /* A dark disc with a gold rim reads on any finish, bright holo included. */
+  background: rgba(13, 19, 21, 0.78);
+  box-shadow: 0 0 0 2px var(--gold), 0 0 0 4px var(--edge), 0 0 16px 4px rgba(255, 220, 120, 0.45);
   color: var(--gold);
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
-  filter: drop-shadow(0 2px 0 var(--edge)) drop-shadow(0 0 2px var(--edge));
   animation: tune-sun 2.4s ease-in-out infinite;
 }
 
 .tune-sun svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   fill: currentColor;
   shape-rendering: crispEdges;
 }
@@ -769,7 +825,7 @@
 
 .tune-sun:focus-visible {
   outline: 3px solid var(--gold);
-  outline-offset: 2px;
+  outline-offset: 6px;
 }
 
 @keyframes tune-sun {

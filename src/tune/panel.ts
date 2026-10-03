@@ -43,6 +43,7 @@ const ICONS: Record<string, string> = {
   sway: '<path d="M1 8h2V6h2v2h2v2h2V8h2V6h2v2h2v2h-2v2h-2v-2H9v-2H7v2H5v2H3v-2H1z"/>',
   spin: '<path d="M6 2h5v1h1v1h1v3h-2V5h-1V4H6v1H5v2H3V4h1V3h2zm-3 7h2v2h1v1h4v-1h1V9h2v3h-1v1h-1v1H5v-1H4v-1H3z"/>',
   breathe: '<path d="M7 7h2v2H7zM5 4h6v1h1v1h1v4h-1v1h-1v1H5v-1H4v-1H3V6h1V5h1zm1 2v1H5v2h1v1h4V9h1V7h-1V6z"/>',
+  eye: '<path d="M5 4h6v1h2v1h1v1h1v2h-1v1h-1v1h-2v1H5v-1H3v-1H2V9H1V7h1V6h1V5h2zm1 2v1H5v2h1v1h4V9h1V7h-1V6zm1 1h2v2H7z"/>',
   reset: '<path d="M7 2h4v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H6v-2h4v-1h1V6h-1V5H7v1H6v1h2v2H2V3h2v2h1V4h1V3h1z"/>',
   chevron: '<path d="M5 3h2v2h2v2h2v2H9v2H7v2H5v-2h2V9h2V7H7V5H5z"/>',
 };
@@ -160,7 +161,8 @@ export function mountTune(store: Store, after: Element): void {
         <div class="tune-dock">
           <span class="tune-dock-peek"></span>
           <div class="tune-actions">
-            <button class="tune-compare" type="button" aria-pressed="false"><span></span></button>
+            <button class="tune-compare" type="button" aria-pressed="false">${svg('eye')}<span></span></button>
+            <p class="tune-undo-msg" hidden><b></b><small></small></p>
             <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
             <button class="tune-undo" type="button" hidden>${svg('reset')}<span></span></button>
           </div>
@@ -470,8 +472,11 @@ export function mountTune(store: Store, after: Element): void {
     }
     root.querySelector<HTMLElement>('.tune-reset-all')!.hidden = !changed.length;
     root.querySelector<HTMLElement>('.tune-undo')!.hidden = !undo;
-    // Right after a reset, the hint says what happened next to the Undo it offers.
-    root.querySelector('.tune-hint')!.textContent = undo ? t.resetDone : touch ? t.hintTouch : t.hint;
+    // Right after a reset, the dock says what happened next to the Undo it offers.
+    const done = root.querySelector<HTMLElement>('.tune-undo-msg')!;
+    done.hidden = !undo;
+    done.querySelector('b')!.textContent = t.resetDone;
+    done.querySelector('small')!.textContent = t.undoHint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
     root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo && !peek.shown;
     peek.setActive(s.tuneOpen);
