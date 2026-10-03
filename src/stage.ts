@@ -50,10 +50,12 @@ export class Stage {
   readonly bg: BackgroundRenderer;
   private o: StageOptions;
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  private start = performance.now();
   private last = performance.now();
   private time = 0;
   private bgTime = 0;
+  private running = false;
+  // Phones and low-core machines get a lighter backbuffer; the pixel look hides the difference.
+  private maxDpr = (navigator.hardwareConcurrency || 8) <= 4 || matchMedia('(pointer: coarse)').matches ? 1.5 : 2;
 
   // Main card motion
   private ox = new Spring(0, 0, 150, 14);
@@ -91,6 +93,15 @@ export class Stage {
       this.rz.x = -0.5;
       this.sc.x = 0.7;
     }
+    this.resume();
+    // Nothing to see in a hidden tab, so stop drawing until it comes back.
+    document.addEventListener('visibilitychange', () => this.resume());
+  }
+
+  private resume() {
+    if (this.running || document.hidden) return;
+    this.running = true;
+    this.last = performance.now();
     requestAnimationFrame(this.frame);
   }
 
@@ -312,14 +323,19 @@ export class Stage {
   }
 
   private frame = (now: number) => {
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    if (document.hidden) {
+      this.running = false;
+      return;
+    }
+    const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000));
     this.last = now;
-    this.time = (now - this.start) / 1000;
+    // Advance by the clamped step so a long pause never jumps the animation ahead.
+    this.time += dt;
     if (this.motion) this.bgTime += dt;
     const state = this.o.store.get();
 
     // Resize canvases to their boxes
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
     this.canvasRect = this.o.canvas.getBoundingClientRect();
     this.cards.resize(this.canvasRect.width, this.canvasRect.height, dpr);
     this.bg.resize(Math.ceil(innerWidth / 4), Math.ceil(innerHeight / 4));
