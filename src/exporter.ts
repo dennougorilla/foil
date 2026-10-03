@@ -49,7 +49,8 @@ export function download(blob: Blob, name: string): string {
 
 /** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
 export async function exportPng(input: ExportInput): Promise<string> {
-  const pad = 24;
+  // Breakout's subject leaps past the card's edge, so it gets room around the card.
+  const pad = input.edition.id === 'breakout' ? 160 : 24;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;

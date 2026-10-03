@@ -4,8 +4,12 @@ import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { RangeLayer } from './range';
 import type { LayerMap } from '../depth/layers';
+import { breakoutPose } from '../depth/breakout';
 
 export type RGB = [number, number, number];
+
+/** The card shader's index for Breakout (see src/editions.ts). */
+const BREAKOUT_SHADER = 17;
 
 export interface BackgroundFrame {
   time: number;
@@ -243,14 +247,27 @@ export class CardRenderer {
     gl.uniform1i(p.u.uPlateBack, 6);
     gl.uniform1f(p.u.uLayerCuts, this.layerCuts);
     gl.uniform1f(p.u.uLayerRise, this.layersRise);
+    // Breakout's subject comes out of the card in a second, larger quad drawn in front of it.
+    const pop = d.edition === BREAKOUT_SHADER;
+    const out = breakoutPose(d.tilt, this.layersRise, d.intensity);
+    gl.uniform2f(p.u.uPopOut, out.scale, out.lift);
 
     // Hard pixel drop shadow first, then the card itself.
     gl.uniform1f(p.u.uShadow, 1);
     gl.uniform2f(p.u.uShift, d.shadow[0], d.shadow[1]);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (pop) this.drawPop();
     gl.uniform1f(p.u.uShadow, 0);
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (pop) this.drawPop();
+  }
+
+  private drawPop(): void {
+    const { gl, card: p } = this;
+    gl.uniform1f(p.u.uPop, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.uniform1f(p.u.uPop, 0);
   }
 
   drawParticles(list: Particle[]): void {

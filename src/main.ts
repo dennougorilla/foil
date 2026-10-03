@@ -67,7 +67,7 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
-// The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
+// The Shadowbox and Breakout finishes cut the art by depth; work only starts once one is chosen.
 const depth = mountShadowDepth({ store, cards: stage.cards, slot: $('cardSlot'), dict: () => t });
 const artIds = new WeakMap<object, number>();
 let artCount = 0;

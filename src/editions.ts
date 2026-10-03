@@ -15,6 +15,7 @@ export type EditionId =
   | 'crystal'
   | 'sakura'
   | 'shadowbox'
+  | 'breakout'
   // Sponsor-only, see src/sponsor.ts
   | 'kintsugi'
   | 'opal'
@@ -49,6 +50,7 @@ export const EDITIONS: Edition[] = [
   { id: 'crystal', shader: 13, color: '#e8f6ff', swirl: ['#101522', '#5a6ea8', '#d8e6ff'], value: 6 },
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
   { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6 },
+  { id: 'breakout', shader: 17, color: '#ffe066', swirl: ['#0a0716', '#5b1fa8', '#ff4f9a'], value: 7 },
   // Sponsor-only finishes (locked until unlocked in src/sponsor.ts).
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

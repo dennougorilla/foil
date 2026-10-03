@@ -3,6 +3,7 @@
 // and then, when the model can run, a better one. The sheets lie down while a new cut is made
 // and stand up again when it lands.
 import { ART, FACE_H, FACE_W } from '../card/face';
+import type { EditionId } from '../editions';
 import type { CardRenderer } from '../gl/renderers';
 import type { Dict } from '../i18n';
 import type { Store } from '../state';
@@ -10,6 +11,8 @@ import { colorLayers, type LayerMap } from './layers';
 import { DepthPill } from './pill';
 import type { CutReply, CutRequest } from './worker';
 
+/** The finishes that stand on the cut. */
+const DEPTH_EDITIONS: EditionId[] = ['shadowbox', 'breakout'];
 /** The art window as the worker sees it (portrait, multiples of 14 for the model). */
 const W = 392;
 const H = 518;
@@ -161,7 +164,7 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
   function update(f: HTMLCanvasElement, key: string) {
     face = f;
     latest = key;
-    if (o.store.get().edition !== 'shadowbox') {
+    if (!DEPTH_EDITIONS.includes(o.store.get().edition)) {
       pill.hide();
       // Cuts of an earlier picture must not sit on this one (the hand still shows the finish).
       if (map && key !== shown) {

@@ -4,6 +4,7 @@ import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
 import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
+import { BREAKOUT_GLSL } from './breakoutShader';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -107,10 +108,13 @@ uniform vec2 uSize;     // card size in css px
 uniform vec3 uRot;      // rx, ry, rz in radians
 uniform float uScale;
 uniform vec2 uShift;    // extra screen offset (shadow)
+uniform float uPop;     // 1 = Breakout's pass in front of the card: a larger quad, lifted
+uniform vec2 uPopOut;   // y: that lift, in card heights
 out vec2 vUv;
 out float vShade;
 void main() {
-  vec3 p = vec3(aPos * uSize * uScale, 0.0);
+  vec2 grow = 1.0 + uPop * vec2(0.4, 0.9);
+  vec3 p = vec3(aPos * grow * uSize * uScale, uPop * uPopOut.y * uSize.y * uScale);
   float cz = cos(uRot.z), sz = sin(uRot.z);
   p.xy = mat2(cz, sz, -sz, cz) * p.xy;
   float cx = cos(uRot.x), sx = sin(uRot.x);
@@ -122,7 +126,7 @@ void main() {
   vec2 s = uCenter + uShift + p.xy / w;
   vec2 ndc = vec2(s.x / uRes.x * 2.0 - 1.0, 1.0 - s.y / uRes.y * 2.0);
   gl_Position = vec4(ndc * w, 0.0, w);
-  vUv = aPos + 0.5;
+  vUv = aPos * grow + 0.5;
   vShade = p.z / (uSize.y * uScale);
 }
 `;
@@ -395,7 +399,14 @@ ${LETTERING_GLSL}
 
 ${SPONSOR_GLSL}
 ${SHADOWBOX_GLSL}
+${BREAKOUT_GLSL}
 void main() {
+  if (uPop > 0.5) {
+    if (!gl_FrontFacing) discard;
+    vec4 p = breakoutPop(vUv, uTilt) * uAlpha;
+    o = vec4(mix(p.rgb, vec3(p.a), uFlash), p.a);
+    return;
+  }
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
     vec4 b = texture(uBack, buv);
@@ -445,6 +456,7 @@ void main() {
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
+  else if (e == 17) col = breakout(c, uv, uTilt, lod);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
