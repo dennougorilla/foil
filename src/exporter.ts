@@ -86,8 +86,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
 export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** Draws loop position p∈[0,1): the card orbits once on the swirl backdrop. */
-  draw(p: number, bgTime: number, cardTime: number, sourceMs?: number): void;
+  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card orbits once on the swirl backdrop. */
+  draw(p: number, bgTime: number, loopSec: number, sourceMs?: number): void;
   dispose(): void;
 }
 
@@ -123,7 +123,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   return {
     out,
     ctx,
-    draw(p, bgTime, cardTime, sourceMs) {
+    draw(p, bgTime, loopSec, sourceMs) {
       // The card's motion and light follow the tune; the defaults give the classic orbit.
       const pose = loopPose(tune, p);
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
@@ -151,8 +151,9 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           alpha: 1,
           flash: 0,
           shadow: [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k],
+          loop: loopSec * tune.speed,
         },
-        cardTime * tune.speed,
+        p * loopSec * tune.speed,
       );
       ctx.imageSmoothingEnabled = false;
       if (transparent) ctx.clearRect(0, 0, W, H);
@@ -190,7 +191,7 @@ export async function exportVideo(input: ExportInput, onProgress?: (p: number) =
   for (let p = 0; p < 1; ) {
     await nextFrame();
     p = Math.min((performance.now() - t0) / 1000 / DUR, 1);
-    scene.draw(p, 40 + p * 6, p * DUR, p * DUR * 1000);
+    scene.draw(p, 40 + p * 6, DUR, p * DUR * 1000);
     onProgress?.(p);
   }
   rec.stop();
@@ -253,7 +254,7 @@ export async function exportGif(
       const p = i / frames;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
-      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * DUR, p * sourceSpan);
+      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, DUR, p * sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, GIF_W, GIF_H);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);

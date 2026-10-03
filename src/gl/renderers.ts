@@ -77,6 +77,8 @@ export interface CardDraw {
   plate?: boolean;
   /** 0..1: overlay showing where the finish lands. */
   rangeView?: number;
+  /** Length of an exported loop in shader seconds, so a finish's own motion can close on itself; 0 or absent live. */
+  loop?: number;
 }
 
 export interface Particle {
@@ -214,6 +216,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uFlash, d.flash);
     gl.uniform1f(p.u.uFaceTexels, this.faceTexels);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
+    gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     applyTune(gl, p.u, this.tune);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
 
