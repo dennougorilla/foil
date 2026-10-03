@@ -212,7 +212,6 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  const scene = createScene(input, GIF_W, GIF_H, true);
   // An animated source sets the loop length so its motion and the orbit repeat together: short
   // sources play whole cycles, and long ones are sped up to fit, so the GIF always loops seamlessly.
   const src = input.loopMs ?? 0;
@@ -221,7 +220,9 @@ export async function exportGif(
   const DUR = (frames * GIF_DELAY) / 1000;
   // Source time covered by one GIF loop: whole cycles, or the full source when sped up.
   const sourceSpan = src > 6000 ? src : src ? loopMs : DUR * 1000;
+  let scene: Scene | undefined;
   try {
+    scene = createScene(input, GIF_W, GIF_H, true);
     for (let i = 0; i < frames; i++) {
       await nextFrame();
       const p = i / frames;
@@ -236,7 +237,7 @@ export async function exportGif(
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {
-    scene.dispose();
+    scene?.dispose();
     worker.terminate();
   }
 }
