@@ -141,7 +141,8 @@ await step('light & motion tab', async () => {
 
 await step('lettering from the name tag', async () => {
   await tab('card');
-  await page.click('.lt-jump');
+  // The name tag sways gently, so Playwright's "stable" wait can time out; the chip is still clickable.
+  await page.click('.lt-jump', { force: true });
   expect(await page.isVisible('#pane-text'), 'name tag did not open the Lettering tab');
   await page.click('.lt-style[data-style=foil]');
   expect((await state()).text.style === 'foil', 'lettering style not applied');
