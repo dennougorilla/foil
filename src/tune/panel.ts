@@ -3,11 +3,11 @@
 // and double-click / Delete puts it back to the default.
 import './tune.css';
 import { DICTS, type Dict } from '../i18n';
-import type { Store } from '../state';
+import type { State, Store } from '../state';
+import type { EditionId } from '../editions';
 import { sfx } from '../audio';
 import {
   changedKeys,
-  fixedLight,
   IDLE_MODES,
   isDefault,
   LIGHT_MODES,
@@ -20,6 +20,7 @@ import {
 } from './model';
 import { gyroAvailable, motion } from './motion';
 import { mountPeek } from './peek';
+import { mountSunHandle } from './handle';
 
 type Tab = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
@@ -45,6 +46,9 @@ const ICONS: Record<string, string> = {
   reset: '<path d="M7 2h4v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H6v-2h4v-1h1V6h-1V5H7v1H6v1h2v2H2V3h2v2h1V4h1V3h1z"/>',
   chevron: '<path d="M5 3h2v2h2v2h2v2H9v2H7v2H5v-2h2V9h2V7H7V5H5z"/>',
 };
+
+/** Finishes with their own animation (they read the shader clock), so Speed always shows. */
+const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura']);
 
 const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -109,6 +113,7 @@ export function mountTune(store: Store, after: Element): void {
   let undoTimer = 0;
   const touch = matchMedia('(pointer: coarse)').matches;
   const peek = mountPeek();
+  const sun = mountSunHandle((deg) => set({ lightAngle: deg }));
   // A stamp on the card while "Hold to compare" shows the defaults.
   const stamp = document.createElement('span');
   stamp.className = 'tune-stamp';
@@ -149,6 +154,8 @@ export function mountTune(store: Store, after: Element): void {
         <div class="tune-panes"></div>
         <div class="tune-foot">
           <p class="tune-hint"></p>
+        </div>
+        <div class="tune-dock">
           <div class="tune-actions">
             <button class="tune-compare" type="button" aria-pressed="false"><span></span></button>
             <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
@@ -257,6 +264,7 @@ export function mountTune(store: Store, after: Element): void {
       b.setAttribute('aria-pressed', String(on));
       root.classList.toggle('is-comparing', on);
       stamp.classList.toggle('is-on', on);
+      sync();
     };
     b.addEventListener('pointerdown', (e) => {
       b.setPointerCapture(e.pointerId);
@@ -332,6 +340,12 @@ export function mountTune(store: Store, after: Element): void {
     notch.setAttribute('aria-hidden', 'true');
     wrap.append(notch);
     row.appendChild(wrap);
+    if (k === 'lightAngle') {
+      const help = document.createElement('p');
+      help.className = 'tune-help';
+      help.textContent = t.sunHelp;
+      row.appendChild(help);
+    }
     // Reset comes after the control in tab order; CSS still shows it beside the value.
     row.appendChild(row.querySelector('.tune-reset')!);
     return row;
@@ -446,7 +460,7 @@ export function mountTune(store: Store, after: Element): void {
     // Right after a reset, the hint says what happened next to the Undo it offers.
     root.querySelector('.tune-hint')!.textContent = undo ? t.resetDone : touch ? t.hintTouch : t.hint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
-    root.querySelector<HTMLElement>('.tune-foot')!.classList.toggle('has-actions', !!changed.length || !!undo);
+    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo;
     peek.setActive(s.tuneOpen);
 
     for (const def of TABS) {
@@ -483,61 +497,72 @@ export function mountTune(store: Store, after: Element): void {
         btn.setAttribute('aria-label', t.reset.replace('{name}', label).replace('{value}', format(k, TUNE_DEFAULTS[k], t)));
         const extra = row.querySelector<HTMLElement>('.tune-extra')!;
         if (k === 'temp') extra.innerHTML = `<i class="tune-swatch" style="--sw:${lightCss(v)}"></i>`;
-        else if (k === 'lightAngle') {
-          const [x, y] = fixedLight(v);
-          const pad = extra.querySelector<HTMLElement>('.tune-pad') ?? lightPad(extra);
-          pad.style.setProperty('--x', `${(x * 100).toFixed(1)}%`);
-          pad.style.setProperty('--y', `${(y * 100).toFixed(1)}%`);
-        }
       }
       btn.title = btn.getAttribute('aria-label')!;
       btn.disabled = !isChanged;
     });
 
-    // Only show the controls that do something right now.
+    // The direction only matters for a fixed light; the others are dimmed with a reason when
+    // the current finish or mode makes them do nothing.
     const row = (k: Key) => root.querySelector<HTMLElement>(`.tune-row[data-key="${k}"]`)!;
     row('lightAngle').hidden = tune.light !== 'fixed';
-    const dim = tune.sparkle <= 0;
-    row('sparkleSize').classList.toggle('is-dim', dim);
-    row('sparkleSize').title = dim ? t.sparkleDim : '';
+    for (const def of TABS) {
+      const reasons = new Map(def.keys.map((k) => [k, whyIdle(k, s)]));
+      // A reason shared by several rows is said once at the top of the tab, not on each row.
+      const counts = new Map<string, number>();
+      for (const r of reasons.values()) if (r) counts.set(r, (counts.get(r) ?? 0) + 1);
+      const shared = [...counts].find(([, n]) => n > 1)?.[0] ?? null;
+      const pane = root.querySelector<HTMLElement>(`#tunePane-${def.id}`)!;
+      const banner = whyLine(pane, `tuneWhyTab-${def.id}`, pane.firstElementChild);
+      banner.classList.add('tune-why-tab');
+      banner.textContent = shared ?? '';
+      banner.hidden = !shared;
+      for (const k of def.keys) {
+        const r = row(k);
+        const reason = reasons.get(k) ?? null;
+        r.classList.toggle('is-dim', !!reason);
+        const why = whyLine(r, `tuneWhy-${k}`, r.querySelector('.tune-reset'));
+        const own = reason && reason !== shared ? reason : null;
+        why.textContent = own ?? '';
+        why.hidden = !own;
+        const control = r.querySelector('input, [role=radiogroup]')!;
+        if (reason) control.setAttribute('aria-describedby', own ? why.id : banner.id);
+        else control.removeAttribute('aria-describedby');
+      }
+    }
+    sun.update({ show: s.tuneOpen && tune.light === 'fixed' && !motion.comparing, angle: tune.lightAngle, label: t.sun, title: t.sunHelp });
 
     const note = root.querySelector<HTMLElement>('.tune-note')!;
     let msg = '';
-    if (reduced.matches) msg = t.reduced;
-    else if (gyroNote === 'denied') msg = t.gyroDenied;
+    if (gyroNote === 'denied') msg = t.gyroDenied;
     else if (tune.light === 'gyro' && gyroNote === 'wait' && !motion.gyroLive()) msg = t.gyroWait;
     note.textContent = msg;
     note.hidden = !msg;
   }
 
-  /**
-   * A tiny card you can drag the light around. Pointer-only shortcut: the slider beside it
-   * stays the accessible control, so the pad is hidden from assistive tech.
-   */
-  function lightPad(host: HTMLElement) {
-    const pad = document.createElement('i');
-    pad.className = 'tune-pad';
-    pad.innerHTML = '<b></b>';
-    host.appendChild(pad);
-    const aim = (e: PointerEvent) => {
-      const r = pad.getBoundingClientRect();
-      const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
-      const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
-      if (Math.hypot(dx, dy) < 0.04) return;
-      const deg = (Math.round((Math.atan2(dx, -dy) * 180) / Math.PI) + 360) % 360;
-      set({ lightAngle: deg });
-    };
-    pad.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      pad.setPointerCapture(e.pointerId);
-      pad.classList.add('is-dragging');
-      aim(e);
-    });
-    pad.addEventListener('pointermove', (e) => pad.hasPointerCapture(e.pointerId) && aim(e));
-    const end = () => pad.classList.remove('is-dragging');
-    pad.addEventListener('pointerup', end);
-    pad.addEventListener('pointercancel', end);
-    return pad;
+  function whyLine(host: HTMLElement, id: string, before: Element | null) {
+    let el = host.querySelector<HTMLElement>(`#${id}`);
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'tune-why';
+      el.id = id;
+      host.insertBefore(el, before);
+    }
+    return el;
+  }
+
+  /** Why a control has no visible effect right now, or null when it does. */
+  function whyIdle(k: Key, s: State): string | null {
+    const tune = s.tune;
+    const finish = ['scale', 'angle', 'hue', 'sat', 'sparkle', 'sparkleSize'].includes(k);
+    if (finish && s.edition === 'base') return t.why.base;
+    if ((finish || k === 'glare' || k === 'sharp') && s.intensity <= 0 && s.edition !== 'base') return t.why.strength;
+    if (k === 'sparkleSize' && tune.sparkle <= 0) return t.why.sparkle;
+    if (k === 'sharp' && tune.glare <= 0) return t.why.glare;
+    if (k === 'temp' && tune.glare <= 0 && (tune.sparkle <= 0 || s.edition === 'base')) return t.why.temp;
+    if (reduced.matches && (k === 'speed' || k === 'idle' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
+    if (k === 'speed' && tune.light !== 'orbit' && tune.idle === 'none' && !ANIMATED.has(s.edition)) return t.why.still;
+    return null;
   }
 
   function announce(msg: string) {
@@ -548,6 +573,21 @@ export function mountTune(store: Store, after: Element): void {
   }
 
   build();
+  // The actions dock and the phone preview sit just above the sticky Export bar; measure it
+  // (and the dock) rather than guess, since both change with width and scaling.
+  {
+    const html = document.documentElement.style;
+    const exp = document.querySelector<HTMLElement>('.sec-export');
+    const measure = () => {
+      if (exp) html.setProperty('--tune-export-h', `${exp.offsetHeight}px`);
+      const dock = root.querySelector<HTMLElement>('.tune-dock');
+      html.setProperty('--tune-dock-h', `${dock && !dock.hidden && store.get().tuneOpen ? dock.offsetHeight : 0}px`);
+    };
+    const ro = new ResizeObserver(measure);
+    if (exp) ro.observe(exp);
+    ro.observe(root);
+    measure();
+  }
   if (tuneNow().light === 'gyro') {
     // A gyro light saved last visit needs its sensor again. Where that takes a tap (iOS),
     // fall back to the pointer and say why.
@@ -559,7 +599,7 @@ export function mountTune(store: Store, after: Element): void {
   }
   store.on((_s, changed) => {
     if (changed.has('lang')) build();
-    else if (changed.has('tune') || changed.has('tuneOpen')) sync();
+    else if (changed.has('tune') || changed.has('tuneOpen') || changed.has('edition') || changed.has('intensity')) sync();
   });
   reduced.addEventListener('change', sync);
   // A gyro that starts reporting clears the "tilt your device" note.
