@@ -68,8 +68,8 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   vec2 ruv = tuneFaceUv(uv);
   // The pool floor sits below the frame, so tilting slides it against the rim (parallax): on one
   // side the floor slips under the frame, on the other the window's wall comes into view.
-  vec2 par = -t * 0.02 * vec2(1.0, 1.0 / 1.4) * art;
-  float wallSeen = smoothstep(-0.007, 0.0, shWindow(ruv + par)) * art;
+  vec2 par = -t * 0.012 * vec2(1.0, 1.0 / 1.4) * art;
+  float wallSeen = smoothstep(-0.005, 0.001, shWindow(ruv + par)) * art;
   vec2 p = (uv - 0.5) * vec2(1.0, 1.4) + par * vec2(1.0, 1.4);
   // The subject stays calm: the net goes soft and faint over skin, and somewhat over lit
   // tones near the middle of the picture (where a subject usually sits, coloured or not).
@@ -121,16 +121,21 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   // The sun, as a direction on the card (towards the light), leaning in from the upper left.
   vec2 sun = (uLight - 0.5) * vec2(1.0, 1.4) + vec2(-0.14, -0.2);
   vec2 sunN = normalize(sun);
-  // The rim on the sun's side shades a band of the floor, wider the lower the light, and the
-  // floor darkens a little where it meets the walls.
-  vec2 reach = sun * 0.3;
-  float shade = smoothstep(-0.012, 0.02 + length(reach) * 0.12, shWindow(ruv + par + reach / vec2(1.0, 1.4)));
-  float sunlit = mix(1.0, 1.0 - shade, art);
-  float wall = (1.0 - smoothstep(0.0, 0.05, inside)) * art;
+  // The rim on the sun's side shades a band of the floor, wider the lower the light. The shade
+  // is cast through the water, so its edge is bent by the same ripples (it wavers and drifts
+  // with the net) and grows softer the further it falls from the rim, as a real penumbra does.
+  vec2 reach = sun * 0.22;
+  vec2 shadeAt = ruv + par + reach / vec2(1.0, 1.4) + slope * vec2(1.0, 1.0 / 1.4) * 1.3;
+  float rimDist = shWindow(shadeAt);
+  float soft = 0.012 + 0.03 * smoothstep(0.0, 0.06, inside);
+  float shade = smoothstep(-soft, soft, rimDist) * art;
+  float sunlit = 1.0 - shade;
+  float wall = (1.0 - smoothstep(0.0, 0.03, inside)) * art;
   // The net, on a log scale so it reads as one continuous web: a soft bloom and a bright core.
   // The light multiplies the floor, so it lights the picture rather than lying over it; the
   // water as a whole only takes a little light, so there are no dark rims along the lines.
-  float keep = (1.0 - 0.95 * calm) * sunlit;
+  // Out of the sun the net all but goes; only a faint trace of skylight caustics stays.
+  float keep = (1.0 - 0.95 * calm) * mix(0.12, 1.0, sunlit);
   float lg = log2(max(mean, 1e-3));
   float line = smoothstep(0.3, 1.9, lg) * keep;
   float core = smoothstep(1.5, 3.0, lg) * keep;
@@ -139,7 +144,8 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   vec3 water = floorC * (0.9 - 0.06 * sunlit + gain * (vec3(1.0) + spectrum));
   // A little light also scatters in the water, so the net still shows over near-black floors.
   water += warm * (0.045 * line + 0.16 * core) * (1.0 - L) * (1.0 - L) + warm * spectrum * core * 0.25;
-  water *= mix(vec3(0.42, 0.5, 0.62), vec3(1.0), sunlit) * (1.0 - 0.35 * wall);
+  // Shade under clear water: darker and a touch cooler, never a flat grey slab.
+  water *= mix(vec3(0.58, 0.63, 0.7), vec3(1.0), sunlit) * (1.0 - 0.2 * wall);
   // The wall facing the sun catches it: a thin lit lip along the far edge of the pool.
   vec2 nrm = normalize(vec2(shWindow(ruv + vec2(0.002, 0.0)) - sd, (shWindow(ruv + vec2(0.0, 0.002)) - sd) / 1.4) + 1e-6);
   float lip = (1.0 - smoothstep(0.004, 0.016, inside)) * smoothstep(0.0, 0.5, dot(nrm, sunN)) * art;
@@ -149,7 +155,7 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   // Bright floors roll off into the light instead of clipping into flat white.
   water = mix(water, 0.72 + 0.3 * (1.0 - exp((0.72 - water) / 0.3)), step(0.72, water));
   // Where the floor has slid away, the window's own wall shows: dark, lit a touch at its top.
-  water = mix(water, vec3(0.07, 0.09, 0.11) + warm * 0.08 * (1.0 - shade), wallSeen);
+  water = mix(water, floorC * vec3(0.4, 0.45, 0.52) + warm * 0.06 * sunlit, wallSeen * 0.85);
   // The frame stays dry paper under a broad, warm dapple of light, faint behind the name.
   // It moves only with the waves and the tilt, so it loops with them.
   vec2 q = p * 2.4 + slope * 2.5 + t * 0.15;
