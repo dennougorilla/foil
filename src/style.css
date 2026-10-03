@@ -696,7 +696,7 @@ button {
 
 .hand {
   position: relative;
-  width: min(100%, 860px);
+  width: min(100%, 980px);
   height: 176px;
 }
 
@@ -930,6 +930,21 @@ button {
   box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
   transition: transform 0.2s var(--ease-back), box-shadow 0.15s;
   image-rendering: pixelated;
+}
+
+.thumb[data-badge]::after {
+  content: attr(data-badge);
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-family: var(--display);
+  font-size: 10px;
+  line-height: 14px;
+  box-shadow: 0 0 0 2px var(--edge);
 }
 
 .thumb:hover {
@@ -1458,7 +1473,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
     width: 100%;
   }
   .hand {
-    height: 150px;
+    height: 290px;
   }
   .stage {
     padding-bottom: 12px;

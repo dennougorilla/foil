@@ -8,6 +8,7 @@ import { Stage } from './stage';
 import { setSound, sfx } from './audio';
 import { exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
+import { decodeGif, frameAt, type Anim } from './gifDecode';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -19,7 +20,15 @@ let t: Dict = DICTS[store.get().lang];
 type Img = HTMLCanvasElement;
 const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSample(i));
 let userImage: Img | null = null;
-const currentImage = (): Img => (store.get().sample >= 0 ? samples[store.get().sample] : userImage ?? samples[0]);
+/** Set when the person's image is an animated GIF; userImage then holds its first frame. */
+let userAnim: Anim | null = null;
+let animFrame = 0;
+const currentImage = (): Img => {
+  const s = store.get();
+  if (s.sample >= 0) return samples[s.sample];
+  if (userAnim) return userAnim.frames[animFrame] ?? userAnim.frames[0];
+  return userImage ?? samples[0];
+};
 
 const face = document.createElement('canvas');
 const mask = document.createElement('canvas');
@@ -204,6 +213,7 @@ function buildThumbs() {
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-label', label);
     b.style.backgroundImage = `url(${thumbUrl(img)})`;
+    if (idx < 0 && userAnim) b.dataset.badge = 'GIF';
     radio(b, s.sample === idx);
     b.onclick = () => {
       if (store.get().sample === idx) return;
@@ -212,10 +222,10 @@ function buildThumbs() {
     th.appendChild(b);
   };
   samples.forEach((img, i) => add(img, t.samplesName[i], i));
-  if (userImage) add(userImage, t.yourImage, -1);
+  if (userImage) add(userImage, userAnim ? `${t.yourImage} (GIF)` : t.yourImage, -1);
   const label = document.createElement('span');
   label.className = 'thumb-label';
-  label.textContent = s.sample >= 0 ? t.sampleNow : t.yourImage;
+  label.textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif : t.yourImage;
   th.appendChild(label);
 }
 
@@ -376,6 +386,24 @@ function setCrop(c: Crop) {
 const ACCEPT = /^image\/(png|jpe?g|webp|gif|avif|bmp)$/;
 const MAX_SIDE = 2048;
 
+/** Decodes a still image (downscaled), or every frame of an animated GIF. */
+async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null }> {
+  if (blob.type === 'image/gif') {
+    const anim = decodeGif(await blob.arrayBuffer());
+    if (anim) return { still: anim.frames[0], anim };
+  }
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  const x = c.getContext('2d')!;
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
+  return { still: c, anim: null };
+}
+
 async function loadFile(file: File) {
   if (!ACCEPT.test(file.type)) {
     toast(t.errType, true);
@@ -384,17 +412,11 @@ async function loadFile(file: File) {
   store.set({ loading: true });
   document.body.classList.add('is-loading');
   try {
-    const bmp = await createImageBitmap(file);
-    const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(bmp.width * k);
-    c.height = Math.round(bmp.height * k);
-    const x = c.getContext('2d')!;
-    x.imageSmoothingQuality = 'high';
-    x.drawImage(bmp, 0, 0, c.width, c.height);
-    bmp.close();
-    userImage = c;
-    void saveUserImage(c);
+    const { still, anim } = await decodeImage(file);
+    userImage = still;
+    userAnim = anim;
+    animFrame = 0;
+    void saveUserImage(anim ? file : still);
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
     const s = store.get();
     if (!s.nameEdited && base && !/^(image|img|photo|IMG_|DSC|screenshot|スクリーンショット)/i.test(base)) {
@@ -497,9 +519,20 @@ function selectEdition(id: EditionId) {
 window.addEventListener('keydown', (e) => {
   const tag = (e.target as HTMLElement).tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+  // 1–9 then 0 pick the first ten finishes, like a keyboard row.
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= EDITIONS.length) {
-    selectEdition(EDITIONS[n - 1].id);
+  if (!Number.isNaN(n) && e.key.length === 1) {
+    const i = n === 0 ? 9 : n - 1;
+    if (EDITIONS[i]) selectEdition(EDITIONS[i].id);
+    return;
+  }
+  // Arrows step through finishes when nothing else on the page wants them.
+  const free = document.activeElement === document.body || document.activeElement?.id === 'cardSlot';
+  if (free && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+    const cur = EDITIONS.findIndex((x) => x.id === store.get().edition);
+    const next = (cur + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
+    selectEdition(EDITIONS[next].id);
   }
 });
 
@@ -694,9 +727,11 @@ document.fonts.load('40px "DotGothic16"').then(boot, boot);
 boot();
 if (store.get().sample < 0) {
   // Bring back the image from last visit; if it's gone, fall back to the first sample.
-  void loadUserImage().then((img) => {
+  void loadUserImage().then(async (blob) => {
+    const img = blob ? await decodeImage(blob).catch(() => null) : null;
     if (img) {
-      userImage = img;
+      userImage = img.still;
+      userAnim = img.anim;
       buildThumbs();
       boot();
     } else {
@@ -708,3 +743,19 @@ if (store.get().sample < 0) {
   });
 }
 window.addEventListener('resize', () => drawCropPreview());
+
+// Animated GIFs: advance the card face whenever the GIF's next frame is due.
+{
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const tick = (now: number) => {
+    if (userAnim && store.get().sample < 0 && !reduced.matches) {
+      const i = frameAt(userAnim, now);
+      if (i !== animFrame) {
+        animFrame = i;
+        redrawFace();
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}

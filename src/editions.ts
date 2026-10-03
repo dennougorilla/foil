@@ -7,7 +7,13 @@ export type EditionId =
   | 'gold'
   | 'prism'
   | 'galaxy'
-  | 'glitch';
+  | 'glitch'
+  | 'aurora'
+  | 'frost'
+  | 'magma'
+  | 'halftone'
+  | 'crystal'
+  | 'sakura';
 
 export interface Edition {
   id: EditionId;
@@ -30,6 +36,12 @@ export const EDITIONS: Edition[] = [
   { id: 'prism', shader: 6, color: '#7ef0e6', swirl: ['#0b2228', '#2bb3b8', '#f08bd0'], value: 6 },
   { id: 'galaxy', shader: 7, color: '#8e7dff', swirl: ['#05071a', '#30247a', '#d052a8'], value: 5 },
   { id: 'glitch', shader: 8, color: '#5cff8a', swirl: ['#060e09', '#1b6b3a', '#d43dff'], value: 1 },
+  { id: 'aurora', shader: 9, color: '#59f2b0', swirl: ['#04121a', '#126b5c', '#7b5cff'], value: 5 },
+  { id: 'frost', shader: 10, color: '#bfe9ff', swirl: ['#0b1a26', '#3f7fa8', '#dff4ff'], value: 4 },
+  { id: 'magma', shader: 11, color: '#ff7a2f', swirl: ['#140605', '#8a2311', '#ff9a3c'], value: 5 },
+  { id: 'halftone', shader: 12, color: '#ffd84a', swirl: ['#151518', '#d83a6a', '#2aa8d8'], value: 3 },
+  { id: 'crystal', shader: 13, color: '#e8f6ff', swirl: ['#101522', '#5a6ea8', '#d8e6ff'], value: 6 },
+  { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
 ];
 
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];

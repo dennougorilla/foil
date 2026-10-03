@@ -26,7 +26,7 @@ const shots = [
   { name: 'mobile-en', w: 390, h: 844, lang: 'en', full: true, dpr: 2 },
 ].filter((s) => s.name.includes(filter));
 
-const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch'];
+const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch', 'aurora', 'frost', 'magma', 'halftone', 'crystal', 'sakura'];
 const errors = [];
 
 for (const s of shots) {
@@ -101,11 +101,11 @@ for (const s of shots) {
   if (s.name === 'desktop-ja') {
     // One frame per edition, cropped to the card.
     for (let i = 0; i < editions.length; i++) {
-      await page.keyboard.press(String(i + 1));
+      await page.locator('.hand-slot').nth(i).click({ force: true });
       await page.waitForTimeout(900);
       const b = await card.boundingBox();
       await page.screenshot({
-        path: `${out}/edition-${i + 1}-${editions[i]}.png`,
+        path: `${out}/edition-${String(i + 1).padStart(2, '0')}-${editions[i]}.png`,
         clip: { x: b.x - 40, y: b.y - 40, width: b.width + 80, height: b.height + 80 },
       });
     }
