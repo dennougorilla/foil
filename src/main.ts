@@ -864,7 +864,7 @@ mountLettering({
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
-initSponsor(stage);
+initSponsor(stage, store);
 const boot = () => {
   redrawFace();
   drawCropPreview();

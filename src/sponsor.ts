@@ -37,7 +37,7 @@ export function releaseLockedEdition(store: Store) {
 }
 
 /** Opening either support link unlocks the hidden finishes, without a word. */
-export function initSponsor(stage: Stage) {
+export function initSponsor(stage: Stage, store: Store) {
   const unlock = () => {
     if (unlocked) return;
     unlocked = true;
@@ -52,5 +52,14 @@ export function initSponsor(stage: Stage) {
     a.addEventListener('click', unlock);
     // A middle click opens the link too; it counts the same (navigation is left alone).
     a.addEventListener('auxclick', (e) => e.button === 1 && unlock());
+  });
+  // Other tabs: an unlock there shows up here, and clearing site data there locks again here.
+  addEventListener('storage', (e) => {
+    if (e.key !== KEY && e.key !== null) return;
+    const now = readUnlocked();
+    if (now === unlocked) return;
+    unlocked = now;
+    stage.syncHandHidden();
+    releaseLockedEdition(store);
   });
 }

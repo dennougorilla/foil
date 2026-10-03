@@ -906,6 +906,8 @@ button {
 .sec-export {
   position: sticky;
   bottom: 0;
+  /* Above everything that scrolls under it (slider thumbs and chips carry their own z-index). */
+  z-index: 10;
   margin-top: auto;
   background: var(--panel);
   border-bottom: 0;
