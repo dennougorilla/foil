@@ -51,3 +51,9 @@ test('a retired secret (Eclipse) saved by an earlier version is ignored and neve
   assert.deepEqual(parseUnlocked('["eclipse","opal"]', secrets), ['opal']);
   for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(secrets, [], Math.random), 'eclipse');
 });
+
+test('Stained Glass joins as a beta finish: a secret, out of the hand until it is unlocked', () => {
+  const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+  assert.ok((secrets as string[]).includes('stainedglass'));
+  assert.deepEqual(parseUnlocked('["stainedglass"]', secrets), ['stainedglass']);
+});
