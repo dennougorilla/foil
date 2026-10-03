@@ -123,7 +123,10 @@ export function initSponsor(o: SponsorOptions) {
   dlg.setAttribute('aria-labelledby', 'spTitle');
   dlg.setAttribute('aria-describedby', 'spBody');
   dlg.innerHTML = `
-    <div class="sp-preview"><canvas class="sp-canvas" aria-hidden="true"></canvas></div>
+    <div class="sp-preview">
+      <canvas class="sp-canvas" aria-hidden="true"></canvas>
+      <p class="sp-glimpse" aria-hidden="true"><b></b><span class="sp-count"></span><span class="sp-dots">${SPONSOR_EDITIONS.map(() => '<i></i>').join('')}</span></p>
+    </div>
     <div class="sp-copy">
       <p class="sp-eyebrow">${STAR_SVG}<span></span></p>
       <h2 class="sp-title" id="spTitle"></h2>
@@ -163,6 +166,7 @@ export function initSponsor(o: SponsorOptions) {
     q('.sp-close').setAttribute('aria-label', t.close);
     q('.sp-close').title = t.close;
     syncSlots();
+    shown = '';
     if (!note.hidden) syncMenu(note.classList.contains('is-hint'));
   }
 
@@ -245,6 +249,19 @@ export function initSponsor(o: SponsorOptions) {
     return { angle, turn };
   }
 
+  /** Names the finish on show and counts it, "2 of 4"; while face down it keeps the name back. */
+  let shown = '';
+  function caption(n: number, faceUp: boolean) {
+    const key = `${n}:${faceUp}:${t.sponsorSecret}`;
+    if (key === shown) return;
+    shown = key;
+    const cap = q('.sp-glimpse');
+    cap.classList.toggle('is-down', !faceUp);
+    q('.sp-glimpse b').textContent = faceUp ? t.edition[SPONSOR_EDITIONS[n]] : '? ? ?';
+    q('.sp-count').textContent = t.sponsorGlimpse.replace('{n}', String(n + 1));
+    cap.querySelectorAll('.sp-dots i').forEach((d, i) => d.classList.toggle('is-on', i === n));
+  }
+
   function draw(now: number) {
     if (!dlg.open) {
       raf = 0;
@@ -259,14 +276,17 @@ export function initSponsor(o: SponsorOptions) {
     // Rests face down, flips to give a glimpse, holds, flips back; each time it
     // comes round, the next hidden finish is on the front. Reduced motion holds one still glimpse.
     const { angle, turn } = motion ? glimpse((now - started) / 1000) : { angle: 0.3, turn: 0 };
-    const id = SPONSOR_EDITIONS[turn % SPONSOR_EDITIONS.length];
+    const n = turn % SPONSOR_EDITIONS.length;
+    const id = SPONSOR_EDITIONS[n];
+    caption(n, Math.cos(angle) > 0.2);
     const ry = angle + (motion ? Math.sin(time * 0.8) * 0.18 : 0);
     const rx = motion ? Math.sin(time * 0.6) * 0.1 : -0.08;
-    const h = Math.min(box.height * 0.84, (box.width * 0.84 * 7) / 5);
+    // Leave room under the card for the name and count.
+    const h = Math.min(box.height * 0.76, (box.width * 0.8 * 7) / 5);
     r.drawCard(
       {
         cx: box.width / 2,
-        cy: box.height / 2 + (motion ? Math.sin(time * 1.3) * 3 : 0),
+        cy: box.height / 2 - 14 + (motion ? Math.sin(time * 1.3) * 3 : 0),
         w: (h * 5) / 7,
         h,
         rx,
@@ -353,10 +373,52 @@ export function initSponsor(o: SponsorOptions) {
 
   applyText();
 
+  // ---------- Touch: no hover, so the first tap says what the card is ----------
+
+  const tip = document.createElement('p');
+  tip.className = 'sp-tip';
+  tip.setAttribute('role', 'status');
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  let lastPointer = '';
+  let armedUntil = 0;
+  let tipTimer = 0;
+  slot(SPONSOR_EDITIONS[0])?.addEventListener('pointerdown', (e) => (lastPointer = e.pointerType));
+  const hideTip = () => {
+    tip.hidden = true;
+    armedUntil = 0;
+  };
+  document.addEventListener('pointerdown', (e) => {
+    if (!tip.hidden && !(e.target as Element).closest?.('.hand-slot[data-secret]')) hideTip();
+  });
+  window.addEventListener('scroll', hideTip, { passive: true });
+
+  function showTip() {
+    const el = slot(SPONSOR_EDITIONS[0]);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    tip.textContent = t.sponsorTapHint;
+    tip.hidden = false;
+    const w = tip.offsetWidth;
+    tip.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+    tip.style.top = `${Math.max(8, r.top - tip.offsetHeight - 10)}px`;
+    armedUntil = performance.now() + 4000;
+    clearTimeout(tipTimer);
+    tipTimer = window.setTimeout(hideTip, 4000);
+    sfx.tick();
+  }
+
   return {
     /** True when the finish is locked; the secret card's dialog opens instead. */
     gate(id: EditionId): boolean {
       if (!isLocked(id)) return false;
+      const touch = lastPointer === 'touch';
+      lastPointer = '';
+      if (touch && performance.now() > armedUntil) {
+        showTip();
+        return true;
+      }
+      hideTip();
       open();
       return true;
     },

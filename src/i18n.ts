@@ -65,6 +65,8 @@ const ja = {
   // Hidden finishes for supporters (src/sponsor.ts)
   sponsorSecret: 'シークレット',
   sponsorSecretHint: '裏向きの一枚。めくると…',
+  sponsorGlimpse: '4\u00a0種中 {n}\u00a0種目',
+  sponsorTapHint: 'シークレットの一枚。もう一度タップでひらきます',
   sponsorTitle: '隠しフォイル 4\u00a0種を、応援のお礼に',
   sponsorBody: 'GitHub\u00a0Sponsors か Buy\u00a0Me\u00a0a\u00a0Coffee を開くと、このブラウザで隠しフォイルがめくれます。',
   sponsorThanks: '応援へのささやかなお礼です。',
@@ -203,6 +205,8 @@ const en: Dict = {
   errGl: "WebGL2 isn't available in this browser, so the card can't be drawn. Open this page in a current Chrome, Edge, Safari or Firefox.",
   sponsorSecret: 'Secret',
   sponsorSecretHint: 'A face-down card. Turn it over…',
+  sponsorGlimpse: '{n} of 4',
+  sponsorTapHint: 'A secret card. Tap again to look',
   sponsorTitle: '4\u00a0hidden finishes, as a thank-you',
   sponsorBody: 'Open GitHub\u00a0Sponsors or Buy\u00a0Me\u00a0a\u00a0Coffee and the hidden finishes turn face up in this browser.',
   sponsorThanks: 'A small thank-you for the support.',

@@ -521,9 +521,11 @@ export class Stage {
       const hot = i === active;
       if (this.time > card.dealAt) card.deal.target = 0;
       card.lift.target = (sel ? 20 : 0) + (hot ? 12 : 0);
-      card.scale.target = hot ? 1.1 : sel ? 1.04 : 1;
+      // A face-down card holds still and flat, so it sits quietly in the fan.
+      const still = card.turn.target !== 0;
+      card.scale.target = still ? 1 : hot ? 1.1 : sel ? 1.04 : 1;
       // Hovered card leans toward the pointer
-      if (hot && this.hovered === i) {
+      if (hot && this.hovered === i && !still) {
         const { row, d } = slot(pos.get(i)!);
         const cx = hr.left + hr.width / 2 + d * spacing;
         const cy = hr.top + row * rowH + 30 + h / 2;
@@ -560,7 +562,7 @@ export class Stage {
         if (peek) peek.style.transform = `translate(${x.toFixed(1)}px, ${(y - (h * card.scale.x) / 2 - 12).toFixed(1)}px) translate(-50%, -100%)`;
       }
       const t = this.time + i * 0.7;
-      const idle = this.motion ? 1 : 0;
+      const idle = this.motion && card.turn.target === 0 ? 1 : 0;
       this.cards.drawCard(
         {
           cx: ox + x,

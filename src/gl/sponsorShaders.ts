@@ -50,46 +50,54 @@ vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
 }
 
 vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
-  // The art falls into night, lit only by the corona.
-  vec3 col = c * vec3(0.3, 0.32, 0.48) * (0.55 + 0.6 * L);
+  // The picture stays the subject: dusk only settles on its darker parts and
+  // edges, while a small eclipse hangs in the upper corner and backlights it.
+  vec2 q = (uv - 0.5) * vec2(1.0, 1.4);
+  float keep = max(smoothstep(0.3, 0.68, L), smoothstep(0.55, 0.15, length(q)) * 0.6);
+  vec3 col = mix(c * vec3(0.42, 0.44, 0.62), c * vec3(0.97, 0.96, 1.02), keep);
   // The sun sits behind the card, so it slides against the tilt.
-  vec2 ctr = vec2(0.5, 0.34) - t * vec2(0.035, 0.03);
+  vec2 ctr = vec2(0.76, 0.17) - t * vec2(0.03, 0.025);
   vec2 d = (uv - ctr) * vec2(1.0, 1.4);
   float r = length(d);
   float a = atan(d.y, d.x);
-  float R = 0.14;
-  float stream = fbm(vec2(a * 2.6, r * 3.0 - uTime * 0.12)) + 0.55 * fbm(vec2(a * 7.0 + 3.0, r * 8.0 - uTime * 0.22));
-  float corona = exp(-max(r - R, 0.0) * 10.0 / (0.35 + stream)) * step(R, r);
+  float R = 0.075;
+  float stream = fbm(vec2(a * 2.6, r * 5.0 - uTime * 0.12)) + 0.55 * fbm(vec2(a * 7.0 + 3.0, r * 12.0 - uTime * 0.22));
+  float corona = exp(-max(r - R, 0.0) * 16.0 / (0.35 + stream)) * step(R, r);
   vec3 hot = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.94, 0.84), smoothstep(0.35, 1.0, corona));
-  col += hot * corona * 1.05;
+  // The corona brightens what is behind it rather than painting over it.
+  col = screen(col, hot * corona * 0.95);
+  // Its glow grazes the picture, warmest towards the sun.
+  col += vec3(1.0, 0.55, 0.25) * exp(-r * 3.2) * (1.0 - keep * 0.5) * 0.2;
   // Chromosphere: a thin red-gold ring hugging the moon.
-  col += vec3(1.0, 0.62, 0.42) * smoothstep(0.014, 0.0, abs(r - R)) * 0.9;
+  col += vec3(1.0, 0.62, 0.42) * smoothstep(0.01, 0.0, abs(r - R)) * 0.9;
   // Diamond ring: one bead of sunlight on the rim, swinging round as you tilt.
   float ba = atan(t.y + 0.6, t.x + 0.0001) + uTime * 0.05;
   vec2 bead = vec2(cos(ba), sin(ba)) * R;
-  // The moon: near black with the faintest earthshine of the picture, its limb
-  // catching a little light on the side where the sun breaks through.
+  // The moon: near black with a faint earthshine, its limb catching a little
+  // light on the side where the sun breaks through.
   float disc = smoothstep(R + 0.003, R - 0.003, r);
   float limb = smoothstep(R * 0.35, R, r);
   float side = 0.5 + 0.5 * dot(d / max(r, 1e-4), bead / R);
   vec3 moon = c * 0.16 + vec3(0.008, 0.008, 0.02) + vec3(0.16, 0.12, 0.1) * limb * limb * side * side;
   col = mix(col, moon, disc);
   vec2 bd = d - bead;
-  float glow = exp(-length(bd) * 38.0);
-  float flare = (smoothstep(0.006, 0.0, abs(bd.x)) * smoothstep(0.16, 0.0, abs(bd.y))
-               + smoothstep(0.006, 0.0, abs(bd.y)) * smoothstep(0.22, 0.0, abs(bd.x)));
-  col += vec3(1.0, 0.97, 0.9) * (glow * 1.4 + flare * 0.7);
+  float glow = exp(-length(bd) * 50.0);
+  float flare = (smoothstep(0.005, 0.0, abs(bd.x)) * smoothstep(0.1, 0.0, abs(bd.y))
+               + smoothstep(0.005, 0.0, abs(bd.y)) * smoothstep(0.14, 0.0, abs(bd.x)));
+  col += vec3(1.0, 0.97, 0.9) * (glow * 1.3 + flare * 0.6);
   return col;
 }
 
 vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
-  // Black lacquer with crushed shell inlaid wherever the picture is bright.
-  vec3 lacquer = mix(c, vec3(0.03, 0.012, 0.018), 0.5);
+  // The picture stays the subject: its bright parts and centre keep their colour
+  // under a thin pearl film, and only the shadows and edges turn to black lacquer
+  // with cut shell inlaid.
   vec2 p = uv * vec2(1.0, 1.4);
+  float keep = max(smoothstep(0.24, 0.55, L), smoothstep(0.5, 0.12, length(p - vec2(0.5, 0.7))) * 0.7);
   vec2 w = p + (vec2(vnoise(p * 6.0), vnoise(p * 6.0 + 9.0)) - 0.5) * 0.06;
-  vec4 v = voronoi(w * 15.0);
+  vec4 v = voronoi(w * 24.0);
   vec2 id = v.zw;
-  float cut = smoothstep(0.012, 0.04, v.y - v.x);
+  float cut = smoothstep(0.015, 0.05, v.y - v.x);
   // Each chip of shell has growth lines running its own way, and its own lean.
   float ang = hash12(id) * 6.28;
   vec2 dir = vec2(cos(ang), sin(ang));
@@ -98,12 +106,16 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Shell only shifts through teal, blue, violet and pink, never orange.
   vec3 nacre = hsv2rgb(vec3(mix(0.42, 0.98, film), 0.5, 1.0)) * (0.7 + 0.3 * sin(s * 2.2));
   float lean = 0.55 + 0.45 * sin(dot(hash22(id + 4.0) * 2.0 - 1.0, t) * 3.0 + hash12(id + 5.0) * 6.28);
-  float shell = smoothstep(0.24, 0.6, L) * cut * 0.9;
-  vec3 inlay = nacre * (0.45 + 0.7 * L) * (0.55 + 0.6 * lean);
-  vec3 col = mix(lacquer, inlay, shell);
+  // In the shadows: lacquer that still shows the picture, with a scatter of shell chips.
+  vec3 lacquer = mix(c * 0.6, vec3(0.03, 0.012, 0.018), 0.4);
+  float chip = cut * step(0.68, hash12(id + 9.0));
+  vec3 dark = mix(lacquer, nacre * (0.4 + 0.6 * lean) * 0.7, chip);
+  // In the light: the picture itself, with a pearl film that shifts as you tilt.
+  vec3 lit = screen(c, nacre * 0.2 * (0.4 + 0.6 * lean));
+  vec3 col = mix(dark, lit, keep);
   // One long wet highlight across the lacquer.
   float gloss = smoothstep(0.86, 1.0, 0.5 + 0.5 * sin((uv.y * 1.4 + uv.x * 0.4) * 3.4 + (t.y + t.x) * 2.0));
-  col += vec3(1.0, 0.96, 0.98) * gloss * 0.2 * (1.0 - shell * 0.6);
+  col += vec3(1.0, 0.96, 0.98) * gloss * 0.16 * (1.0 - keep * 0.5);
   return col;
 }
 `;
