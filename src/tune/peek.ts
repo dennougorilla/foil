@@ -6,7 +6,7 @@ export interface Peek {
   readonly el: HTMLElement;
   readonly shown: boolean;
   setActive(on: boolean): void;
-  setLabel(text: string): void;
+  setLabel(text: string, caption: string): void;
 }
 
 /** `facing` is how squarely the card face looks at us; the preview holds its last face-on frame while a spin shows the back. */
@@ -18,7 +18,10 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
   btn.className = 'tune-peek';
   btn.hidden = true;
   const view = document.createElement('canvas');
-  btn.appendChild(view);
+  const cap = document.createElement('span');
+  cap.className = 'tune-peek-cap';
+  cap.setAttribute('aria-hidden', 'true');
+  btn.append(view, cap);
   if (!slot || !source) return { el: btn, shown: false, setActive() {}, setLabel() {} };
 
   const narrow = matchMedia('(max-width: 900px)');
@@ -89,7 +92,8 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
       active = on;
       update();
     },
-    setLabel(text) {
+    setLabel(text, caption) {
+      cap.textContent = caption;
       btn.setAttribute('aria-label', text);
       btn.title = text;
     },

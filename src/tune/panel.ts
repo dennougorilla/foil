@@ -174,7 +174,7 @@ export function mountTune(store: Store, after: Element): void {
     root.querySelector('.tune-reset-all span')!.textContent = t.resetAll;
     root.querySelector('.tune-undo span')!.textContent = t.undo;
     stamp.textContent = t.stamp;
-    peek.setLabel(t.peek);
+    peek.setLabel(t.peek, t.peekCap);
     root.querySelector('.tune-dock-peek')!.replaceWith(peek.el);
     bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
     const tabs = root.querySelector<HTMLElement>('.tune-tabs')!;
@@ -469,7 +469,7 @@ export function mountTune(store: Store, after: Element): void {
     root.querySelector<HTMLElement>('.tune-body')!.hidden = !s.tuneOpen;
     const badge = toggle.querySelector<HTMLElement>('.tune-badge')!;
     badge.hidden = !changed.length;
-    badge.textContent = String(changed.length);
+    badge.textContent = t.changed.replace('{n}', String(changed.length));
     // The badge is just a number on screen; spell it out for screen readers.
     const label = changed.length ? `${t.toggle} (${t.changed.replace('{n}', String(changed.length))})` : t.toggle;
     toggle.setAttribute('aria-label', label);
@@ -558,7 +558,7 @@ export function mountTune(store: Store, after: Element): void {
         else control.removeAttribute('aria-describedby');
       }
     }
-    sun.update({ show: s.tuneOpen && tune.light === 'fixed' && !motion.comparing, angle: tune.lightAngle, label: t.sun, title: t.sunHelp });
+    sun.update({ show: s.tuneOpen && tune.light === 'fixed' && !motion.comparing, angle: tune.lightAngle, label: t.sun, title: t.sunHelp, keys: t.sunKeys });
 
     const note = root.querySelector<HTMLElement>('.tune-note')!;
     let msg = '';

@@ -3,7 +3,7 @@
 import { fixedLight, TUNE_DEFAULTS } from './model';
 
 export interface SunHandle {
-  update(opts: { show: boolean; angle: number; label: string; title: string }): void;
+  update(opts: { show: boolean; angle: number; label: string; title: string; keys: string }): void;
 }
 
 const ICON =
@@ -15,7 +15,7 @@ export function mountSunHandle(onAngle: (deg: number) => void, facing: () => num
   const aim = document.createElement('div');
   aim.className = 'tune-aim';
   aim.hidden = true;
-  aim.innerHTML = `<i class="tune-aim-ring" aria-hidden="true"></i><span class="tune-sun" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="359">${ICON}</span>`;
+  aim.innerHTML = `<i class="tune-aim-ring" aria-hidden="true"></i><span class="tune-sun" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="359">${ICON}<i class="tune-sun-keys" aria-hidden="true"></i></span>`;
   document.body.appendChild(aim);
   const sun = aim.querySelector<HTMLElement>('.tune-sun')!;
   if (!slot) return { update() {} };
@@ -65,7 +65,8 @@ export function mountSunHandle(onAngle: (deg: number) => void, facing: () => num
   });
 
   return {
-    update({ show, angle: a, label, title }) {
+    update({ show, angle: a, label, title, keys }) {
+      sun.querySelector('.tune-sun-keys')!.textContent = keys;
       angle = a;
       const [x, y] = fixedLight(a);
       sun.style.left = `${x * 100}%`;
