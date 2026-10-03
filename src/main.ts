@@ -18,6 +18,7 @@ import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
+import { mountProof } from './proof';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -139,6 +140,8 @@ function applyText() {
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
   stage.setHandLabels(t.edition, t.look);
+  // Written into the fade at the foot of the sheet when more of it waits below.
+  $('panel').style.setProperty('--more-text', JSON.stringify(t.moreBelow));
   $('cropView').setAttribute('aria-label', t.cropHint);
   $('cropView').title = t.cropHint;
   // Paste is ⌘V on Apple keyboards; taps, not clicks, on touch screens.
@@ -168,13 +171,10 @@ function renderInfo() {
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
   pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
-  // The panel names the finish on the card and points to the hand where it is picked.
+  // The panel names the finish on the card (beside a live proof of it) and points to the hand where it is picked.
   $('finishName').textContent = t.edition[s.edition];
-  const chip = $('finishChip');
-  chip.style.setProperty('--c', s.edition === 'base' ? '#c9c2b2' : ed.color);
-  chip.style.setProperty('--a', ed.swirl[0]);
-  chip.style.setProperty('--b', ed.swirl[1]);
-  chip.style.setProperty('--c3', ed.swirl[2]);
+  $('finishLook').textContent = t.look[s.edition];
+  $('recapFinishName').textContent = t.edition[s.edition];
   $('finishPick').setAttribute('aria-label', t.finishPick);
   $('finishPick').title = matchMedia('(max-width: 900px)').matches ? t.finishPickHintPhone : t.finishPickHint;
 }
@@ -295,6 +295,10 @@ function buildThumbs() {
   samples.forEach((img, i) => add(img, t.samplesName[i], i));
   if (userImage) add(userImage, userAnim ? `${t.yourImage} (${animKind(userAnim)})` : t.yourImage, -1);
   $('thumbLabel').textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif.replace('GIF', animKind(userAnim)) : t.yourImage;
+  // While a sample shows, opening your own picture is the loud step; once it is yours, Save is.
+  $('panel').dataset.picture = s.sample >= 0 ? 'sample' : 'own';
+  $('recapThumb').style.backgroundImage = `url(${thumbUrl(currentImage())})`;
+  $('recapImageName').textContent = s.sample >= 0 ? t.samplesName[s.sample] : t.yourImage;
   apngExport.refresh();
 }
 
@@ -519,7 +523,7 @@ async function loadFile(file: File) {
   } finally {
     store.set({ loading: false });
     document.body.classList.remove('is-loading');
-    pickLabel.textContent = t.pick;
+    pickLabel.textContent = t.pickFile;
     $('pickBtn').removeAttribute('aria-busy');
     if (!saveBtn.hasAttribute('aria-busy')) saveBtn.disabled = false;
   }
@@ -673,6 +677,17 @@ rovingKeys($('frameSeg'));
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
 mountTune(store, $('pane-light'));
+mountProof($('finishProof'));
+mountProof($('recapProof'));
+
+// A folded step leads back to itself: Fine-tune closes and the step is brought into view.
+for (const id of ['recapImage', 'recapFinish']) {
+  $(id).addEventListener('click', () => {
+    sfx.tick();
+    store.set({ adjustOpen: false });
+    requestAnimationFrame(() => $(id).closest('.sec')!.scrollIntoView({ block: 'nearest' }));
+  });
+}
 
 // ---------- Fine-tune: closed until asked for, then four tabs ----------
 
@@ -726,12 +741,12 @@ tabBar.addEventListener('keydown', (e) => {
   revealTabs();
 });
 
-/** Scrolls so the Fine-tune row and its tabs sit at the top, giving the tab the panel's whole height. */
+/** Scrolls to the top of the sheet: the folded steps, the Fine-tune row and its tabs, then the tab itself. */
 function revealTabs() {
   const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   requestAnimationFrame(() => {
     const panel = $('panel');
-    const top = $('adjust').getBoundingClientRect().top;
+    const top = panel.querySelector('.sec')!.getBoundingClientRect().top;
     // The panel scrolls on its own beside the stage; on phones the page does.
     if (getComputedStyle(panel).overflowY === 'visible') window.scrollBy({ top, behavior });
     else panel.scrollBy({ top: top - panel.getBoundingClientRect().top, behavior });
@@ -761,6 +776,9 @@ function syncAdjust() {
     ? t.adjustChanged.replace('{list}', changed.map((id) => t.tabs[id]).join(s.lang === 'ja' ? '・' : ', '))
     : t.adjustSub;
   summary.classList.toggle('is-changed', changed.length > 0);
+  // While tuning, steps 1 and 2 fold into one line each, so the tabs get the sheet.
+  $('panel').classList.toggle('is-tuning', s.adjustOpen);
+  requestAnimationFrame(trackExportBar);
 }
 
 $('cardReset').addEventListener('click', () => {
@@ -823,7 +841,9 @@ function buildFormats() {
     b.className = 'seg-btn';
     b.dataset.format = f;
     b.setAttribute('role', 'radio');
-    b.textContent = t.format[f];
+    b.innerHTML = '<b></b><small></small>';
+    b.firstElementChild!.textContent = t.format[f];
+    b.lastElementChild!.textContent = t.formatKind[f];
     radio(b, store.get().exportFormat === f);
     b.disabled = saveBtn.hasAttribute('aria-busy');
     b.onclick = () => {
@@ -968,7 +988,10 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   }
 }
 
-/** A saved card is a pulled card: it hops, sheds sparks in its finish's colour, and Save shines once. */
+/**
+ * A saved card is a pulled card: it hops and sheds sparks in its finish's colour, and a dated
+ * seal is pressed onto the Save stamp, the way a print shop signs off a job.
+ */
 let celebrateTimer = 0;
 function celebrate(file: string) {
   stage.juice(0.6);
@@ -976,8 +999,11 @@ function celebrate(file: string) {
   saveBtn.classList.remove('is-saved');
   void saveBtn.offsetWidth;
   saveBtn.classList.add('is-saved');
-  saveBtn.querySelector('.btn-text b')!.textContent = `${t.savedShort} ✓`;
-  saveBtn.querySelector('.btn-text small')!.textContent = file;
+  // The stamp keeps its name (it can be pressed again); its note says what was written.
+  saveBtn.querySelector('.btn-text small')!.textContent = `${t.savedShort}: ${file}`;
+  const now = new Date();
+  $('seal').querySelector('b')!.textContent = t.sealDone;
+  $('seal').querySelector('small')!.textContent = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, '0')).join('.');
   clearTimeout(celebrateTimer);
   celebrateTimer = window.setTimeout(() => {
     saveBtn.classList.remove('is-saved');
@@ -1092,25 +1118,30 @@ new ResizeObserver(([e]) =>
   document.documentElement.style.setProperty('--export-h', `${Math.round(e.borderBoxSize[0].blockSize)}px`),
 ).observe(exportSec);
 
-/** Toasts rise from just above the Export bar, wherever it is now, so they never cover Save. */
-function placeToasts() {
+/**
+ * Toasts rise from just above the Export bar, wherever it is now, so they never cover Save.
+ * On phones the bar floats over the whole page; it fades the sheet's lines only over the sheet.
+ * Scrolled, the sheet fades what has gone up under its head, and marks when more waits below.
+ */
+function trackExportBar() {
   const top = exportSec.getBoundingClientRect().top;
   const bottom = Math.max(12, Math.min(innerHeight - top + 12, innerHeight - 160));
   $('toasts').style.bottom = `${Math.round(bottom)}px`;
+  const panel = $('panel');
+  const sheet = panel.getBoundingClientRect();
+  exportSec.classList.toggle('is-over-sheet', sheet.top < top && sheet.bottom > top);
+  panel.classList.toggle('is-scrolled', panel.scrollTop > 2);
+  panel.classList.toggle('has-more', panel.scrollHeight - panel.scrollTop - panel.clientHeight > 8);
 }
-new ResizeObserver(placeToasts).observe($('panel'));
-$('panel').addEventListener('scroll', placeToasts, { passive: true });
-addEventListener('scroll', placeToasts, { passive: true });
-addEventListener('resize', placeToasts);
+new ResizeObserver(trackExportBar).observe($('panel'));
+$('panel').addEventListener('scroll', trackExportBar, { passive: true });
+addEventListener('scroll', trackExportBar, { passive: true });
+addEventListener('resize', trackExportBar);
 
 function dismissToast(el: HTMLElement) {
   if (el.classList.contains('is-out')) return;
   // Don't strand keyboard focus on a toast that's about to vanish.
-  // Phones hide the panel's pick button, so land on whichever one is showing.
-  if (el.contains(document.activeElement)) {
-    const pick = [$('pickBtn'), $('pickBtnStage')].find((b) => b.getClientRects().length) ?? $('pickBtn');
-    pick.focus({ preventScroll: true });
-  }
+  if (el.contains(document.activeElement)) $('pickBtn').focus({ preventScroll: true });
   el.classList.add('is-out');
   el.addEventListener('animationend', () => el.remove());
   setTimeout(() => el.remove(), 400);

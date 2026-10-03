@@ -845,77 +845,165 @@ button {
 
 /* ---------- Panel ---------- */
 
+/* The pixel face draws × like a small x; on the sheet, times signs come from the system face. */
+@font-face {
+  font-family: 'Times Sign';
+  src: local('Segoe UI'), local('Helvetica Neue'), local('Helvetica'), local('Roboto'), local('Arial');
+  unicode-range: U+00D7;
+}
+
 /*
- * One rhythm for the whole panel: 24px around and between sections, 16px between fields,
- * 8px inside a field. One face: DotGothic16 for words and numbers alike, at 16px (its own
- * pixel grid) for everything you read or press, 13px only for side notes. One look per part:
- * a quiet label (dim) over its control, the value on the right; chosen settings turn
- * paper-white like a card face; gold is only for keyboard focus; red is only for Save.
+ * The panel is the card's job ticket: the paper order a print shop sends through the press
+ * with it. Trim marks hold its corners and a colour bar runs along its head; three numbered
+ * steps are ruled off down the sheet, values sit at the end of dotted leaders, and the last
+ * step is a tear-off stub pinned to the bottom, where the format is ringed and the Save stamp
+ * waits.
+ *
+ * One rhythm: 24px around and between steps, 16px between fields, 8px inside a field. One
+ * face: DotGothic16 at 16px (its own pixel grid) for everything you read or press, 18px in
+ * bold for the step heads, 14px for side notes. The sheet is a step darker than the card face, so the card stays the
+ * brightest thing on screen. Its inks each mean one thing: black ink for words and for every
+ * choice that is made (a chosen option is inked solid), vermilion only for the one next step
+ * (Open a file while a sample shows, the Save stamp once the picture is yours), cyan only for
+ * keyboard focus, violet only for "changed from the default".
  */
 .panel {
+  --sheet: #d9ceb1;
+  --sheet-lo: #ccc0a1;
+  --ink: #2a241e;
+  --ink-dim: #4b4236;
+  --rule: #a3957a;
+  --stamp: #c93a2f;
+  --stamp-lo: #8e271f;
+  --cyan: #0a6fae;
+  --mark: #6a3aa8;
+  /* A rubber stamp's print: vermilion with a paper line inside its border. */
+  --stamp-face: inset 0 0 0 3px var(--stamp), inset 0 0 0 5px rgba(255, 248, 239, 0.8);
+  --more: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4'%3E%3Cpath d='M0 0h6L3 4z' fill='%234b4236'/%3E%3C/svg%3E");
+  --pad: 24px;
+  /* The shared parts (fields, sliders, segments and the tabs' own controls) read these. */
+  --panel: var(--sheet);
+  --panel-lo: var(--sheet-lo);
+  --panel-hi: var(--rule);
+  --edge: var(--ink);
+  --text: var(--ink);
+  --text-dim: var(--ink-dim);
+  --paper: var(--ink);
+  --paper-ink: var(--sheet);
+  --slider-fill: var(--ink);
+  --gold: var(--cyan);
   grid-area: panel;
   position: relative;
   z-index: 4;
-  /* As tall as its content, up to the window: closed, it leaves no empty middle. */
-  align-self: start;
-  max-height: calc(100dvh - 32px);
+  /* The whole height of the window, so the Save stub never moves when the steps change. */
+  height: calc(100dvh - 32px);
   margin: 16px 16px 16px 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-radius: 14px;
-  background: var(--panel);
+  border-radius: 3px;
+  color: var(--ink);
+  /* Trim marks and the colour bar stay on the sheet's head; the fibres scroll. */
+  background:
+    var(--trim-tl) left 6px top 6px / 14px 14px no-repeat,
+    var(--trim-tr) right 6px top 6px / 14px 14px no-repeat,
+    linear-gradient(90deg, #1b9ad6 0 10px, #d6247a 10px 20px, #f4d21f 20px 30px, var(--ink) 30px 40px, #c9a227 40px 50px,
+      #ff7eb3 50px, #ffd36e 54px, #7cf7c8 58px, #6ec3ff 62px, #c18bff 66px 70px) right 28px top 9px / 70px 6px no-repeat,
+    radial-gradient(rgba(80, 60, 30, 0.07) 1px, transparent 1.3px) 0 0 / 5px 5px local,
+    var(--sheet);
   box-shadow:
-    0 0 0 3px var(--edge),
-    inset 0 0 0 2px var(--panel-hi),
+    0 0 0 3px #0b1012,
     0 10px 0 3px rgba(0, 0, 0, 0.45);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--panel-hi) transparent;
+  scrollbar-color: var(--rule) transparent;
+  font-family: 'Times Sign', var(--font);
+  /* Japanese wraps between phrases, never mid-word. */
+  word-break: auto-phrase;
+  --trim-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M0 6h10M6 0v10' stroke='%232a241e' stroke-width='1.5' fill='none' opacity='.55'/%3E%3C/svg%3E");
+  --trim-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M14 6H4M8 0v10' stroke='%232a241e' stroke-width='1.5' fill='none' opacity='.55'/%3E%3C/svg%3E");
 }
 
 .sec {
   flex: none;
-  padding: 24px;
+  padding: 20px var(--pad);
 }
 
-/* A soft shadow under the panel's top edge says more sits above when scrolled. */
+/* Scrolled, what has gone up fades into the sheet's head instead of being sliced; the pinned
+   Fine-tune line covers it while it is stuck at the top. */
 .panel::before {
   content: '';
   position: sticky;
   top: 0;
-  z-index: 6;
+  z-index: 3;
   display: block;
-  height: 0;
-  box-shadow: 0 0 14px 10px var(--panel);
+  flex: none;
+  height: 40px;
+  margin-bottom: -40px;
+  background: linear-gradient(var(--sheet) 45%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s;
   pointer-events: none;
 }
 
-.sec + .sec {
-  border-top: 2px solid var(--panel-lo);
+.panel.is-scrolled::before {
+  opacity: 1;
 }
 
+/* A step's head: its circled number, what to do, and a rule run out to what it shows now. */
 .sec-head {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
   margin-bottom: 16px;
-  line-height: 1.35;
 }
 
 .sec-title {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 400;
-  text-shadow: 0 2px 0 var(--edge);
+  line-height: 1.35;
+  /* The pixel face has one weight; a one-pixel echo sets the step heads in bold. */
+  text-shadow: 1px 0 0 currentColor;
+}
+
+.sec-title::after {
+  content: '';
+  flex: 1;
+  min-width: 16px;
+  margin-left: 12px;
+  border-top: 2px solid var(--ink);
+}
+
+.step {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--sheet);
+  font-size: 13px;
+  font-style: normal;
+  line-height: 1;
+  text-shadow: none;
 }
 
 .sec-note {
-  font-size: 13px;
-  color: var(--text-dim);
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--ink-dim);
 }
 
-/* Buttons */
+/* Buttons (also used on the stage and in dialogs, so dark by default) */
 .btn {
   --c: var(--panel-hi);
   --lo: var(--edge);
@@ -976,23 +1064,6 @@ button {
   opacity: 0.85;
 }
 
-/* The one loud button. Hover lifts it off the panel a little. */
-.btn-primary {
-  --c: var(--red);
-  --lo: var(--red-lo);
-}
-
-.btn-primary:not([aria-busy]):hover {
-  transform: translateY(-3px);
-  filter: brightness(1.1);
-  box-shadow: 0 8px 0 var(--lo), 0 0 0 3px var(--paper);
-}
-
-.btn-primary:not([aria-busy]):active {
-  transform: translateY(5px);
-  box-shadow: 0 0 0 var(--lo);
-}
-
 /* A paper-white button: a clear next step that doesn't compete with Save. */
 .btn-paper {
   --c: var(--paper);
@@ -1009,23 +1080,45 @@ button {
   box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(255, 255, 255, 0.06);
 }
 
-/* Image */
+/* On the sheet a button is printed, not raised: a ruled box, or a solid block of ink. */
+.panel .btn {
+  border-radius: 3px;
+  text-shadow: none;
+}
+
+.panel .btn-quiet {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.panel .btn-quiet:hover {
+  filter: none;
+  background: var(--sheet-lo);
+}
+
+.panel .btn-quiet:active {
+  transform: translate(1px, 2px);
+}
+
+/* 1 Choose a picture */
 .thumbs {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 20px;
 }
 
+/* Each picture is a small print with a white border, the chosen one pulled up and ticked. */
 .thumb {
   position: relative;
   width: 46px;
   aspect-ratio: 5 / 7;
   padding: 0;
-  border: 3px solid var(--paper);
-  border-radius: 5px;
-  background: var(--panel-lo) center / cover no-repeat;
-  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
+  border: 3px solid #fbf7ec;
+  border-radius: 3px;
+  background: var(--sheet-lo) center / cover no-repeat;
+  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 2px rgba(42, 36, 30, 0.22);
   transition: transform 0.2s var(--ease-back), box-shadow 0.15s;
   image-rendering: pixelated;
 }
@@ -1033,16 +1126,15 @@ button {
 .thumb[data-badge]::after {
   content: attr(data-badge);
   position: absolute;
-  right: -6px;
-  bottom: -6px;
+  right: -7px;
+  bottom: -7px;
   padding: 0 4px;
-  border-radius: 3px;
-  background: var(--paper);
-  color: var(--paper-ink);
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--sheet);
   font-family: var(--display);
   font-size: 10px;
   line-height: 14px;
-  box-shadow: 0 0 0 2px var(--edge);
 }
 
 .thumb:hover {
@@ -1050,22 +1142,68 @@ button {
 }
 
 .thumb:not([aria-checked='true']) {
-  filter: saturate(0.6) brightness(0.8);
+  filter: saturate(0.7) brightness(0.92);
 }
 
-/* The chosen one is pulled up out of the row, like a card drawn from the hand. */
 .thumb[aria-checked='true'] {
-  box-shadow: 0 0 0 2px var(--edge), 0 8px 0 2px var(--edge), 0 0 18px var(--accent);
+  box-shadow: 0 0 0 2px var(--ink), 3px 6px 0 2px rgba(42, 36, 30, 0.28);
   transform: translateY(-6px) rotate(-3deg);
 }
 
+.thumb[aria-checked='true']::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4l2 2 4-4' stroke='%23d9ceb1' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") center / 10px no-repeat,
+    var(--ink);
+}
+
+/* While a sample shows, opening your own picture is the vermilion step; after that, a ruled one. */
 .pick {
   justify-content: flex-start;
   min-height: 56px;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
 }
 
+.pick:hover {
+  filter: none;
+  background: var(--sheet-lo);
+}
+
+.pick:active {
+  transform: translate(1px, 2px);
+}
+
+.panel[data-picture='sample'] .pick {
+  background: var(--stamp);
+  color: #fff8ef;
+  box-shadow: var(--stamp-face), 3px 4px 0 rgba(42, 36, 30, 0.3);
+}
+
+.panel[data-picture='sample'] .pick:hover {
+  background: var(--stamp);
+  filter: brightness(1.06);
+  transform: translate(-1px, -2px);
+  box-shadow: var(--stamp-face), 5px 7px 0 rgba(42, 36, 30, 0.3);
+}
+
+.panel[data-picture='sample'] .pick:active {
+  transform: translate(3px, 4px);
+  box-shadow: var(--stamp-face), 0 0 0 rgba(42, 36, 30, 0.3);
+}
+
+/* The crop frame beside its zoom, the same for any shape of picture: zoom, then what to do. */
 .crop {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
   margin-top: 24px;
 }
 
@@ -1073,12 +1211,13 @@ button {
   position: relative;
   display: grid;
   place-items: center;
-  /* Taller where the screen allows: a bigger window is easier to frame with. */
-  height: clamp(96px, 15vh, 140px);
-  border-radius: 8px;
+  width: 120px;
+  height: 136px;
+  border-radius: 2px;
   background:
-    repeating-conic-gradient(var(--panel-lo) 0 25%, #1f2a30 0 50%) 0 0 / 16px 16px;
-  box-shadow: inset 0 0 0 2px var(--edge);
+    repeating-linear-gradient(45deg, rgba(42, 36, 30, 0.09) 0 2px, transparent 2px 7px),
+    var(--sheet-lo);
+  box-shadow: inset 0 0 0 2px var(--ink);
   overflow: hidden;
   touch-action: none;
   cursor: grab;
@@ -1092,16 +1231,15 @@ button {
   display: block;
   max-width: 100%;
   max-height: 100%;
-  opacity: 0.45;
+  opacity: 0.6;
 }
 
 .crop-window {
   position: absolute;
-  border-radius: 4px;
   box-shadow:
-    0 0 0 2px var(--paper),
-    0 0 0 4px var(--edge),
-    0 0 0 999px rgba(10, 14, 16, 0.45);
+    0 0 0 2px #fbf7ec,
+    0 0 0 4px var(--ink),
+    0 0 0 999px color-mix(in srgb, var(--sheet-lo) 35%, transparent);
   background-repeat: no-repeat;
   pointer-events: none;
 }
@@ -1112,18 +1250,25 @@ button {
 
 .crop-view:focus-visible .crop-window {
   box-shadow:
-    0 0 0 3px var(--gold),
-    0 0 0 5px var(--edge),
-    0 0 0 999px rgba(10, 14, 16, 0.45);
+    0 0 0 2px #fbf7ec,
+    0 0 0 5px var(--cyan),
+    0 0 0 999px color-mix(in srgb, var(--sheet-lo) 35%, transparent);
 }
 
-.crop .row {
-  margin-top: 16px;
+.crop-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 10px 12px;
+  padding-top: 2px;
+}
+
+.crop-side .row {
+  grid-column: 1 / -1;
 }
 
 .crop-reset {
-  justify-self: end;
-  margin-top: 4px;
+  align-self: start;
 }
 
 /* A picture that couldn't be read: said right here, with the way forward. */
@@ -1136,9 +1281,9 @@ button {
   gap: 12px;
   margin-top: 16px;
   padding: 14px 16px 14px 20px;
-  border-radius: 4px;
-  background: rgba(255, 90, 79, 0.1);
-  box-shadow: inset 4px 0 0 var(--red), inset 0 0 0 2px rgba(255, 90, 79, 0.45);
+  border-radius: 2px;
+  background: rgba(201, 58, 47, 0.08);
+  box-shadow: inset 4px 0 0 var(--stamp), inset 0 0 0 2px rgba(201, 58, 47, 0.5);
 }
 
 .image-error p {
@@ -1160,7 +1305,7 @@ button {
   height: 20px;
   margin-top: 2px;
   border-radius: 2px;
-  background: var(--red);
+  background: var(--stamp);
   color: #fff;
   font-size: 14px;
   line-height: 1;
@@ -1175,6 +1320,9 @@ button {
 .image-error .btn {
   width: auto;
   min-height: 40px;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
 }
 
 .image-error .btn svg {
@@ -1187,75 +1335,163 @@ button {
   filter: saturate(0.6);
 }
 
-/* Finish: names what is on the card and points to the hand where it is picked. */
-.sec-finish {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding-top: 16px;
-  padding-bottom: 16px;
+/* 2 Choose a finish: what is on the card, as a swatch of the foil stock, and a way to the hand. */
+.sec-finish .sec-title {
+  margin-bottom: 16px;
 }
 
-/* A tiny foil card in the finish's own colour, with the sheen sliding across it. */
-.finish-chip {
-  --c: var(--accent);
-  position: relative;
-  width: 22px;
-  height: 30px;
-  overflow: hidden;
-  border-radius: 3px;
+/* The proof, and beside it the finish's name, its look, and the way to the hand. */
+.finish-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  gap: 4px 18px;
+}
+
+.finish-row .proof-sheet {
+  grid-row: 1 / span 3;
+}
+
+.finish-look {
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.finish-row .finish-pick {
+  justify-self: start;
+  align-self: end;
+  margin-top: 6px;
+}
+
+/* A proof as the print shop pulls it: trim marks at its corners and a tag under it. */
+.proof-sheet {
+  --t: linear-gradient(var(--ink-dim), var(--ink-dim));
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 7px 7px 0;
   background:
-    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0) 0 4px, rgba(255, 255, 255, 0.35) 4px 6px),
-    linear-gradient(135deg, #ff6b8b55, #59f2b055 50%, #5fb4ff55),
-    linear-gradient(160deg, var(--a, #333), var(--b, var(--c)) 50%, var(--c3, #eee));
-  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--paper);
+    var(--t) left 0 top 0 / 6px 1.5px no-repeat,
+    var(--t) left 0 top 0 / 1.5px 6px no-repeat,
+    var(--t) right 0 top 0 / 6px 1.5px no-repeat,
+    var(--t) right 0 top 0 / 1.5px 6px no-repeat;
 }
 
-.finish-chip::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.85) 50%, transparent 70%) 0 0 / 300% 100% no-repeat;
-  animation: chip-sheen 3.2s ease-in-out infinite;
+.proof-sheet i {
+  padding: 0 5px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1.5px var(--ink-dim);
+  color: var(--ink-dim);
+  font-family: var(--display);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 15px;
+  letter-spacing: 0.06em;
 }
 
-@keyframes chip-sheen {
-  from { background-position: 100% 0; }
-  to { background-position: -50% 0; }
+/* A proof of the card as it is now: the finish as it really looks, pinned beside its name. */
+.finish-proof {
+  width: 52px;
+  height: 73px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #141c1f;
+  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 2px rgba(42, 36, 30, 0.22);
 }
 
-.finish-text {
+.finish-proof canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+
+/* While tuning, the formats keep to their names so the tabs get the room. */
+.panel.is-tuning .seg-format small {
+  display: none;
+}
+
+.panel.is-tuning .seg-format .seg-btn {
+  min-height: 38px;
+}
+
+/* While tuning, steps 1 and 2 fold into one line each: the picture or proof, its name, and a
+   way back to the step. */
+.recap {
+  display: none;
+}
+
+.panel.is-tuning :is(.sec-image, .sec-finish) > :not(.recap) {
+  display: none;
+}
+
+.panel.is-tuning :is(.sec-image, .sec-finish) {
+  padding-block: 4px;
+}
+
+.panel.is-tuning .sec-image {
+  padding-top: 16px;
+}
+
+.panel.is-tuning .recap {
   display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+
+.recap:hover {
+  background: var(--sheet-lo);
+}
+
+.recap .step {
+  margin-right: 0;
+}
+
+.recap-thumb {
+  width: 24px;
+  height: 33px;
+  border: 2px solid #fbf7ec;
+  border-radius: 2px;
+  background: center / cover no-repeat;
+  box-shadow: 0 0 0 2px var(--ink);
+  image-rendering: pixelated;
+}
+
+.recap .finish-proof {
+  border: 0;
+}
+
+.recap-name {
   min-width: 0;
-  line-height: 1.35;
+  overflow: hidden;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.finish-text small {
-  font-size: 13px;
-  color: var(--text-dim);
+.recap-go {
+  font-size: 14px;
+  color: var(--ink-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.finish-text b {
+.finish-name {
+  min-width: 0;
+  overflow: hidden;
   font-weight: 400;
   font-size: 16px;
-  text-shadow: 0 2px 0 var(--edge);
-}
-
-/* The main flow reads down the panel: 1 picture, 2 finish, then the Save button. */
-.step {
-  display: inline-grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  border-radius: 2px;
-  background: var(--paper);
-  color: var(--paper-ink);
-  font-size: 13px;
-  line-height: 1;
-  text-shadow: none;
-  vertical-align: 1px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .finish-pick {
@@ -1265,17 +1501,20 @@ button {
   min-height: 36px;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 3px;
   background: none;
-  box-shadow: inset 0 0 0 2px #4b6068;
-  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  color: var(--ink);
   font-size: 13px;
   white-space: nowrap;
 }
 
 .finish-pick:hover {
-  color: var(--text);
-  box-shadow: inset 0 0 0 2px var(--text-dim);
+  background: var(--sheet-lo);
+}
+
+.finish-pick:active {
+  transform: translate(1px, 2px);
 }
 
 .finish-pick svg {
@@ -1284,10 +1523,12 @@ button {
   fill: currentColor;
 }
 
-/* Fine-tune: one row that opens the detailed controls */
+/* Fine-tune: one ruled line on the sheet that opens the detailed controls. */
 .sec-adjust {
   padding-top: 8px;
   padding-bottom: 8px;
+  /* Whatever room is left sits here, so the GIF options and the stub keep to the bottom. */
+  margin-bottom: auto;
 }
 
 .adjust-toggle {
@@ -1299,22 +1540,25 @@ button {
   align-items: center;
   gap: 14px;
   width: 100%;
-  min-height: 52px;
-  padding: 6px 4px;
+  min-height: 60px;
+  padding: 10px 0;
   border: 0;
+  border-top: 2px solid var(--rule);
+  border-bottom: 2px solid var(--rule);
   border-radius: 0;
-  background: var(--panel);
+  background: var(--sheet);
   text-align: left;
 }
 
 .adjust-toggle:hover {
-  background: #2a3940;
+  background: var(--sheet-lo);
 }
 
 .adjust-icon {
   width: 22px;
   height: 22px;
-  fill: var(--text-dim);
+  margin-left: 4px;
+  fill: var(--ink);
 }
 
 .adjust-text {
@@ -1325,50 +1569,90 @@ button {
 .adjust-text b {
   font-weight: 400;
   font-size: 16px;
-  text-shadow: 0 2px 0 var(--edge);
 }
 
 .adjust-text small {
-  font-size: 13px;
-  color: var(--text-dim);
+  font-size: 14px;
+  color: var(--ink-dim);
 }
 
 .adjust-text small.is-changed {
-  color: var(--paper);
+  color: var(--mark);
 }
 
+/* The fold opener: a ruled box like the ticket's tick boxes, its arrow turning when open. */
 .adjust-chev {
-  width: 16px;
-  height: 16px;
-  fill: var(--text-dim);
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
+  padding: 5px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 2px var(--ink);
+  fill: var(--ink);
+}
+
+/* Open, the line says it closes: a word beside the turned arrow. */
+.adjust-close {
+  display: none;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.sec-adjust.is-open .adjust-close {
+  display: block;
+}
+
+/* Open, the tabs carry their own marks, so the line's summary steps aside. */
+.sec-adjust.is-open .adjust-text small {
+  display: none;
+}
+
+.adjust-toggle:has(.adjust-close) {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
 .sec-adjust.is-open .adjust-chev {
+  box-shadow: none;
   transform: rotate(180deg);
 }
 
 .adjust-body {
-  margin-top: 4px;
+  margin-top: 0;
 }
+
+
 
 /* Tabs, and the way to close them, stay in reach while their content scrolls under them. */
 .tabs-bar {
   position: sticky;
   top: var(--adjust-row-h, 64px);
   z-index: 3;
-  margin: 0 -24px;
-  padding: 8px 24px;
-  background: var(--panel);
-  box-shadow: 0 2px 0 var(--panel-lo);
+  margin: 0 calc(-1 * var(--pad));
+  padding: 10px var(--pad);
+  /* Its rule keeps to the sheet's margins, like every other rule on it. */
+  background:
+    linear-gradient(var(--ink), var(--ink)) bottom center / calc(100% - 2 * var(--pad)) 2px no-repeat,
+    var(--sheet);
+}
+
+/* What scrolls up under the tabs fades into the sheet instead of being cut by their rule. */
+.tabs-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 18px;
+  background: linear-gradient(var(--sheet), transparent);
+  pointer-events: none;
 }
 
 /* Each tab is as wide as its word, so long English names never run together. */
 .tabs {
   display: flex;
   justify-content: space-between;
-  gap: 2px;
+  gap: 4px;
 }
-
 
 .tab {
   position: relative;
@@ -1376,39 +1660,40 @@ button {
   min-height: 40px;
   padding: 4px 8px;
   border: 0;
-  border-radius: 8px 8px 4px 4px;
+  border-radius: 2px;
   background: none;
-  color: var(--text-dim);
+  box-shadow: inset 0 0 0 2px var(--rule);
+  color: var(--ink);
   font-size: 16px;
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .tab:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--sheet-lo);
+  box-shadow: inset 0 0 0 2px var(--ink);
 }
 
 .tab[aria-selected='true'] {
-  background: var(--panel-hi);
-  color: var(--text);
-  box-shadow: inset 0 -3px 0 var(--paper);
+  background: var(--ink);
+  color: var(--sheet);
+  box-shadow: none;
 }
 
-/* Something in the tab differs from the defaults: a small rarity diamond, like the card's own. */
+/* Something in the tab differs from the defaults: a violet correction mark. */
 .tab-dot {
   position: absolute;
-  top: 6px;
-  right: 7px;
+  top: 5px;
+  right: 6px;
   width: 7px;
   height: 7px;
-  background: var(--gold);
-  box-shadow: 0 0 0 2px var(--panel);
+  background: var(--mark);
+  box-shadow: 0 0 0 2px var(--sheet);
   transform: rotate(45deg);
 }
 
 .tab[aria-selected='true'] .tab-dot {
-  box-shadow: 0 0 0 2px var(--panel-hi);
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .pane {
@@ -1431,57 +1716,103 @@ button {
   display: none;
 }
 
-/* Export: format, then the one Save button */
-/* Format and its options sit in the flow; only Save is pinned to the bottom. */
+/* GIF options sit in the flow just above the stub; only the stub is pinned. */
 .sec-format {
   display: grid;
   gap: 16px;
-  margin-top: auto;
-}
-
-
-.sec-export {
-  position: sticky;
-  bottom: 0;
-  /* Above everything that scrolls under it (slider thumbs and chips carry their own z-index). */
-  z-index: 10;
-  display: grid;
-  gap: 12px;
-  padding-top: 16px;
-  background: var(--panel);
-  box-shadow: 0 -2px 0 var(--panel-lo);
-}
-
-.sec.sec-export {
-  border-top: 0;
 }
 
 .sec-format:not(:has(.save-opts:not([hidden]))) {
   display: none;
 }
 
+/* 3 Export: the tear-off stub, pinned to the bottom of the sheet. */
+.sec-export {
+  position: sticky;
+  bottom: 0;
+  /* Above everything that scrolls under it (slider thumbs and chips carry their own z-index). */
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding-top: 26px;
+  background: var(--sheet);
+}
+
+/* Steps scrolling under the stub fade into the sheet instead of being sliced mid-line. */
 .sec-export::before {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
   bottom: 100%;
-  height: 16px;
-  background: linear-gradient(transparent, var(--panel));
+  height: 36px;
+  background: linear-gradient(transparent, var(--sheet) 85%);
   pointer-events: none;
 }
 
+/* More of the sheet waits below: a small arrow in the fade says so. */
+.panel.has-more :is(.sec-export, .tune-dock)::before {
+  content: var(--more-text);
+  display: grid;
+  place-items: end center;
+  height: 44px;
+  padding-bottom: 6px;
+  background: linear-gradient(transparent, var(--sheet) 55%);
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+/* With the Shine tab's dock pinned above the stub, the dock carries the fade instead. */
+.panel:has(.tune-dock:not([hidden])) .sec-export::before {
+  display: none;
+}
+
+/* The perforation: a dashed tear line with a punched hole every few pixels. */
+.sec-export::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 8px;
+  background:
+    radial-gradient(circle, #141c1f 2.5px, transparent 3px) center / 12px 8px repeat-x;
+  pointer-events: none;
+}
+
+/* Formats: one of four, each with a word for what it makes (a still, a loop...); the chosen
+   one is inked. */
 .seg.seg-format {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
-.seg-format .seg-btn {
-  min-height: 36px;
+.panel .seg-format .seg-btn {
+  display: grid;
+  place-content: center;
+  min-height: 46px;
+  padding: 4px 2px;
+  line-height: 1.15;
 }
 
+.seg-format .seg-btn b {
+  font-weight: 400;
+}
 
-/* Save options: one quiet row under the formats; opened only by those who want them. */
+.seg-format .seg-btn small {
+  font-size: 12px;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  color: var(--ink-dim);
+}
+
+.seg-format .seg-btn[aria-checked='true'] small {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* Save options: one quiet line under the formats; opened only by those who want them. */
 .save-opts[hidden],
 .save-opts-body[hidden],
 .save-opts .field[hidden],
@@ -1504,13 +1835,13 @@ button {
   padding: 0 2px;
   border: 0;
   background: none;
-  color: var(--text-dim);
+  color: var(--ink-dim);
   font-size: 16px;
   text-align: left;
 }
 
 .save-opts-toggle:hover {
-  color: var(--text);
+  color: var(--ink);
 }
 
 .save-opts-toggle small {
@@ -1551,10 +1882,10 @@ button {
   height: 34px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
-  background: var(--sw, var(--panel-lo));
-  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
-  color: var(--text-dim);
+  border-radius: 3px;
+  background: var(--sw, var(--sheet-lo));
+  box-shadow: 0 0 0 2px var(--ink);
+  color: var(--ink-dim);
   font-size: 13px;
   transition: transform 0.15s var(--ease-back), box-shadow 0.15s;
 }
@@ -1572,8 +1903,7 @@ button {
 }
 
 .matte-auto {
-  background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
+  background: var(--sheet-lo);
 }
 
 /* Any colour: a colour wheel with a plus, or the picked colour once set. */
@@ -1587,17 +1917,17 @@ button {
   inset: 7px;
   display: grid;
   place-items: center;
-  border-radius: 3px;
-  background: var(--panel-lo);
-  color: var(--text);
+  border-radius: 2px;
+  background: var(--sheet);
+  color: var(--ink);
   font-family: var(--display);
   font-size: 13px;
   line-height: 1;
 }
 
 .matte-sw[aria-checked='true'] {
-  color: var(--text);
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--paper), 0 6px 0 5px var(--edge);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink);
   transform: translateY(-2px);
 }
 
@@ -1615,19 +1945,52 @@ button {
   font-size: 13px;
 }
 
+/*
+ * The Save stamp. While a sample shows, it waits in a plain ruled box (still pressable); once
+ * the picture is yours, it is the vermilion stamp. Hover lifts it off the sheet a little;
+ * pressing sets it down.
+ */
 #saveBtn {
+  --c: var(--stamp);
+  --lo: var(--stamp-lo);
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   justify-items: start;
   min-height: 60px;
+  overflow: hidden;
+  color: #fff8ef;
+  box-shadow: var(--stamp-face), 3px 4px 0 rgba(42, 36, 30, 0.3);
+}
+
+#saveBtn:not([aria-busy]):hover {
+  filter: brightness(1.06);
+  transform: translate(-1px, -2px);
+  box-shadow: var(--stamp-face), 5px 7px 0 rgba(42, 36, 30, 0.3);
+}
+
+#saveBtn:not([aria-busy]):active {
+  transform: translate(3px, 4px);
+  box-shadow: var(--stamp-face), 0 0 0 rgba(42, 36, 30, 0.3);
+}
+
+.panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved) {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  transform: none;
+}
+
+.panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved):hover {
+  filter: none;
+  background: var(--sheet-lo);
+}
+
+.panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved):active {
+  transform: translate(1px, 2px);
 }
 
 /* A band of foil light sweeps across once on hover, the same sheen the cards wear. */
-#saveBtn {
-  position: relative;
-  overflow: hidden;
-}
-
 #saveBtn::before {
   content: '';
   position: absolute;
@@ -1654,29 +2017,22 @@ button {
   to { background-position: 0 0; opacity: 1; }
 }
 
-/* Saved: the button turns to foil for a moment. */
-#saveBtn.is-saved {
-  background: linear-gradient(110deg, #ff6b8b, #f2c14e 25%, #59f2b0 50%, #5fb4ff 75%, #c58bff) 0 0 / 200% 100%;
-  color: var(--paper-ink);
-  text-shadow: none;
-  animation: saved-foil 2.4s var(--ease-out);
+/* Saved: the stamp has done its job and goes quiet, and the dated seal says so on it. */
+#saveBtn.is-saved,
+#saveBtn.is-saved:not([aria-busy]):hover {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  filter: none;
+  transform: none;
 }
 
 #saveBtn.is-saved .btn-text small {
   opacity: 1;
-  color: var(--paper-ink);
-}
-
-@keyframes saved-foil {
-  from { background-position: 100% 0; transform: translateY(-4px) scale(1.02); }
-  15% { transform: translateY(0) scale(1); }
-  to { background-position: 0 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #saveBtn:not([aria-busy]):hover::before,
-  #saveBtn.is-saved,
-  .finish-chip::after {
+  #saveBtn:not([aria-busy]):hover::before {
     animation: none;
   }
 }
@@ -1685,10 +2041,9 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* The note wraps rather than being cut off where the stamp is narrow. */
 #saveBtn .btn-text small {
-  overflow: hidden;
-  max-width: 100%;
-  text-overflow: ellipsis;
+  white-space: normal;
 }
 
 .save-meta {
@@ -1714,7 +2069,55 @@ button {
   opacity: 0.85;
 }
 
-/* Busy: the face of the button fills left to right as the export runs. */
+/* Saved: a dated "done" seal is pressed onto the stamp, and fades when it is ready again. */
+.seal {
+  display: none;
+  grid-column: 3;
+  grid-row: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px var(--sheet), inset 0 0 0 5px var(--ink);
+  color: var(--ink);
+  line-height: 1.1;
+  rotate: -5deg;
+  pointer-events: none;
+}
+
+.seal b {
+  font-weight: 400;
+  font-size: 22px;
+}
+
+.seal small {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+#saveBtn.is-saved .save-meta {
+  display: none;
+}
+
+#saveBtn.is-saved .seal {
+  display: flex;
+  animation: seal-in 0.3s var(--ease-back);
+}
+
+@keyframes seal-in {
+  from {
+    opacity: 0;
+    scale: 1.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #saveBtn.is-saved .seal {
+    animation: none;
+  }
+}
+
+/* Busy: the stamp's face fills left to right as the export runs. */
 #saveBtn[aria-busy] {
   filter: none;
   background: linear-gradient(90deg, var(--c) calc(var(--p, 0) * 100%), var(--lo) 0);
@@ -1940,6 +2343,108 @@ input[type='range']:disabled {
   background: linear-gradient(160deg, #4f6e86, #24384a);
 }
 
+/* On the sheet, choices are ruled boxes and the chosen one is inked; sliders are a ruled
+   groove inked up to a paper grip. */
+.panel .seg-btn {
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--ink-dim);
+  color: var(--ink);
+}
+
+.panel .seg-btn:hover {
+  background: var(--sheet-lo);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.panel .seg-btn[aria-checked='true'] {
+  background: var(--ink);
+  color: var(--sheet);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.panel .seg-btn:active {
+  transform: translate(1px, 2px);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.panel input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.panel input[type='range']::-moz-range-track {
+  height: 6px;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+/* Shine paints its own tracks (fills from the default, hue and saturation scales). */
+.panel input[type='range']:not(.tune-range)::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(var(--ink), var(--ink)) 0 0 / var(--fill, 50%) 100% no-repeat,
+    var(--sheet-lo);
+}
+
+.panel input[type='range']:not(.tune-range)::-moz-range-track {
+  background: var(--sheet-lo);
+}
+
+.panel input[type='range']:not(.tune-range)::-moz-range-progress {
+  height: 6px;
+  background: var(--ink);
+}
+
+.panel input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: 22px;
+  margin-top: -8px;
+  background: #fbf7ec;
+  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 rgba(42, 36, 30, 0.3);
+}
+
+.panel input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 22px;
+  background: #fbf7ec;
+  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 rgba(42, 36, 30, 0.3);
+}
+
+.panel input[type='range']:focus-visible::-webkit-slider-thumb {
+  background: var(--cyan);
+}
+
+.panel input[type='range']:focus-visible::-moz-range-thumb {
+  background: var(--cyan);
+}
+
+/* Side notes on the sheet stay readable over its fibres. */
+.panel :is(.btn-text small, .hint) {
+  font-size: 14px;
+}
+
+/* A dotted leader runs from a label to its value, as on a printed form. */
+.panel .row > .field-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.panel .row > .field-label::after {
+  content: '';
+  flex: 1;
+  min-width: 12px;
+  border-bottom: 2px dotted var(--rule);
+}
+
+.panel .link {
+  color: var(--ink);
+  text-decoration-color: var(--ink-dim);
+}
+
+.panel .link:hover {
+  text-decoration-color: currentColor;
+}
+
 /* ---------- Overlays ---------- */
 
 .crt {
@@ -1999,7 +2504,7 @@ input[type='range']:disabled {
 
 .toasts {
   position: fixed;
-  /* Lifted just above the Export bar by main.ts (placeToasts), clear of the header and the hand. */
+  /* Lifted just above the Export bar by main.ts (trackExportBar), clear of the header and the hand. */
   left: auto;
   right: 36px;
   bottom: 200px;
@@ -2179,35 +2684,67 @@ input[type='range']:disabled {
 
 /* ---------- Responsive ---------- */
 
-/* Short laptop screens and 125% scaling: a smaller crop preview keeps Fine-tune above Save. */
+/* Short laptop screens and 125% scaling: a smaller crop window keeps Fine-tune above the stub. */
 @media (min-width: 901px) and (max-height: 800px) {
+  .panel {
+    --pad: 20px;
+  }
   .sec {
-    padding: 16px 20px;
+    padding-block: 14px;
   }
   .sec-head {
     margin-bottom: 10px;
   }
+  .sec-finish .sec-title {
+    margin-bottom: 10px;
+  }
   .crop-view {
-    height: 64px;
+    width: 84px;
+    height: 96px;
   }
   .crop {
     margin-top: 12px;
   }
-  .crop .row {
-    margin-top: 8px;
+  .crop-side .hint {
+    display: none;
+  }
+  .finish-row .finish-proof {
+    width: 38px;
+    height: 53px;
   }
   .thumbs {
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
   .thumb {
     width: 36px;
   }
   .pick {
+    min-height: 46px;
+  }
+  .finish-row {
+    row-gap: 4px;
+  }
+  .finish-row .finish-pick {
+    min-height: 30px;
+  }
+  .adjust-toggle {
+    min-height: 46px;
+    padding: 2px 0;
+  }
+  .sec-export {
+    gap: 8px;
+    padding-top: 18px;
+    padding-bottom: 16px;
+  }
+  .panel .seg-format .seg-btn {
+    min-height: 40px;
+    padding-block: 2px;
+  }
+  #saveBtn {
     min-height: 48px;
   }
   .tabs-bar {
-    margin: 0 -20px;
-    padding: 8px 12px 8px 20px;
+    padding-block: 8px;
   }
 }
 
@@ -2260,10 +2797,7 @@ input[type='range']:disabled {
     height: auto;
     width: min(62vw, 300px);
   }
-  /* On phones the panel is far below, so the first action sits right under the card. */
-  #pickBtn {
-    display: none;
-  }
+  /* On phones the panel is far below, so the first action also sits right under the card. */
   .btn.stage-pick {
     display: flex;
     width: auto;
@@ -2295,33 +2829,86 @@ input[type='range']:disabled {
     display: none;
   }
   .panel {
-    max-height: none;
+    --pad: 20px;
+    height: auto;
     margin: 16px;
     overflow: visible;
   }
-  .sec {
-    padding: 20px;
+  /* While tuning, the pinned head is just the tabs, so the controls keep most of the screen. */
+  .adjust-toggle {
+    position: static;
   }
   .tabs-bar {
-    margin: 0 -20px;
-    padding: 8px 12px 8px 20px;
+    top: 0;
+    padding-block: 8px;
   }
-  /* Save rides along the bottom of the screen from the start, so the main action is always one tap away. */
+  /* The stub rides along the bottom of the screen from the start, so Save is always one tap away. */
   .sec-export {
     position: fixed;
     left: 16px;
     right: 16px;
     bottom: 0;
     z-index: 30;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 0 0 3px var(--edge), 0 -8px 24px rgba(0, 0, 0, 0.45);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'formats'
+      'save';
+    column-gap: 12px;
+    row-gap: 10px;
+    padding: 20px var(--pad) calc(14px + env(safe-area-inset-bottom));
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 0 0 3px #0b1012, 0 -8px 24px rgba(0, 0, 0, 0.45);
   }
+  .sec-export .sec-title {
+    grid-area: title;
+  }
+  .sec-export .seg-format {
+    grid-area: formats;
+  }
+  #saveBtn {
+    grid-area: save;
+  }
+  /* Over the stage there is nothing to fade; over the sheet, its lines fade into the stub. */
   .sec-export::before {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .sec-export.is-over-sheet::before {
+    opacity: 1;
+  }
+  /* The live view of the card, while Shine is tuned, rides beside the formats and Save. */
+  .sec-export:has(.tune-peek:not([hidden])) {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'peek title'
+      'peek formats'
+      'peek save';
+  }
+  /* Beside the preview the formats keep to their names, so tuning keeps the screen. */
+  .sec-export:has(.tune-peek:not([hidden])) .seg-format small {
     display: none;
+  }
+  .sec-export:has(.tune-peek:not([hidden])) .seg-format .seg-btn {
+    min-height: 38px;
+  }
+  .sec-export .tune-peek {
+    grid-area: peek;
+    align-self: stretch;
+    height: auto;
+  }
+  #saveBtn {
+    min-height: 54px;
   }
   .app {
     padding-bottom: calc(var(--export-h, 90px) + 8px);
+  }
+}
+
+/* Touch screens have nothing to drop or paste with. */
+@media (pointer: coarse) {
+  .pick .btn-text small {
+    display: none;
   }
 }
 

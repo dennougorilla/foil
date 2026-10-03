@@ -109,14 +109,20 @@
 
       <aside class="panel" id="panel">
         <section class="sec sec-image" aria-labelledby="imageTitle">
+          <button class="recap" id="recapImage" type="button">
+            <i class="step" aria-hidden="true">1</i>
+            <span class="recap-thumb" id="recapThumb" aria-hidden="true"></span>
+            <b class="recap-name" id="recapImageName"></b>
+            <span class="recap-go" data-t="recapGo"></span>
+          </button>
           <div class="sec-head">
             <h2 class="sec-title"><i class="step" aria-hidden="true">1</i><span id="imageTitle" data-t="secImage"></span></h2>
             <small class="sec-note" id="thumbLabel"></small>
           </div>
           <div class="thumbs" id="thumbs" role="radiogroup"></div>
-          <button class="btn btn-quiet pick" id="pickBtn" type="button">
+          <button class="btn pick" id="pickBtn" type="button">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg>
-            <span class="btn-text"><b data-t="pick"></b><small data-t="pickSub"></small></span>
+            <span class="btn-text"><b data-t="pickFile"></b><small data-t="pickSub"></small></span>
           </button>
           <div class="image-error" id="imageError" hidden>
             <p role="alert"></p>
@@ -134,28 +140,42 @@
               <canvas id="cropCanvas"></canvas>
               <div class="crop-window" id="cropWindow"></div>
             </div>
-            <div class="row">
-              <label class="field-label" for="zoom" data-t="zoom"></label>
-              <output id="zoomOut" for="zoom"></output>
-              <input type="range" id="zoom" min="1" max="4" step="0.01" value="1" />
+            <div class="crop-side">
+              <div class="row">
+                <label class="field-label" for="zoom" data-t="zoom"></label>
+                <output id="zoomOut" for="zoom"></output>
+                <input type="range" id="zoom" min="1" max="4" step="0.01" value="1" />
+              </div>
+              <p class="hint" data-t="cropTip"></p>
+              <button class="link crop-reset" id="cropReset" type="button" data-t="cropReset"></button>
             </div>
-            <button class="link crop-reset" id="cropReset" type="button" data-t="cropReset"></button>
           </div>
         </section>
 
         <section class="sec sec-finish" aria-labelledby="finishTitle">
-          <span class="finish-chip" id="finishChip" aria-hidden="true"></span>
-          <span class="finish-text"><b><i class="step" aria-hidden="true">2</i><span id="finishName"></span></b><small id="finishTitle" data-t="finishLabel"></small></span>
-          <button class="finish-pick" id="finishPick" type="button">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5h4v8H1zm4-2h4v1H6v9H4V4h1zm5-1h4v8h-4zM9 3h1v9H9z" /></svg>
-            <span data-t="finishPick"></span>
+          <button class="recap" id="recapFinish" type="button">
+            <i class="step" aria-hidden="true">2</i>
+            <span class="finish-proof recap-thumb" id="recapProof" aria-hidden="true"></span>
+            <b class="recap-name" id="recapFinishName"></b>
+            <span class="recap-go" data-t="recapGo"></span>
           </button>
+          <h2 class="sec-title"><i class="step" aria-hidden="true">2</i><span id="finishTitle" data-t="secFinish"></span></h2>
+          <div class="finish-row">
+            <span class="proof-sheet" aria-hidden="true"><span class="finish-proof" id="finishProof"></span><i data-t="proofTag"></i></span>
+            <b class="finish-name" id="finishName"></b>
+            <small class="finish-look" id="finishLook"></small>
+            <button class="finish-pick" id="finishPick" type="button">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5h4v8H1zm4-2h4v1H6v9H4V4h1zm5-1h4v8h-4zM9 3h1v9H9z" /></svg>
+              <span data-t="finishPick"></span>
+            </button>
+          </div>
         </section>
 
         <section class="sec sec-adjust" id="adjust">
           <button class="adjust-toggle" id="adjustToggle" type="button" aria-controls="adjustBody" aria-expanded="false">
             <svg class="adjust-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h7v2H2zm10 0h2v2h-2zM9 2h3v4H9zM2 11h2v2H2zm5 0h7v2H7zM4 10h3v4H4zM2 7h4v2H2zm7 0h5v2H9zM6 6h3v4H6z" /></svg>
             <span class="adjust-text"><b data-t="adjust"></b><small id="adjustSummary"></small></span>
+            <span class="adjust-close" data-t="adjustClose"></span>
             <svg class="adjust-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5h2v2h2v2h2V7h2V5h2v2h-2v2H9v2H7V9H5V7H3z" /></svg>
           </button>
           <div class="adjust-body" id="adjustBody" hidden>
@@ -185,8 +205,7 @@
           </div>
         </section>
 
-        <section class="sec sec-format" aria-labelledby="exportTitle">
-          <h2 class="sr-only" id="exportTitle" data-t="secExport"></h2>
+        <section class="sec sec-format">
           <div class="save-opts" id="saveOpts">
             <button class="save-opts-toggle" id="saveOptsToggle" type="button" aria-controls="saveOptsBody" aria-expanded="false">
               <span data-t="gifOpts"></span><small id="saveOptsSummary"></small>
@@ -207,12 +226,14 @@
           </div>
         </section>
 
-        <section class="sec sec-export">
+        <section class="sec sec-export" aria-labelledby="exportTitle">
+          <h2 class="sec-title"><i class="step" aria-hidden="true">3</i><span id="exportTitle" data-t="secExport"></span></h2>
           <div class="seg seg-format" id="formatSeg" role="radiogroup" aria-labelledby="exportTitle"></div>
           <button class="btn btn-primary" id="saveBtn" type="button">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M2 10v3.5h12V10" /></svg>
             <span class="btn-text"><b></b><small></small></span>
             <span class="save-meta"><b></b><small></small></span>
+            <span class="seal" id="seal" aria-hidden="true"><b></b><small></small></span>
           </button>
         </section>
       </aside>

@@ -24,6 +24,8 @@ async function step(name, fn) {
 function expect(cond, msg) {
   if (!cond) throw new Error(msg);
 }
+/** Whether a button wears a solid face (inked) rather than an outline. */
+const filled = (id, p = page) => p.evaluate((id) => !/^rgba\(.*, 0\)$|transparent/.test(getComputedStyle(document.getElementById(id)).backgroundColor), id);
 const tab = async (id) => {
   if (!(await page.isVisible('#panelTabs'))) await page.click('#adjustToggle');
   await page.click(`#panelTabs [role=tab][data-tab=${id}]`);
@@ -44,6 +46,25 @@ await step('first visit shows only the main flow', async () => {
   expect(!(await page.isVisible('#panelTabs')), 'fine-tuning is open on a first visit');
   expect(!(await page.isVisible('#intensity')), 'a fine control shows before Fine-tune is opened');
   expect(!(await page.isVisible('.sw-strip-stage')), 'the backdrop row should be gone');
+});
+
+await step('the panel reads as three numbered steps', async () => {
+  const steps = await page.locator('.panel .step').evaluateAll((els) => els.filter((e) => e.getClientRects().length).map((e) => e.textContent));
+  expect(steps.join() === '1,2,3', `steps shown: ${steps.join() || 'none'}`);
+});
+
+await step('while a sample shows, choosing a picture outranks Save', async () => {
+  expect((await filled('pickBtn')) && !(await filled('saveBtn')), 'expected an inked pick button and a Save stamp still in outline');
+});
+
+await step('the crop preview is sized to the picture', async () => {
+  const [view, pic] = await page.evaluate(() => ['#cropView', '#cropCanvas'].map((s) => document.querySelector(s).getBoundingClientRect().width));
+  expect((view - pic) / view < 0.4, `the preview is mostly empty (${Math.round(pic)} of ${Math.round(view)} px)`);
+});
+
+await step('content fades out above the pinned Save bar', async () => {
+  const fade = await page.evaluate(() => getComputedStyle(document.querySelector('.sec-export'), '::before'));
+  expect(fade.display !== 'none' && parseFloat(fade.height) >= 24, `fade is ${fade.display} / ${fade.height}`);
 });
 
 await step('fine-tune opens with four tabs and is remembered', async () => {
@@ -82,6 +103,7 @@ await step('load an image', async () => {
   await page.setInputFiles('#fileInput', { name: 'meadow.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').sample === -1, null, { timeout: 15000 });
   expect((await page.locator('#thumbs .thumb').count()) === 4, 'own image thumb missing');
+  expect((await filled('saveBtn')) && !(await filled('pickBtn')), 'with your own picture, Save should be the inked stamp and the pick button quiet');
 });
 
 await step('crop zoom', async () => {
@@ -128,7 +150,7 @@ await step('add a frame color', async () => {
   expect(s.frameSwatches.includes('#2266aa') && s.frameColor === '#2266aa', 'frame colour not saved');
 });
 
-await step('light & motion tab', async () => {
+await step('shine tab', async () => {
   await tab('light');
   await page.locator('#tune-scale').fill('1.6');
   await page.click('#pane-light [data-key=idle] [role=radio][data-value=spin]');
@@ -148,7 +170,7 @@ await step('lettering from the name tag', async () => {
   expect((await state()).text.style === 'foil', 'lettering style not applied');
 });
 
-await step('area tab and brush', async () => {
+await step('finish area tab and brush', async () => {
   await tab('range');
   await page.click('#pane-range .region-btn[data-v=art]');
   expect((await state()).rangeRegion === 'art', 'region not applied');
@@ -213,6 +235,24 @@ await step('the hand opens with seven finishes; each support link unlocks one se
   await page.keyboard.press('8');
   await page.waitForTimeout(400);
   expect((await state()).edition === first, 'the unlocked secret could not be applied');
+});
+
+await step('phones: the live preview rides in the Save stub, never over the controls', async () => {
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const p = await phone.newPage();
+  p.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(1500);
+  await p.click('#adjustToggle');
+  await p.click('#panelTabs [role=tab][data-tab=light]');
+  // Mid-tab, so the sheet runs on under the stub.
+  await p.locator('#pane-light .tune-row').nth(3).scrollIntoViewIfNeeded();
+  await p.waitForTimeout(600);
+  expect(await p.isVisible('.tune-peek'), 'no preview once the card has scrolled away');
+  expect(await p.evaluate(() => !!document.querySelector('.tune-peek').closest('.sec-export')), 'the preview is not inside the Save stub');
+  const fade = await p.evaluate(() => getComputedStyle(document.querySelector('.sec-export'), '::before'));
+  expect(fade.display !== 'none' && fade.opacity === '1' && parseFloat(fade.height) >= 24, `no fade above the Save stub on phones (${fade.display} / ${fade.opacity} / ${fade.height})`);
+  await phone.close();
 });
 
 await browser.close();

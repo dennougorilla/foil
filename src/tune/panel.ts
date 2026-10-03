@@ -1,4 +1,4 @@
-// The panel's "Light & motion" tab: three groups of controls (pattern, light, motion). Every
+// The panel's "Shine" tab: three groups of controls (pattern, light, motion). Every
 // control shows its value, can be reset on its own, and double-click / Delete puts it back.
 import './tune.css';
 import { DICTS, type Dict } from '../i18n';
@@ -119,7 +119,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
   let undo: Tune | null = null;
   let undoTimer = 0;
   const touch = matchMedia('(pointer: coarse)').matches;
-  const peek = mountPeek(() => sync(), () => Math.cos(motion.spinAngle));
+  const peek = mountPeek();
+  document.querySelector('.sec-export')?.prepend(peek.el);
   const sun = mountSunHandle((deg) => set({ lightAngle: deg }), () => Math.cos(motion.spinAngle));
   // A stamp on the card while "Hold to compare" shows the defaults.
   const stamp = document.createElement('span');
@@ -147,7 +148,6 @@ export function mountTune(store: Store, root: HTMLElement): void {
         <div class="tune-groups"></div>
         <p class="hint tune-hint"></p>
         <div class="tune-dock">
-          <span class="tune-dock-peek"></span>
           <div class="tune-actions">
             <button class="tune-compare" type="button" aria-pressed="false">${svg('eye')}<span class="tune-long"></span><span class="tune-short"></span></button>
             <p class="tune-undo-msg" hidden><b></b><small></small></p>
@@ -160,7 +160,6 @@ export function mountTune(store: Store, root: HTMLElement): void {
     root.querySelector('.tune-undo span')!.textContent = t.undo;
     stamp.textContent = t.stamp;
     peek.setLabel(t.peek, t.peekCap);
-    root.querySelector('.tune-dock-peek')!.replaceWith(peek.el);
     bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
     const groups = root.querySelector<HTMLElement>('.tune-groups')!;
     for (const def of GROUPS) {
@@ -168,7 +167,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
       group.className = 'tune-group';
       group.id = `tuneGroup-${def.id}`;
       group.setAttribute('aria-labelledby', `tuneGroupTitle-${def.id}`);
-      group.innerHTML = `<h3 class="group-title" id="tuneGroupTitle-${def.id}">${svg(def.id)}<span></span><i class="tune-dot" aria-hidden="true"></i></h3>`;
+      group.innerHTML = `<h3 class="group-title" id="tuneGroupTitle-${def.id}">${svg(def.id)}<span></span></h3>`;
       group.querySelector('span')!.textContent = t.groups[def.id];
       if (def.id === 'pattern') group.appendChild(sampleRow());
       for (const k of def.keys)
@@ -369,7 +368,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
   function sampleRow() {
     const row = document.createElement('div');
     row.className = 'tune-sample-row';
-    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div>';
+    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div><p class="tune-help"></p>';
+    row.querySelector('p')!.textContent = t.sampleNote;
     return row;
   }
 
@@ -449,15 +449,9 @@ export function mountTune(store: Store, root: HTMLElement): void {
     done.querySelector('b')!.textContent = t.resetDone;
     done.querySelector('small')!.textContent = t.undoHint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
-    // The dock always carries the hint; its button row only when there is something to do.
-    // The dock only shows when it has something to offer: changes to compare or reset, an undo, the phone preview.
-    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo && !peek.shown;
+    // The dock only shows when it has something to offer: changes to compare or reset, or an undo.
+    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo;
     peek.setActive(shown());
-
-    for (const def of GROUPS) {
-      const n = def.keys.filter((k) => changed.includes(k)).length;
-      root.querySelector<HTMLElement>(`#tuneGroup-${def.id} .tune-dot`)!.hidden = !n;
-    }
 
     root.querySelectorAll<HTMLElement>('.tune-row').forEach((row) => {
       const k = row.dataset.key as Key;

@@ -67,7 +67,7 @@
 .seg-region:is(.is-invert, .is-custom) .region-btn[aria-checked='true'] {
   background: var(--panel-lo);
   color: var(--paper);
-  box-shadow: inset 0 0 0 2px var(--paper), 0 4px 0 var(--edge);
+  box-shadow: inset 0 0 0 2px var(--paper);
 }
 
 .seg-region.is-invert .region-btn[aria-checked='true'] {
@@ -315,9 +315,9 @@
   min-height: 34px;
   padding: 2px;
   border: 0;
-  border-radius: 8px;
-  background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px #4b6068, 0 4px 0 var(--edge);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--ink-dim);
   color: var(--text);
   font-size: 13px;
   line-height: 1.2;
@@ -335,15 +335,18 @@
 
 .tone-chip:active,
 .chip.range-chip:active {
-  transform: translateY(4px);
-  box-shadow: inset 0 0 0 2px var(--panel-hi);
+  transform: translate(1px, 2px);
+}
+
+.chip.range-chip:hover {
+  box-shadow: inset 0 0 0 2px var(--ink);
 }
 
 .tone-chip[aria-pressed='true'],
 .chip.range-chip[aria-pressed='true'] {
   background: var(--paper);
   color: var(--paper-ink);
-  box-shadow: 0 4px 0 var(--edge);
+  box-shadow: inset 0 0 0 2px var(--paper);
 }
 
 .range-row {
@@ -404,7 +407,7 @@
   transform: none;
   background: var(--panel-lo);
   text-shadow: none;
-  box-shadow: inset 0 0 0 2px var(--paper), 0 4px 0 var(--edge);
+  box-shadow: inset 0 0 0 2px var(--paper);
 }
 
 .range-cover {
@@ -856,9 +859,9 @@
   height: 36px;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 2px;
   background: none;
-  box-shadow: inset 0 0 0 2px #4b6068;
+  box-shadow: inset 0 0 0 2px var(--ink-dim);
   color: var(--text);
   font-size: 13px;
   transition: color 0.15s, box-shadow 0.15s, transform 0.08s;

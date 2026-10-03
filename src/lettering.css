@@ -25,9 +25,9 @@
   min-width: 0;
   padding: 5px 3px 2px;
   border: 0;
-  border-radius: 8px;
-  background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 4px 0 var(--edge);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--ink-dim);
   color: var(--text-dim);
   font-size: 12px;
   line-height: 1.2;
@@ -45,7 +45,7 @@
 .lt-style[aria-checked='true'] {
   background: var(--paper);
   color: var(--paper-ink);
-  box-shadow: 0 4px 0 var(--edge);
+  box-shadow: inset 0 0 0 2px var(--paper);
 }
 
 .lt-style[aria-checked='true'] .lt-chip {
@@ -54,8 +54,7 @@
 }
 
 .lt-style:active {
-  transform: translateY(4px);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 0 0 var(--edge);
+  transform: translate(1px, 2px);
 }
 
 /* Names wrap only between words onto a second line rather than shrink ("Spot / UV"). */
