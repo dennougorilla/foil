@@ -322,7 +322,7 @@ export function mountLettering(o: Options): void {
 
   reset.addEventListener('click', () => {
     sfx.tick();
-    set({ ...DEFAULT_LETTERING, style: store.get().text.style });
+    set({ ...DEFAULT_LETTERING });
   });
 
   // ---------- Sync ----------
@@ -425,7 +425,7 @@ export function mountLettering(o: Options): void {
     gloss.out.textContent = word(l.gloss, t.glossLevel);
     gloss.input.setAttribute('aria-valuetext', `${gloss.out.textContent} (${Math.round(l.gloss * 100)}%)`);
     fill(gloss.input);
-    reset.hidden = JSON.stringify({ ...l, style: DEFAULT_LETTERING.style }) === JSON.stringify(DEFAULT_LETTERING);
+    reset.hidden = JSON.stringify(l) === JSON.stringify(DEFAULT_LETTERING);
     lastFill = `${l.style}|${shown}`;
   }
 

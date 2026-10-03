@@ -333,6 +333,9 @@ float letterH(vec2 uv) {
   return (uTextStyle == 1 || uTextStyle == 2) ? s.b : s.g;
 }
 
+// The die's footprint: the plate height cut at half, with a sub-texel soft edge.
+float die(vec2 uv) { return smoothstep(0.4, 0.6, letterH(uv)); }
+
 vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   if (uTextStyle == 0 || uPlate < 0.5) return col;
   vec2 texel = 1.0 / vec2(textureSize(uTextMap, 0));
@@ -373,23 +376,31 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   // Light boost is gentler on bare stock than on the raised or sunk glyph itself.
   float shade = clamp(lam * 1.5, -0.5, 0.4);
 
+  // Presses are drawn as hard pixel bevels, like the rest of the app: bands one
+  // to three texels wide on the die's edge, never a soft blur. The bands turn
+  // with the light, so tilting still moves them.
+  vec2 dirL = normalize(Ldir.xy + 1e-4);
+  // At least ~2 screen pixels, so the bevel still reads when the card is small.
+  float bite = 1.0 + 1.6 * sin(3.14159 * k) * (1.0 - k);
+  vec2 band = dirL * max(texel * (1.0 + 2.0 * uTextDepth), e * (1.4 + 1.2 * uTextDepth)) * bite;
+  float d0 = die(uv);
+  float nearLight = d0 * (1.0 - die(uv + band));  // die edge facing the light
+  float farSide = d0 * (1.0 - die(uv - band));    // die edge facing away
+
   if (uTextStyle == 1) {
-    // Deboss: a sunken trough. The wall nearest the light falls into shadow,
-    // the far wall catches a thin lip of light, and the floor sits in shade.
-    float shadow = max(h - hl, 0.0) * (0.5 + 0.8 * uTextDepth);
-    col *= 1.0 - (0.06 + 0.12 * uTextDepth) * h;
-    // The lit lip stays a paper highlight, never brighter than white card stock under the lamp.
-    col *= 1.0 + clamp(lam * 1.7, -0.5, 0.14);
-    col *= 1.0 - clamp(shadow, 0.0, 0.45);
+    // Deboss: a sunken trough. The wall nearest the light is in shadow, the far
+    // wall is a lit lip, the floor a step darker. Nothing falls outside it.
+    col *= 1.0 - (0.12 + 0.14 * uTextDepth) * d0;
+    col *= 1.0 - (0.35 + 0.25 * uTextDepth) * nearLight;
+    col = mix(col, vec3(1.0), (0.5 + 0.25 * uTextDepth) * farSide * (1.0 - nearLight));
   } else if (uTextStyle == 2) {
-    // Emboss: a raised pillow. Lit shoulders towards the light, the top a touch
-    // brighter, and a long soft shadow thrown onto the stock on the far side.
-    float hf = letterH(uv + toward * 2.4);
-    float shadow = (max(hl - h, 0.0) * 0.7 + max(hf - h, 0.0) * 0.6) * (0.45 + 0.75 * uTextDepth);
-    col *= 1.0 + 0.02 * h;
-    col *= 1.0 + clamp(lam * 1.6, -0.45, 0.22);
-    col *= 1.0 - clamp(shadow, 0.0, 0.55);
-    col += pow(ndh, mix(10.0, 60.0, uTextGloss)) * uTextGloss * 0.3 * smoothstep(0.2, 0.7, h);
+    // Emboss: a raised plateau. Lit edge towards the light, a dark edge away
+    // from it, and a hard drop shadow thrown onto the stock beyond.
+    float thrown = (1.0 - d0) * die(uv + band * (1.6 + 1.2 * uTextDepth));
+    col = mix(col, vec3(1.0), (0.4 + 0.2 * uTextDepth) * nearLight * (1.0 - farSide));
+    col *= 1.0 - (0.25 + 0.2 * uTextDepth) * farSide * (1.0 - nearLight);
+    col *= 1.0 - (0.22 + 0.2 * uTextDepth) * thrown;
+    col += pow(ndh, mix(10.0, 60.0, uTextGloss)) * uTextGloss * 0.25 * d0;
   } else if (uTextStyle == 3) {
     // Hot-foil: a mirror-like metal with a fine grain, pressed slightly into the card.
     // Grain fades out as the card shrinks, so small cards don't turn to dither noise.
@@ -437,9 +448,12 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     col += vec3(0.05) * cover;
     // The sweep fades across each glyph so the varnish reads as a reflection, not paint.
     float across = 0.6 + 0.4 * sin(dot(uv, vec2(60.0, -40.0)) + dot(t, vec2(4.0)));
-    float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * across * (0.12 + 0.3 * uTextGloss);
+    float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * across * (0.25 + 0.45 * uTextGloss);
     col += vec3(0.95, 0.97, 1.0) * cover * (gloss + flare * 0.9);
-    col += vec3(1.0) * clamp(shade, 0.0, 0.4) * cover * (0.3 + sweep);
+    // The film's edge catches a hard one-pixel rim on the light side, even head-on.
+    vec2 rimStep = dirL * max(texel * 1.5, e);
+    float rim = cover * (1.0 - textureLod(uTextMap, uv + rimStep, letterLod).r);
+    col = mix(col, vec3(1.0), rim * (0.25 + 0.35 * uTextGloss + 0.4 * sweep));
   }
   return col;
 }
