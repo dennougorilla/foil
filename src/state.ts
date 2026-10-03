@@ -3,6 +3,7 @@ import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
+import type { ReliefMetal } from './relief';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 export interface State extends RangeColorState {
@@ -29,6 +30,8 @@ export interface State extends RangeColorState {
   tuneOpen: boolean;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
+  /** Metal of the Relief finish. */
+  reliefMetal: ReliefMetal;
 }
 
 type Listener = (s: State, changed: Set<keyof State>) => void;
@@ -52,6 +55,7 @@ const PERSIST: (keyof State)[] = [
   'tune',
   'tuneOpen',
   'text',
+  'reliefMetal',
   ...RANGE_COLOR_PERSIST,
 ];
 
@@ -76,6 +80,7 @@ export function createStore() {
     tune: { ...TUNE_DEFAULTS },
     tuneOpen: false,
     text: { ...DEFAULT_LETTERING },
+    reliefMetal: 'gold',
     ...RANGE_COLOR_DEFAULTS,
   };
   try {
@@ -83,6 +88,7 @@ export function createStore() {
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
     state.tuneOpen = state.tuneOpen === true;
+    if (state.reliefMetal !== 'silver') state.reliefMetal = 'gold';
     Object.assign(state, sanitizeRangeColors(state));
   } catch {
     /* storage unavailable: defaults are fine */

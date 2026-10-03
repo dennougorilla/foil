@@ -15,6 +15,7 @@ import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
 import { initRangeColors } from './features';
 import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
+import { mountReliefPick } from './reliefPick';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -66,6 +67,8 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
+// Relief's gold / silver coins ride in the finish pill on the name tag.
+const reliefPill = mountReliefPick({ store, dict: () => t, onPick: () => stage.juice(0.4) });
 
 function faceSpec(image: Img) {
   const s = store.get();
@@ -135,7 +138,8 @@ function renderInfo() {
   const pe = $('pillEdition');
   pe.textContent = t.edition[s.edition];
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
-  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
+  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
+  reliefPill(pe);
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
 }
 

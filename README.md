@@ -5,7 +5,8 @@ Turn any picture into a collectible card and give it a rare finish.
 **Live:** https://dennougorilla.github.io/foil/
 
 - Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). Animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
-- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura. Keys 1–9 and 0 pick the first ten, ← → step through them all.
+- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura, Relief. Keys 1–9 and 0 pick the first ten, ← → step through them all.
+- Relief raises the picture in metal: outlines and light/dark borders rise in flat terraces with crisp steps, line work sinks into grooves, the frame gets a stamped dot texture and the name a foil press, and the reflections and shadows move as the card tilts. Gold or silver is picked with the two coins in the finish pill beside the card.
 - Opening one of the support links in the header quietly adds a few extra finishes to the hand in this browser, as a thank-you. It is an honor system with no payment check.
 - Edit the name, line and rarity right in the tag beside the card. Tune the frame, effect strength and pixelation.
 - Print the name in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and jumps to its controls (last in Tune). The relief and shine follow the card's tilt and light, in exports too.

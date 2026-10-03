@@ -1,5 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { FoilTone, LetterStyle } from './lettering';
+import type { ReliefMetal } from './relief';
 import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
 
 export type Lang = 'ja' | 'en';
@@ -90,6 +91,7 @@ const ja = {
     halftone: 'ハーフトーン',
     crystal: 'クリスタル',
     sakura: 'サクラ',
+    relief: 'レリーフ',
     kintsugi: '金継ぎ',
     opal: 'オパール',
     eclipse: 'エクリプス',
@@ -111,6 +113,7 @@ const ja = {
     halftone: '網点で刷った、漫画の一コマ',
     crystal: '多面カットで光が折れる',
     sakura: '花びらが舞い落ちる',
+    relief: '金か銀で打ち出した絵と、傾けると動く陰影',
     kintsugi: 'ひびを金で継いだ、一点もの',
     opal: '絵の奥を、虹の帯がゆっくり流れる',
     eclipse: '黒い太陽と、燃えるコロナ',
@@ -128,6 +131,8 @@ const ja = {
     gilt: '真鍮',
     rarity: 'レア色',
   } satisfies Record<FrameId, string>,
+  reliefMetal: '金属',
+  reliefMetalName: { gold: '金', silver: '銀' } satisfies Record<ReliefMetal, string>,
   samplesName: ['夕焼けの峠', '月の潮', 'ハートのA'],
   samplesDesc: [
     'お気に入りの一枚を、とっておきのレアに。',
@@ -336,6 +341,7 @@ const en: Dict = {
     halftone: 'Halftone',
     crystal: 'Crystal',
     sakura: 'Sakura',
+    relief: 'Relief',
     kintsugi: 'Kintsugi',
     opal: 'Opal',
     eclipse: 'Eclipse',
@@ -357,6 +363,7 @@ const en: Dict = {
     halftone: 'Printed in dots, like a comic panel',
     crystal: 'Light bent through cut facets',
     sakura: 'Petals drifting down',
+    relief: 'Struck in gold or silver, with shadows that move as you tilt',
     kintsugi: 'Cracks mended in gold, one of a kind',
     opal: 'Bands of rainbow light drifting through the stone',
     eclipse: 'A black sun with a blazing corona',
@@ -374,6 +381,8 @@ const en: Dict = {
     gilt: 'Brass',
     rarity: 'Rare tint',
   },
+  reliefMetal: 'Metal',
+  reliefMetalName: { gold: 'Gold', silver: 'Silver' },
   samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts'],
   samplesDesc: [
     'Your favorite picture, made gloriously rare.',
