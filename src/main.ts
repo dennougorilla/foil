@@ -124,12 +124,18 @@ function renderInfo() {
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
 }
 
+/**
+ * The caption always names the finish that is applied. A finish you are only
+ * pointing at gets a small tag right above its card, so the two never mix up.
+ */
 function renderCaption(id: EditionId | null) {
   const s = store.get();
-  const show = id ?? s.edition;
   const cap = $('handCaption');
-  cap.querySelector('b')!.textContent = t.edition[show];
-  cap.querySelector('span')!.textContent = t.look[show];
+  cap.querySelector('b')!.textContent = t.edition[s.edition];
+  cap.querySelector('span')!.textContent = t.look[s.edition];
+  const peek = $('handPeek');
+  peek.hidden = !id || id === s.edition;
+  if (id) peek.textContent = t.edition[id];
 }
 
 // ---------- Panel controls ----------

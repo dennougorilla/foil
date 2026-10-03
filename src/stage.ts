@@ -100,7 +100,7 @@ export class Stage {
 
   private buildHand() {
     const { hand } = this.o;
-    hand.textContent = '';
+    hand.querySelectorAll('.hand-slot').forEach((el) => el.remove());
     EDITIONS.forEach((e, i) => {
       const el = document.createElement('button');
       el.type = 'button';
@@ -496,6 +496,11 @@ export class Stage {
       card.el.style.height = `${h}px`;
       card.el.style.transform = `translate(${(x - w / 2).toFixed(1)}px, ${(y - h / 2).toFixed(1)}px) rotate(${rot.toFixed(4)}rad)`;
       card.el.style.zIndex = String(3 + (i === active ? 2 : 0));
+      if (i === active) {
+        // The peek tag rides just above the card being pointed at.
+        const peek = this.o.hand.querySelector<HTMLElement>('.hand-peek');
+        if (peek) peek.style.transform = `translate(${x.toFixed(1)}px, ${(y - (h * card.scale.x) / 2 - 12).toFixed(1)}px) translate(-50%, -100%)`;
+      }
       const t = this.time + i * 0.7;
       const idle = this.motion ? 1 : 0;
       this.cards.drawCard(
