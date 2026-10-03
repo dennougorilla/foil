@@ -1,8 +1,8 @@
 // Breakout: the subject, cut out by depth (src/depth), bursts out through the frame. The card
 // itself is drawn as usual with the subject painted out of the window, its shadow and a cracked
-// frame; then a larger quad, hinged at the window's foot and lifted off the card (uPop), draws the subject enlarged about the
-// window's foot, so its top crosses the frame and the card's own edge, with glints and shards
-// where it breaks through. Spliced into CARD_FS after the Shadowbox code, whose sheets (only the
+// frame; then a larger quad, hinged at the window's foot and lifted off the card (uPop), draws
+// the subject enlarged upwards from that foot, so its top crosses the frame and the card's own
+// edge, with glints and shards where it breaks through. Spliced into CARD_FS after the Shadowbox code, whose sheets (only the
 // front one is used here), plate, window and untune it shares.
 import { ART, FACE_H } from '../card/face';
 
