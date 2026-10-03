@@ -10,6 +10,7 @@ uniform sampler2D uLayers; // over the art window: r, g, b = the cut sheets from
 uniform float uLayerCuts;  // cut sheets in front of the back one, 0..3
 uniform float uLayerRise;  // 0..1: how far the sheets stand forward from the back wall
 uniform sampler2D uPlateBack; // the art with the cut-out subjects painted out
+uniform float uPlateMix;      // 1 = use it; 0 = animated picture, keep the current frame
 
 // Art window in uv (x0, y0, x1, y1), from the face layout.
 const vec4 SB_ART = vec4(${n(ART.x / FACE_W)}, ${n(ART.y / FACE_H)}, ${n((ART.x + ART.w) / FACE_W)}, ${n((ART.y + ART.h) / FACE_H)});
@@ -147,7 +148,7 @@ vec3 shadowbox(vec3 c, vec2 puv, vec2 t, float lod) {
     // background, not a second copy of the subject.
     if (back && k > 0) {
       vec3 plate = textureLod(uPlateBack, (su - SB_ART.xy) / (SB_ART.zw - SB_ART.xy), blur).rgb;
-      img = mix(img, plate, smoothstep(0.3, 0.7, sbPick(here, k - 1)));
+      img = mix(img, plate, smoothstep(0.3, 0.7, sbPick(here, k - 1)) * uPlateMix);
     }
     vec2 away = (p - lp) / (lz + z);
     // Cast shadows: the window's rim, and each sheet in front, sharp near and softer the further

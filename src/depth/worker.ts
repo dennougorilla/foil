@@ -48,28 +48,47 @@ function scaleRgba(src: Uint8ClampedArray, sw: number, sh: number, w: number, h:
   return out;
 }
 
-let latest = 0;
+/** The newest picture waiting for the model; older ones are dropped, never run. */
+let waiting: CutRequest | null = null;
+let running = false;
+let lastId = 0;
 
-scope.onmessage = async (e) => {
-  const { id, rgba, w, h, model } = e.data;
-  latest = id;
+scope.onmessage = (e) => {
+  const req = e.data;
+  lastId = req.id;
+  const { id, rgba, w, h } = req;
   const cw = w >> 1;
   const chh = h >> 1;
   const color = colorLayers(scaleRgba(rgba, w, h, cw, chh), cw, chh);
   post({ id, type: 'layers', source: 'color', map: color }, [color.data.buffer, color.plate.buffer]);
-  if (!model) return;
+  if (!req.model) return;
+  waiting = req;
+  if (!running) void runModel();
+};
+
+/** One inference at a time, always on the newest picture. */
+async function runModel() {
+  running = true;
   try {
-    const runner = await loadModel((loaded, total) => post({ id, type: 'download', loaded, total }));
-    // A newer picture arrived while the model loaded; it will get its own turn.
-    if (id !== latest) return;
-    post({ id, type: 'running' });
-    const input = runner.w === w && runner.h === h ? rgba : scaleRgba(rgba, w, h, runner.w, runner.h);
-    const raw = await estimateDepth(runner, input);
-    if (id !== latest) return;
-    const map = modelLayers(raw, rgba, w, h);
-    post({ id, type: 'layers', source: 'model', map }, [map.data.buffer, map.plate.buffer]);
+    while (waiting) {
+      const { id, rgba, w, h } = waiting;
+      // Download progress is about the one shared model, so it goes out under the newest request.
+      const runner = await loadModel((loaded, total) => post({ id: lastId, type: 'download', loaded, total }));
+      if (waiting.id !== id) continue;
+      waiting = null;
+      post({ id, type: 'running' });
+      const input = runner.w === w && runner.h === h ? rgba : scaleRgba(rgba, w, h, runner.w, runner.h);
+      const raw = await estimateDepth(runner, input);
+      // A newer picture arrived meanwhile; its turn is next.
+      if (waiting) continue;
+      const map = modelLayers(raw, rgba, w, h);
+      post({ id, type: 'layers', source: 'model', map }, [map.data.buffer, map.plate.buffer]);
+    }
   } catch (err) {
     console.warn('depth: model failed, keeping the colour cut', err);
-    post({ id, type: 'failed', reason: (err as Error).message || 'model' });
+    waiting = null;
+    post({ id: lastId, type: 'failed', reason: (err as Error).message || 'model' });
+  } finally {
+    running = false;
   }
-};
+}

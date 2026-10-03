@@ -12,7 +12,7 @@
 // or a store schema change can never take an unlock back.
 
 import { EDITIONS, type EditionId } from './editions';
-import { OPEN_EDITIONS, parseUnlocked, pickSecret } from './secrets';
+import { mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret } from './secrets';
 import type { Stage } from './stage';
 import type { Store } from './state';
 
@@ -32,6 +32,14 @@ const readUnlocked = () => {
 
 let unlocked = readUnlocked();
 
+const save = (list: EditionId[]) => {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch {
+    /* storage unavailable: unlocked for this visit only */
+  }
+};
+
 export const isLocked = (id: EditionId) => SECRETS.includes(id) && !unlocked.includes(id);
 
 /** Run before anything reads the edition: a locked finish restored from a past visit falls back quietly. */
@@ -43,15 +51,11 @@ export function releaseLockedEdition(store: Store) {
 export function initSponsor(stage: Stage, store: Store) {
   const unlock = () => {
     // Another tab may have unlocked some since this one last looked.
-    const saved = readUnlocked();
-    const id = pickSecret(SECRETS, [...unlocked, ...saved], Math.random);
+    const known = mergeUnlocked(SECRETS, readUnlocked(), unlocked);
+    const id = pickSecret(SECRETS, known, Math.random);
     if (!id) return;
-    unlocked = SECRETS.filter((s) => s === id || unlocked.includes(s) || saved.includes(s));
-    try {
-      localStorage.setItem(KEY, JSON.stringify(unlocked));
-    } catch {
-      /* storage unavailable: unlocked for this visit only */
-    }
+    unlocked = mergeUnlocked(SECRETS, known, [id]);
+    save(unlocked);
     stage.syncHandHidden();
   };
   document.querySelectorAll<HTMLAnchorElement>('#supportMenu .support-link').forEach((a) => {
@@ -60,9 +64,13 @@ export function initSponsor(stage: Stage, store: Store) {
     a.addEventListener('auxclick', (e) => e.button === 1 && unlock());
   });
   // Other tabs: an unlock there shows up here, and clearing site data there locks again here.
+  // Two tabs unlocking at the same moment overwrite each other's save, so each writes back the
+  // union and both draws survive.
   addEventListener('storage', (e) => {
     if (e.key !== KEY && e.key !== null) return;
-    const now = readUnlocked();
+    const saved = readUnlocked();
+    const now = e.newValue === null ? saved : mergeUnlocked(SECRETS, saved, unlocked);
+    if (now.length > saved.length) save(now);
     if (now.join() === unlocked.join()) return;
     unlocked = now;
     stage.syncHandHidden();

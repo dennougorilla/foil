@@ -90,6 +90,20 @@ test('the automatic stroke loops seamlessly', () => {
   assert.ok(total(a) > 1, 'something is drawn');
 });
 
+test('a stroke first asked for late in a session catches up in a few loops, not all of them', () => {
+  const a = new AutoTouch();
+  const b = new AutoTouch();
+  a.at(3.3);
+  const t0 = performance.now();
+  b.at(5000.3);
+  const ms = performance.now() - t0;
+  let diff = 0;
+  for (let i = 0; i < a.data.length; i++) diff = Math.max(diff, Math.abs(a.data[i] - b.data[i]));
+  assert.ok(diff < 0.01, `differs by ${diff}`);
+  assert.equal(a.prints.length, b.prints.length);
+  assert.ok(ms < 1000, `took ${ms.toFixed(0)} ms`);
+});
+
 test('the automatic stroke is the same however the loop is sampled', () => {
   const a = new AutoTouch();
   const b = new AutoTouch();

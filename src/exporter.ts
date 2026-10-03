@@ -122,7 +122,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
-  if (input.layers) cards.setLayers(input.layers);
+  if (input.layers) cards.setLayers(input.layers, !input.faceAt);
   cards.resize(W, H, 1);
   const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.

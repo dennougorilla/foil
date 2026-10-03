@@ -48,7 +48,6 @@ export class ReliefGL {
   private read: Uint8ClampedArray | null = null;
   private pending: HTMLCanvasElement | null = null;
   private last = -Infinity;
-  private timer = 0;
 
   /** `live`: false for exports, which always draw at full quality. */
   constructor(
@@ -62,24 +61,22 @@ export class ReliefGL {
     this.ctx.imageSmoothingQuality = 'high';
   }
 
-  /**
-   * Exports read every face they are given. The stage reads at most every LIVE_EVERY_MS (the
-   * latest face wins), and skips the work when only the nameplate changed, as while typing.
-   */
+  /** Notes a new face; it is read only once a Relief card is drawn with it (see bind). */
   setFace(face: HTMLCanvasElement): void {
-    if (!this.live) return this.analyse(face);
     this.pending = face;
-    const wait = this.last + LIVE_EVERY_MS - performance.now();
-    if (wait <= 0) this.flush();
-    else if (!this.timer) this.timer = window.setTimeout(() => this.flush(), wait);
   }
 
-  private flush() {
-    this.timer = 0;
+  /**
+   * Exports read every face they draw. The stage reads at most every LIVE_EVERY_MS (the latest
+   * face wins), and skips the work when only the nameplate changed, as while typing.
+   */
+  private refresh() {
     if (!this.pending) return;
+    const now = performance.now();
+    if (this.live && now < this.last + LIVE_EVERY_MS) return;
     this.analyse(this.pending);
     this.pending = null;
-    this.last = performance.now();
+    this.last = now;
   }
 
   private analyse(face: HTMLCanvasElement) {
@@ -96,9 +93,12 @@ export class ReliefGL {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, MAP_W, MAP_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, m.data);
   }
 
-  bind(p: Program, unit: number): void {
+  /** `relief`: the card being drawn is Relief, so its map must be current. */
+  bind(p: Program, unit: number, relief: boolean): void {
     const { gl } = this;
+    // On its own unit first: a refresh uploads the map and must not disturb the other textures.
     gl.activeTexture(gl.TEXTURE0 + unit);
+    if (relief) this.refresh();
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.uniform1i(p.u.uReliefMap, unit);
     gl.uniform3f(p.u.uRelief, this.range[0], this.range[1], this.live && LITE ? 1 : 0);

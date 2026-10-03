@@ -263,6 +263,8 @@ export const AUTO_STILL = 0.3;
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */
 const START = 10;
+/** Loops from a cold card after which the heat repeats (with margin). */
+const RUN_UP = 3;
 
 /**
  * A finger that swipes and presses once per loop, then leaves the card to cool. `at(phase)` takes
@@ -291,10 +293,12 @@ export class AutoTouch implements HeatSource {
 
   at(phase: number) {
     const target = Math.max(0, Math.round(phase * TICKS));
-    if (target < this.tick) {
+    // Going back starts over; going far ahead (a preview first drawn late in a session) starts
+    // three loops short, since the heat has repeated exactly long before then.
+    if (target < this.tick || target - this.tick > RUN_UP * TICKS) {
       this.f = new HeatField();
       this.swipe = null;
-      this.tick = 0;
+      this.tick = Math.max(0, target - RUN_UP * TICKS);
     }
     while (this.tick < target) this.advance(this.tick++);
   }
