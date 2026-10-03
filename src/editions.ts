@@ -14,7 +14,11 @@ export type EditionId =
   | 'halftone'
   | 'crystal'
   | 'sakura'
-  // Sponsor-only, see src/sponsor.ts
+  | 'relief'
+  | 'warmth'
+  | 'shadowbox'
+  | 'shallows'
+  // Shaders in src/gl/sponsorShaders.ts
   | 'kintsugi'
   | 'opal'
   | 'eclipse'
@@ -29,8 +33,13 @@ export interface Edition {
   /** Three swirl colours for the background (dark, mid, light). */
   swirl: [string, string, string];
   value: number;
+  /** Smooth gradients that band in 256 colours: its GIF is dithered. */
+  dither?: boolean;
+  /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a heat field. */
+  touch?: boolean;
 }
 
+/** Hand order. Only the first five are out from the start; the rest are secrets (src/secrets.ts, src/sponsor.ts). */
 export const EDITIONS: Edition[] = [
   { id: 'base', shader: 0, color: '#c9d3d4', swirl: ['#142024', '#a83a33', '#25706b'], value: 0 },
   { id: 'foil', shader: 1, color: '#5fb4ff', swirl: ['#0f1c33', '#2d6fd6', '#9cc8ff'], value: 2 },
@@ -47,7 +56,11 @@ export const EDITIONS: Edition[] = [
   { id: 'halftone', shader: 12, color: '#ffd84a', swirl: ['#151518', '#d83a6a', '#2aa8d8'], value: 3 },
   { id: 'crystal', shader: 13, color: '#e8f6ff', swirl: ['#101522', '#5a6ea8', '#d8e6ff'], value: 6 },
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
-  // Sponsor-only finishes (locked until unlocked in src/sponsor.ts).
+  { id: 'relief', shader: 15, color: '#e3bf72', swirl: ['#07090d', '#1c2633', '#4d6274'], value: 7, dither: true },
+  { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: true },
+  { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6 },
+  { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
+  // Shaders in src/gl/sponsorShaders.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
   { id: 'eclipse', shader: 42, color: '#ffb36b', swirl: ['#030308', '#1c1534', '#c25a2a'], value: 8 },

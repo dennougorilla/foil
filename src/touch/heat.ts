@@ -1,0 +1,358 @@
+// Heat on the card for the Warmth finish: where it was touched, how warm it still is, and the
+// fingerprints left by a press. A small grid over the card face, simulated on the CPU (a few
+// thousand cells, so it costs next to nothing) and uploaded to the card shader as a texture.
+//
+// No imports: the tests load this file directly with Node.
+
+/** Grid size. Cells are square on the 5:7 card, so one cell is 1/60 of the card's width. */
+export const HEAT_W = 60;
+export const HEAT_H = 84;
+
+/** Most heat one spot holds: a finger left still for a while. */
+const MAX = 1.5;
+/** How fast heat spreads, in cells² per second: slow, so a cooling trail narrows along its line instead of smearing. */
+const SPREAD = 0.5;
+/** Newton cooling per second, plus a small steady loss so the tail really reaches zero. */
+const COOL = 0.42;
+const LOSS = 0.02;
+/** Below this everywhere, the card counts as cold and stops simulating. */
+const COLD = 0.002;
+/** Fingerprints kept at once; the oldest makes way. */
+const PRINTS = 3;
+
+export interface Print {
+  /** Centre, in card uv (y down). */
+  u: number;
+  v: number;
+  /** Turn of the print, radians. */
+  angle: number;
+  /** 0..1: builds while pressed, cools after. */
+  heat: number;
+}
+
+/** What the card shader reads. `version` changes whenever `data` or `prints` do. */
+export interface HeatSource {
+  readonly data: Float32Array;
+  readonly version: number;
+  readonly prints: readonly Print[];
+}
+
+export class HeatField implements HeatSource {
+  readonly data = new Float32Array(HEAT_W * HEAT_H);
+  private next = new Float32Array(HEAT_W * HEAT_H);
+  prints: Print[] = [];
+  version = 0;
+  private warm = false;
+  private pressing: Print | null = null;
+
+  get cold() {
+    return !this.warm && !this.prints.length;
+  }
+
+  /**
+   * Warms the card along a segment travelled during `dt` (card uv, y down). A firm touch (a
+   * finger, a pressed button) is wider and warmer than a hovering mouse. Every spot passed gets
+   * about the same warmth however fast the stroke goes; lingering adds more, up to MAX.
+   */
+  touch(u0: number, v0: number, u1: number, v1: number, dt: number, firm: boolean) {
+    const r = (firm ? 0.07 : 0.042) * HEAT_W;
+    const ax = u0 * HEAT_W - 0.5;
+    const ay = v0 * HEAT_H - 0.5;
+    const bx = u1 * HEAT_W - 0.5;
+    const by = v1 * HEAT_H - 0.5;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const gain = (firm ? 2.4 : 1.1) * dt + (firm ? 0.55 : 0.34) * Math.min(Math.sqrt(len2) / r, 1);
+    const reach = r * 2.6;
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach));
+    const x1 = Math.min(HEAT_W - 1, Math.ceil(Math.max(ax, bx) + reach));
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach));
+    const y1 = Math.min(HEAT_H - 1, Math.ceil(Math.max(ay, by) + reach));
+    if (x0 > x1 || y0 > y1) return;
+    const inv = 1 / (r * r);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const t = len2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / len2)) : 0;
+        const ex = x - ax - dx * t;
+        const ey = y - ay - dy * t;
+        const g = Math.exp(-(ex * ex + ey * ey) * inv);
+        if (g < 1e-3) continue;
+        const i = y * HEAT_W + x;
+        this.data[i] = Math.min(MAX, this.data[i] + gain * g * (1 - this.data[i] / MAX));
+      }
+    }
+    this.warm = true;
+    this.version++;
+  }
+
+  /** A finger held at (u, v): its print forms over the first half second or so. */
+  press(u: number, v: number, dt: number) {
+    let p = this.pressing;
+    if (!p) {
+      // Turned a little, the same way for the same spot, so a recording comes out the same.
+      p = { u, v, angle: -0.3 + 0.35 * Math.sin(u * 91.7 + v * 37.3), heat: 0 };
+      this.prints.push(p);
+      if (this.prints.length > PRINTS) this.prints.shift();
+      this.pressing = p;
+    }
+    p.heat = Math.min(1, p.heat + dt * 1.6);
+    this.version++;
+  }
+
+  /** The finger is gone: its print starts to cool. */
+  lift() {
+    this.pressing = null;
+  }
+
+  step(dt: number) {
+    if (this.cold) return;
+    if (this.warm) {
+      // Spread (explicit diffusion, split into stable sub-steps), then cool.
+      const k = SPREAD * dt;
+      const n = Math.ceil(k / 0.2);
+      for (let s = 0; s < n; s++) this.spread(k / n);
+      const keep = Math.exp(-COOL * dt);
+      const loss = LOSS * dt;
+      let peak = 0;
+      const d = this.data;
+      for (let i = 0; i < d.length; i++) {
+        const v = Math.max(0, d[i] * keep - loss);
+        d[i] = v;
+        if (v > peak) peak = v;
+      }
+      if (peak < COLD) {
+        d.fill(0);
+        this.warm = false;
+      }
+    }
+    for (const p of this.prints) if (p !== this.pressing) p.heat = p.heat * Math.exp(-COOL * dt) - LOSS * dt;
+    this.prints = this.prints.filter((p) => p === this.pressing || p.heat > 0.01);
+    this.version++;
+  }
+
+  private spread(k: number) {
+    const a = this.data;
+    const b = this.next;
+    for (let y = 0; y < HEAT_H; y++) {
+      const up = (y > 0 ? y - 1 : y) * HEAT_W;
+      const row = y * HEAT_W;
+      const down = (y < HEAT_H - 1 ? y + 1 : y) * HEAT_W;
+      for (let x = 0; x < HEAT_W; x++) {
+        const l = x > 0 ? x - 1 : x;
+        const r = x < HEAT_W - 1 ? x + 1 : x;
+        const c = a[row + x];
+        b[row + x] = c + k * (a[row + l] + a[row + r] + a[up + x] + a[down + x] - 4 * c);
+      }
+    }
+    a.set(b);
+  }
+}
+
+// ---------- An unseen finger (the hint on arrival, the hand's preview card, exports) ----------
+
+/** One thumb's sweep up across the art, as a right hand swipes a phone: points around its centre, card uv. */
+const ARC: [number, number][] = [
+  [0.29, 0.2],
+  [0.21, 0.08],
+  [0.1, -0.03],
+  [-0.03, -0.11],
+  [-0.16, -0.16],
+  [-0.29, -0.18],
+];
+/** Where the thumb presses afterwards, from the same centre: low on the side the swipe started from. */
+const PRESS: [number, number] = [-0.2, 0.17];
+
+/** Where a swipe sits on the card. `press` is the spot it presses afterwards. */
+export interface SwipeShape {
+  center: [number, number];
+  mirror: boolean;
+  press: [number, number];
+}
+
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+function shape(cu: number, cv: number, mirror: boolean): SwipeShape {
+  const m = mirror ? -1 : 1;
+  return { center: [cu, cv], mirror, press: [clamp(cu + PRESS[0] * m, 0.15, 0.85), clamp(cv + PRESS[1], 0.15, 0.75)] };
+}
+
+/** The placements to choose from; the first is the default (the hand's preview, the hint on arrival). */
+export const SWIPES: SwipeShape[] = [shape(0.5, 0.45, false)];
+for (const cv of [0.3, 0.45, 0.6]) {
+  for (const cu of [0.42, 0.5, 0.58]) {
+    for (const mirror of [false, true]) if (cv !== 0.45 || cu !== 0.5 || mirror) SWIPES.push(shape(cu, cv, mirror));
+  }
+}
+
+/** Point `s` (0..1) along a swipe, eased so the finger sets down and lifts off gently. */
+export function swipeAt(shape: SwipeShape, s: number): [number, number] {
+  const e = s * s * (3 - 2 * s);
+  const f = e * (ARC.length - 1);
+  const i = Math.min(ARC.length - 2, Math.floor(f));
+  const t = f - i;
+  const p0 = ARC[Math.max(0, i - 1)];
+  const p1 = ARC[i];
+  const p2 = ARC[i + 1];
+  const p3 = ARC[Math.min(ARC.length - 1, i + 2)];
+  // Catmull-Rom through the points.
+  const cr = (a: number, b: number, c: number, d: number) =>
+    0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
+  const x = cr(p0[0], p1[0], p2[0], p3[0]) * (shape.mirror ? -1 : 1);
+  return [clamp(shape.center[0] + x, 0.08, 0.92), clamp(shape.center[1] + cr(p0[1], p1[1], p2[1], p3[1]), 0.07, 0.84)];
+}
+
+/**
+ * The swipe that passes through the busiest part of the picture, so an export reveals what
+ * matters in it. `busy` is a w×h map over the card (rows top to bottom), larger where more goes on.
+ */
+export function pickSwipe(busy: Float32Array, w: number, h: number): SwipeShape {
+  let best = SWIPES[0];
+  let top = -1;
+  for (const sh of SWIPES) {
+    let sum = 0;
+    for (let i = 0; i <= 24; i++) {
+      const [u, v] = swipeAt(sh, i / 24);
+      sum += busy[Math.min(h - 1, Math.floor(v * h)) * w + Math.min(w - 1, Math.floor(u * w))];
+    }
+    if (sum > top * 1.05) {
+      top = sum;
+      best = sh;
+    }
+  }
+  return best;
+}
+
+/** Seconds a swipe takes, when it presses, and when the thumb lifts. */
+const SWIPE_DRAW = 1.4;
+const PRESS_FROM = 1.6;
+const PRESS_TO = 2.6;
+
+/** Plays one swipe and press into a heat field; the owner keeps stepping the field itself. */
+export class Swipe {
+  private t = 0;
+  private field: HeatField;
+  private shape: SwipeShape;
+
+  constructor(field: HeatField, shape: SwipeShape) {
+    this.field = field;
+    this.shape = shape;
+  }
+
+  /** Advances by `dt` seconds; false once the thumb has lifted. */
+  step(dt: number): boolean {
+    const t0 = this.t;
+    const t1 = (this.t += dt);
+    if (t0 < SWIPE_DRAW) {
+      const [au, av] = swipeAt(this.shape, t0 / SWIPE_DRAW);
+      const [bu, bv] = swipeAt(this.shape, Math.min(1, t1 / SWIPE_DRAW));
+      this.field.touch(au, av, bu, bv, dt, true);
+    }
+    if (t0 >= PRESS_FROM && t0 < PRESS_TO) this.field.press(this.shape.press[0], this.shape.press[1], dt);
+    if (t1 < PRESS_TO) return true;
+    this.field.lift();
+    return false;
+  }
+}
+
+/** Seconds of heat one loop covers, however long the clip plays it: enough to cool all but fully. */
+export const AUTO_LOOP = 10;
+/** Where in the loop a still picture (PNG, a held preview) is taken: the swipe still warm, the print just made. */
+export const AUTO_STILL = 0.3;
+/** Simulation ticks per loop: fixed, so every recording of the same phase is identical. */
+const TICKS = 200;
+/** The card shows cold for a moment before the finger comes. */
+const START = 10;
+
+/**
+ * A finger that swipes and presses once per loop, then leaves the card to cool. `at(phase)` takes
+ * the loop count so far (2.5 = halfway through the third loop) and simulates up to it; after the
+ * first couple of loops the heat repeats exactly, so asking for phase 3 + p gives a seamless loop.
+ */
+export class AutoTouch implements HeatSource {
+  private f = new HeatField();
+  private tick = 0;
+  private swipe: Swipe | null = null;
+  private shape: SwipeShape;
+
+  constructor(shape: SwipeShape = SWIPES[0]) {
+    this.shape = shape;
+  }
+
+  get data() {
+    return this.f.data;
+  }
+  get version() {
+    return this.f.version;
+  }
+  get prints() {
+    return this.f.prints;
+  }
+
+  at(phase: number) {
+    const target = Math.max(0, Math.round(phase * TICKS));
+    if (target < this.tick) {
+      this.f = new HeatField();
+      this.swipe = null;
+      this.tick = 0;
+    }
+    while (this.tick < target) this.advance(this.tick++);
+  }
+
+  private advance(tick: number) {
+    const dt = AUTO_LOOP / TICKS;
+    if (tick % TICKS === START) this.swipe = new Swipe(this.f, this.shape);
+    if (this.swipe && !this.swipe.step(dt)) this.swipe = null;
+    this.f.step(dt);
+  }
+}
+
+// ---------- From the screen to the card ----------
+
+/** Where the card is drawn: the same numbers the card's vertex shader gets (css px, radians). */
+export interface CardPose {
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
+  rx: number;
+  ry: number;
+  rz: number;
+  scale: number;
+}
+
+/** The card's rotation (z, then x, then y, as in CARD_VS) applied to a point on its plane. */
+function rotate(p: CardPose, x: number, y: number): [number, number, number] {
+  const x1 = Math.cos(p.rz) * x - Math.sin(p.rz) * y;
+  const y1 = Math.sin(p.rz) * x + Math.cos(p.rz) * y;
+  const y2 = Math.cos(p.rx) * y1;
+  const z2 = Math.sin(p.rx) * y1;
+  return [Math.cos(p.ry) * x1 + Math.sin(p.ry) * z2, y2, -Math.sin(p.ry) * x1 + Math.cos(p.ry) * z2];
+}
+
+const depth = (p: CardPose) => Math.max(p.h, 120) * 3.2;
+
+/** Screen position of card uv (u, v), y down. */
+export function cardPoint(u: number, v: number, p: CardPose): [number, number] {
+  const [x, y, z] = rotate(p, (u - 0.5) * p.w * p.scale, (v - 0.5) * p.h * p.scale);
+  const w = (depth(p) - z) / depth(p);
+  return [p.cx + x / w, p.cy + y / w];
+}
+
+/** The card uv under a screen position: the inverse of `cardPoint` (a ray meeting the card's plane). */
+export function cardUv(sx: number, sy: number, p: CardPose): [number, number] {
+  const D = depth(p);
+  const a = rotate(p, 1, 0);
+  const b = rotate(p, 0, 1);
+  const qx = sx - p.cx;
+  const qy = sy - p.cy;
+  // D·(X·a + Y·b).xy = q·(D − (X·a + Y·b).z), linear in the plane coordinates X and Y.
+  const m11 = D * a[0] + qx * a[2];
+  const m12 = D * b[0] + qx * b[2];
+  const m21 = D * a[1] + qy * a[2];
+  const m22 = D * b[1] + qy * b[2];
+  const det = m11 * m22 - m12 * m21;
+  const X = (qx * D * m22 - m12 * qy * D) / det;
+  const Y = (m11 * qy * D - m21 * qx * D) / det;
+  return [X / (p.w * p.scale) + 0.5, Y / (p.h * p.scale) + 0.5];
+}

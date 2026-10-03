@@ -195,16 +195,24 @@ await step('GIF with a clear background is really clear', async () => {
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
 });
 
-await step('hidden finishes unlock from the support menu', async () => {
-  await page.click('#supportBtn');
-  const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
-  await popup.close();
-  await page.waitForTimeout(600);
-  expect(await page.evaluate(() => localStorage.getItem('foil:sponsor') !== null), 'unlock flag not set');
-  await page.keyboard.press('Escape');
-  await page.locator('.hand-slot[data-id=kintsugi]').click({ force: true });
+await step('the hand opens with five finishes; each support link unlocks one secret', async () => {
+  const shown = () => page.locator('.hand-slot:not([hidden])').count();
+  expect((await shown()) === 5, `the hand opened with ${await shown()} finishes, not five`);
+  for (let n = 1; n <= 2; n++) {
+    await page.click('#supportBtn');
+    const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click(`.support-link >> nth=${n - 1}`)]);
+    await popup.close();
+    await page.waitForTimeout(600);
+    const unlocked = await page.evaluate(() => JSON.parse(localStorage.getItem('foil:secrets') ?? '[]'));
+    expect(unlocked.length === n, `expected ${n} secrets unlocked, got ${unlocked.length}`);
+    expect((await shown()) === 5 + n, 'the unlocked secret did not join the hand');
+    await page.keyboard.press('Escape');
+  }
+  // Secrets follow the five open finishes in the hand, so key 6 picks the first one unlocked.
+  const first = await page.locator('.hand-slot:not([hidden]) >> nth=5').getAttribute('data-id');
+  await page.keyboard.press('6');
   await page.waitForTimeout(400);
-  expect((await state()).edition === 'kintsugi', 'Kintsugi could not be applied');
+  expect((await state()).edition === first, 'the unlocked secret could not be applied');
 });
 
 await browser.close();

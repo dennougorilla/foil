@@ -4,6 +4,8 @@
 
 export type LightMode = 'pointer' | 'orbit' | 'fixed' | 'gyro';
 export type IdleMode = 'none' | 'sway' | 'spin' | 'breathe';
+/** The metal the Relief finish is struck in; other finishes ignore it. */
+export type Metal = 'gold' | 'silver';
 
 export interface Tune {
   /** Pattern zoom: 2 draws every finish's pattern twice as large. */
@@ -32,10 +34,11 @@ export interface Tune {
   /** Largest tilt the card reaches while you point at it, degrees. */
   tiltMax: number;
   idle: IdleMode;
+  metal: Metal;
 }
 
 export type NumKey = { [K in keyof Tune]: Tune[K] extends number ? K : never }[keyof Tune];
-export type ChoiceKey = 'light' | 'idle';
+export type ChoiceKey = 'light' | 'idle' | 'metal';
 
 export const TUNE_DEFAULTS: Tune = {
   scale: 1,
@@ -52,6 +55,7 @@ export const TUNE_DEFAULTS: Tune = {
   speed: 1,
   tiltMax: 18,
   idle: 'sway',
+  metal: 'gold',
 };
 
 export interface Range {
@@ -79,6 +83,7 @@ export const RANGES: Record<NumKey, Range> = {
 
 export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed', 'gyro'];
 export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'spin', 'breathe'];
+export const METALS: Metal[] = ['gold', 'silver'];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
@@ -92,6 +97,7 @@ export function sanitizeTune(raw: unknown): Tune {
   }
   if (LIGHT_MODES.includes(src.light as LightMode)) out.light = src.light as LightMode;
   if (IDLE_MODES.includes(src.idle as IdleMode)) out.idle = src.idle as IdleMode;
+  if (METALS.includes(src.metal as Metal)) out.metal = src.metal as Metal;
   return out;
 }
 
@@ -150,6 +156,8 @@ export interface TuneGl {
   light: [number, number, number];
   sparkle: number;
   sparkleSize: number;
+  /** 0 gold, 1 silver. */
+  metal: number;
 }
 
 export function tuneGl(t: Tune): TuneGl {
@@ -163,6 +171,7 @@ export function tuneGl(t: Tune): TuneGl {
     light: lightColor(t.temp),
     sparkle: t.sparkle,
     sparkleSize: t.sparkleSize,
+    metal: METALS.indexOf(t.metal),
   };
 }
 
@@ -181,6 +190,7 @@ export function applyTune(gl: WebGL2RenderingContext, u: Uniforms, g: TuneGl): v
   gl.uniform3f(u.uTLight, g.light[0], g.light[1], g.light[2]);
   gl.uniform1f(u.uTSparkle, g.sparkle);
   gl.uniform1f(u.uTSparkleSize, g.sparkleSize);
+  gl.uniform1f(u.uTMetal, g.metal);
 }
 
 // ---------- Exported clips ----------

@@ -1,9 +1,10 @@
-import { EDITIONS, type EditionId } from './editions';
+import { EDITIONS, editionById, type EditionId } from './editions';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
+import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
 
 class Spring {
   v = 0;
@@ -74,6 +75,18 @@ export class Stage {
   // Pointer
   private pointer = { x: -1, y: -1, inside: false, nx: 0, ny: 0, overCard: false };
   private drag = { active: false, id: -1, sx: 0, sy: 0, lx: 0, ly: 0, lt: 0, vx: 0, vy: 0, moved: 0 };
+  /** A press on a finish that reacts to touch: it strokes the card instead of tossing it. */
+  private rub = { active: false, id: -1 };
+  /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
+  private lastTouch: [number, number] | null = null;
+  private lastPointer: [number, number] = [0, 0];
+  /** The finish on the main card last frame, to greet a touch finish as it arrives. */
+  private shown: EditionId | null = null;
+  /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
+  private greet: Swipe | null = null;
+  /** Heat left on the main card by touch, and the stroke the hand's preview card draws itself. */
+  readonly heat = new HeatField();
+  private demo = new AutoTouch();
 
   private hand: HandCard[] = [];
   private hovered = -1;
@@ -127,7 +140,6 @@ export class Stage {
       el.className = 'hand-slot';
       el.setAttribute('role', 'radio');
       el.dataset.id = e.id;
-      if (i < 10) el.innerHTML = `<span class="key" aria-hidden="true">${(i + 1) % 10}</span>`;
       el.addEventListener('click', () => this.o.onSelect(e.id));
       el.addEventListener('pointerenter', () => {
         this.hovered = i;
@@ -165,16 +177,23 @@ export class Stage {
         deal: new Spring(this.motion ? 1 : 0, this.motion ? 1 : 0, 120, 13),
         tiltX: new Spring(0, 0, 200, 16),
         tiltY: new Spring(0, 0, 200, 16),
-        dealAt: 0.35 + i * 0.04,
+        dealAt: 0,
       });
     });
     this.syncHandHidden();
     this.syncHandChecked();
   }
 
-  /** Re-reads which finishes are left out of the hand; the fan closes up around them. */
+  /** Re-reads which finishes are left out of the hand; the fan closes up around them and the number keys follow. */
   syncHandHidden() {
-    for (const h of this.hand) h.el.hidden = this.o.isHidden?.(h.id) ?? false;
+    let n = 0;
+    for (const h of this.hand) {
+      h.el.hidden = this.o.isHidden?.(h.id) ?? false;
+      if (h.el.hidden) continue;
+      h.dealAt = 0.35 + n * 0.04;
+      h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
+      n++;
+    }
   }
 
   syncHandChecked() {
@@ -207,6 +226,9 @@ export class Stage {
     };
     window.addEventListener('pointermove', (e) => {
       update(e);
+      if (this.rub.active && e.pointerId === this.rub.id) {
+        this.drag.moved = Math.max(this.drag.moved, Math.hypot(e.clientX - this.drag.sx, e.clientY - this.drag.sy));
+      }
       if (this.drag.active && e.pointerId === this.drag.id) {
         const now = performance.now();
         const dt = Math.max(1, now - this.drag.lt) / 1000;
@@ -231,6 +253,15 @@ export class Stage {
     });
     cardSlot.addEventListener('pointerdown', (e) => {
       cardSlot.setPointerCapture(e.pointerId);
+      if (editionById(this.o.store.get().edition).touch) {
+        // A finger lands without moving first, so take its position from the press itself.
+        update(e);
+        // The card gives a little under the finger and stays put to be stroked.
+        this.rub = { active: true, id: e.pointerId };
+        Object.assign(this.drag, { sx: e.clientX, sy: e.clientY, moved: 0 });
+        this.sc.target = 0.985;
+        return;
+      }
       Object.assign(this.drag, {
         active: true,
         id: e.pointerId,
@@ -247,6 +278,11 @@ export class Stage {
       this.o.stage.classList.add('is-dragging');
     });
     const release = (e: PointerEvent) => {
+      if (this.rub.active && e.pointerId === this.rub.id) {
+        this.rub.active = false;
+        this.sc.target = 1;
+        this.heat.lift();
+      }
       if (!this.drag.active || e.pointerId !== this.drag.id) return;
       this.drag.active = false;
       this.o.stage.classList.remove('is-dragging');
@@ -331,8 +367,8 @@ export class Stage {
 
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
-    // A tall hand box (phones) deals two smaller fans so every card stays tappable.
-    const rows = hr.height > 240 ? 2 : 1;
+    // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
+    const rows = hr.height > 240 && count > 7 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
@@ -347,7 +383,9 @@ export class Stage {
       const inRow = Math.min(perRow, count - row * perRow);
       return { row, d: (i % perRow) - (inRow - 1) / 2 };
     };
-    return { hr, w, h, spacing, arcK, rowH, slot };
+    // A single fan in a tall box sits in its middle rather than along its top.
+    const top = rows === 1 && hr.height > 240 ? (rowH - h - 46) / 2 : 0;
+    return { hr, w, h, spacing, arcK, rowH, top, slot };
   }
 
   private frame = (now: number) => {
@@ -380,6 +418,16 @@ export class Stage {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });
+    if (ed.id !== this.shown) {
+      this.shown = ed.id;
+      // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
+      this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
+      // Held still, the swipe is simply there, and fades.
+      if (this.greet && !this.motion) {
+        while (this.greet.step(1 / 30)) this.heat.step(1 / 30);
+        this.greet = null;
+      }
+    }
     const r = this.cardRect();
     if (r) {
       // The swirl winds around the card, easing along when the layout changes.
@@ -414,8 +462,10 @@ export class Stage {
         this.rx.target = clamp(-this.drag.vy * 0.00025, -0.5, 0.5) * amp;
         this.rz.target = clamp(this.drag.vx * 0.00018, -0.35, 0.35) * amp;
       } else if (over) {
-        this.ry.target = clamp(nx, -1, 1) * 0.32 * amp;
-        this.rx.target = -clamp(ny, -1, 1) * 0.28 * amp;
+        // Being stroked, the card leans less, so the finger keeps its place on it.
+        const lean = this.rub.active ? 0.45 : 1;
+        this.ry.target = clamp(nx, -1, 1) * 0.32 * amp * lean;
+        this.rx.target = -clamp(ny, -1, 1) * 0.28 * amp * lean;
         this.rz.target = 0;
       } else if (gyro) {
         this.ry.target = gyro[0] * 0.32 * amp;
@@ -477,16 +527,11 @@ export class Stage {
       light = motion.light(tune, light);
 
       const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
+      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
       this.cards.drawCard(
         {
-          cx: r.cx + this.ox.x,
-          cy: r.cy + this.oy.x + fy,
-          w: r.w,
-          h: r.h,
-          rx: RX,
-          ry: RY,
-          rz: RZ,
-          scale: this.sc.x * pose.scale,
+          ...cardPose,
           edition: ed.shader,
           intensity: state.intensity,
           pixel: PIXEL_STEPS[state.pixel] ?? 0,
@@ -496,6 +541,7 @@ export class Stage {
           flash: this.flash,
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
+          heat: ed.touch ? this.heat : undefined,
         },
         motion.fx,
       );
@@ -510,11 +556,39 @@ export class Stage {
     requestAnimationFrame(this.frame);
   };
 
+  /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
+  private warm(at: [number, number] | null, dt: number) {
+    const on = at && at[0] > -0.02 && at[0] < 1.02 && at[1] > -0.02 && at[1] < 1.02;
+    if (on && this.greet) {
+      // A real touch takes over from the hint.
+      this.greet = null;
+      this.heat.lift();
+    }
+    if (this.greet && !this.greet.step(dt)) this.greet = null;
+    if (on) {
+      const from = this.lastTouch ?? at;
+      const firm = this.rub.active;
+      // Held still on the screen (the card may still be settling under it), a finger leaves its print; moving, it draws.
+      const still = Math.hypot(this.pointer.x - this.lastPointer[0], this.pointer.y - this.lastPointer[1]) < 1;
+      if (firm && still) this.heat.press(at[0], at[1], dt);
+      else {
+        this.heat.lift();
+        this.heat.touch(from[0], from[1], at[0], at[1], dt, firm);
+      }
+      this.lastTouch = at;
+      this.lastPointer = [this.pointer.x, this.pointer.y];
+    } else if (this.lastTouch) {
+      this.lastTouch = null;
+      this.heat.lift();
+    }
+    this.heat.step(dt);
+  }
+
   private stepHand(dt: number, state: ReturnType<Store['get']>) {
     // Left-out cards take no room; everything else fans by its position among the shown ones.
     const pos = new Map<number, number>();
     this.hand.forEach((c, i) => !c.el.hidden && pos.set(i, pos.size));
-    const { hr, w, h, spacing, arcK, rowH, slot } = this.handLayout(pos.size);
+    const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(pos.size);
     const ox = hr.left - this.canvasRect.left;
     const oy = hr.top - this.canvasRect.top;
     const active = this.hovered >= 0 ? this.hovered : this.focused;
@@ -530,7 +604,7 @@ export class Stage {
       if (hot && this.hovered === i) {
         const { row, d } = slot(pos.get(i)!);
         const cx = hr.left + hr.width / 2 + d * spacing;
-        const cy = hr.top + row * rowH + 30 + h / 2;
+        const cy = hr.top + top + row * rowH + 30 + h / 2;
         card.tiltY.target = clamp((this.pointer.x - cx) / (w / 2), -1, 1) * 0.35;
         card.tiltX.target = -clamp((this.pointer.y - cy) / (h / 2), -1, 1) * 0.3;
       } else {
@@ -552,7 +626,7 @@ export class Stage {
       const fan = d * 0.045;
       const arc = d * d * arcK;
       const x = hr.width / 2 + d * spacing;
-      const y = row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
+      const y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
       const rot = fan * (1 - Math.min(card.lift.x / 40, 0.6));
       card.el.style.width = `${w}px`;
       card.el.style.height = `${h}px`;
@@ -584,10 +658,17 @@ export class Stage {
           flash: 0,
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],
           plate: false,
+          heat: e.touch ? this.demoAt(motion.fx) : undefined,
         },
         motion.fx,
       );
     }
+  }
+
+  /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
+  private demoAt(time: number) {
+    this.demo.at(2 + AUTO_STILL + time / AUTO_LOOP);
+    return this.demo;
   }
 
   private stepParticles(dt: number) {

@@ -1,5 +1,6 @@
 // Quantizes and encodes the GIF off the main thread, so the card keeps moving while it saves.
 import { GIFEncoder, applyPalette, quantize } from 'gifenc';
+import { ditherToPalette } from './gifDither';
 
 export type GifRequest =
   | { type: 'frame'; data: ArrayBuffer }
@@ -12,6 +13,8 @@ export type GifRequest =
       clear: boolean;
       /** Colour that solid edge pixels are blended into, or null to keep their own colour. */
       matte: [number, number, number] | null;
+      /** Smooth gradients: error-diffuse into the palette instead of snapping to it. */
+      dither: boolean;
     };
 
 export type GifResponse =
@@ -82,7 +85,7 @@ function encode(m: Extract<GifRequest, { type: 'encode' }>) {
   const gif = GIFEncoder({ initialCapacity: 1 << 20 });
   let prev: Uint8Array | null = null;
   frames.forEach((f, i) => {
-    const index = applyPalette(f, palette);
+    const index = m.dither ? ditherToPalette(f, width, palette, 16) : applyPalette(f, palette);
     const first = i === 0 ? { palette: [...palette, [0, 0, 0]], repeat: 0 } : {};
     if (clear) {
       // Each frame is drawn whole on a cleared canvas: the card moves, so what was solid may now be clear.

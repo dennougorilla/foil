@@ -1,5 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { FoilTone, LetterStyle } from './lettering';
+import type { Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
 import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
 
@@ -28,7 +29,7 @@ const ja = {
   stageLabel: 'カードのプレビュー。ドラッグで投げる、クリックで弾む',
   handLabel: '加工を選ぶ',
   finishLabel: '加工',
-  handHint: '1〜9・0キーや ← → でも切り替えられます',
+  handHint: '数字キーや ← → でも切り替えられます',
   applied: '加工を「{name}」に切り替えました',
   cardHint: '名前・説明・◆はクリックで変更。カードは投げて遊べます',
   cardHintTouch: '名前・説明・◆はタップで変更。カードは投げて遊べます',
@@ -89,6 +90,11 @@ const ja = {
   errVideoFail: '動画を書き出せませんでした。もう一度お試しください。',
   errPng: 'PNGを書き出せませんでした。もう一度お試しください。',
   errGl: 'このブラウザでは WebGL2 が使えないため、カードを描画できません。Chrome・Edge・Safari・Firefox の最新版で開いてください。',
+  depthFetch: '奥行きモデルを準備中',
+  depthRead: '奥行きを読み取り中…',
+  depthDone: '奥行きを読み取りました',
+  depthGuess: '色から奥行きを推定中',
+  depthAsk: '奥行きを詳しく読む',
   myCard: 'マイ・カード',
   myDesc: 'ここに説明を書けます',
   edition: {
@@ -107,6 +113,10 @@ const ja = {
     halftone: 'ハーフトーン',
     crystal: 'クリスタル',
     sakura: 'サクラ',
+    relief: 'レリーフ',
+    warmth: 'ぬくもり',
+    shadowbox: 'シャドーボックス',
+    shallows: '水底',
     kintsugi: '金継ぎ',
     opal: 'オパール',
     eclipse: 'エクリプス',
@@ -128,6 +138,10 @@ const ja = {
     halftone: '網点で刷った、漫画の一コマ',
     crystal: '多面カットで光が折れる',
     sakura: '花びらが舞い落ちる',
+    relief: '絵をメダルに打ち出す。傾けると光が走る',
+    warmth: 'なぞると、ぬくもりで色がよみがえる',
+    shadowbox: '絵が切り絵の層になり、箱の奥に並ぶ',
+    shallows: '水底にゆらめく光の網。縁が虹にほどける',
     kintsugi: 'ひびを金で継いだ、一点もの',
     opal: '絵の奥を、虹の帯がゆっくり流れる',
     eclipse: '黒い太陽と、燃えるコロナ',
@@ -170,6 +184,7 @@ const ja = {
       speed: '動きの速さ',
       tiltMax: 'カードの最大の傾き',
       idle: '自動の動き',
+      metal: 'レリーフの金属',
     },
     lightMode: { pointer: 'ポインター', orbit: '周回', fixed: '固定', gyro: 'ジャイロ' },
     lightHelp: {
@@ -179,6 +194,8 @@ const ja = {
       gyro: 'スマホを傾けると光が動きます',
     },
     idleMode: { none: 'なし', sway: '揺れ', spin: '回転', breathe: '呼吸' },
+    metalMode: { gold: '金', silver: '銀' } satisfies Record<Metal, string>,
+    metalHelp: '金はあたたかく、銀は青白く冷たい光になります',
     idleHelp: {
       none: '操作するまで静止します',
       sway: '触れていない間、ふわりと揺れます',
@@ -272,7 +289,7 @@ const en: Dict = {
   stageLabel: 'Card preview. Drag to toss it, click to make it bounce',
   handLabel: 'Choose a finish',
   finishLabel: 'Finish',
-  handHint: 'Keys 1–9, 0 or ← → switch finishes too',
+  handHint: 'Number keys or ← → switch finishes too',
   applied: 'Finish changed to {name}',
   cardHint: 'Click the name, text or ◆ to change them. Toss the card around',
   cardHintTouch: 'Tap the name, text or ◆ to change them. Toss the card around',
@@ -333,6 +350,11 @@ const en: Dict = {
   errVideoFail: "Couldn't record the video. Please try again.",
   errPng: "Couldn't make the PNG. Please try again.",
   errGl: "WebGL2 isn't available in this browser, so the card can't be drawn. Open this page in a current Chrome, Edge, Safari or Firefox.",
+  depthFetch: 'Fetching the depth model',
+  depthRead: 'Reading the depth…',
+  depthDone: 'Depth read',
+  depthGuess: 'Guessing depth from color',
+  depthAsk: 'Read the depth properly',
   myCard: 'My Card',
   myDesc: 'Write a line about it here',
   edition: {
@@ -351,6 +373,10 @@ const en: Dict = {
     halftone: 'Halftone',
     crystal: 'Crystal',
     sakura: 'Sakura',
+    relief: 'Relief',
+    warmth: 'Warmth',
+    shadowbox: 'Shadowbox',
+    shallows: 'Shallows',
     kintsugi: 'Kintsugi',
     opal: 'Opal',
     eclipse: 'Eclipse',
@@ -372,6 +398,10 @@ const en: Dict = {
     halftone: 'Printed in dots, like a comic panel',
     crystal: 'Light bent through cut facets',
     sakura: 'Petals drifting down',
+    relief: 'Struck like a medal; light runs across as you tilt',
+    warmth: 'Stroke it and your warmth brings the color back',
+    shadowbox: 'The picture as paper-cut layers, set deep in a box',
+    shallows: 'Sunlight netting a pool floor, fraying into spectrum',
     kintsugi: 'Cracks mended in gold, one of a kind',
     opal: 'Bands of rainbow light drifting through the stone',
     eclipse: 'A black sun with a blazing corona',
@@ -414,6 +444,7 @@ const en: Dict = {
       speed: 'Animation speed',
       tiltMax: 'Max tilt',
       idle: 'Idle motion',
+      metal: 'Relief metal',
     },
     lightMode: { pointer: 'Pointer', orbit: 'Orbit', fixed: 'Fixed', gyro: 'Gyro' },
     lightHelp: {
@@ -423,6 +454,8 @@ const en: Dict = {
       gyro: 'Tilt your phone to move the light',
     },
     idleMode: { none: 'None', sway: 'Sway', spin: 'Spin', breathe: 'Breathe' },
+    metalMode: { gold: 'Gold', silver: 'Silver' },
+    metalHelp: 'Gold shines warm; silver, a cool blue-white',
     idleHelp: {
       none: 'Holds still until you interact',
       sway: 'Floats and sways gently',

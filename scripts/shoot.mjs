@@ -26,7 +26,7 @@ const shots = [
   { name: 'mobile-en', w: 390, h: 844, lang: 'en', full: true, dpr: 2 },
 ].filter((s) => s.name.includes(filter));
 
-const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch', 'aurora', 'frost', 'magma', 'halftone', 'crystal', 'sakura'];
+const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch', 'aurora', 'frost', 'magma', 'halftone', 'crystal', 'sakura', 'relief', 'warmth', 'shadowbox', 'shallows'];
 const errors = [];
 
 for (const s of shots) {
@@ -100,9 +100,9 @@ for (const s of shots) {
   }
   await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
   if (s.name === 'desktop-ja') {
-    // One frame per edition, cropped to the card.
+    // One frame per edition, cropped to the card (secrets too: their hidden slots still take a scripted click).
     for (let i = 0; i < editions.length; i++) {
-      await page.locator('.hand-slot').nth(i).click({ force: true });
+      await page.$eval(`.hand-slot[data-id=${editions[i]}]`, (el) => el.click());
       await page.waitForTimeout(900);
       const b = await card.boundingBox();
       await page.screenshot({

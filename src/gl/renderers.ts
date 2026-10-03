@@ -3,6 +3,10 @@ import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { RangeLayer } from './range';
+import { ReliefGL } from '../relief';
+import { HeatLayer } from '../touch/layer';
+import type { HeatSource } from '../touch/heat';
+import type { LayerMap } from '../depth/layers';
 
 export type RGB = [number, number, number];
 
@@ -78,6 +82,10 @@ export interface CardDraw {
   plate?: boolean;
   /** 0..1: overlay showing where the finish lands. */
   rangeView?: number;
+  /** Length of an exported loop in shader seconds, so a finish's own motion can close on itself; 0 or absent live. */
+  loop?: number;
+  /** Where the card was touched, for finishes that react to it. */
+  heat?: HeatSource;
 }
 
 export interface Particle {
@@ -104,7 +112,14 @@ export class CardRenderer {
   private mask: WebGLTexture;
   private back: WebGLTexture;
   private lettering: LetteringGL;
+  private heat: HeatLayer;
   private faceTexels = 1;
+  private relief: ReliefGL;
+  private layers: WebGLTexture;
+  private plate: WebGLTexture;
+  private layerCuts = 0;
+  /** 0..1: how far the Shadowbox sheets stand up (they lie flat while a new cut is made). */
+  layersRise = 1;
   /** Where on the face the finish applies. */
   readonly range: RangeLayer;
   cssW = 1;
@@ -149,14 +164,30 @@ export class CardRenderer {
     this.face = createTexture(gl, true);
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
+    this.layers = createTexture(gl, true);
+    this.plate = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
+    this.relief = new ReliefGL(gl, !opts.settled);
     this.range = new RangeLayer(gl);
+    this.heat = new HeatLayer(gl);
   }
 
-  setFace(face: TexImageSource & { width: number }, mask: TexImageSource): void {
+  setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement): void {
     uploadTexture(this.gl, this.face, face, true);
     uploadTexture(this.gl, this.mask, mask, false);
+    this.relief.setFace(face);
     this.faceTexels = face.width;
+  }
+
+  /** The Shadowbox sheets over the art window. Alpha carries depth, so it is never premultiplied. */
+  setLayers(map: LayerMap): void {
+    const { gl } = this;
+    for (const [t, data] of [[this.layers, map.data], [this.plate, map.plate]] as const) {
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, map.w, map.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      gl.generateMipmap(gl.TEXTURE_2D);
+    }
+    this.layerCuts = map.cuts;
   }
 
   setBack(back: TexImageSource): void {
@@ -215,8 +246,19 @@ export class CardRenderer {
     gl.uniform1f(p.u.uFlash, d.flash);
     gl.uniform1f(p.u.uFaceTexels, this.faceTexels);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
+    gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     applyTune(gl, p.u, this.tune);
+    this.relief.bind(p, 5);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
+    this.heat.bind(p, 6, d.heat);
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, this.layers);
+    gl.uniform1i(p.u.uLayers, 7);
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D, this.plate);
+    gl.uniform1i(p.u.uPlateBack, 8);
+    gl.uniform1f(p.u.uLayerCuts, this.layerCuts);
+    gl.uniform1f(p.u.uLayerRise, this.layersRise);
 
     // Hard pixel drop shadow first, then the card itself.
     if (d.shadow) {

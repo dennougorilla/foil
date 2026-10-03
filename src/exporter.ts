@@ -5,6 +5,9 @@ import type { GifRequest, GifResponse } from './gifWorker';
 import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
+import { AUTO_STILL } from './touch/heat';
+import { autoTouchFor } from './touch/busy';
+import type { LayerMap } from './depth/layers';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -22,6 +25,8 @@ export interface ExportInput {
   tune?: Tune;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
+  /** The Shadowbox sheets cut from the picture. */
+  layers?: LayerMap;
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -52,6 +57,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
+  if (input.layers) r.setLayers(input.layers);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
   r.begin();
   r.drawCard(
@@ -67,6 +73,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
+      // A finish that reacts to touch shows a swipe made for this picture, caught while it is warm.
+      heat: input.edition.touch ? autoTouch(input.face, 3 + AUTO_STILL) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
       ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
       alpha: 1,
@@ -81,11 +89,17 @@ export async function exportPng(input: ExportInput): Promise<string> {
   return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
 }
 
+function autoTouch(face: HTMLCanvasElement, phase: number) {
+  const a = autoTouchFor(face);
+  a.at(phase);
+  return a;
+}
+
 export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** Draws loop position p∈[0,1): the card orbits once on the swirl backdrop. */
-  draw(p: number, bgTime: number, cardTime: number, sourceMs?: number): void;
+  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card orbits once on the swirl backdrop. */
+  draw(p: number, bgTime: number, loopSec: number, sourceMs?: number): void;
   dispose(): void;
 }
 
@@ -108,11 +122,14 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
+  if (input.layers) cards.setLayers(input.layers);
   cards.resize(W, H, 1);
   const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
+  // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
+  const touch = input.edition.touch ? autoTouchFor(input.face) : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
   const ch = 640 * k;
@@ -121,13 +138,14 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   return {
     out,
     ctx,
-    draw(p, bgTime, cardTime, sourceMs) {
+    draw(p, bgTime, loopSec, sourceMs) {
       // The card's motion and light follow the tune; the defaults give the classic orbit.
       const pose = loopPose(tune, p);
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
+      touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL : p));
       if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const { rx, ry } = pose;
@@ -149,8 +167,10 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           alpha: 1,
           flash: 0,
           shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
+          loop: loopSec * tune.speed,
+          heat: touch ?? undefined,
         },
-        cardTime * tune.speed,
+        p * loopSec * tune.speed,
       );
       ctx.imageSmoothingEnabled = false;
       if (transparent) ctx.clearRect(0, 0, W, H);
@@ -188,7 +208,7 @@ export async function exportVideo(input: ExportInput, onProgress?: (p: number) =
   for (let p = 0; p < 1; ) {
     await nextFrame();
     p = Math.min((performance.now() - t0) / 1000 / DUR, 1);
-    scene.draw(p, 40 + p * 6, p * DUR, p * DUR * 1000);
+    scene.draw(p, 40 + p * 6, DUR, p * DUR * 1000);
     onProgress?.(p);
   }
   rec.stop();
@@ -262,13 +282,13 @@ export async function exportGif(
       const p = i / frames;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
-      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * DUR, p * sourceSpan);
+      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, DUR, p * sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, GIF_W, GIF_H);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null });
+    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {

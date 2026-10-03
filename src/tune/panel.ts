@@ -11,6 +11,7 @@ import {
   isDefault,
   LIGHT_MODES,
   lightCss,
+  METALS,
   RANGES,
   TUNE_DEFAULTS,
   type ChoiceKey,
@@ -25,7 +26,7 @@ type Group = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
 
 const GROUPS: { id: Group; keys: Key[] }[] = [
-  { id: 'pattern', keys: ['scale', 'angle', 'hue', 'sat'] },
+  { id: 'pattern', keys: ['scale', 'angle', 'hue', 'sat', 'metal'] },
   { id: 'light', keys: ['glare', 'sharp', 'temp', 'sparkle', 'sparkleSize'] },
   { id: 'motion', keys: ['light', 'lightAngle', 'speed', 'tiltMax', 'idle'] },
 ];
@@ -42,12 +43,14 @@ const ICONS: Record<string, string> = {
   sway: '<path d="M1 8h2V6h2v2h2v2h2V8h2V6h2v2h2v2h-2v2h-2v-2H9v-2H7v2H5v2H3v-2H1z"/>',
   spin: '<path d="M6 2h5v1h1v1h1v3h-2V5h-1V4H6v1H5v2H3V4h1V3h2zm-3 7h2v2h1v1h4v-1h1V9h2v3h-1v1h-1v1H5v-1H4v-1H3z"/>',
   breathe: '<path d="M7 7h2v2H7zM5 4h6v1h1v1h1v4h-1v1h-1v1H5v-1H4v-1H3V6h1V5h1zm1 2v1H5v2h1v1h4V9h1V7h-1V6z"/>',
+  gold: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm1 3v1H5v4h1v1h4v-1h1V6h-1V5z"/>',
+  silver: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm0 3v6h6V5zm2 2h2v2H7z"/>',
   eye: '<path d="M5 4h6v1h2v1h1v1h1v2h-1v1h-1v1h-2v1H5v-1H3v-1H2V9H1V7h1V6h1V5h2zm1 2v1H5v2h1v1h4V9h1V7h-1V6zm1 1h2v2H7z"/>',
   reset: '<path d="M7 2h4v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H6v-2h4v-1h1V6h-1V5H7v1H6v1h2v2H2V3h2v2h1V4h1V3h1z"/>',
 };
 
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
-const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'kintsugi', 'opal', 'eclipse']);
+const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'kintsugi', 'opal', 'eclipse']);
 
 const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -82,7 +85,7 @@ function format(k: NumKey, v: number, t: Dict['tune']): string {
 }
 
 const formatChoice = (k: ChoiceKey, v: string, t: Dict['tune']) =>
-  k === 'light' ? t.lightMode[v as Tune['light']] : t.idleMode[v as Tune['idle']];
+  k === 'light' ? t.lightMode[v as Tune['light']] : k === 'idle' ? t.idleMode[v as Tune['idle']] : t.metalMode[v as Tune['metal']];
 
 const pct = (k: NumKey, v: number) => ((v - RANGES[k].min) / (RANGES[k].max - RANGES[k].min)) * 100;
 
@@ -169,7 +172,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
       group.querySelector('span')!.textContent = t.groups[def.id];
       if (def.id === 'pattern') group.appendChild(sampleRow());
       for (const k of def.keys)
-        group.appendChild(k === 'light' || k === 'idle' ? choiceRow(k) : k === 'lightAngle' ? dialRow(k) : rangeRow(k));
+        group.appendChild(k === 'light' || k === 'idle' || k === 'metal' ? choiceRow(k) : k === 'lightAngle' ? dialRow(k) : rangeRow(k));
       if (def.id === 'motion') {
         const note = document.createElement('p');
         note.className = 'tune-note';
@@ -379,7 +382,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
     group.className = 'seg tune-seg';
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', `tuneLabel-${k}`);
-    const options: string[] = k === 'light' ? LIGHT_MODES.filter((m) => m !== 'gyro' || hasGyro) : IDLE_MODES;
+    const options: string[] = k === 'light' ? LIGHT_MODES.filter((m) => m !== 'gyro' || hasGyro) : k === 'idle' ? IDLE_MODES : METALS;
     group.style.gridTemplateColumns = `repeat(${options.length}, 1fr)`;
     for (const v of options) {
       const b = document.createElement('button');
@@ -463,7 +466,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
       const out = row.querySelector('output')!;
       const btn = row.querySelector<HTMLButtonElement>('.tune-reset')!;
       const label = t.label[k];
-      if (k === 'light' || k === 'idle') {
+      if (k === 'light' || k === 'idle' || k === 'metal') {
         const v = tune[k];
         out.textContent = formatChoice(k, v, t);
         row.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => {
@@ -472,7 +475,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
           b.tabIndex = on ? 0 : -1;
         });
         const help = row.querySelector('.tune-help')!;
-        help.textContent = k === 'light' ? t.lightHelp[tune.light] : t.idleHelp[tune.idle];
+        help.textContent = k === 'light' ? t.lightHelp[tune.light] : k === 'idle' ? t.idleHelp[tune.idle] : t.metalHelp;
         btn.setAttribute('aria-label', t.reset.replace('{name}', label).replace('{value}', formatChoice(k, TUNE_DEFAULTS[k], t)));
       } else if (k === 'lightAngle') {
         const v = tune[k];
@@ -510,6 +513,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
     // the current finish or mode makes them do nothing.
     const row = (k: Key) => root.querySelector<HTMLElement>(`.tune-row[data-key="${k}"]`)!;
     row('lightAngle').hidden = tune.light !== 'fixed';
+    // The metal only shows on Relief, so a locked secret leaves no trace here.
+    row('metal').hidden = s.edition !== 'relief';
     for (const def of GROUPS) {
       const reasons = new Map(def.keys.map((k) => [k, whyIdle(k, s)]));
       // A reason shared by several rows is said once at the top of the group, not on each row.
@@ -558,7 +563,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
   /** Why a control has no visible effect right now, or null when it does. */
   function whyIdle(k: Key, s: State): string | null {
     const tune = s.tune;
-    const finish = ['scale', 'angle', 'hue', 'sat', 'sparkle', 'sparkleSize'].includes(k);
+    if (k === 'metal' && s.edition !== 'relief') return null;
+    const finish = ['scale', 'angle', 'hue', 'sat', 'metal', 'sparkle', 'sparkleSize'].includes(k);
     if (finish && s.edition === 'base') return t.why.base;
     if ((finish || k === 'glare' || k === 'sharp' || k === 'temp') && s.intensity <= 0 && s.edition !== 'base') return t.why.strength;
     if (k === 'sparkleSize' && tune.sparkle <= 0) return t.why.sparkle;

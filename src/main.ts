@@ -3,6 +3,7 @@ import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } fr
 import { DICTS, type Dict } from './i18n';
 import { EDITIONS, FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face';
+import { mountShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
@@ -68,6 +69,17 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
+// The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
+const depth = mountShadowDepth({ store, cards: stage.cards, slot: $('cardSlot'), dict: () => t });
+const artIds = new WeakMap<object, number>();
+let artCount = 0;
+/** Names the art in the window (picture and crop), so depth is read once per art. */
+function artKey() {
+  const s = store.get();
+  const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
+  if (!artIds.has(src)) artIds.set(src, ++artCount);
+  return `${artIds.get(src)}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
+}
 
 function faceSpec(image: Img) {
   const s = store.get();
@@ -79,6 +91,7 @@ function redrawFace() {
   drawFace(face, mask, spec);
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
+  depth.update(face, artKey());
 }
 
 // ---------- Text ----------
@@ -147,7 +160,7 @@ function renderInfo() {
   const pe = $('pillEdition');
   pe.textContent = t.edition[s.edition];
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
-  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
+  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
   // The panel names the finish on the card and points to the hand where it is picked.
   $('finishName').textContent = t.edition[s.edition];
@@ -600,11 +613,12 @@ function announce(msg: string) {
 window.addEventListener('keydown', (e) => {
   const tag = (e.target as HTMLElement).tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-  // 1–9 then 0 pick the first ten finishes, like a keyboard row.
+  // 1–9 then 0 pick the first ten finishes in the hand, like a keyboard row.
   const n = parseInt(e.key, 10);
   if (!Number.isNaN(n) && e.key.length === 1) {
+    const shown = EDITIONS.filter((x) => !isLocked(x.id));
     const i = n === 0 ? 9 : n - 1;
-    if (EDITIONS[i]) selectEdition(EDITIONS[i].id);
+    if (shown[i]) selectEdition(shown[i].id);
     return;
   }
   // Arrows step through finishes when nothing else on the page wants them.
@@ -775,6 +789,7 @@ function exportInput() {
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
+    layers: depth.current(),
   };
 }
 
@@ -1184,6 +1199,7 @@ store.on((s, changed) => {
   if (changed.has('edition')) {
     stage.syncHandChecked();
     renderCaption(null);
+    depth.update(face, artKey());
   }
   if (changed.has('rarity') || changed.has('frame')) buildSegments();
   if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
