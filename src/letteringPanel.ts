@@ -69,6 +69,9 @@ function radio(btn: HTMLElement, on: boolean) {
   btn.tabIndex = on ? 0 : -1;
 }
 
+/** True while arrow keys are selecting, so "any colour" doesn't pop the system picker mid-browse. */
+let browsing = false;
+
 /** Arrow keys move and select within a radiogroup, like the rest of the panel. */
 function roving(group: HTMLElement) {
   group.addEventListener('keydown', (e) => {
@@ -82,7 +85,9 @@ function roving(group: HTMLElement) {
     else if (e.key === 'End') n = items.length - 1;
     if (n < 0) return;
     e.preventDefault();
+    browsing = true;
     items[n].click();
+    browsing = false;
     items[n].focus();
   });
 }
@@ -175,7 +180,7 @@ export function mountLettering(o: Options): void {
         const cur = store.get().text.ink;
         inkPicker.value = cur.startsWith('#') ? cur : '#e0a030';
         set({ ink: inkPicker.value as LetterInk });
-        inkPicker.click();
+        if (!browsing) inkPicker.click();
       } else set({ ink: k === 'auto' || k === 'none' ? k : INKS[k] });
     });
     ink.group.append(b);
@@ -199,7 +204,7 @@ export function mountLettering(o: Options): void {
       set({ foil: k });
       if (k === 'custom') {
         foilPicker.value = store.get().text.foilColor;
-        foilPicker.click();
+        if (!browsing) foilPicker.click();
       }
     });
     foil.group.append(b);
@@ -338,6 +343,7 @@ export function mountLettering(o: Options): void {
       host.style.setProperty('--lt-hi', hi);
       host.classList.toggle('is-blind', l.ink === 'none' && c.blind);
       host.classList.toggle('is-rainbow', l.foil === 'rainbow');
+      host.classList.toggle('is-dark-stock', s.frame === 'ink');
     }
     styleBtns.forEach((b) => {
       radio(b, b.dataset.style === l.style);

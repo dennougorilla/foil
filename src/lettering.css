@@ -138,6 +138,22 @@
   color: transparent;
 }
 
+/* On dark stock the shadow side needs more weight and the lit side less. */
+.is-dark-stock[data-style='deboss'] .lt-chip b,
+.is-dark-stock [data-style='deboss'] .lt-chip b {
+  color: color-mix(in srgb, var(--lt-ink) 70%, #000);
+  text-shadow:
+    calc(var(--lx) * 2.5px) calc(var(--ly) * 2.5px) 0 rgba(0, 0, 0, 0.95),
+    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 rgba(255, 255, 255, 0.4);
+}
+
+.is-dark-stock[data-style='emboss'] .lt-chip b,
+.is-dark-stock [data-style='emboss'] .lt-chip b {
+  text-shadow:
+    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 rgba(255, 255, 255, 0.45),
+    calc(var(--lx) * -3.5px) calc(var(--ly) * -3.5px + 1px) 2px rgba(0, 0, 0, 0.95);
+}
+
 /* Foil: metal ramp that slides as the light moves. */
 [data-style='foil'] .lt-chip b {
   color: transparent;
@@ -266,10 +282,26 @@
     var(--lt-paper);
 }
 
-/* Custom: a colour wheel, with the chosen colour as a dot once set. */
+/* Custom: a colour wheel with a plus, or the chosen colour as a dot once set. */
 .lt-ink-custom,
 .lt-foil-custom:not([aria-checked='true']) {
   background: conic-gradient(#ff5a4f, #ffd84a, #3fc28f, #1a9cff, #b26cd8, #ff5a4f);
+}
+
+.lt-ink-custom:not(.is-set)::after,
+.lt-foil-custom:not([aria-checked='true'])::after {
+  content: '+';
+  position: absolute;
+  inset: 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  background: var(--panel-lo);
+  box-shadow: 0 0 0 2px var(--edge);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1;
 }
 
 .lt-ink-custom.is-set::after {
