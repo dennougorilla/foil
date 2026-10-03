@@ -1307,8 +1307,9 @@ input[type='range']:focus-visible::-moz-range-thumb {
 
 .toasts {
   position: fixed;
-  left: 50%;
-  top: 20px;
+  /* Centred over the stage, near the bottom, so header controls stay reachable. */
+  left: calc((100% - 400px) / 2);
+  bottom: 24px;
   z-index: 70;
   display: grid;
   gap: 8px;
@@ -1623,6 +1624,13 @@ input[type='range']:focus-visible::-moz-range-thumb {
   }
   .sec-export .sec-title {
     display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .toasts {
+    left: 50%;
+    bottom: calc(96px + env(safe-area-inset-bottom));
   }
 }
 
