@@ -283,18 +283,23 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // Deboss: the floor sits in shade, the wall nearest the light is in shadow, the far wall catches light.
     float shadow = max(h - hl, 0.0) * (0.35 + 0.6 * uTextDepth);
     col *= 1.0 - 0.1 * h * (0.4 + uTextDepth);
-    col *= 1.0 + shade;
+    // Outside the letter only the far lip catches light; the near edge stays in the dent's shade.
+    col *= 1.0 + mix(min(shade, 0.0) * 1.3 + max(shade, 0.0), shade, cover);
     col *= 1.0 - clamp(shadow, 0.0, 0.4);
   } else if (uTextStyle == 2) {
     // Emboss: lit shoulders, shaded far side, a soft shadow on the stock below.
-    float shadow = max(hl - h, 0.0) * (0.3 + 0.5 * uTextDepth) * (1.0 - cover);
-    col *= 1.0 + shade;
-    col *= 1.0 - clamp(shadow, 0.0, 0.32);
+    // The raised letters throw a longer, softer shadow than a dent can.
+    float hf = letterH(uv + toward * 2.2);
+    float shadow = (max(hl - h, 0.0) * 0.6 + max(hf - h, 0.0) * 0.5) * (0.35 + 0.6 * uTextDepth) * (1.0 - cover);
+    col *= 1.0 + shade * mix(0.5, 1.0, cover);
+    col *= 1.0 - clamp(shadow, 0.0, 0.45);
     col += pow(ndh, mix(10.0, 60.0, uTextGloss)) * uTextGloss * 0.3 * smoothstep(0.2, 0.7, h);
   } else if (uTextStyle == 3) {
     // Hot-foil: a mirror-like metal with a fine grain, pressed slightly into the card.
-    float grain = vnoise(uv * vec2(1100.0, 1540.0)) - 0.5;
-    float grain2 = vnoise(uv * vec2(1540.0, 1100.0) + 7.0) - 0.5;
+    // Grain fades out as the card shrinks, so small cards don't turn to dither noise.
+    float fine = 1.0 / (1.0 + 2.5 * letterLod);
+    float grain = (vnoise(uv * vec2(1100.0, 1540.0)) - 0.5) * fine;
+    float grain2 = (vnoise(uv * vec2(1540.0, 1100.0) + 7.0) - 0.5) * fine;
     vec3 Nf = normalize(N + vec3(grain, grain2, 0.0) * (0.06 + 0.14 * (1.0 - uTextGloss)));
     float nd = max(dot(Nf, Hv), 0.0);
     // Sweeping reflection band: the foil mirrors a bright room edge that slides as the card tilts.
@@ -302,7 +307,9 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     float sheen = pow(0.5 + 0.5 * sin(ph), 3.0) + 0.45 * pow(0.5 + 0.5 * sin(ph * 2.3 + 1.7), 6.0);
     vec3 lo = uTextLo, hi = uTextHi;
     if (uTextRainbow > 0.5) {
-      float hue = fract(uv.x * 1.8 + uv.y * 0.9 + dot(t, vec2(0.5, 0.35)) + dot(Nf.xy, vec2(0.5)));
+      // Diffraction: fine slanted bands that each shift hue as the card tilts.
+      float grating = sin(dot(uv, vec2(210.0, 90.0)) + dot(t, vec2(6.0, 4.0)));
+      float hue = fract(uv.x * 1.8 + uv.y * 0.9 + dot(t, vec2(0.5, 0.35)) + dot(Nf.xy, vec2(0.5)) + grating * 0.12);
       vec3 rb = hsv2rgb(vec3(hue, 0.75, 1.0));
       lo = rb * 0.5 + vec3(0.04, 0.03, 0.08);
       hi = mix(rb, vec3(1.0), 0.3);
@@ -310,7 +317,9 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     float x = clamp(0.18 + sheen * 0.7 + lam * 1.4 + grain * 0.14, 0.0, 1.0);
     // Metal is never mid-grey: push the ramp towards its ends.
     vec3 metal = mix(lo, hi, smoothstep(0.0, 1.0, x));
-    metal += hi * pow(nd, mix(14.0, 140.0, uTextGloss)) * (0.4 + 0.8 * uTextGloss);
+    metal += hi * pow(nd, mix(14.0, 140.0, uTextGloss)) * (0.5 + 0.9 * uTextGloss);
+    // A bright glint along the band's crest reads as polished metal even on a small card.
+    metal += hi * smoothstep(0.85, 1.0, sheen) * 0.35 * uTextGloss;
     // The press leaves a dent: a thin shaded wall that keeps pale foils legible on pale stock.
     col *= 1.0 - (0.18 + 0.3 * uTextDepth) * h * (1.0 - cover);
     col *= 1.0 + clamp(lam, -0.2, 0.15) * (1.0 - cover) * uTextDepth;
@@ -320,7 +329,9 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // a hard gloss when the angle is right.
     float glint = pow(ndh, mix(40.0, 260.0, uTextGloss));
     float sweep = pow(0.5 + 0.5 * sin(dot(uv, vec2(5.0, 7.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 10.0);
-    col = mix(col, col * 0.93, cover * 0.6);  // varnish deepens the ink a touch
+    // Varnish deepens what's under it and leaves a faint gloss, so even clear varnish on bare stock reads.
+    col = mix(col, col * 0.86, cover * 0.8);
+    col += vec3(0.05) * cover;
     // The sweep fades across each glyph so the varnish reads as a reflection, not paint.
     float across = 0.6 + 0.4 * sin(dot(uv, vec2(60.0, -40.0)) + dot(t, vec2(4.0)));
     float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * across * (0.12 + 0.3 * uTextGloss);

@@ -15,10 +15,15 @@
   gap: 8px;
 }
 
+.lt-head .field-label {
+  color: var(--text);
+  font-size: 16px;
+  text-shadow: 0 2px 0 var(--edge);
+}
+
 .lt-target {
   font-size: 13px;
   color: var(--text-dim);
-  opacity: 0.8;
 }
 
 .lt-reset {
@@ -43,16 +48,16 @@
 .lt-style {
   display: grid;
   justify-items: center;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
-  padding: 5px 3px 6px;
+  padding: 5px 3px 2px;
   border: 0;
   border-radius: 8px;
   background: var(--panel-lo);
   box-shadow: inset 0 0 0 2px var(--panel-hi), 0 4px 0 var(--edge);
   color: var(--text-dim);
-  font-size: 12px;
-  line-height: 1.15;
+  font-size: 13px;
+  line-height: 1.1;
   transition: transform 0.08s, background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
@@ -66,8 +71,14 @@
 
 .lt-style[aria-checked='true'] {
   background: var(--panel-hi);
-  color: var(--text);
-  box-shadow: inset 0 0 0 2px var(--gold), 0 4px 0 var(--edge);
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 0 var(--edge);
+}
+
+.lt-style[aria-checked='true'] .lt-chip {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
 
 .lt-style:active {
@@ -76,6 +87,9 @@
 }
 
 .lt-style-name {
+  display: grid;
+  place-items: center;
+  min-height: 2.3em;
   max-width: 100%;
   text-align: center;
   word-break: keep-all;
@@ -84,7 +98,7 @@
 /* Narrow panels (1024px and down to phones): tighter labels so words never split. */
 @container (max-width: 320px) {
   .lt-style {
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: -0.03em;
   }
   .lt-chip {
@@ -171,6 +185,10 @@
 }
 
 /* Spot UV: the glyph barely shows; a hard gloss band crosses it. */
+[data-style='spot'] .lt-chip b {
+  color: color-mix(in srgb, var(--lt-ink) 85%, #000);
+}
+
 [data-style='spot'] .lt-chip b::after {
   content: attr(data-g);
   position: absolute;
@@ -178,7 +196,8 @@
   color: transparent;
   background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, transparent 58%);
   background-size: 300% 100%;
-  background-position: calc(var(--mx) * 100%) 0;
+  /* At rest the band crosses the glyph's right side; moving the pointer sweeps it across. */
+  background-position: calc((var(--mx) * 0.6 + 0.2) * 100%) 0;
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -190,6 +209,7 @@
 
 .lt-help {
   min-height: 2.6em;
+  text-wrap: pretty;
   margin: 10px 0 0;
   line-height: 1.3;
 }
@@ -255,7 +275,7 @@
 
 .lt-swatch[aria-checked='true'] {
   transform: translateY(-2px);
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 4px var(--gold), 0 0 0 6px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 4px var(--text), 0 0 0 6px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.3);
 }
 
 /* Auto: the frame's own ink, shown as a letter on the card stock. */
@@ -410,6 +430,19 @@
   transform: translateY(-2px) rotate(-4deg);
 }
 
+/* A small sparkle marks the chip as a finish you can change. */
+.lt-jump::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 11px;
+  height: 11px;
+  background: var(--gold);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: drop-shadow(0 0 1px var(--edge));
+}
+
 .lt-jump:active {
   transform: translateY(2px);
 }
@@ -430,8 +463,16 @@
 }
 
 @keyframes lt-called {
-  0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 70%, transparent); border-radius: 8px; }
-  100% { box-shadow: 0 0 0 3px transparent; border-radius: 8px; }
+  0%, 40% {
+    background: color-mix(in srgb, var(--gold) 12%, transparent);
+    box-shadow: 0 0 0 3px var(--gold), 0 4px 0 3px var(--edge);
+    border-radius: 10px;
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 3px transparent, 0 4px 0 3px transparent;
+    border-radius: 10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -443,5 +484,16 @@
   }
   .lt.is-called {
     animation-duration: 0.01s;
+  }
+}
+
+/* Touch: bigger swatches. */
+@media (pointer: coarse) {
+  .lt-swatch {
+    width: 34px;
+    height: 34px;
+  }
+  .lt-swatches {
+    gap: 10px;
   }
 }
