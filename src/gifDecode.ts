@@ -12,6 +12,8 @@ const PIXEL_BUDGET = 30_000_000;
 const MAX_FRAMES = 180;
 /** Decompression expands every frame to RGBA at once, so cap the raw patch pixels (~400 MB) before it runs. */
 const RAW_PIXEL_BUDGET = 100_000_000;
+/** The full-size logical screen we composite onto (plus a restore copy); larger GIFs open as stills. */
+const SCREEN_PIXEL_MAX = 16_777_216;
 
 /**
  * Decodes an animated GIF into fully composited frames.
@@ -19,6 +21,9 @@ const RAW_PIXEL_BUDGET = 100_000_000;
  */
 export function decodeGif(buf: ArrayBuffer): Anim | null {
   const gif = parseGIF(buf);
+  const W = gif.lsd.width;
+  const H = gif.lsd.height;
+  if (W * H > SCREEN_PIXEL_MAX) return null;
   // Keep only the frames we will use, and stop early on huge GIFs, before anything is decompressed.
   const images = gif.frames.filter((f) => 'image' in f);
   let px = 0;
@@ -26,15 +31,14 @@ export function decodeGif(buf: ArrayBuffer): Anim | null {
   for (const f of images) {
     const { width, height } = f.image.descriptor;
     px += width * height;
-    if (n >= MAX_FRAMES || (n >= 2 && px > RAW_PIXEL_BUDGET)) break;
+    if (n >= MAX_FRAMES || px > RAW_PIXEL_BUDGET) break;
     n++;
   }
+  if (n < 2) return null;
   gif.frames = images.slice(0, n);
   const raw = decompressFrames(gif, true);
   if (raw.length < 2) return null;
 
-  const W = gif.lsd.width;
-  const H = gif.lsd.height;
   const k = Math.min(1, 1024 / Math.max(W, H), Math.sqrt(PIXEL_BUDGET / (W * H * raw.length)));
   const outW = Math.max(1, Math.round(W * k));
   const outH = Math.max(1, Math.round(H * k));

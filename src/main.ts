@@ -735,7 +735,11 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
 function dismissToast(el: HTMLElement) {
   if (el.classList.contains('is-out')) return;
   // Don't strand keyboard focus on a toast that's about to vanish.
-  if (el.contains(document.activeElement)) $('pickBtn').focus({ preventScroll: true });
+  // Phones hide the panel's pick button, so land on whichever one is showing.
+  if (el.contains(document.activeElement)) {
+    const pick = [$('pickBtn'), $('pickBtnStage')].find((b) => b.getClientRects().length) ?? $('pickBtn');
+    pick.focus({ preventScroll: true });
+  }
   el.classList.add('is-out');
   el.addEventListener('animationend', () => el.remove());
   setTimeout(() => el.remove(), 400);
