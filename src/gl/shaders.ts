@@ -390,6 +390,38 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   }
   return col;
 }
+// Snow Globe: the art seen through a curved pane of clear liquid. The glitter in it is drawn as
+// GPU particles on top of the card (src/gl/snowglobe.ts). g is the card uv (not the pattern).
+vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
+  const vec4 W = vec4(0.062, 0.0443, 0.938, 0.8786); // art window: left, top, right, bottom
+  vec2 a = (g - W.xy) / (W.zw - W.xy);
+  vec2 q = (a - 0.5) * vec2(2.0, 2.66);
+  float r2 = dot(q, q) / 2.8;
+  // The liquid lens magnifies a touch toward the middle and never quite stops moving.
+  vec2 wob = vec2(vnoise(g * 5.0 + vec2(uTime * 0.2, 0.0)), vnoise(g * 5.0 + vec2(5.2, -uTime * 0.17))) - 0.5;
+  vec2 s = g - (g - (W.xy + W.zw) * 0.5) * 0.07 * (1.0 - min(r2, 1.0)) + wob * 0.006 + t * 0.005;
+  vec3 col = mix(c, face(tunePattern(s), lod).rgb, art);
+  // Clear water with a faint cool cast, deeper toward the walls.
+  float edge = min(min(a.x, 1.0 - a.x), min(a.y, 1.0 - a.y) * 1.33);
+  col = mix(col, col * vec3(0.9, 0.97, 1.05) + vec3(0.0, 0.012, 0.03), 0.7);
+  col *= 1.0 - 0.3 * smoothstep(0.14, 0.0, edge);
+  // Light through the moving water, rippling over the lower half.
+  float caus = 1.0 - abs(vnoise(g * vec2(9.0, 7.0) + vec2(uTime * 0.25, uTime * 0.1)) * 2.0 - 1.0);
+  col += vec3(0.75, 0.9, 1.0) * pow(caus, 6.0) * 0.12 * smoothstep(0.35, 1.0, a.y);
+  // The pane bulges like a dome: a thin highlight follows its curve in one corner and a soft
+  // sheet of reflected light fills in behind it, both swinging round as the card turns.
+  vec2 e = q / vec2(0.84, 1.16);
+  float ell = length(e);
+  vec2 dir = normalize(vec2(-0.62, -0.78) + t * vec2(-0.35, -0.3));
+  float side = smoothstep(0.55, 0.97, dot(e / max(ell, 1e-3), dir));
+  float arc = smoothstep(0.035, 0.0, abs(ell - 1.0)) * side;
+  float sheet = smoothstep(0.55, 1.0, ell) * smoothstep(1.06, 0.98, ell) * side;
+  float back = smoothstep(0.03, 0.0, abs(ell - 0.97)) * smoothstep(0.8, 0.98, dot(e / max(ell, 1e-3), -dir));
+  col += vec3(0.85, 0.93, 1.0) * (sheet * 0.12 + arc * 0.35 + back * 0.15);
+  // A bright rim where the glass curves away.
+  col += vec3(0.8, 0.9, 1.0) * smoothstep(0.03, 0.0, edge) * 0.3;
+  return mix(c, col, art);
+}
 ${LETTERING_GLSL}
 
 ${SPONSOR_GLSL}
@@ -442,6 +474,7 @@ void main() {
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
+  else if (e == 60) col = snowglobe(c, artUv, uTilt, L, lod, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;

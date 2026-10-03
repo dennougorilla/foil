@@ -3,6 +3,7 @@ import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { RangeLayer } from './range';
+import { SnowGlobe, SNOWGLOBE_SHADER } from './snowglobe';
 
 export type RGB = [number, number, number];
 
@@ -104,6 +105,9 @@ export class CardRenderer {
   private back: WebGLTexture;
   private lettering: LetteringGL;
   private faceTexels = 1;
+  private settled: boolean;
+  /** Flakes of the Snow Globe finish, made the first time a card needs them. */
+  private globe: SnowGlobe | null = null;
   /** Where on the face the finish applies. */
   readonly range: RangeLayer;
   cssW = 1;
@@ -148,6 +152,7 @@ export class CardRenderer {
     this.face = createTexture(gl, true);
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
+    this.settled = !!opts.settled;
     this.lettering = new LetteringGL(gl, opts.settled);
     this.range = new RangeLayer(gl);
   }
@@ -224,6 +229,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uShadow, 0);
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (d.edition === SNOWGLOBE_SHADER) (this.globe ??= new SnowGlobe(gl, this.settled)).draw(this, d, time);
   }
 
   drawParticles(list: Particle[]): void {
