@@ -55,7 +55,7 @@ Balatro is a registered trademark of LocalThunk LLC.
 
 ## Third-party
 
-The Shadowbox finish uses [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small) (Apache-2.0), fetched at run time from the [onnx-community conversion](https://huggingface.co/onnx-community/depth-anything-v2-small) pinned to one revision and checked against its SHA-256, and [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). The model is not part of this repository.
+The Shadowbox finish uses [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small) (Apache-2.0), fetched at run time from the [onnx-community conversion](https://huggingface.co/onnx-community/depth-anything-v2-small) pinned to one revision and checked against its SHA-256, and [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). The model is not part of this repository. Licenses of the bundled third-party code ship with the site as `THIRD_PARTY_NOTICES.txt` (from `public/`).
 
 ## Support
 
