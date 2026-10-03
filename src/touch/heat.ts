@@ -90,7 +90,7 @@ export class HeatField implements HeatSource {
   press(u: number, v: number, dt: number) {
     let p = this.pressing;
     if (!p) {
-      // Turned a little, the same way for the same spot, so a recording comes out the same.
+      // Turned a little, the same way for the same spot, so every export comes out the same.
       p = { u, v, angle: -0.3 + 0.35 * Math.sin(u * 91.7 + v * 37.3), heat: 0 };
       this.prints.push(p);
       if (this.prints.length > PRINTS) this.prints.shift();
@@ -259,7 +259,7 @@ export class Swipe {
 export const AUTO_LOOP = 10;
 /** Where in the loop a still picture (PNG, a held preview) is taken: the swipe still warm, the print just made. */
 export const AUTO_STILL = 0.3;
-/** Simulation ticks per loop: fixed, so every recording of the same phase is identical. */
+/** Simulation ticks per loop: fixed, so every export of the same phase is identical. */
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */
 const START = 10;

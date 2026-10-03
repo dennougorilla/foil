@@ -165,7 +165,7 @@ await step('area tab and brush', async () => {
   expect(!(await page.isVisible('.brush')), 'brush bar did not close');
 });
 
-for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['video', /\.(mp4|webm)$/], ['apng', '-anim.png']]) {
+for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.png']]) {
   await step(`export ${format}`, async () => {
     await page.click(`#formatSeg [role=radio][data-format=${format}]`);
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);

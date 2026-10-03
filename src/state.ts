@@ -8,8 +8,8 @@ import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type Ra
 /** Tabs of the Fine-tune area in the side panel. */
 export type PanelTab = 'card' | 'light' | 'text' | 'range';
 export const PANEL_TABS: PanelTab[] = ['card', 'light', 'text', 'range'];
-export type ExportFormat = 'png' | 'gif' | 'video' | 'apng';
-export const EXPORT_FORMATS: ExportFormat[] = ['png', 'gif', 'video', 'apng'];
+export type ExportFormat = 'png' | 'gif' | 'apng';
+export const EXPORT_FORMATS: ExportFormat[] = ['png', 'gif', 'apng'];
 
 export interface State extends RangeColorState {
   lang: Lang;

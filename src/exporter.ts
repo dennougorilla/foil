@@ -104,7 +104,7 @@ export interface Scene {
 }
 
 /**
- * The shared stage for video and GIF: a pixel swirl upscaled nearest, with the card composited on top.
+ * The shared stage for GIF and APNG: a pixel swirl upscaled nearest, with the card composited on top.
  * `transparent` leaves the swirl out so only the card (and its shadow, unless `shadow` is off) is drawn.
  */
 export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false, shadow = true): Scene {
@@ -182,42 +182,6 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
       cards.gl.getExtension('WEBGL_lose_context')?.loseContext();
     },
   };
-}
-
-export function videoSupported(): string | null {
-  if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) return null;
-  const types = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-  return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? null;
-}
-
-/** Records a 4-second loop: the card orbits once on the swirl backdrop. */
-export async function exportVideo(input: ExportInput, onProgress?: (p: number) => void): Promise<string> {
-  const mime = videoSupported();
-  if (!mime) throw new Error('video-unsupported');
-  const scene = createScene(input, 720, 900);
-
-  const stream = scene.out.captureStream(30);
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
-  const chunks: Blob[] = [];
-  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  const done = new Promise<void>((res) => (rec.onstop = () => res()));
-
-  const DUR = 4;
-  const t0 = performance.now();
-  rec.start();
-  for (let p = 0; p < 1; ) {
-    await nextFrame();
-    p = Math.min((performance.now() - t0) / 1000 / DUR, 1);
-    scene.draw(p, 40 + p * 6, DUR, p * DUR * 1000);
-    onProgress?.(p);
-  }
-  rec.stop();
-  await done;
-  scene.dispose();
-  // Some encoders hand back nothing at all; fail loudly rather than saving an empty file.
-  if (!chunks.length) throw new Error('video-empty');
-  const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-  return download(new Blob(chunks, { type: mime.split(';')[0] }), `${fileSafe(input.name)}-${input.edition.id}.${ext}`);
 }
 
 /**

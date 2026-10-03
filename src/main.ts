@@ -7,7 +7,7 @@ import { mountShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
-import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
+import { exportGif, exportPng } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
@@ -799,7 +799,7 @@ function exportInput() {
   };
 }
 
-/** Lets GIF and video exports step through the person's animated GIF frame by frame. */
+/** Lets GIF and APNG exports step through the person's animated GIF frame by frame. */
 function animatedExport(anim: Anim) {
   // Settings are fixed when the export starts, so edits made meanwhile don't change it midway.
   const spec = faceSpec(anim.frames[0]);
@@ -954,7 +954,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   } catch (err) {
     console.error(err);
     sfx.error();
-    toast((err as Error).message === 'video-unsupported' ? t.errVideo : fail, true);
+    toast(fail, true);
   } finally {
     saveBtn.removeAttribute('aria-busy');
     // A picture still loading keeps Save resting; the format buttons are rebuilt, not the old ones re-enabled.
@@ -1005,13 +1005,6 @@ saveBtn.addEventListener('click', () => {
         ),
       t.errGif,
     );
-  } else if (f === 'video') {
-    if (!videoSupported()) {
-      sfx.error();
-      toast(t.errVideo, true);
-      return;
-    }
-    void busy(t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
   }
   // APNG runs from its own module, which also handles stopping it.
 });
