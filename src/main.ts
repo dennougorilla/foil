@@ -70,7 +70,13 @@ try {
 }
 stage.cards.setBack(back);
 // The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
-const depth = mountShadowDepth({ store, cards: stage.cards, slot: $('cardSlot'), dict: () => t });
+const depth = mountShadowDepth({
+  store,
+  cards: stage.cards,
+  slot: $('cardSlot'),
+  dict: () => t,
+  animated: () => !!userAnim && store.get().sample < 0,
+});
 const artIds = new WeakMap<object, number>();
 let artCount = 0;
 /** Names the art in the window (picture and crop), so depth is read once per art. */

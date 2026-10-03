@@ -17,6 +17,8 @@ const H = 518;
 const EMPTY: LayerMap = { w: 1, h: 1, cuts: 0, data: new Uint8ClampedArray(4), plate: new Uint8ClampedArray(4) };
 /** Shown with the data-saver offer; the CPU model's download. */
 const MODEL_BYTES = 27258801;
+/** How long the worker (and the model session in it) is kept after leaving Shadowbox. */
+const IDLE_MS = 30000;
 
 export interface ShadowDepth {
   /** Call after the face is redrawn; `key` names the art (picture and crop), not the frame or name. */
@@ -25,7 +27,14 @@ export interface ShadowDepth {
   current(): LayerMap | undefined;
 }
 
-export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: HTMLElement; dict: () => Dict }): ShadowDepth {
+export function mountShadowDepth(o: {
+  store: Store;
+  cards: CardRenderer;
+  slot: HTMLElement;
+  dict: () => Dict;
+  /** The picture is animated, so a cut from one frame must not paint pixels into the others. */
+  animated: () => boolean;
+}): ShadowDepth {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
   let allowModel = !saveData;
@@ -39,7 +48,11 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
   let map: LayerMap | undefined;
   let sent = { id: 0, key: '' };
   let timer = 0;
+  let idle = 0;
+  /** A model cut is on its way; the worker stays until it lands. */
+  let awaiting = false;
   const cuts = new Map<string, LayerMap>();
+  const active = () => o.store.get().edition === 'shadowbox';
   const pill = new DepthPill(o.slot, o.dict, () => {
     allowModel = true;
     wanted = shown = '';
@@ -89,7 +102,7 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
     map = next;
     shown = key;
     shownSource = source;
-    o.cards.setLayers(next);
+    o.cards.setLayers(next, !o.animated());
     await riseTo(1, 650);
   }
 
@@ -100,9 +113,11 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
       w.onmessage = (e: MessageEvent<CutReply>) => onReply(e.data);
       w.onerror = (e) => {
         console.warn('depth: worker failed', e.message);
+        w.terminate();
         worker = null;
+        awaiting = false;
         allowModel = false;
-        pill.failed();
+        if (active()) pill.failed();
         // Carry on with the colour cut, here.
         if (face) void show(colorLayers(artPixels(face), W, H), 'color', wanted);
       };
@@ -114,21 +129,38 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
 
   function onReply(m: CutReply) {
     if (m.id !== sent.id) return;
+    // The chip speaks only while Shadowbox is on the card; replies landing after it left stay quiet.
+    const speak = active();
     if (m.type === 'layers') {
       if (m.source === 'model') {
+        awaiting = false;
         cuts.set(sent.key, m.map);
         // A few recent pictures stay cut, so flipping back is instant.
         if (cuts.size > 4) cuts.delete(cuts.keys().next().value!);
-        pill.done();
+        if (speak) pill.done();
       }
       void show(m.map, m.source, sent.key);
-    } else if (m.type === 'download') pill.download(m.loaded, m.total);
-    else if (m.type === 'running') pill.running();
-    else {
+    } else if (m.type === 'download') {
+      if (speak) pill.download(m.loaded, m.total);
+    } else if (m.type === 'running') {
+      if (speak) pill.running();
+    } else {
       // Once the model has failed, the colour cut carries on without asking again this visit.
+      awaiting = false;
       allowModel = false;
-      pill.failed();
+      if (speak) pill.failed();
     }
+  }
+
+  /** Lets the worker go a while after Shadowbox is left, freeing the model session it holds. */
+  function retire() {
+    if (active() || !worker) return;
+    if (awaiting) {
+      idle = window.setTimeout(retire, IDLE_MS);
+      return;
+    }
+    worker.terminate();
+    worker = null;
   }
 
   function artPixels(f: HTMLCanvasElement): Uint8ClampedArray {
@@ -146,6 +178,7 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
       return;
     }
     const rgba = artPixels(face);
+    clearTimeout(idle);
     worker ??= startWorker();
     if (!worker) {
       // No workers: the colour cut, here and now.
@@ -155,14 +188,17 @@ export function mountShadowDepth(o: { store: Store; cards: CardRenderer; slot: H
     sent = { id: sent.id + 1, key };
     const req: CutRequest = { id: sent.id, rgba, w: W, h: H, model: allowModel };
     worker.postMessage(req, [rgba.buffer]);
+    awaiting = allowModel;
     if (saveData && !allowModel) pill.offer(MODEL_BYTES);
   }
 
   function update(f: HTMLCanvasElement, key: string) {
     face = f;
     latest = key;
-    if (o.store.get().edition !== 'shadowbox') {
+    if (!active()) {
       pill.hide();
+      clearTimeout(idle);
+      if (worker) idle = window.setTimeout(retire, IDLE_MS);
       // Cuts of an earlier picture must not sit on this one (the hand still shows the finish).
       if (map && key !== shown) {
         map = undefined;

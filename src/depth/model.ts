@@ -33,7 +33,12 @@ async function modelBytes(m: ModelFile, progress: Progress): Promise<ArrayBuffer
   const url = REPO + m.file;
   const cache = await caches.open(CACHE).catch(() => null);
   const hit = await cache?.match(url);
-  if (hit) return hit.arrayBuffer();
+  if (hit) {
+    // The cached copy is checked like a fresh one; a damaged entry is dropped and fetched again.
+    const buf = await hit.arrayBuffer();
+    if (buf.byteLength === m.bytes && hex(await crypto.subtle.digest('SHA-256', buf)) === m.sha256) return buf;
+    await cache?.delete(url).catch(() => false);
+  }
   const res = await fetch(url);
   if (!res.ok || !res.body) throw new Error(`model-http-${res.status}`);
   const out = new Uint8Array(m.bytes);
@@ -43,7 +48,11 @@ async function modelBytes(m: ModelFile, progress: Progress): Promise<ArrayBuffer
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (at + value.length > out.length) throw new Error('model-size');
+    if (at + value.length > out.length) {
+      // Stop the oversized download instead of letting it run on in the background.
+      await reader.cancel().catch(() => {});
+      throw new Error('model-size');
+    }
     out.set(value, at);
     at += value.length;
     progress(at, m.bytes);

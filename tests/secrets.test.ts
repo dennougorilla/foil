@@ -1,7 +1,7 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OPEN_EDITIONS, parseUnlocked, pickSecret } from '../src/secrets.ts';
+import { mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret } from '../src/secrets.ts';
 
 const SECRETS = ['gold', 'relief', 'kintsugi'] as const;
 
@@ -25,4 +25,9 @@ test('each unlock draws one secret that is still locked, at random', () => {
 
 test('once every secret is out, nothing more is drawn', () => {
   assert.equal(pickSecret(SECRETS, ['gold', 'relief', 'kintsugi'], () => 0.5), null);
+});
+
+test('two tabs unlocking at once both keep what they drew', () => {
+  assert.deepEqual(mergeUnlocked(SECRETS, ['kintsugi'], ['gold']), ['gold', 'kintsugi']);
+  assert.deepEqual(mergeUnlocked(SECRETS, ['gold', 'relief'], ['relief']), ['gold', 'relief']);
 });

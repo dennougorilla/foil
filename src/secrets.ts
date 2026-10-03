@@ -22,3 +22,8 @@ export function pickSecret(secrets: readonly EditionId[], unlocked: readonly Edi
   const locked = secrets.filter((id) => !unlocked.includes(id));
   return locked.length ? locked[Math.floor(random() * locked.length)] : null;
 }
+
+/** Both lists' unlocks, in hand order: two tabs that unlocked at the same moment each keep theirs. */
+export function mergeUnlocked(secrets: readonly EditionId[], saved: readonly EditionId[], mine: readonly EditionId[]): EditionId[] {
+  return secrets.filter((id) => saved.includes(id) || mine.includes(id));
+}
