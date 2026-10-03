@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret } from '../src/secrets.ts';
+import { EDITIONS } from '../src/editions.ts';
 
 const SECRETS = ['gold', 'relief', 'kintsugi'] as const;
 
@@ -30,4 +31,12 @@ test('once every secret is out, nothing more is drawn', () => {
 test('two tabs unlocking at once both keep what they drew', () => {
   assert.deepEqual(mergeUnlocked(SECRETS, ['kintsugi'], ['gold']), ['gold', 'kintsugi']);
   assert.deepEqual(mergeUnlocked(SECRETS, ['gold', 'relief'], ['relief']), ['gold', 'relief']);
+});
+
+test('a retired secret (Eclipse) saved by an earlier version is ignored and never drawn', () => {
+  // The same list the app builds in src/sponsor.ts.
+  const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+  assert.ok(!(secrets as string[]).includes('eclipse'));
+  assert.deepEqual(parseUnlocked('["eclipse","opal"]', secrets), ['opal']);
+  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(secrets, [], Math.random), 'eclipse');
 });

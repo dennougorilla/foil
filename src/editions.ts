@@ -21,7 +21,6 @@ export type EditionId =
   // Shaders in src/gl/sponsorShaders.ts
   | 'kintsugi'
   | 'opal'
-  | 'eclipse'
   | 'raden';
 
 export interface Edition {
@@ -63,7 +62,6 @@ export const EDITIONS: Edition[] = [
   // Shaders in src/gl/sponsorShaders.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
-  { id: 'eclipse', shader: 42, color: '#ffb36b', swirl: ['#030308', '#1c1534', '#c25a2a'], value: 8 },
   { id: 'raden', shader: 43, color: '#b9a6ff', swirl: ['#07060a', '#2c1a3a', '#4fc0c8'], value: 8 },
 ];
 
