@@ -8,11 +8,12 @@
      changes and actions. */
   --tune-info: #7cc6ff;
   /* "Changed" has its own colour, shared with the reset arrows, so it never reads as a slider fill. */
-  --tune-changed: var(--gold);
+  /* "Changed" is plain bright white, so gold keeps to actions (reset, undo) and focus. */
+  --tune-changed: var(--text);
 }
 
 .tune-toggle {
-  --tune-changed: var(--gold);
+  --tune-changed: var(--text);
 }
 
 .tune svg {
@@ -351,11 +352,10 @@
   top: 21px;
   /* The thumb's centre travels 10px in from each end of the track. */
   left: calc(10px + (100% - 20px) * var(--def) / 100%);
-  width: 6px;
-  height: 6px;
-  margin-left: -3px;
+  width: 8px;
+  height: 7px;
+  margin-left: -4px;
   background: var(--text);
-  opacity: 0.75;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
@@ -368,9 +368,9 @@
   width: 20px;
   height: 24px;
   margin-left: -10px;
-  border: 2px dashed var(--gold);
+  border: 2px dashed var(--text);
   border-radius: 5px;
-  background: rgba(242, 193, 78, 0.25);
+  background: rgba(245, 242, 234, 0.2);
   pointer-events: none;
   opacity: 0;
 }
@@ -384,7 +384,7 @@
 }
 
 .tune.is-comparing .tune-row.is-changed .tune-opt.is-default {
-  box-shadow: inset 0 0 0 2px var(--gold), 0 4px 0 var(--edge);
+  box-shadow: inset 0 0 0 2px var(--text), 0 4px 0 var(--edge);
 }
 
 .tune-ends {
@@ -396,7 +396,7 @@
   color: var(--text-dim);
 }
 
-.tune-row.is-dim :is(.tune-label, .tune-out, .tune-extra, .tune-track, .tune-seg, .tune-help, .tune-reset) {
+.tune-row.is-dim :is(.tune-label, .tune-out, .tune-extra, .tune-track, .tune-seg, .tune-help, .tune-reset:not(:disabled)) {
   opacity: 0.45;
 }
 
@@ -541,6 +541,7 @@
   padding: 10px 12px 12px;
   border-radius: 0 0 10px 10px;
   background: var(--panel-lo);
+  filter: drop-shadow(0 -6px 8px rgba(0, 0, 0, 0.35));
   box-shadow: inset 0 2px 0 var(--edge), inset 2px 0 0 var(--edge), inset -2px 0 0 var(--edge), inset 0 -2px 0 var(--edge);
 }
 
@@ -911,7 +912,7 @@
 .tune-peek {
   flex: none;
   width: 60px;
-  height: 80px;
+  height: 96px;
   margin: -2px 0;
   padding: 0;
   border: 0;
@@ -932,7 +933,8 @@
 .tune-peek canvas {
   display: block;
   width: 100%;
-  height: 100%;
+  /* The caption sits under the picture, not on it. */
+  height: calc(100% - 16px);
 }
 
 .tune-peek-cap {
@@ -941,7 +943,7 @@
   right: 0;
   bottom: 0;
   padding: 1px 0 2px;
-  background: rgba(13, 19, 21, 0.85);
+  background: var(--panel-lo);
   color: var(--text-dim);
   font-size: 10px;
   line-height: 1.3;

@@ -29,6 +29,7 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
   let active = false;
   let offscreen = false;
   let raf = 0;
+  let drawn = false;
 
   btn.addEventListener('click', () => slot.scrollIntoView({ block: 'center', behavior: reduced.matches ? 'auto' : 'smooth' }));
 
@@ -60,7 +61,8 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
 
   function draw() {
     raf = requestAnimationFrame(draw);
-    if (facing() < 0.35 && view.width) return;
+    // Hold the last face-on frame while a spin shows the back (but always draw a first frame).
+    if (facing() < 0.35 && drawn) return;
     const c = source!.getBoundingClientRect();
     const s = slot!.getBoundingClientRect();
     if (!c.width || !s.width) return;
@@ -81,6 +83,7 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
     const x = view.getContext('2d')!;
     x.clearRect(0, 0, w, h);
     x.drawImage(source!, sx, sy, sw, sh, 0, 0, w, h);
+    drawn = facing() >= 0.35;
   }
 
   return {
