@@ -253,16 +253,6 @@
   color: var(--text);
 }
 
-.tune-row.is-changed .tune-label::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 7px 2px 0;
-  background: var(--tune-changed);
-  vertical-align: middle;
-}
-
 .tune-row-choice .tune-out {
   display: none;
 }
@@ -351,11 +341,11 @@
   top: 21px;
   /* The thumb's centre travels 10px in from each end of the track. */
   left: calc(10px + (100% - 20px) * var(--def) / 100%);
-  width: 2px;
-  height: 4px;
-  margin-left: -1px;
+  width: 4px;
+  height: 6px;
+  margin-left: -2px;
   background: var(--text-dim);
-  opacity: 0.6;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
 .tune-row.is-dim {
@@ -473,9 +463,9 @@
   display: none;
 }
 
-/* While comparing, the changed markers dim so it's clear the card shows the defaults. */
-.tune.is-comparing .tune-row.is-changed .tune-label::before {
-  opacity: 0.25;
+/* While comparing, changed labels dim so it's clear the card shows the defaults. */
+.tune.is-comparing .tune-row.is-changed .tune-label {
+  color: var(--text-dim);
 }
 
 .tune-reset-all {

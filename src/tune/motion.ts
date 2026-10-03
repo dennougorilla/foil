@@ -67,8 +67,8 @@ class LiveMotion {
       pose.sheen = [Math.sin(s * 0.45) * 0.3, Math.cos(s * 0.38) * 0.3];
     } else if (t.idle === 'breathe') {
       const b = Math.sin(s * 1.15);
-      pose.scale = 1 + b * 0.022;
-      pose.fy = -b * 4;
+      pose.scale = 1 + b * 0.035;
+      pose.fy = -b * 6;
       pose.rx = b * 0.03;
       pose.sheen = [Math.sin(s * 0.4) * 0.15, b * 0.4];
     }

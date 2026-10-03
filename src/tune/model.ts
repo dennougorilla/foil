@@ -221,7 +221,7 @@ export function loopPose(t: Tune, p: number): LoopPose {
     ry = a - Math.sin(a * 2) * 0.4;
     rx = Math.sin(a) * 0.08 * k;
   } else if (t.idle === 'breathe') {
-    scale = 1 + Math.sin(a) * 0.03;
+    scale = 1 + Math.sin(a) * 0.035;
     rx = Math.sin(a) * 0.06 * k;
     dy = -Math.sin(a) * 6;
   }

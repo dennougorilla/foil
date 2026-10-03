@@ -433,7 +433,9 @@ export function mountTune(store: Store, after: Element): void {
     badge.hidden = !changed.length;
     badge.textContent = String(changed.length);
     // The badge is just a number on screen; spell it out for screen readers.
-    toggle.setAttribute('aria-label', changed.length ? `${t.toggle} (${t.changed.replace('{n}', String(changed.length))})` : t.toggle);
+    const label = changed.length ? `${t.toggle} (${t.changed.replace('{n}', String(changed.length))})` : t.toggle;
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
     if (undo && changed.length) {
       // Anything changed after a reset makes the undo offer stale.
       undo = null;
@@ -441,6 +443,8 @@ export function mountTune(store: Store, after: Element): void {
     }
     root.querySelector<HTMLElement>('.tune-reset-all')!.hidden = !changed.length;
     root.querySelector<HTMLElement>('.tune-undo')!.hidden = !undo;
+    // Right after a reset, the hint says what happened next to the Undo it offers.
+    root.querySelector('.tune-hint')!.textContent = undo ? t.resetDone : touch ? t.hintTouch : t.hint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
     root.querySelector<HTMLElement>('.tune-foot')!.classList.toggle('has-actions', !!changed.length || !!undo);
     peek.setActive(s.tuneOpen);
