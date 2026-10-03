@@ -5,15 +5,17 @@ Turn any picture into a collectible card and give it a rare finish.
 **Live:** https://dennougorilla.github.io/foil/
 
 - Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). Animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
-- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura, Shallows (the art sunk like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports). Keys 1–9 and 0 pick the first ten, ← → step through them all.
+- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura, Relief, Shallows. Keys 1–9 and 0 pick the first ten, ← → step through them all.
+- Relief strikes the picture in metal like a proof coin: the subject stands up as a matte relief in a few flat levels with crisp steps, the background becomes a flat mirror field that flashes as the card tilts, and line work sinks into grooves. Dark pictures are lifted rather than crushed. The frame gets a stamped dot texture and the name a mirror foil on a matte plate. Gold by default; silver is a choice under Light & motion.
+- Shallows sinks the art like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports.
 - Opening one of the support links in the header quietly adds a few extra finishes to the hand in this browser, as a thank-you. It is an honor system with no payment check.
 - Edit the name, line and rarity right in the tag beside the card. Tune the frame, effect strength and pixelation.
 - Print the name in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and jumps to its controls (last in Tune). The relief and shine follow the card's tilt and light, in exports too.
 - Choose where the finish goes: the whole card, the art, the frame, the text or nowhere, a band of brightness (highlights only, shadows only…), inverted, and painted in or out with a soft brush while the card holds still. An overlay shows what is left out, and exports follow it.
 - Add your own frame and backdrop colors with the color picker; they stay as swatches for next time (hover or press Delete to remove).
 - The card tilts with your pointer, can be tossed around, and bounces when clicked. Press the logo to shuffle the finish.
-- **Light & motion** (in Tune) fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe). Defaults keep the original look; exports follow the same settings.
-- Save a transparent PNG (900×1260), a looping GIF, a full-color transparent APNG loop, or a 4-second clip (MP4/WebM). With an animated picture, the loop follows its timing.
+- **Light & motion** (in Tune) fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe), and the metal of Relief (gold or silver). Defaults keep the original look; exports follow the same settings.
+- Save a transparent PNG (900×1260), a looping GIF, a full-color transparent APNG loop, or a 4-second clip (MP4/WebM). With an animated picture, the loop follows its timing. Relief GIFs are dithered so its smooth metal doesn't band in 256 colors.
 - English / 日本語, sound effects and a CRT filter can be toggled. Respects `prefers-reduced-motion`.
 
 ## Development
@@ -22,6 +24,7 @@ Turn any picture into a collectible card and give it a rare finish.
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # type-check + production build
+npm test         # unit tests (Node's built-in runner)
 npm run shoot -- <outDir> [filter]   # with the dev server running: capture the screenshot matrix
 ```
 

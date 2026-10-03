@@ -1,9 +1,10 @@
 // Quantizes and encodes the GIF off the main thread, so the card keeps moving while it saves.
 import { GIFEncoder, applyPalette, quantize } from 'gifenc';
+import { ditherToPalette } from './gifDither';
 
 export type GifRequest =
   | { type: 'frame'; data: ArrayBuffer }
-  | { type: 'encode'; width: number; height: number; delay: number };
+  | { type: 'encode'; width: number; height: number; delay: number; dither: boolean };
 
 export type GifResponse =
   | { type: 'progress'; p: number }
@@ -39,13 +40,13 @@ function globalPalette() {
   return quantize(sample.subarray(0, o), 255);
 }
 
-function encode(width: number, height: number, delay: number) {
+function encode(width: number, height: number, delay: number, dither: boolean) {
   const palette = globalPalette();
   const key = palette.length;
   const gif = GIFEncoder({ initialCapacity: 1 << 20 });
   let prev: Uint8Array | null = null;
   frames.forEach((f, i) => {
-    const index = applyPalette(f, palette);
+    const index = dither ? ditherToPalette(f, width, palette, 16) : applyPalette(f, palette);
     if (prev) {
       // Pixels identical to the frame underneath turn transparent; long runs of one index cost almost nothing.
       const delta = new Uint8Array(index.length);
@@ -70,7 +71,7 @@ scope.onmessage = (e) => {
     return;
   }
   try {
-    encode(m.width, m.height, m.delay);
+    encode(m.width, m.height, m.delay, m.dither);
   } catch (err) {
     post({ type: 'error', message: (err as Error).message });
   }

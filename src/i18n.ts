@@ -1,5 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { FoilTone, LetterStyle } from './lettering';
+import type { Metal } from './tune/model';
 import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
 
 export type Lang = 'ja' | 'en';
@@ -91,6 +92,7 @@ const ja = {
     crystal: 'クリスタル',
     sakura: 'サクラ',
     shallows: '水底',
+    relief: 'レリーフ',
     kintsugi: '金継ぎ',
     opal: 'オパール',
     eclipse: 'エクリプス',
@@ -113,6 +115,7 @@ const ja = {
     crystal: '多面カットで光が折れる',
     sakura: '花びらが舞い落ちる',
     shallows: '水底にゆらめく光の網。縁が虹にほどける',
+    relief: '絵をメダルに打ち出す。傾けると光が走る',
     kintsugi: 'ひびを金で継いだ、一点もの',
     opal: '絵の奥を、虹の帯がゆっくり流れる',
     eclipse: '黒い太陽と、燃えるコロナ',
@@ -158,6 +161,7 @@ const ja = {
       speed: '動きの速さ',
       tiltMax: 'カードの最大の傾き',
       idle: '自動の動き',
+      metal: 'レリーフの金属',
     },
     lightMode: { pointer: 'ポインター', orbit: '周回', fixed: '固定', gyro: 'ジャイロ' },
     lightHelp: {
@@ -167,6 +171,8 @@ const ja = {
       gyro: 'スマホを傾けると光が動きます',
     },
     idleMode: { none: 'なし', sway: '揺れ', spin: '回転', breathe: '呼吸' },
+    metalMode: { gold: '金', silver: '銀' } satisfies Record<Metal, string>,
+    metalHelp: '金はあたたかく、銀は青白く冷たい光になります',
     idleHelp: {
       none: '操作するまで静止します',
       sway: '触れていない間、ふわりと揺れます',
@@ -209,6 +215,7 @@ const ja = {
       temp: 'グレアとラメが 0 の間は効きません',
       still: '自動で動くものがありません。周回か自動の動きを選んでください',
       reduced: '動きを減らす設定のため画面では止めています。書き出しには効きます',
+      relief: 'レリーフの加工にだけ効きます',
     },
     sun: '光の向き (カード上でドラッグ)',
     sunHelp: 'カード上の太陽をドラッグしても動かせます',
@@ -339,6 +346,7 @@ const en: Dict = {
     crystal: 'Crystal',
     sakura: 'Sakura',
     shallows: 'Shallows',
+    relief: 'Relief',
     kintsugi: 'Kintsugi',
     opal: 'Opal',
     eclipse: 'Eclipse',
@@ -361,6 +369,7 @@ const en: Dict = {
     crystal: 'Light bent through cut facets',
     sakura: 'Petals drifting down',
     shallows: 'Sunlight netting a pool floor, fraying into spectrum',
+    relief: 'Struck like a medal; light runs across as you tilt',
     kintsugi: 'Cracks mended in gold, one of a kind',
     opal: 'Bands of rainbow light drifting through the stone',
     eclipse: 'A black sun with a blazing corona',
@@ -406,6 +415,7 @@ const en: Dict = {
       speed: 'Animation speed',
       tiltMax: 'Max tilt',
       idle: 'Idle motion',
+      metal: 'Relief metal',
     },
     lightMode: { pointer: 'Pointer', orbit: 'Orbit', fixed: 'Fixed', gyro: 'Gyro' },
     lightHelp: {
@@ -415,6 +425,8 @@ const en: Dict = {
       gyro: 'Tilt your phone to move the light',
     },
     idleMode: { none: 'None', sway: 'Sway', spin: 'Spin', breathe: 'Breathe' },
+    metalMode: { gold: 'Gold', silver: 'Silver' },
+    metalHelp: 'Gold shines warm; silver, a cool blue-white',
     idleHelp: {
       none: 'Holds still until you interact',
       sway: 'Floats and sways gently',
@@ -457,6 +469,7 @@ const en: Dict = {
       temp: 'No effect while Glare and Glitter are both 0%',
       still: 'Nothing moves on its own. Pick Orbit or an idle motion',
       reduced: 'Paused on screen because Reduce motion is on. Exports still use it',
+      relief: 'Only used by the Relief finish',
     },
     sun: 'Light direction (drag on the card)',
     sunHelp: 'You can also drag the sun on the card',

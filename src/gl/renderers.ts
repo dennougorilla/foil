@@ -3,6 +3,7 @@ import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { RangeLayer } from './range';
+import { ReliefGL } from '../relief';
 
 export type RGB = [number, number, number];
 
@@ -106,6 +107,7 @@ export class CardRenderer {
   private back: WebGLTexture;
   private lettering: LetteringGL;
   private faceTexels = 1;
+  private relief: ReliefGL;
   /** Where on the face the finish applies. */
   readonly range: RangeLayer;
   cssW = 1;
@@ -151,12 +153,14 @@ export class CardRenderer {
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
+    this.relief = new ReliefGL(gl, !opts.settled);
     this.range = new RangeLayer(gl);
   }
 
-  setFace(face: TexImageSource & { width: number }, mask: TexImageSource): void {
+  setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement): void {
     uploadTexture(this.gl, this.face, face, true);
     uploadTexture(this.gl, this.mask, mask, false);
+    this.relief.setFace(face);
     this.faceTexels = face.width;
   }
 
@@ -218,6 +222,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     applyTune(gl, p.u, this.tune);
+    this.relief.bind(p, 5);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
 
     // Hard pixel drop shadow first, then the card itself.

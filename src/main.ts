@@ -135,7 +135,7 @@ function renderInfo() {
   const pe = $('pillEdition');
   pe.textContent = t.edition[s.edition];
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
-  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
+  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal', 'eclipse'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
 }
 

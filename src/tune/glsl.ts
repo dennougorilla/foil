@@ -12,6 +12,7 @@ uniform float uTSharp;       // glare tightness
 uniform vec3 uTLight;        // light colour
 uniform float uTSparkle;     // glitter density 0..1
 uniform float uTSparkleSize; // glitter fleck size
+uniform float uTMetal;       // Relief's metal: 0 gold, 1 silver
 
 // True while a finish runs on pattern coordinates; face() then maps back to the art.
 bool tPattern = false;
