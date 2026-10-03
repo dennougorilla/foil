@@ -17,6 +17,7 @@ import {
   letterFill,
   normalizeLettering,
   setLettering,
+  stamp,
   type LetterInk,
   type Lettering,
 } from './lettering';
@@ -32,7 +33,7 @@ interface Options {
   repaint: () => void;
   /** A small bounce on the card when a style is picked. */
   onPick: () => void;
-  /** Where to put the shortcut button that jumps to these controls (the card's name tag). */
+  /** The card's name tag; the shortcut button that jumps to these controls goes right under it. */
   tag?: HTMLElement;
 }
 
@@ -42,16 +43,16 @@ type InkKey = 'auto' | 'none' | keyof typeof INKS | 'custom';
 const INK_KEYS: InkKey[] = ['auto', 'none', 'white', 'black', 'red', 'navy', 'custom'];
 
 /** Frame paper and ink, mirrored from card/face so the chips sit on the card's own stock. */
-function stock(frame: FrameId, rarity: Parameters<typeof rarityById>[0]): { paper: string; ink: string } {
+function stock(frame: FrameId, rarity: Parameters<typeof rarityById>[0]): { paper: string; solid: string; ink: string } {
   switch (frame) {
     case 'ink':
-      return { paper: '#252c30', ink: '#f3eee2' };
+      return { paper: '#252c30', solid: '#252c30', ink: '#f3eee2' };
     case 'gilt':
-      return { paper: 'linear-gradient(135deg,#f7dc8b,#d9a441 45%,#fbe7a6 60%,#b97f26)', ink: '#3b2408' };
+      return { paper: 'linear-gradient(135deg,#f7dc8b,#d9a441 45%,#fbe7a6 60%,#b97f26)', solid: '#e2b65a', ink: '#3b2408' };
     case 'rarity':
-      return { paper: rarityById(rarity).color, ink: '#ffffff' };
+      return { paper: rarityById(rarity).color, solid: rarityById(rarity).color, ink: '#ffffff' };
     default:
-      return { paper: '#f3eee2', ink: '#262d31' };
+      return { paper: '#f3eee2', solid: '#f3eee2', ink: '#262d31' };
   }
 }
 
@@ -128,10 +129,16 @@ export function mountLettering(o: Options): void {
       if (store.get().text.style === id) return;
       sfx.tick();
       set({ style: id });
+      stamp();
       o.onPick();
+      // The tile itself takes a little press too.
+      b.classList.remove('is-stamped');
+      void b.offsetWidth;
+      b.classList.add('is-stamped');
       // The style's own tuning appears below; keep it in view.
       requestAnimationFrame(() => reveal(detail, true));
     });
+    b.addEventListener('animationend', () => b.classList.remove('is-stamped'));
     styles.append(b);
     return b;
   });
@@ -250,7 +257,10 @@ export function mountLettering(o: Options): void {
   const detail = el('div', 'lt-detail');
   detail.append(foil.row, ink.row, depth.row, gloss.row, tilt);
   root.append(head, styles, help, detail);
-  o.host.append(root);
+  // First in its section, so the block starts above the fold on a 900px-tall screen.
+  const sectionTitle = o.host.querySelector('.sec-title');
+  if (sectionTitle) sectionTitle.after(root);
+  else o.host.append(root);
   roving(styles);
 
   // The panel's export bar is sticky; never leave a control hidden behind it.
@@ -286,11 +296,14 @@ export function mountLettering(o: Options): void {
   const jumpChip = el('span', 'lt-chip');
   jumpChip.setAttribute('aria-hidden', 'true');
   jumpChip.append(el('b'));
-  jump.append(jumpChip);
-  if (o.tag) {
-    o.tag.classList.add('has-lt-jump');
-    o.tag.append(jump);
-  }
+  const jumpText = el('span', 'lt-jump-text');
+  jumpText.setAttribute('aria-hidden', 'true');
+  jumpText.append(el('small'), el('b'));
+  const chevron = el('span', 'lt-jump-arrow');
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = '›';
+  jump.append(jumpChip, jumpText, chevron);
+  o.tag?.after(jump);
   jump.addEventListener('click', () => {
     sfx.tick();
     const on = styles.querySelector<HTMLButtonElement>('[aria-checked=true]');
@@ -345,13 +358,14 @@ export function mountLettering(o: Options): void {
     const l = s.text;
     const t = o.dict().lt;
     const c = STYLE_CONTROLS[l.style];
-    const { paper, ink: frameInk } = stock(s.frame, s.rarity);
+    const { paper, solid, ink: frameInk } = stock(s.frame, s.rarity);
     const glyph = Array.from(o.name().trim())[0]?.toLocaleUpperCase() || 'A';
     const [lo, hi] = foilRamp(l);
     const shown = letterFill(l, frameInk);
     // Chips preview each style in your current colours on your current frame.
     for (const host of [root, jump]) {
       host.style.setProperty('--lt-paper', paper);
+      host.style.setProperty('--lt-stock', solid);
       host.style.setProperty('--lt-ink', l.ink === 'auto' || l.ink === 'none' ? frameInk : l.ink);
       host.style.setProperty('--lt-lo', lo);
       host.style.setProperty('--lt-hi', hi);
@@ -370,7 +384,9 @@ export function mountLettering(o: Options): void {
     jump.setAttribute('aria-label', jumpLabel);
     jump.title = jumpLabel;
     jump.dataset.style = l.style;
-    const jg = jump.querySelector('b')!;
+    jumpText.querySelector('small')!.textContent = t.title;
+    jumpText.querySelector('b')!.textContent = t.style[l.style].replace('​', '');
+    const jg = jumpChip.querySelector('b')!;
     jg.textContent = jg.dataset.g = glyph;
 
     ink.row.hidden = !c.ink;
@@ -398,12 +414,16 @@ export function mountLettering(o: Options): void {
     cf.style.setProperty('--lo', foilRamp({ ...l, foil: 'custom' })[0]);
     cf.style.setProperty('--hi', foilRamp({ ...l, foil: 'custom' })[1]);
 
+    // Values read as words (shallow…deep, matte…mirror); the percentage stays for screen readers.
+    const word = (v: number, w: readonly string[]) => w[v < 0.34 ? 0 : v < 0.67 ? 1 : 2];
     depth.label.textContent = t.depth[l.style];
     depth.input.value = String(l.depth);
-    depth.out.textContent = `${Math.round(l.depth * 100)}%`;
+    depth.out.textContent = word(l.depth, t.level[l.style]);
+    depth.input.setAttribute('aria-valuetext', `${depth.out.textContent} (${Math.round(l.depth * 100)}%)`);
     fill(depth.input);
     gloss.input.value = String(l.gloss);
-    gloss.out.textContent = `${Math.round(l.gloss * 100)}%`;
+    gloss.out.textContent = word(l.gloss, t.glossLevel);
+    gloss.input.setAttribute('aria-valuetext', `${gloss.out.textContent} (${Math.round(l.gloss * 100)}%)`);
     fill(gloss.input);
     reset.hidden = JSON.stringify({ ...l, style: DEFAULT_LETTERING.style }) === JSON.stringify(DEFAULT_LETTERING);
     lastFill = `${l.style}|${shown}`;

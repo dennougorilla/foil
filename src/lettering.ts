@@ -115,6 +115,43 @@ let mapKey = '';
 let mapVersion = 0;
 /** Bevel radius in face pixels; the shader needs it to scale slopes. */
 let bevel = 1;
+/** How far the deboss/emboss plate reaches past the ink, plus its bevel, in face pixels. */
+let plateBevel = 1;
+/** Centre of the printed name in face uv (y down). */
+let nameCenter: [number, number] = [0.3, 0.94];
+/** Left and right edge of the printed name in face uv. */
+let nameSpan: [number, number] = [0.1, 0.5];
+
+// ---------- Stamp moment ----------
+// Picking a style presses the die once: relief overshoots and settles, and foil
+// is laid down left to right behind a bright sweep.
+
+const STAMP_MS = 560;
+let stampAt = -Infinity;
+/** Plays the stamp on the live card (skipped when motion is reduced). */
+export function stamp(): void {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  stampAt = performance.now();
+}
+
+/** Grows a coverage mask by r texels (a square max filter, separable). */
+function dilate(src: Float32Array, w: number, h: number, r: number): Float32Array {
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let m = 0;
+      for (let i = Math.max(0, x - r); i <= Math.min(w - 1, x + r); i++) m = Math.max(m, src[y * w + i]);
+      tmp[y * w + x] = m;
+    }
+  for (let x = 0; x < w; x++)
+    for (let y = 0; y < h; y++) {
+      let m = 0;
+      for (let i = Math.max(0, y - r); i <= Math.min(h - 1, y + r); i++) m = Math.max(m, tmp[i * w + x]);
+      out[y * w + x] = m;
+    }
+  return out;
+}
 
 /** Separable box blur, run three times: close to a Gaussian, and works where ctx.filter doesn't (Safari). */
 function blur(src: Float32Array, w: number, h: number, r: number): Float32Array {
@@ -157,7 +194,7 @@ function paintMap(W: number, H: number, text: string, font: string, x: number, y
   glyphCtx.textBaseline = 'middle';
   glyphCtx.fillStyle = '#fff';
   glyphCtx.fillText(text, x, y);
-  const pad = radius * 3 + 2;
+  const pad = radius * 5 + 2;
   const rx = Math.max(0, Math.floor(x - pad));
   const ry = Math.max(0, Math.floor(y - size * 0.75 - pad));
   const rw = Math.min(W - rx, Math.ceil(glyphCtx.measureText(text).width + pad * 2));
@@ -166,16 +203,25 @@ function paintMap(W: number, H: number, text: string, font: string, x: number, y
     mapVersion++;
     return;
   }
+  const tw = glyphCtx.measureText(text).width;
+  nameCenter = [(x + tw / 2) / W, y / H];
+  nameSpan = [x / W, (x + tw) / W];
   const src = glyphCtx.getImageData(rx, ry, rw, rh).data;
   const cover = new Float32Array(rw * rh);
   for (let i = 0; i < cover.length; i++) cover[i] = src[i * 4 + 3] / 255;
   // Box radius per pass so three passes span roughly the requested bevel.
   const soft = blur(cover, rw, rh, Math.max(1, Math.round(radius / 1.8)));
+  // Deboss and emboss dies are a little bigger than the printed letter, as on real
+  // cards: the walls land on bare stock, so they read even around dark ink.
+  const grow = Math.max(1, Math.round(radius * 1.2));
+  const plate = blur(dilate(cover, rw, rh, grow), rw, rh, Math.max(1, Math.round(radius / 1.6)));
+  plateBevel = radius * 1.6;
   const out = mapCtx.createImageData(rw, rh);
   for (let i = 0; i < cover.length; i++) {
     out.data[i * 4] = Math.round(cover[i] * 255);
     // Lift the softened field so stroke centres reach full height.
     out.data[i * 4 + 1] = Math.round(Math.min(1, soft[i] * 1.3) * 255);
+    out.data[i * 4 + 2] = Math.round(Math.min(1, plate[i] * 1.15) * 255);
     out.data[i * 4 + 3] = 255;
   }
   mapCtx.putImageData(out, rx, ry);
@@ -196,6 +242,35 @@ export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: n
   const size = parseFloat(/(\d+(?:\.\d+)?)px/.exec(ctx.font)?.[1] ?? '40');
   // A narrow bevel: the pixel font's strokes are only ~6 texels wide at face size.
   paintMap(ctx.canvas.width, ctx.canvas.height, text, ctx.font, x, y, size, Math.max(1.5, size * 0.032));
+}
+
+/**
+ * A still frame (PNG) freezes one light angle. Foil and spot UV only show at the
+ * right one, so nudge the frozen tilt until their reflection band crosses the
+ * middle of the name. Mirrors the band phases in the shader below.
+ */
+export function stillPose(tilt: [number, number], light: [number, number]): { tilt: [number, number]; light: [number, number] } {
+  const s = active.style;
+  if (s !== 'foil' && s !== 'spot') return { tilt, light };
+  const [cx, cy] = nameCenter;
+  const ty = tilt[1];
+  // spot:  5u + 7v - 1.3 (3.4 tx + 2.2 ty) = pi/2 + 2pi k
+  // foil:  9u + 13v + 3.2 tx + 2.4 ty      = pi/2 + 2pi k
+  const solve = (k: number) =>
+    s === 'spot'
+      ? ((5 * cx + 7 * cy - Math.PI / 2 - 2 * Math.PI * k) / 1.3 - 2.2 * ty) / 3.4
+      : (Math.PI / 2 + 2 * Math.PI * k - 9 * cx - 13 * cy - 2.4 * ty) / 3.2;
+  let best = tilt[0];
+  let gap = Infinity;
+  for (let k = -6; k <= 6; k++) {
+    const tx = solve(k);
+    if (Math.abs(tx) <= 0.9 && Math.abs(tx - tilt[0]) < gap) {
+      gap = Math.abs(tx - tilt[0]);
+      best = tx;
+    }
+  }
+  // Light from just above the name so the varnish's own glint lands on it too.
+  return { tilt: [best, ty], light: s === 'spot' ? [cx, cy - 0.12] : light };
 }
 
 // ---------- GL side ----------
@@ -229,22 +304,34 @@ export class LetteringGL {
     gl.uniform1f(p.u.uTextRainbow, l.style === 'foil' && l.foil === 'rainbow' ? 1 : 0);
     gl.uniform1f(p.u.uTextDepth, l.depth);
     gl.uniform1f(p.u.uTextGloss, l.gloss);
-    gl.uniform1f(p.u.uTextBevel, bevel);
+    const pressed = l.style === 'deboss' || l.style === 'emboss';
+    gl.uniform1f(p.u.uTextBevel, pressed ? plateBevel : bevel);
+    gl.uniform1f(p.u.uTextStamp, Math.min(1, (performance.now() - stampAt) / STAMP_MS));
+    gl.uniform2f(p.u.uTextSpan, nameSpan[0], nameSpan[1]);
+    // Bare stock just above the name, for foil that hasn't been laid down yet.
+    gl.uniform1f(p.u.uTextStockY, nameCenter[1] - 0.042);
   }
 }
 
 /** Card-shader chunk. Expects COMMON helpers and the card uniforms (uLight, uPlate, uTime) above it. */
 export const LETTERING_GLSL = /* glsl */ `
-uniform sampler2D uTextMap;  // r: glyph coverage, g: softened height
+uniform sampler2D uTextMap;  // r: glyph coverage, g: softened height, b: deboss/emboss plate
 uniform int uTextStyle;      // 0 ink, 1 deboss, 2 emboss, 3 foil stamp, 4 spot UV
 uniform vec3 uTextLo, uTextHi;
 uniform float uTextRainbow;
 uniform float uTextDepth;
 uniform float uTextGloss;
 uniform float uTextBevel;    // bevel radius in map texels
+uniform float uTextStamp;    // 0..1 progress of the stamp moment; 1 = at rest
+uniform vec2 uTextSpan;      // name's left and right edge in uv
+uniform float uTextStockY;   // a row of bare nameplate stock just above the name
 
 float letterLod;  // set per pixel in lettering()
-float letterH(vec2 uv) { return textureLod(uTextMap, uv, letterLod).g; }
+// Presses use the wider plate; foil and varnish follow the letter itself.
+float letterH(vec2 uv) {
+  vec4 s = textureLod(uTextMap, uv, letterLod);
+  return (uTextStyle == 1 || uTextStyle == 2) ? s.b : s.g;
+}
 
 vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   if (uTextStyle == 0 || uPlate < 0.5) return col;
@@ -254,7 +341,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   vec2 e = max(texel, fwidth(uv));
   letterLod = max(log2(max(e.x / texel.x, e.y / texel.y)) - 0.5, 0.0);
   vec4 tm = textureLod(uTextMap, uv, letterLod);
-  float cover = tm.r, h = tm.g;
+  float cover = tm.r, h = (uTextStyle == 1 || uTextStyle == 2) ? tm.b : tm.g;
   // Only an embossed rim casts a shadow past its own soft edge.
   if (h < 0.002 && cover < 0.002 && uTextStyle != 2) return col;
   float hx = letterH(uv + vec2(e.x, 0.0)) - letterH(uv - vec2(e.x, 0.0));
@@ -264,6 +351,13 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   float sgn = (uTextStyle == 1 || uTextStyle == 3) ? -1.0 : 1.0; // deboss and foil press in
   float relief = uTextStyle == 3 ? 0.25 + 0.6 * uTextDepth : 0.15 + 1.6 * uTextDepth;
   if (uTextStyle == 4) relief = 0.1 + 0.5 * uTextDepth; // varnish is only a thin film
+  // Stamp: the die bites deeper for a moment, then springs back to rest.
+  float k = uTextStamp;
+  relief *= 1.0 + 1.6 * sin(3.14159 * k) * (1.0 - k);
+  // Where a sweep has reached across the name (foil goes down behind it).
+  float sweepX = mix(uTextSpan.x - 0.04, uTextSpan.y + 0.04, smoothstep(0.0, 0.85, k));
+  float laid = k >= 1.0 ? 1.0 : smoothstep(sweepX + 0.012, sweepX - 0.012, uv.x);
+  float flare = k >= 1.0 ? 0.0 : exp(-pow((uv.x - sweepX) / 0.018, 2.0)) * (1.0 - k);
   vec3 N = normalize(vec3(-grad * sgn * relief, 1.0));
   // A point light at the hotspot, nudged to the upper left so relief always reads.
   vec2 lp = (uLight - uv) * vec2(1.0, 1.4);
@@ -280,19 +374,21 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   float shade = clamp(lam * 1.5, -0.5, 0.4);
 
   if (uTextStyle == 1) {
-    // Deboss: the floor sits in shade, the wall nearest the light is in shadow, the far wall catches light.
-    float shadow = max(h - hl, 0.0) * (0.35 + 0.6 * uTextDepth);
-    col *= 1.0 - 0.1 * h * (0.4 + uTextDepth);
-    // Outside the letter only the far lip catches light; the near edge stays in the dent's shade.
-    col *= 1.0 + mix(min(shade, 0.0) * 1.3 + max(shade, 0.0), shade, cover);
-    col *= 1.0 - clamp(shadow, 0.0, 0.4);
-  } else if (uTextStyle == 2) {
-    // Emboss: lit shoulders, shaded far side, a soft shadow on the stock below.
-    // The raised letters throw a longer, softer shadow than a dent can.
-    float hf = letterH(uv + toward * 2.2);
-    float shadow = (max(hl - h, 0.0) * 0.6 + max(hf - h, 0.0) * 0.5) * (0.35 + 0.6 * uTextDepth) * (1.0 - cover);
-    col *= 1.0 + shade * mix(0.5, 1.0, cover);
+    // Deboss: a sunken trough. The wall nearest the light falls into shadow,
+    // the far wall catches a thin lip of light, and the floor sits in shade.
+    float shadow = max(h - hl, 0.0) * (0.5 + 0.8 * uTextDepth);
+    col *= 1.0 - (0.06 + 0.12 * uTextDepth) * h;
+    // The lit lip stays a paper highlight, never brighter than white card stock under the lamp.
+    col *= 1.0 + clamp(lam * 1.7, -0.5, 0.14);
     col *= 1.0 - clamp(shadow, 0.0, 0.45);
+  } else if (uTextStyle == 2) {
+    // Emboss: a raised pillow. Lit shoulders towards the light, the top a touch
+    // brighter, and a long soft shadow thrown onto the stock on the far side.
+    float hf = letterH(uv + toward * 2.4);
+    float shadow = (max(hl - h, 0.0) * 0.7 + max(hf - h, 0.0) * 0.6) * (0.45 + 0.75 * uTextDepth);
+    col *= 1.0 + 0.02 * h;
+    col *= 1.0 + clamp(lam * 1.6, -0.45, 0.22);
+    col *= 1.0 - clamp(shadow, 0.0, 0.55);
     col += pow(ndh, mix(10.0, 60.0, uTextGloss)) * uTextGloss * 0.3 * smoothstep(0.2, 0.7, h);
   } else if (uTextStyle == 3) {
     // Hot-foil: a mirror-like metal with a fine grain, pressed slightly into the card.
@@ -323,19 +419,26 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // The press leaves a dent: a thin shaded wall that keeps pale foils legible on pale stock.
     col *= 1.0 - (0.18 + 0.3 * uTextDepth) * h * (1.0 - cover);
     col *= 1.0 + clamp(lam, -0.2, 0.15) * (1.0 - cover) * uTextDepth;
-    col = mix(col, metal, cover);
+    metal += hi * flare * 1.6;
+    if (laid < 1.0) {
+      // Not yet stamped: the letter is bare, faintly pressed stock.
+      vec4 st = face(vec2(uv.x, uTextStockY), 0.0);
+      vec3 bare = st.rgb / max(st.a, 1e-4) * (1.0 + clamp(lam, -0.3, 0.2));
+      col = mix(col, bare, cover * (1.0 - laid));
+    }
+    col = mix(col, metal, cover * laid);
   } else if (uTextStyle == 4) {
     // Spot UV: clear varnish exactly on the glyphs. Nearly invisible head-on,
     // a hard gloss when the angle is right.
     float glint = pow(ndh, mix(40.0, 260.0, uTextGloss));
-    float sweep = pow(0.5 + 0.5 * sin(dot(uv, vec2(5.0, 7.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 10.0);
+    float sweep = pow(0.5 + 0.5 * sin(dot(uv, vec2(5.0, 7.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 6.0);
     // Varnish deepens what's under it and leaves a faint gloss, so even clear varnish on bare stock reads.
     col = mix(col, col * 0.86, cover * 0.8);
     col += vec3(0.05) * cover;
     // The sweep fades across each glyph so the varnish reads as a reflection, not paint.
     float across = 0.6 + 0.4 * sin(dot(uv, vec2(60.0, -40.0)) + dot(t, vec2(4.0)));
     float gloss = glint * (0.4 + 0.6 * uTextGloss) + sweep * across * (0.12 + 0.3 * uTextGloss);
-    col += vec3(0.95, 0.97, 1.0) * cover * gloss;
+    col += vec3(0.95, 0.97, 1.0) * cover * (gloss + flare * 0.9);
     col += vec3(1.0) * clamp(shade, 0.0, 0.4) * cover * (0.3 + sweep);
   }
   return col;

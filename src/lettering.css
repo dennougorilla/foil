@@ -1,12 +1,13 @@
 /* ---------- Lettering finishes (panel block) ---------- */
 
 .lt {
-  --mx: 0.28;
-  --my: 0.22;
+  /* Rest light: raking from the upper left. */
+  --mx: 0.15;
+  --my: 0.1;
   container-type: inline-size;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 2px dashed var(--panel-lo);
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 2px dashed var(--panel-lo);
 }
 
 .lt-head {
@@ -88,6 +89,10 @@
   box-shadow: inset 0 0 0 2px var(--panel-hi), 0 0 0 var(--edge);
 }
 
+[data-style='spot'] .lt-style-name {
+  letter-spacing: -0.06em;
+}
+
 .lt-style-name {
   display: grid;
   place-items: center;
@@ -124,50 +129,63 @@
 .lt-chip b {
   position: relative;
   font-family: 'DotGothic16', monospace;
-  font-size: 34px;
-  font-weight: 400;
+  font-size: 36px;
+  /* Faux bold: the pixel font is thin, and relief needs a letter with some body. */
+  font-weight: 700;
   line-height: 1;
   color: var(--lt-ink);
 }
 
-/* Ink: flat. */
+/* Print: flat. */
 
-/* Deboss: shadow on the wall facing the light, a lit lip on the far side. */
-[data-style='deboss'] .lt-chip b {
-  color: color-mix(in srgb, var(--lt-ink) 88%, #000);
-  text-shadow:
-    calc(var(--lx) * 2.5px) calc(var(--ly) * 2.5px) 0 rgba(0, 0, 0, 0.6),
-    calc(var(--lx) * -2px) calc(var(--ly) * -2px) 0 rgba(255, 255, 255, 0.95);
+/*
+ * Deboss and emboss chips are lit by a fixed raking light from the upper left
+ * (the angle that shows a press best); the pointer swings it around. The stroke
+ * widens the die past the letter, as on a real card, so the walls show even
+ * around dark ink.
+ */
+.lt {
+  --lt-sh: rgba(0, 0, 0, 0.55);
+  --lt-hl: rgba(255, 255, 255, 0.95);
+  --lt-trough: rgba(0, 0, 0, 0.2);
+  --lt-pillow: rgba(255, 255, 255, 0.85);
 }
 
-/* Emboss: lit shoulder towards the light, a soft cast shadow away from it. */
+.is-dark-stock {
+  --lt-sh: rgba(0, 0, 0, 0.95);
+  --lt-hl: rgba(255, 255, 255, 0.4);
+  --lt-trough: rgba(0, 0, 0, 0.45);
+  --lt-pillow: rgba(255, 255, 255, 0.14);
+}
+
+[data-style='deboss'] .lt-chip b,
 [data-style='emboss'] .lt-chip b {
-  text-shadow:
-    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 rgba(255, 255, 255, 0.95),
-    calc(var(--lx) * -4px) calc(var(--ly) * -4px + 2px) 3px rgba(0, 0, 0, 0.55);
+  -webkit-text-stroke: 6px var(--lt-trough);
+  paint-order: stroke fill;
 }
 
+/* Deboss: a sunken trough; the wall towards the light in shadow, a lit lip on the far side. */
+[data-style='deboss'] .lt-chip b {
+  color: color-mix(in srgb, var(--lt-ink) 85%, #000);
+  text-shadow:
+    calc(var(--lx) * 2px) calc(var(--ly) * 2px) 0 var(--lt-sh),
+    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 var(--lt-hl);
+}
+
+/* Emboss: a raised pillow; lit shoulder towards the light, a long soft shadow away from it. */
+[data-style='emboss'] .lt-chip b {
+  -webkit-text-stroke-color: var(--lt-pillow);
+  text-shadow:
+    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 var(--lt-hl),
+    calc(var(--lx) * -4px) calc(var(--ly) * -4px + 1px) 3px var(--lt-sh);
+}
+
+/* Blind (no ink): the letter is the card stock itself. */
 .is-blind[data-style='deboss'] .lt-chip b,
 .is-blind[data-style='emboss'] .lt-chip b,
 .is-blind [data-style='deboss'] .lt-chip b,
 .is-blind [data-style='emboss'] .lt-chip b {
-  color: transparent;
-}
-
-/* On dark stock the shadow side needs more weight and the lit side less. */
-.is-dark-stock[data-style='deboss'] .lt-chip b,
-.is-dark-stock [data-style='deboss'] .lt-chip b {
-  color: color-mix(in srgb, var(--lt-ink) 70%, #000);
-  text-shadow:
-    calc(var(--lx) * 2.5px) calc(var(--ly) * 2.5px) 0 rgba(0, 0, 0, 0.95),
-    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 rgba(255, 255, 255, 0.4);
-}
-
-.is-dark-stock[data-style='emboss'] .lt-chip b,
-.is-dark-stock [data-style='emboss'] .lt-chip b {
-  text-shadow:
-    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 rgba(255, 255, 255, 0.45),
-    calc(var(--lx) * -3.5px) calc(var(--ly) * -3.5px + 1px) 2px rgba(0, 0, 0, 0.95);
+  color: var(--lt-stock);
 }
 
 /* Foil: metal ramp that slides as the light moves. */
@@ -400,58 +418,84 @@
   }
 }
 
-/* ---------- Shortcut on the card's name tag ---------- */
+/* ---------- Shortcut under the card's name tag ---------- */
 
-.has-lt-jump {
-  position: relative;
-}
-
-.has-lt-jump .info-name {
-  padding-inline: 44px;
-}
-
+/* A chunky button like the rest of the app: the finish preview, its name, and an arrow. */
 .lt-jump {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 34px;
-  height: 32px;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px 12px 6px 6px;
   border: 0;
-  border-radius: 7px;
-  background: none;
-  transition: transform 0.12s var(--ease-back);
-}
-
-.lt-jump .lt-chip {
-  height: 100%;
-  border-radius: 6px;
-  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.25);
-}
-
-.lt-jump .lt-chip b {
-  font-size: 20px;
+  border-radius: 10px;
+  background: var(--panel-lo);
+  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 5px 0 3px var(--edge);
+  color: var(--text);
+  text-align: left;
+  transition: transform 0.08s, background 0.15s;
 }
 
 .lt-jump:hover {
-  transform: translateY(-2px) rotate(-4deg);
-}
-
-/* A small sparkle marks the chip as a finish you can change. */
-.lt-jump::after {
-  content: '';
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 11px;
-  height: 11px;
-  background: var(--gold);
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  filter: drop-shadow(0 0 1px var(--edge));
+  background: var(--panel-hi);
 }
 
 .lt-jump:active {
-  transform: translateY(2px);
+  transform: translateY(4px);
+  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 1px 0 3px var(--edge);
+}
+
+.lt-jump .lt-chip {
+  flex: none;
+  width: 40px;
+  height: 34px;
+  border-radius: 6px;
+}
+
+.lt-jump .lt-chip b {
+  font-size: 24px;
+}
+
+.lt-jump-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.lt-jump-text small {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.lt-jump-text b {
+  font-weight: 400;
+  font-size: 17px;
+  text-shadow: 0 2px 0 var(--edge);
+}
+
+.lt-jump-arrow {
+  margin-left: auto;
+  font-family: var(--display);
+  font-size: 20px;
+  color: var(--gold);
+  transition: transform 0.15s var(--ease-back);
+}
+
+.lt-jump:hover .lt-jump-arrow {
+  transform: translateX(3px);
+}
+
+/* A small sparkle on the preview marks it as a finish. */
+.lt-jump .lt-chip::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 9px;
+  height: 9px;
+  background: var(--gold);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
 }
 
 /* Focus and scroll targets clear the sticky export bar at the bottom of the panel. */
@@ -483,10 +527,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lt-jump {
+  .lt-jump,
+  .lt-jump-arrow {
     transition: none;
   }
-  .lt-jump:hover {
+  .lt-jump:hover .lt-jump-arrow {
     transform: none;
   }
   .lt.is-called {
@@ -502,5 +547,45 @@
   }
   .lt-swatches {
     gap: 10px;
+  }
+}
+
+/* Slider values are words, so give them a little more room than the panel's % column. */
+.lt .lt-slider {
+  grid-template-columns: 116px 1fr 60px;
+}
+
+.lt .lt-slider output {
+  font-family: var(--font);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .lt .lt-slider {
+    grid-template-columns: 100px 1fr 56px;
+  }
+}
+
+@media (max-width: 420px) {
+  .lt .lt-slider {
+    grid-template-columns: 88px 1fr 52px;
+  }
+}
+
+/* The tile you pick gets stamped: a quick press and spring back. */
+.lt-style.is-stamped .lt-chip {
+  animation: lt-stamp 0.32s var(--ease-back);
+}
+
+@keyframes lt-stamp {
+  0% { transform: translateY(-2px) scale(1); }
+  35% { transform: translateY(3px) scale(0.9); filter: brightness(0.9); }
+  100% { transform: translateY(-2px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-style.is-stamped .lt-chip {
+    animation: none;
   }
 }

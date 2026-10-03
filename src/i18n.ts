@@ -133,6 +133,14 @@ const ja = {
     foil: '箔の色',
     depth: { ink: '深さ', deboss: '深さ', emboss: '高さ', foil: '押しの深さ', spot: 'ニスの厚み' } satisfies Record<LetterStyle, string>,
     gloss: '光沢',
+    level: {
+      ink: ['浅い', 'ふつう', '深い'],
+      deboss: ['浅い', 'ふつう', '深い'],
+      emboss: ['低い', 'ふつう', '高い'],
+      foil: ['軽く', 'ふつう', '強く'],
+      spot: ['薄い', 'ふつう', '厚い'],
+    } satisfies Record<LetterStyle, [string, string, string]>,
+    glossLevel: ['マット', '半光沢', '鏡面'],
     inkName: { auto: '枠に合わせる', none: '色なし (押すだけ)', white: '白', black: '黒', red: '朱', navy: '藍', custom: '好きな色' },
     foilName: {
       gold: '金',
@@ -280,6 +288,14 @@ const en: Dict = {
     foil: 'Foil',
     depth: { ink: 'Depth', deboss: 'Depth', emboss: 'Height', foil: 'Press depth', spot: 'Varnish' },
     gloss: 'Gloss',
+    level: {
+      ink: ['Shallow', 'Medium', 'Deep'],
+      deboss: ['Shallow', 'Medium', 'Deep'],
+      emboss: ['Low', 'Medium', 'High'],
+      foil: ['Light', 'Medium', 'Firm'],
+      spot: ['Thin', 'Medium', 'Thick'],
+    },
+    glossLevel: ['Matte', 'Satin', 'Mirror'],
     inkName: { auto: 'Match the frame', none: 'No ink, pressed only', white: 'White', black: 'Black', red: 'Vermilion', navy: 'Indigo', custom: 'Any colour' },
     foilName: {
       gold: 'Gold',

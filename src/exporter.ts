@@ -2,6 +2,7 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
+import { stillPose } from './lettering';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -56,8 +57,7 @@ export async function exportPng(input: ExportInput): Promise<void> {
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
-      tilt: [0.35, -0.25],
-      light: [0.32, 0.22],
+      ...stillPose([0.35, -0.25], [0.32, 0.22]),
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
