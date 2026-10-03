@@ -1,13 +1,24 @@
 // Breakout: the subject, cut out by depth (src/depth), bursts out through the frame. The card
 // itself is drawn as usual with the subject painted out of the window, its shadow and a cracked
-// frame; then a larger quad lifted off the card (uPop) draws the subject enlarged about the
+// frame; then a larger quad, hinged at the window's foot and lifted off the card (uPop), draws the subject enlarged about the
 // window's foot, so its top crosses the frame and the card's own edge, with glints and shards
 // where it breaks through. Spliced into CARD_FS after the Shadowbox code, whose sheets (only the
 // front one is used here), plate, window and untune it shares.
+import { ART, FACE_H } from '../card/face';
+
+const n = (v: number) => v.toFixed(5);
+
+/**
+ * For CARD_VS: the lifted quad is hinged at the window's foot like a pop-up page, so it rises
+ * off the card towards the top and the subject's foot stays on the picture. 1 at the window's top.
+ */
+export const BREAKOUT_HINGE = /* glsl */ `
+float boHinge(float v) { return (${n((ART.y + ART.h) / FACE_H)} - v) / ${n(ART.h / FACE_H)}; }
+`;
 
 export const BREAKOUT_GLSL = /* glsl */ `
 uniform float uPop;   // 1 = the pass that draws the subject out in front of the card
-uniform vec2 uPopOut; // x: how much the subject is enlarged, y: how far it floats (card heights)
+uniform vec2 uPopOut; // x: how much the subject is enlarged, y: how far its top floats (card heights)
 
 // The foot of the art window: the subject grows from it, so it rises out of the top.
 const vec2 BO_FOOT = vec2(0.5, SB_ART.w);
@@ -29,7 +40,7 @@ float boRaw(vec2 su, float lod) {
 // grows out of the picture instead of ending in a straight edge.
 float boFade(vec2 su) {
   vec2 a = (su - SB_ART.xy) / (SB_ART.zw - SB_ART.xy);
-  return smoothstep(0.0, 0.07, a.x) * smoothstep(0.0, 0.07, 1.0 - a.x) * smoothstep(0.02, 0.1, 1.0 - a.y);
+  return smoothstep(0.0, 0.07, a.x) * smoothstep(0.0, 0.07, 1.0 - a.x) * smoothstep(0.0, 0.025, 1.0 - a.y);
 }
 float boCut(vec2 su, float lod) { return boRaw(su, lod) * boFade(su); }
 
@@ -75,9 +86,11 @@ vec3 breakout(vec3 c, vec2 puv, vec2 t, float lod) {
   col = mix(col, col * (0.7 + 0.5 * h) + vec3(1.0, 0.95, 0.85) * catchL * 0.5, near);
   col += vec3(1.0, 0.82, 0.45) * crack * near * (1.1 + 0.4 * sin(uTime * 4.0 + h * 6.28));
 
-  // The floating subject's shadow falls away from the light, softer the higher it floats.
-  vec2 off = (uv - uLight) * uPopOut.y * 0.8 + vec2(0.1, 0.14) * uPopOut.y;
-  float sh = boCut(boSource(uv - off), 2.5 + uPopOut.y * 12.0);
+  // The floating subject's shadow falls away from the light, further and softer the higher it
+  // floats (nothing at its foot, where it is hinged).
+  float rise = uPopOut.y * clamp((BO_FOOT.y - uv.y) / (SB_ART.w - SB_ART.y), 0.0, 1.0);
+  vec2 off = (uv - uLight) * rise * 0.4 + vec2(0.1, 0.14) * rise;
+  float sh = boCut(boSource(uv - off), 2.5 + rise * 12.0);
   // ...but not on the subject's own foot, which stays in the picture.
   sh *= mix(1.0, boFade(uv), boRaw(uv, 1.0) * m.r);
   col *= 1.0 - 0.55 * smoothstep(0.05, 0.6, sh);
@@ -94,7 +107,8 @@ vec4 boDebris(vec2 q, vec2 tc, float sc, float seed) {
   if (h < 0.3) return vec4(0.0);
   vec2 o = (id + 0.5) / vec2(sc, sc * 1.4);
   float cov = boCut(boSource(o), 4.5);
-  float zone = clamp(cov * (1.0 - cov) * 6.0, 0.0, 1.0) * smoothstep(0.08, -0.01, boWindow(o));
+  float zone = clamp(cov * (1.0 - cov) * 6.0, 0.0, 1.0) * smoothstep(0.08, -0.01, boWindow(o))
+    * smoothstep(BO_FOOT.y - 0.04, BO_FOOT.y - 0.1, o.y); // never at the foot, which stays put
   if (zone < 0.02) return vec4(0.0);
   vec2 rnd = hash22(id + seed * 1.7);
   // Each piece flies out and fades, over and over, at its own pace.

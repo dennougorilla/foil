@@ -4,7 +4,7 @@ import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
 import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
-import { BREAKOUT_GLSL } from './breakoutShader';
+import { BREAKOUT_GLSL, BREAKOUT_HINGE } from './breakoutShader';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -109,12 +109,13 @@ uniform vec3 uRot;      // rx, ry, rz in radians
 uniform float uScale;
 uniform vec2 uShift;    // extra screen offset (shadow)
 uniform float uPop;     // 1 = Breakout's pass in front of the card: a larger quad, lifted
-uniform vec2 uPopOut;   // y: that lift, in card heights
+uniform vec2 uPopOut;   // y: that lift at the window's top, in card heights
 out vec2 vUv;
 out float vShade;
+${BREAKOUT_HINGE}
 void main() {
   vec2 grow = 1.0 + uPop * vec2(0.4, 0.9);
-  vec3 p = vec3(aPos * grow * uSize * uScale, uPop * uPopOut.y * uSize.y * uScale);
+  vec3 p = vec3(aPos * grow * uSize * uScale, uPop * uPopOut.y * boHinge(aPos.y * grow.y + 0.5) * uSize.y * uScale);
   float cz = cos(uRot.z), sz = sin(uRot.z);
   p.xy = mat2(cz, sz, -sz, cz) * p.xy;
   float cx = cos(uRot.x), sx = sin(uRot.x);
