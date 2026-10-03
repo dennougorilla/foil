@@ -11,13 +11,15 @@ Turn any picture into a collectible card and give it a rare finish.
 - Warmth reacts to touch: untouched, the art is printed as a blue cyanotype in thermochromic ink. Hover with a mouse or drag a finger across it and the ink flushes rose, coral and peach, then turns clear to show the picture in its own colors, and slowly cools back. Press and hold to leave a fingerprint. The card arrives with an unseen finger swiping it once, as a hint. On this finish a drag strokes the card instead of tossing it. Exports play the whole story (cold, a swipe, a press, cooling) and aim the swipe at the busiest part of the picture.
 - Shadowbox cuts the picture into paper layers along its depth and stands them up inside a lit box, so the layers slide apart and cast shadows as the card tilts. It reads the picture's depth with a small depth model that runs on your device (WebGPU when available, otherwise WebAssembly). The first time it is chosen it downloads the model once (about 19–27 MB, then cached by the browser); a chip on the card shows the progress. Until then, or if the model can't run, the layers are guessed from color. With the browser's data saver on, it waits until you ask.
 - Shallows sinks the art like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports.
-- Edit the name, line and rarity right in the tag beside the card. Tune the frame, effect strength and pixelation.
-- Print the name in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and jumps to its controls (last in Tune). The relief and shine follow the card's tilt and light, in exports too.
+- Edit the name, line and rarity right in the tag beside the card.
+- The side panel keeps to the main flow: your picture (samples, choose a file, crop and zoom) at the top and one Save button at the bottom, with the format (PNG, GIF, video, APNG) picked right above it. Everything finer sits behind **Fine-tune**, which stays closed until you open it (and remembers that): four tabs — **Card** (effect strength, frame, pixelation), **Light & motion**, **Lettering** and **Area**. A dot on a tab means something in it differs from the defaults.
+- Print the name in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and opens the Lettering tab. The relief and shine follow the card's tilt and light, in exports too.
 - Choose where the finish goes: the whole card, the art, the frame, the text or nowhere, a band of brightness (highlights only, shadows only…), inverted, and painted in or out with a soft brush while the card holds still. An overlay shows what is left out, and exports follow it.
-- Add your own frame and backdrop colors with the color picker; they stay as swatches for next time (hover or press Delete to remove).
+- Add your own frame colors with the color picker; they stay as swatches for next time (hover or press Delete to remove).
 - The card tilts with your pointer, can be tossed around, and bounces when clicked. Press the logo to shuffle the finish.
-- **Light & motion** (in Tune) fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe), and the metal of Relief (gold or silver). Defaults keep the original look; exports follow the same settings.
+- **Light & motion** fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer / orbits / stays fixed / follows the phone's gyro, speed, max tilt and idle motion (none, sway, spin, breathe), and the metal of Relief (gold or silver). Defaults keep the original look; exports follow the same settings.
 - Save a transparent PNG (900×1260), a looping GIF, a full-color transparent APNG loop, or a 4-second clip (MP4/WebM). With an animated picture, the loop follows its timing. Relief GIFs are dithered so its smooth metal doesn't band in 256 colors.
+- The GIF can also drop the backdrop (GIF options under the formats, closed by default). GIF transparency is one bit, so a clear GIF has no shadow and a hard edge; the edge pixels keep the card's border color (Auto) or blend into a matte you pick (white, black or any color) to suit where it will sit. For a soft shadow and edges, save an APNG.
 - English / 日本語, sound effects and a CRT filter can be toggled. Respects `prefers-reduced-motion`.
 
 ## Development
@@ -28,6 +30,7 @@ npm run dev      # http://localhost:5173
 npm run build    # type-check + production build
 npm test         # unit tests (Node's built-in runner)
 npm run shoot -- <outDir> [filter]   # with the dev server running: capture the screenshot matrix
+npm run e2e      # with the dev server running: check the panel, every export and the secret finishes
 ```
 
 Rendering is WebGL2 (swirl backdrop, cards, particles). Shaders live in `src/gl/shaders.ts`; the card face is composed in `src/card/face.ts`.

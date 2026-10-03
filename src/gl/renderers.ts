@@ -76,7 +76,8 @@ export interface CardDraw {
   light: [number, number];
   alpha: number;
   flash: number;
-  shadow: [number, number];
+  /** Offset of the hard drop shadow, or null for none. */
+  shadow: [number, number] | null;
   /** Draw the nameplate text; off for thumbnail-sized cards. */
   plate?: boolean;
   /** 0..1: overlay showing where the finish lands. */
@@ -260,9 +261,11 @@ export class CardRenderer {
     gl.uniform1f(p.u.uLayerRise, this.layersRise);
 
     // Hard pixel drop shadow first, then the card itself.
-    gl.uniform1f(p.u.uShadow, 1);
-    gl.uniform2f(p.u.uShift, d.shadow[0], d.shadow[1]);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (d.shadow) {
+      gl.uniform1f(p.u.uShadow, 1);
+      gl.uniform2f(p.u.uShift, d.shadow[0], d.shadow[1]);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
     gl.uniform1f(p.u.uShadow, 0);
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

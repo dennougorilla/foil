@@ -1,6 +1,5 @@
-// The "Fine-tune light & motion" drawer in the Tune section. Closed by default; opening it
-// reveals three tabs of controls. Every control shows its value, can be reset on its own,
-// and double-click / Delete puts it back to the default.
+// The panel's "Light & motion" tab: three groups of controls (pattern, light, motion). Every
+// control shows its value, can be reset on its own, and double-click / Delete puts it back.
 import './tune.css';
 import { DICTS, type Dict } from '../i18n';
 import type { State, Store } from '../state';
@@ -23,10 +22,10 @@ import { gyroAvailable, motion } from './motion';
 import { mountPeek } from './peek';
 import { mountSunHandle } from './handle';
 
-type Tab = 'pattern' | 'light' | 'motion';
+type Group = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
 
-const TABS: { id: Tab; keys: Key[] }[] = [
+const GROUPS: { id: Group; keys: Key[] }[] = [
   { id: 'pattern', keys: ['scale', 'angle', 'hue', 'sat', 'metal'] },
   { id: 'light', keys: ['glare', 'sharp', 'temp', 'sparkle', 'sparkleSize'] },
   { id: 'motion', keys: ['light', 'lightAngle', 'speed', 'tiltMax', 'idle'] },
@@ -48,7 +47,6 @@ const ICONS: Record<string, string> = {
   silver: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm0 3v6h6V5zm2 2h2v2H7z"/>',
   eye: '<path d="M5 4h6v1h2v1h1v1h1v2h-1v1h-1v1h-2v1H5v-1H3v-1H2V9H1V7h1V6h1V5h2zm1 2v1H5v2h1v1h4V9h1V7h-1V6zm1 1h2v2H7z"/>',
   reset: '<path d="M7 2h4v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H6v-2h4v-1h1V6h-1V5H7v1H6v1h2v2H2V3h2v2h1V4h1V3h1z"/>',
-  chevron: '<path d="M5 3h2v2h2v2h2v2H9v2H7v2H5v-2h2V9h2V7H7V5H5z"/>',
 };
 
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
@@ -58,7 +56,11 @@ const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICO
 
 const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 
+/** Amounts read as a multiple of the finish's own look (×1.0); the notch under the track marks it. */
+const RELATIVE = new Set<NumKey>(['scale', 'sharp', 'sparkleSize', 'sat', 'glare']);
+
 function format(k: NumKey, v: number, t: Dict['tune']): string {
+  if (RELATIVE.has(k)) return `×${(v / (TUNE_DEFAULTS[k] || 1)).toFixed(1)}`;
   switch (k) {
     case 'scale':
     case 'sharp':
@@ -108,10 +110,9 @@ function trackFor(k: NumKey, v: number): string {
   return `linear-gradient(90deg, ${fill} ${at}%, ${base} ${at}%)`;
 }
 
-export function mountTune(store: Store, after: Element): void {
+export function mountTune(store: Store, root: HTMLElement): void {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const hasGyro = gyroAvailable();
-  let tab: Tab = 'pattern';
   let t = DICTS[store.get().lang].tune;
   let gyroNote: 'wait' | 'denied' | null = null;
   /** What "Reset all" replaced, offered back for a few seconds. */
@@ -126,16 +127,9 @@ export function mountTune(store: Store, after: Element): void {
   stamp.setAttribute('aria-hidden', 'true');
   document.getElementById('cardSlot')?.appendChild(stamp);
 
-  // The drawer opens under the section's last slider; its toggle sits in the section's title
-  // row, so a closed drawer adds no height and every control still fits above Export.
-  const root = document.createElement('div');
-  root.className = 'tune';
-  after.after(root);
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'tune-toggle';
-  toggle.setAttribute('aria-controls', 'tuneBody');
-  root.closest('.sec')!.querySelector('.sec-title')!.after(toggle);
+  root.classList.add('tune');
+  /** True while this tab is the one showing. */
+  const shown = () => store.get().adjustOpen && store.get().panelTab === 'light';
 
   const tuneNow = () => store.get().tune;
   const set = (patch: Partial<Tune>) => store.set({ tune: { ...tuneNow(), ...patch } });
@@ -149,21 +143,10 @@ export function mountTune(store: Store, after: Element): void {
 
   function build() {
     t = DICTS[store.get().lang].tune;
-    const open = store.get().tuneOpen;
-    toggle.innerHTML = `
-      <span class="tune-toggle-label"></span>
-      <span class="tune-badge" hidden></span>
-      <span class="tune-chev">${svg('chevron')}</span>`;
     root.innerHTML = `
-      <div class="tune-body" id="tuneBody">
-        <div class="tune-tabbar">
-          <div class="tune-tabs" role="tablist"></div>
-          <button class="tune-close" type="button"><span></span>${svg('chevron')}</button>
-        </div>
-        <div class="tune-panes"></div>
+        <div class="tune-groups"></div>
+        <p class="hint tune-hint"></p>
         <div class="tune-dock">
-          <p class="tune-hint"></p>
-          <div class="tune-dock-row">
           <span class="tune-dock-peek"></span>
           <div class="tune-actions">
             <button class="tune-compare" type="button" aria-pressed="false">${svg('eye')}<span class="tune-long"></span><span class="tune-short"></span></button>
@@ -171,11 +154,7 @@ export function mountTune(store: Store, after: Element): void {
             <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
             <button class="tune-undo" type="button" hidden>${svg('reset')}<span></span></button>
           </div>
-          </div>
-        </div>
-      </div>`;
-    toggle.querySelector('.tune-toggle-label')!.textContent = t.toggleShort;
-    toggle.title = t.toggle;
+        </div>`;
     root.querySelector('.tune-hint')!.textContent = touch ? t.hintTouch : t.hint;
     root.querySelector('.tune-reset-all span')!.textContent = t.resetAll;
     root.querySelector('.tune-undo span')!.textContent = t.undo;
@@ -183,66 +162,25 @@ export function mountTune(store: Store, after: Element): void {
     peek.setLabel(t.peek, t.peekCap);
     root.querySelector('.tune-dock-peek')!.replaceWith(peek.el);
     bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
-    // A way to close the drawer that stays in reach once the section title has scrolled away.
-    const close = root.querySelector<HTMLButtonElement>('.tune-close')!;
-    close.querySelector('span')!.textContent = t.close;
-    close.addEventListener('click', () => {
-      sfx.tick();
-      store.set({ tuneOpen: false });
-      toggle.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
-      toggle.focus({ preventScroll: true });
-    });
-    const tabs = root.querySelector<HTMLElement>('.tune-tabs')!;
-    tabs.setAttribute('aria-label', t.toggle);
-    const panes = root.querySelector<HTMLElement>('.tune-panes')!;
-    for (const def of TABS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'tune-tab';
-      b.id = `tuneTab-${def.id}`;
-      b.dataset.tab = def.id;
-      b.setAttribute('role', 'tab');
-      b.setAttribute('aria-controls', `tunePane-${def.id}`);
-      b.innerHTML = `${svg(def.id)}<span></span><i class="tune-dot" aria-hidden="true"></i>`;
-      b.querySelector('span')!.textContent = t.tabs[def.id];
-      b.addEventListener('click', () => selectTab(def.id));
-      tabs.appendChild(b);
-
-      const pane = document.createElement('div');
-      pane.className = 'tune-pane';
-      pane.id = `tunePane-${def.id}`;
-      pane.setAttribute('role', 'tabpanel');
-      pane.setAttribute('aria-labelledby', b.id);
-      if (def.id === 'pattern') pane.appendChild(sampleRow());
+    const groups = root.querySelector<HTMLElement>('.tune-groups')!;
+    for (const def of GROUPS) {
+      const group = document.createElement('section');
+      group.className = 'tune-group';
+      group.id = `tuneGroup-${def.id}`;
+      group.setAttribute('aria-labelledby', `tuneGroupTitle-${def.id}`);
+      group.innerHTML = `<h3 class="group-title" id="tuneGroupTitle-${def.id}">${svg(def.id)}<span></span><i class="tune-dot" aria-hidden="true"></i></h3>`;
+      group.querySelector('span')!.textContent = t.groups[def.id];
+      if (def.id === 'pattern') group.appendChild(sampleRow());
       for (const k of def.keys)
-        pane.appendChild(k === 'light' || k === 'idle' || k === 'metal' ? choiceRow(k) : k === 'lightAngle' ? dialRow(k) : rangeRow(k));
+        group.appendChild(k === 'light' || k === 'idle' || k === 'metal' ? choiceRow(k) : k === 'lightAngle' ? dialRow(k) : rangeRow(k));
       if (def.id === 'motion') {
         const note = document.createElement('p');
         note.className = 'tune-note';
         note.setAttribute('role', 'status');
-        pane.appendChild(note);
+        group.appendChild(note);
       }
-      panes.appendChild(pane);
+      groups.appendChild(group);
     }
-    tabs.addEventListener('keydown', (e) => {
-      const i = TABS.findIndex((d) => d.id === tab);
-      const n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : null;
-      if (n === null) return;
-      e.preventDefault();
-      selectTab(TABS[(n + TABS.length) % TABS.length].id);
-      root.querySelector<HTMLElement>(`#tuneTab-${tab}`)?.focus();
-    });
-    toggle.onclick = () => {
-      sfx.tick();
-      const next = !store.get().tuneOpen;
-      store.set({ tuneOpen: next });
-      if (next) {
-        // Bring the drawer into view without hiding it behind the sticky Export bar.
-        requestAnimationFrame(() =>
-          root.querySelector('.tune-body')!.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' }),
-        );
-      }
-    };
     root.querySelector('.tune-reset-all')!.addEventListener('click', () => {
       if (!changedKeys(tuneNow()).length) return;
       sfx.tick();
@@ -257,7 +195,7 @@ export function mountTune(store: Store, after: Element): void {
         const had = root.contains(document.activeElement) && document.activeElement?.classList.contains('tune-undo');
         undo = null;
         sync();
-        if (had) root.querySelector<HTMLElement>(`#tuneTab-${tab}`)?.focus();
+        if (had) root.querySelector<HTMLElement>('.tune-range')?.focus();
       }, 8000);
       sync();
       root.querySelector<HTMLElement>('.tune-undo')?.focus();
@@ -272,8 +210,6 @@ export function mountTune(store: Store, after: Element): void {
       announce(t.undoDone);
       root.querySelector<HTMLElement>('.tune-reset-all')?.focus();
     });
-    root.classList.toggle('is-open', open);
-    selectTab(tab, true);
     sync();
   }
 
@@ -369,14 +305,6 @@ export function mountTune(store: Store, after: Element): void {
     ghost.className = 'tune-ghost';
     ghost.setAttribute('aria-hidden', 'true');
     wrap.append(ghost);
-    // Plain words for the two ends. Every slider row keeps this line (empty where the track
-    // already says it, like Hue), so all rows share one height.
-    const ends = (t.ends as Partial<Record<NumKey, string[]>>)[k] ?? ['', ''];
-    const cap = document.createElement('div');
-    cap.className = 'tune-ends';
-    cap.setAttribute('aria-hidden', 'true');
-    for (const word of ends) cap.appendChild(document.createElement('span')).textContent = word;
-    wrap.append(cap);
     row.appendChild(wrap);
     // Reset comes after the control in tab order; CSS still shows it beside the value.
     row.appendChild(row.querySelector('.tune-reset')!);
@@ -437,12 +365,11 @@ export function mountTune(store: Store, after: Element): void {
     return row;
   }
 
-  /** A little holo swatch at the top of the Pattern tab that zooms, turns and tints live. */
+  /** A little holo swatch at the top of the Pattern group that zooms, turns and tints live. */
   function sampleRow() {
     const row = document.createElement('div');
     row.className = 'tune-sample-row';
-    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div><p class="tune-help"></p>';
-    row.querySelector('p')!.textContent = t.swatch;
+    row.innerHTML = '<div class="tune-sample" aria-hidden="true"><i></i></div>';
     return row;
   }
 
@@ -503,40 +430,12 @@ export function mountTune(store: Store, after: Element): void {
     set({ [k]: v } as Partial<Tune>);
   }
 
-  function selectTab(id: Tab, quiet = false) {
-    if (!quiet && id !== tab) sfx.tick();
-    tab = id;
-    if (!quiet) {
-      // Show the new tab's controls, not just its label, when the drawer runs past the fold.
-      requestAnimationFrame(() =>
-        root.querySelector('.tune-panes')?.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' }),
-      );
-    }
-    root.querySelectorAll<HTMLButtonElement>('.tune-tab').forEach((b) => {
-      const on = b.dataset.tab === id;
-      b.setAttribute('aria-selected', String(on));
-      b.tabIndex = on ? 0 : -1;
-    });
-    root.querySelectorAll<HTMLElement>('.tune-pane').forEach((p) => (p.hidden = p.id !== `tunePane-${id}`));
-  }
-
   // ---------- Sync ----------
 
   function sync() {
     const s = store.get();
     const tune = s.tune;
     const changed = changedKeys(tune);
-    root.classList.toggle('is-open', s.tuneOpen);
-    toggle.classList.toggle('is-open', s.tuneOpen);
-    toggle.setAttribute('aria-expanded', String(s.tuneOpen));
-    root.querySelector<HTMLElement>('.tune-body')!.hidden = !s.tuneOpen;
-    const badge = toggle.querySelector<HTMLElement>('.tune-badge')!;
-    badge.hidden = !changed.length;
-    badge.textContent = t.changed.replace('{n}', String(changed.length));
-    // The badge is just a number on screen; spell it out for screen readers.
-    const label = changed.length ? `${t.toggle} (${t.changed.replace('{n}', String(changed.length))})` : t.toggle;
-    toggle.setAttribute('aria-label', label);
-    toggle.title = label;
     if (undo && changed.length) {
       // Anything changed after a reset makes the undo offer stale.
       undo = null;
@@ -551,12 +450,13 @@ export function mountTune(store: Store, after: Element): void {
     done.querySelector('small')!.textContent = t.undoHint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
     // The dock always carries the hint; its button row only when there is something to do.
-    root.querySelector<HTMLElement>('.tune-dock-row')!.hidden = !changed.length && !undo && !peek.shown;
-    peek.setActive(s.tuneOpen);
+    // The dock only shows when it has something to offer: changes to compare or reset, an undo, the phone preview.
+    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo && !peek.shown;
+    peek.setActive(shown());
 
-    for (const def of TABS) {
+    for (const def of GROUPS) {
       const n = def.keys.filter((k) => changed.includes(k)).length;
-      root.querySelector<HTMLElement>(`#tuneTab-${def.id} .tune-dot`)!.hidden = !n;
+      root.querySelector<HTMLElement>(`#tuneGroup-${def.id} .tune-dot`)!.hidden = !n;
     }
 
     root.querySelectorAll<HTMLElement>('.tune-row').forEach((row) => {
@@ -613,15 +513,15 @@ export function mountTune(store: Store, after: Element): void {
     // the current finish or mode makes them do nothing.
     const row = (k: Key) => root.querySelector<HTMLElement>(`.tune-row[data-key="${k}"]`)!;
     row('lightAngle').hidden = tune.light !== 'fixed';
-    for (const def of TABS) {
+    for (const def of GROUPS) {
       const reasons = new Map(def.keys.map((k) => [k, whyIdle(k, s)]));
-      // A reason shared by several rows is said once at the top of the tab, not on each row.
+      // A reason shared by several rows is said once at the top of the group, not on each row.
       const counts = new Map<string, number>();
       for (const r of reasons.values()) if (r) counts.set(r, (counts.get(r) ?? 0) + 1);
       const shared = [...counts].find(([, n]) => n > 1)?.[0] ?? null;
-      const pane = root.querySelector<HTMLElement>(`#tunePane-${def.id}`)!;
-      const banner = whyLine(pane, `tuneWhyTab-${def.id}`, pane.firstElementChild);
-      banner.classList.add('tune-why-tab');
+      const group = root.querySelector<HTMLElement>(`#tuneGroup-${def.id}`)!;
+      const banner = whyLine(group, `tuneWhyGroup-${def.id}`, group.querySelector('.group-title')!.nextElementSibling);
+      banner.classList.add('tune-why-group');
       banner.textContent = shared ?? '';
       banner.hidden = !shared;
       for (const k of def.keys) {
@@ -637,7 +537,7 @@ export function mountTune(store: Store, after: Element): void {
         else control.removeAttribute('aria-describedby');
       }
     }
-    sun.update({ show: s.tuneOpen && tune.light === 'fixed' && !motion.comparing, angle: tune.lightAngle, label: t.sun, title: t.sunHelp, keys: t.sunKeys });
+    sun.update({ show: shown() && tune.light === 'fixed' && !motion.comparing, angle: tune.lightAngle, label: t.sun, title: t.sunHelp, keys: t.sunKeys });
 
     const note = root.querySelector<HTMLElement>('.tune-note')!;
     let msg = '';
@@ -683,19 +583,14 @@ export function mountTune(store: Store, after: Element): void {
   }
 
   build();
-  // The actions dock and the phone preview sit just above the sticky Export bar; measure it
-  // (and the dock) rather than guess, since both change with width and scaling.
+  // The actions dock sits just above the sticky Export bar (see --export-h in main.ts); measure
+  // it rather than guess, since it changes with width and scaling.
   {
-    const html = document.documentElement.style;
-    const exp = document.querySelector<HTMLElement>('.sec-export');
     const measure = () => {
-      if (exp) html.setProperty('--tune-export-h', `${exp.offsetHeight}px`);
       const dock = root.querySelector<HTMLElement>('.tune-dock');
-      html.setProperty('--tune-dock-h', `${dock && !dock.hidden && store.get().tuneOpen ? dock.offsetHeight : 0}px`);
+      document.documentElement.style.setProperty('--tune-dock-h', `${dock && !dock.hidden && shown() ? dock.offsetHeight : 0}px`);
     };
-    const ro = new ResizeObserver(measure);
-    if (exp) ro.observe(exp);
-    ro.observe(root);
+    new ResizeObserver(measure).observe(root);
     measure();
   }
   if (tuneNow().light === 'gyro') {
@@ -722,7 +617,7 @@ export function mountTune(store: Store, after: Element): void {
         });
     }
     if (changed.has('lang')) build();
-    else if (changed.has('tune') || changed.has('tuneOpen') || changed.has('edition') || changed.has('intensity')) sync();
+    else if (['tune', 'adjustOpen', 'panelTab', 'edition', 'intensity'].some((k) => changed.has(k as keyof State))) sync();
   });
   reduced.addEventListener('change', sync);
   // A gyro that starts reporting clears the "tilt your device" note.

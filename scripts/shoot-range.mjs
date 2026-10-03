@@ -1,4 +1,4 @@
-// Screenshots for the Foil area and custom colours: node scripts/shoot-range.mjs [outDir] [filter]
+// Screenshots for the Area tab and custom frame colours: node scripts/shoot-range.mjs [outDir] [filter]
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
@@ -11,13 +11,13 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 
 const saved = {
   frameSwatches: ['#2f8f83', '#e86a92'],
-  stageSwatches: ['#6a3fd0', '#d8a020'],
+  panelTab: 'card',
 };
 
 const shots = [
   { name: 'panel-ja', w: 1440, h: 900, lang: 'ja', act: 'scrollPanel' },
   { name: 'panel-en', w: 1440, h: 900, lang: 'en', act: 'scrollPanel' },
-  { name: 'colors-ja', w: 1440, h: 900, lang: 'ja', state: { ...saved, frameColor: '#2f8f83', stageColor: '#6a3fd0' } },
+  { name: 'colors-ja', w: 1440, h: 900, lang: 'ja', state: { ...saved, frameColor: '#2f8f83' } },
   { name: 'colors-hover', w: 1440, h: 900, lang: 'en', state: { ...saved, frameColor: '#e86a92' }, act: 'hoverSwatch' },
   { name: 'range-art-hi', w: 1440, h: 900, lang: 'ja', state: { rangeRegion: 'art', rangeLo: 0.6, rangeHi: 1 }, act: 'hoverRange' },
   { name: 'range-text', w: 1440, h: 900, lang: 'en', state: { rangeRegion: 'text', rangeShow: true }, act: 'scrollPanel' },
@@ -78,11 +78,12 @@ for (const s of shots) {
   await page.addInitScript((st) => {
     localStorage.clear();
     indexedDB.deleteDatabase('foil');
-    if (st) localStorage.setItem('foil:v1', JSON.stringify({ edition: 'holo', ...st }));
+    // Fine-tune open on the Area tab unless the shot asks for another.
+    localStorage.setItem('foil:v1', JSON.stringify({ edition: 'holo', adjustOpen: true, panelTab: 'range', ...st }));
   }, s.state ?? null);
   await page.goto(`${URL}?lang=${s.lang}`);
   await page.waitForTimeout(2600);
-  const scrollPanel = () => page.locator('.sec-range').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  const scrollPanel = () => page.locator('#pane-range').evaluate((e) => e.scrollIntoView({ block: 'center' }));
   if (s.act === 'scrollPanel') {
     await scrollPanel();
     await page.waitForTimeout(400);
@@ -102,7 +103,7 @@ for (const s of shots) {
   } else if (s.act === 'paintErase') {
     await strokes(page, true);
   } else if (s.act === 'mobileRange') {
-    await page.locator('.sec-range .tone').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+    await page.locator('#pane-range .tone').evaluate((e) => e.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(1200);
   } else if (s.act === 'paintMid') {
     await page.locator('.range-paint').click();
@@ -121,7 +122,7 @@ for (const s of shots) {
     await page.waitForTimeout(500);
   } else if (s.act === 'exportPng') {
     const dl = page.waitForEvent('download');
-    await page.locator('#pngBtn').click();
+    await page.locator('#saveBtn').click();
     const d = await dl;
     await d.saveAs(`${out}/export-range.png`);
     await page.waitForTimeout(300);
