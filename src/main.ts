@@ -93,7 +93,7 @@ function applyText() {
   document.querySelectorAll('.support-link').forEach((a) => a.setAttribute('title', t.supportOpen));
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
-  stage.setHandLabels(t.edition);
+  stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
   buildSegments();
   buildThumbs();
@@ -489,9 +489,18 @@ function selectEdition(id: EditionId) {
   }
   const i = EDITIONS.findIndex((e) => e.id === id);
   store.set({ edition: id });
+  announce(t.applied.replace('{name}', t.edition[id]));
   sfx.select(i);
   stage.juice();
   stage.burst(editionById(id).color);
+}
+
+/** Tell screen readers which finish is on the card now. */
+function announce(msg: string) {
+  const live = $('announcer');
+  // Clear first so the same words are read again if they repeat.
+  live.textContent = '';
+  setTimeout(() => (live.textContent = msg), 60);
 }
 
 window.addEventListener('keydown', (e) => {

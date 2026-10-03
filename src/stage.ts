@@ -169,8 +169,11 @@ export class Stage {
     }
   }
 
-  setHandLabels(names: Record<EditionId, string>) {
-    for (const h of this.hand) h.el.setAttribute('aria-label', names[h.id]);
+  setHandLabels(names: Record<EditionId, string>, looks: Record<EditionId, string>) {
+    for (const h of this.hand) {
+      h.el.setAttribute('aria-label', names[h.id]);
+      h.el.setAttribute('aria-description', looks[h.id]);
+    }
   }
 
   focusHand(id: EditionId) {
