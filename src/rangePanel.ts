@@ -435,6 +435,7 @@ export function initRangePanel(host: RangeHost) {
   function measure() {
     clearTimeout(coverTimer);
     coverTimer = window.setTimeout(() => {
+      coverTimer = 0;
       const t = host.t();
       const n = Math.round(model.coverage(store.get()) * 100);
       cover.querySelector('span')!.textContent = n >= 100 ? t.rangeAllCover : n <= 0 ? t.rangeNone : t.rangeCover.replace('{n}', String(n));
@@ -451,7 +452,6 @@ export function initRangePanel(host: RangeHost) {
 
   function sync() {
     const s = store.get();
-    const t = host.t();
     regionSeg.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => radio(b, b.dataset.v === s.rangeRegion));
     lo.value = String(s.rangeLo);
     hi.value = String(s.rangeHi);
@@ -479,7 +479,6 @@ export function initRangePanel(host: RangeHost) {
     soft.nextElementSibling!.textContent = pct(s.brushSoft);
     const custom = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
     q<HTMLButtonElement>('.range-reset').hidden = !custom;
-    void t;
   }
 
   function applyText() {
@@ -519,7 +518,10 @@ export function initRangePanel(host: RangeHost) {
     if (key !== faceKey) {
       faceKey = key;
       push();
-    } else measure();
+    } else if (!coverTimer) {
+      // Animated sources redraw faster than the debounce; measure at most once per window instead.
+      measure();
+    }
   }
 
   void model.load().then((ok) => ok && push());

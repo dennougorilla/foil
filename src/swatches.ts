@@ -91,7 +91,7 @@ export function initSwatches(host: SwatchHost) {
       // Keep focus in the group: land on the neighbour, or the add button if it was the last one.
       const group = b.closest('[role=radiogroup]')!;
       forget(strip, hex);
-      requestAnimationFrame(() => group.querySelector<HTMLElement>('[role=radio][tabindex="0"]')?.focus() ?? group.querySelector<HTMLElement>('.sw-add')?.focus());
+      requestAnimationFrame(() => (group.querySelector<HTMLElement>('[role=radio][tabindex="0"]') ?? group.querySelector<HTMLElement>('.sw-add'))?.focus());
     });
     const del = document.createElement('button');
     del.type = 'button';
