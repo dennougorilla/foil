@@ -2,6 +2,7 @@
 import { TUNE_GLSL } from '../tune/glsl';
 import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
+import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -390,6 +391,8 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${LETTERING_GLSL}
+
+${SPONSOR_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -439,6 +442,7 @@ void main() {
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
+  ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
   if (e != 0) col = tuneColor(col, c);

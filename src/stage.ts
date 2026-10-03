@@ -28,6 +28,8 @@ interface HandCard {
   deal: Spring;
   tiltX: Spring;
   tiltY: Spring;
+  /** Extra turn about the vertical axis: π shows the card back. */
+  turn: Spring;
   dealAt: number;
 }
 
@@ -45,7 +47,11 @@ export interface StageOptions {
   info: HTMLElement;
   onSelect: (id: EditionId) => void;
   onHover: (id: EditionId | null) => void;
+  /** How a card sits in the hand: face up, face down (a secret, opens on purpose), or left out. */
+  handMode?: (id: EditionId) => HandMode;
 }
+
+export type HandMode = 'front' | 'back' | 'hidden';
 
 export class Stage {
   readonly cards: CardRenderer;
@@ -150,8 +156,11 @@ export class Stage {
         const dir = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0;
         if (!dir) return;
         ev.preventDefault();
-        const next = (i + dir + EDITIONS.length) % EDITIONS.length;
-        this.o.onSelect(EDITIONS[next].id);
+        let next = i;
+        do next = (next + dir + EDITIONS.length) % EDITIONS.length;
+        while (this.mode(EDITIONS[next].id) === 'hidden');
+        // A face-down card takes focus but only opens on purpose (Enter or click).
+        if (this.mode(EDITIONS[next].id) === 'front') this.o.onSelect(EDITIONS[next].id);
         this.hand[next].el.focus();
       });
       hand.appendChild(el);
@@ -163,10 +172,37 @@ export class Stage {
         deal: new Spring(this.motion ? 1 : 0, this.motion ? 1 : 0, 120, 13),
         tiltX: new Spring(0, 0, 200, 16),
         tiltY: new Spring(0, 0, 200, 16),
+        turn: new Spring(0, 0, 90, 9),
         dealAt: 0.35 + i * 0.04,
       });
     });
+    this.syncHandModes(false);
     this.syncHandChecked();
+  }
+
+  private mode(id: EditionId): HandMode {
+    return this.o.handMode?.(id) ?? 'front';
+  }
+
+  /**
+   * Re-reads handMode. With `animate`, cards that join the hand are dealt in one
+   * by one and face-down cards turn over with a little overshoot.
+   */
+  syncHandModes(animate = true) {
+    let n = 0;
+    for (const h of this.hand) {
+      const m = this.mode(h.id);
+      const wasHidden = h.el.hidden;
+      h.el.hidden = m === 'hidden';
+      h.turn.target = m === 'back' ? Math.PI : 0;
+      if (!animate || !this.motion) h.turn.x = h.turn.target;
+      if (animate && this.motion && wasHidden && !h.el.hidden) {
+        // A shorter rise than the opening deal, so nothing pokes out below the hand.
+        h.deal.x = 0.22;
+        h.deal.target = 0.22;
+        h.dealAt = this.time + 0.25 + n++ * 0.12;
+      }
+    }
   }
 
   syncHandChecked() {
@@ -321,11 +357,11 @@ export class Stage {
     return { cx: s.left - c.left + s.width / 2, cy: s.top - c.top + s.height / 2, w: s.width, h: s.height };
   }
 
-  private handLayout() {
+  private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
     // A tall hand box (phones) deals two smaller fans so every card stays tappable.
     const rows = hr.height > 240 ? 2 : 1;
-    const perRow = Math.ceil(this.hand.length / rows);
+    const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
     const h = Math.max(60, Math.min(rowH - 46, 124));
@@ -336,7 +372,7 @@ export class Stage {
     const arcK = Math.min(2, 30 / (midRow * midRow));
     const slot = (i: number) => {
       const row = Math.floor(i / perRow);
-      const inRow = Math.min(perRow, this.hand.length - row * perRow);
+      const inRow = Math.min(perRow, count - row * perRow);
       return { row, d: (i % perRow) - (inRow - 1) / 2 };
     };
     return { hr, w, h, spacing, arcK, rowH, slot };
@@ -503,20 +539,26 @@ export class Stage {
   };
 
   private stepHand(dt: number, state: ReturnType<Store['get']>) {
-    const { hr, w, h, spacing, arcK, rowH, slot } = this.handLayout();
+    // Left-out cards take no room; everything else fans by its position among the shown ones.
+    const pos = new Map<number, number>();
+    this.hand.forEach((c, i) => !c.el.hidden && pos.set(i, pos.size));
+    const { hr, w, h, spacing, arcK, rowH, slot } = this.handLayout(pos.size);
     const ox = hr.left - this.canvasRect.left;
     const oy = hr.top - this.canvasRect.top;
     const active = this.hovered >= 0 ? this.hovered : this.focused;
     const order: number[] = [];
     this.hand.forEach((card, i) => {
+      if (card.el.hidden) return;
       const sel = card.id === state.edition;
       const hot = i === active;
       if (this.time > card.dealAt) card.deal.target = 0;
       card.lift.target = (sel ? 20 : 0) + (hot ? 12 : 0);
-      card.scale.target = hot ? 1.1 : sel ? 1.04 : 1;
+      // A face-down card holds still and flat, so it sits quietly in the fan.
+      const still = card.turn.target !== 0;
+      card.scale.target = still ? 1 : hot ? 1.1 : sel ? 1.04 : 1;
       // Hovered card leans toward the pointer
-      if (hot && this.hovered === i) {
-        const { row, d } = slot(i);
+      if (hot && this.hovered === i && !still) {
+        const { row, d } = slot(pos.get(i)!);
         const cx = hr.left + hr.width / 2 + d * spacing;
         const cy = hr.top + row * rowH + 30 + h / 2;
         card.tiltY.target = clamp((this.pointer.x - cx) / (w / 2), -1, 1) * 0.35;
@@ -525,7 +567,7 @@ export class Stage {
         card.tiltX.target = 0;
         card.tiltY.target = 0;
       }
-      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY]) s.step(dt);
+      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY, card.turn]) s.step(dt);
       order.push(i);
     });
     // Draw so the selected and hovered cards sit on top of their neighbours.
@@ -536,7 +578,7 @@ export class Stage {
     for (const i of order) {
       const card = this.hand[i];
       const e = EDITIONS[i];
-      const { row, d } = slot(i);
+      const { row, d } = slot(pos.get(i)!);
       const fan = d * 0.045;
       const arc = d * d * arcK;
       const x = hr.width / 2 + d * spacing;
@@ -552,7 +594,7 @@ export class Stage {
         if (peek) peek.style.transform = `translate(${x.toFixed(1)}px, ${(y - (h * card.scale.x) / 2 - 12).toFixed(1)}px) translate(-50%, -100%)`;
       }
       const t = this.time + i * 0.7;
-      const idle = this.motion ? 1 : 0;
+      const idle = this.motion && card.turn.target === 0 ? 1 : 0;
       this.cards.drawCard(
         {
           cx: ox + x,
@@ -560,8 +602,9 @@ export class Stage {
           w,
           h,
           rx: card.tiltX.x + Math.sin(t * 0.8) * 0.06 * idle,
-          ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle,
-          rz: rot + card.deal.x * 0.6 * (d >= 0 ? 1 : -1),
+          ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle + card.turn.x,
+          // Turning a card over mirrors its lean; undo that so a face-down card fans like the rest.
+          rz: (rot + card.deal.x * 0.6 * (d >= 0 ? 1 : -1)) * Math.cos(card.turn.x),
           scale: card.scale.x,
           edition: e.shader,
           intensity: state.intensity,

@@ -720,6 +720,23 @@
   margin-top: 4px;
 }
 
+/* With no saved colors yet, the lone "Add color" button sits on the Frame label's row instead of
+   taking a row of its own, so the Tune sliders and the backdrop stay above Export. */
+.field:has(> #frameSeg) {
+  position: relative;
+}
+
+.sw-strip-frame:not(:has(.sw-item)) {
+  position: absolute;
+  top: -8px;
+  right: 0;
+  margin: 0;
+}
+
+.sw-strip-frame:not(:has(.sw-item)) .sw-add {
+  height: 28px;
+}
+
 .sw-item {
   position: relative;
   display: inline-flex;
@@ -1479,6 +1496,8 @@
 
 .field-backdrop {
   container-type: inline-size;
+  /* Below Pixelate now: a little air so it reads as its own control. */
+  margin-top: 12px;
 }
 
 @container (max-width: 340px) {
@@ -1534,4 +1553,10 @@
 
 .range-cover {
   gap: 8px;
+}
+
+@media (min-width: 901px) and (max-height: 820px) {
+  .field-backdrop {
+    margin-top: 4px;
+  }
 }

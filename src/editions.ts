@@ -13,7 +13,12 @@ export type EditionId =
   | 'magma'
   | 'halftone'
   | 'crystal'
-  | 'sakura';
+  | 'sakura'
+  // Sponsor-only, see src/sponsor.ts
+  | 'kintsugi'
+  | 'opal'
+  | 'eclipse'
+  | 'raden';
 
 export interface Edition {
   id: EditionId;
@@ -42,6 +47,11 @@ export const EDITIONS: Edition[] = [
   { id: 'halftone', shader: 12, color: '#ffd84a', swirl: ['#151518', '#d83a6a', '#2aa8d8'], value: 3 },
   { id: 'crystal', shader: 13, color: '#e8f6ff', swirl: ['#101522', '#5a6ea8', '#d8e6ff'], value: 6 },
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
+  // Sponsor-only finishes (locked until unlocked in src/sponsor.ts).
+  { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
+  { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
+  { id: 'eclipse', shader: 42, color: '#ffb36b', swirl: ['#030308', '#1c1534', '#c25a2a'], value: 8 },
+  { id: 'raden', shader: 43, color: '#b9a6ff', swirl: ['#07060a', '#2c1a3a', '#4fc0c8'], value: 8 },
 ];
 
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];
