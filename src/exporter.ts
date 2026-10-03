@@ -19,11 +19,11 @@ export interface ExportInput {
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 
-const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
+export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
 
 const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
 
-function download(blob: Blob, name: string): string {
+export function download(blob: Blob, name: string): string {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -71,7 +71,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
   return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
 }
 
-interface Scene {
+export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   /** Draws loop position p∈[0,1): the card orbits once on the swirl backdrop. */
@@ -79,8 +79,11 @@ interface Scene {
   dispose(): void;
 }
 
-/** The shared stage for video and GIF: a pixel swirl upscaled nearest, with the card composited on top. */
-function createScene(input: ExportInput, W: number, H: number, readback = false): Scene {
+/**
+ * The shared stage for video and GIF: a pixel swirl upscaled nearest, with the card composited on top.
+ * `transparent` leaves the swirl out so only the card and its shadow are drawn (APNG).
+ */
+export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false): Scene {
   const out = document.createElement('canvas');
   out.width = W;
   out.height = H;
@@ -111,7 +114,7 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
-      bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
+      if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const rx = Math.sin(a) * 0.22;
       const ry = Math.cos(a) * 0.3;
@@ -137,7 +140,8 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
         cardTime,
       );
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(bgCanvas, 0, 0, W, H);
+      if (transparent) ctx.clearRect(0, 0, W, H);
+      else ctx.drawImage(bgCanvas, 0, 0, W, H);
       ctx.drawImage(cardCanvas, 0, 0);
     },
     dispose() {

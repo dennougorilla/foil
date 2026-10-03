@@ -1346,7 +1346,7 @@ input[type='range']:focus-visible::-moz-range-thumb {
   /* Sits just above the export row, so it covers neither the header nor the hand. */
   left: auto;
   right: 36px;
-  bottom: 124px;
+  bottom: 172px;
   z-index: 70;
   display: grid;
   gap: 8px;
