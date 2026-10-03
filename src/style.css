@@ -1288,6 +1288,97 @@ input[type='range']:focus-visible::-moz-range-thumb {
   background: var(--red);
 }
 
+.toast-msg {
+  margin: 0;
+  word-break: auto-phrase;
+}
+
+/* Errors stay put and offer a way out: message, then actions; close sits top-right. */
+.toast.is-error {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px 12px;
+  width: min(460px, calc(100vw - 32px));
+  padding: 12px 10px 14px 16px;
+  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px rgba(255, 90, 79, 0.35), 0 6px 0 3px rgba(0, 0, 0, 0.45);
+  line-height: 1.45;
+  pointer-events: auto;
+}
+
+.toast.is-error::before {
+  margin-top: 7px;
+  box-shadow: 0 0 8px var(--red);
+}
+
+.toast.is-error .toast-msg {
+  padding-top: 1px;
+}
+
+.toast-close {
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  transition: color 0.15s, background 0.15s;
+}
+
+.toast-close:hover {
+  color: var(--text);
+  background: var(--panel-hi);
+}
+
+.toast-close svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.toast-btn {
+  grid-column: 2 / 4;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--orange);
+  color: #fff;
+  font-size: 15px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 0 var(--orange-lo);
+  transition: transform 0.07s, box-shadow 0.07s, filter 0.15s;
+}
+
+.toast-btn:hover {
+  filter: brightness(1.08);
+}
+
+.toast-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--orange-lo);
+}
+
+.toast-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: square;
+}
+
 .toast.is-out {
   animation: toast-out 0.25s ease-in forwards;
 }
