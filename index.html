@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#11181a" />
+    <title>FOIL</title>
+    <meta name="description" content="Turn any picture into a collectible card and give it a rare finish — foil, holographic, polychrome, gold, prism and more. Save it as a PNG or a looping clip." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 14'%3E%3Crect width='10' height='14' rx='1.5' fill='%23161c1f'/%3E%3Crect x='1' y='1' width='8' height='12' rx='1' fill='%23f3eee2'/%3E%3Crect x='2' y='2' width='6' height='7' fill='%23ff5a4f'/%3E%3Crect x='2' y='5' width='6' height='4' fill='%231a9cff'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="bg" aria-hidden="true"></canvas>
+
+    <div class="app">
+      <header class="top">
+        <h1 class="logo">
+          <button class="logo-word" id="logoBtn" type="button">
+            <span class="tile" aria-hidden="true">F</span><span class="tile" aria-hidden="true">O</span><span class="tile" aria-hidden="true">I</span><span class="tile" aria-hidden="true">L</span>
+            <i class="spark" aria-hidden="true"></i><i class="spark" aria-hidden="true"></i><i class="spark" aria-hidden="true"></i><i class="spark" aria-hidden="true"></i>
+          </button>
+        </h1>
+        <div class="toggles">
+          <a class="chip chip-icon" id="repoLink" href="https://github.com/dennougorilla/foil" target="_blank" rel="noopener">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.71 1.23 1.87.87 2.33.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0z" /></svg>
+          </a>
+          <div class="support">
+            <button class="chip chip-heart" id="supportBtn" type="button" aria-expanded="false" aria-controls="supportMenu">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h3v1h1v1h2V3h1V2h3v1h1v5h-1v1h-1v1h-1v1h-1v1H9v1H7v-1H6v-1H5v-1H4V9H3V8H2V3h1z" /></svg>
+              <span data-t="support"></span>
+            </button>
+            <div class="support-menu" id="supportMenu" hidden>
+              <p class="support-title" data-t="supportTitle"></p>
+              <a class="support-link" href="https://github.com/sponsors/dennougorilla" target="_blank" rel="noopener">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.71 1.23 1.87.87 2.33.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0z" /></svg>
+                <span><b>GitHub Sponsors</b><small data-t="supportGh"></small></span>
+              </a>
+              <a class="support-link" href="https://buymeacoffee.com/dennougorip" target="_blank" rel="noopener">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h10v1h2v4h-2v2h-1v1H4v-1H3v-1H2zm10 2v2h1V7zM4 1h1v2H4zm3 0h1v2H7zm3 0h1v2h-1z" /></svg>
+                <span><b>Buy Me a Coffee</b><small data-t="supportBmc"></small></span>
+              </a>
+            </div>
+          </div>
+          <button class="chip" id="langBtn" type="button"></button>
+          <button class="chip" id="soundBtn" type="button" aria-pressed="true">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" /><path class="wave" d="M11 5.5c1 .8 1 4.2 0 5M12.5 4c2 1.6 2 6.4 0 8" /></svg>
+            <span data-t="sound"></span>
+          </button>
+          <button class="chip" id="crtBtn" type="button" aria-pressed="true">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="9" rx="2" /><path d="M5 14h6" /></svg>
+            <span data-t="crt"></span>
+          </button>
+        </div>
+      </header>
+
+      <main class="stage" id="stage">
+        <canvas id="cards" aria-hidden="true"></canvas>
+        <div class="showcase">
+          <button class="card-slot" id="cardSlot" type="button"></button>
+          <button class="btn btn-orange stage-pick" id="pickBtnStage" type="button">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg>
+            <span class="btn-text"><b data-t="pick"></b></span>
+          </button>
+          <aside class="info" id="info">
+            <div class="info-box">
+              <input class="info-name" id="nameInput" type="text" maxlength="24" autocomplete="off" spellcheck="false" />
+              <div class="info-desc">
+                <textarea id="descInput" maxlength="72" rows="2" spellcheck="false"></textarea>
+              </div>
+              <div class="pills">
+                <span class="pill pill-rarity" id="pillRarity">
+                  <span class="rarity-pick" id="raritySeg" role="radiogroup"></span>
+                  <span id="rarityName"></span>
+                </span>
+                <span class="pill" id="pillEdition"></span>
+              </div>
+            </div>
+            <p class="card-hint" data-t="cardHint"></p>
+          </aside>
+        </div>
+        <div class="hand-wrap">
+          <p class="hand-caption" id="handCaption" aria-hidden="true"><b></b><span></span></p>
+          <div class="hand" id="hand" role="radiogroup"></div>
+          <p class="hand-hint" data-t="handHint"></p>
+        </div>
+      </main>
+
+      <aside class="panel" id="panel">
+        <section class="sec">
+          <h3 class="sec-title"><i>01</i><span data-t="secImage"></span></h3>
+          <button class="btn btn-orange btn-big" id="pickBtn" type="button">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg>
+            <span class="btn-text"><b data-t="pick"></b><small data-t="pickSub"></small></span>
+          </button>
+          <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" hidden />
+          <div class="thumbs" id="thumbs" role="radiogroup"></div>
+          <div class="crop" id="crop">
+            <div class="crop-view" id="cropView" tabindex="0" role="application">
+              <canvas id="cropCanvas"></canvas>
+              <div class="crop-window" id="cropWindow"></div>
+            </div>
+            <div class="row">
+              <label class="field-label" for="zoom" data-t="zoom"></label>
+              <input type="range" id="zoom" min="1" max="4" step="0.01" value="1" />
+              <output id="zoomOut" for="zoom"></output>
+            </div>
+            <div class="row row-between">
+              <p class="hint" data-t="cropHint"></p>
+              <button class="link" id="cropReset" type="button" data-t="cropReset"></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <h3 class="sec-title"><i>02</i><span data-t="secFinish"></span></h3>
+          <div class="field">
+            <span class="field-label" id="frameLabel" data-t="frame"></span>
+            <div class="seg seg-frames" id="frameSeg" role="radiogroup" aria-labelledby="frameLabel"></div>
+          </div>
+          <div class="row">
+            <label class="field-label" for="intensity" data-t="intensity"></label>
+            <input type="range" id="intensity" min="0" max="1" step="0.01" />
+            <output id="intensityOut" for="intensity"></output>
+          </div>
+          <div class="row">
+            <label class="field-label" for="pixel" data-t="pixel"></label>
+            <input type="range" id="pixel" min="0" max="6" step="1" />
+            <output id="pixelOut" for="pixel"></output>
+          </div>
+        </section>
+
+
+        <section class="sec sec-export">
+          <h3 class="sec-title"><i>03</i><span data-t="secExport"></span></h3>
+          <div class="export">
+            <button class="btn btn-red" id="pngBtn" type="button">
+              <span class="btn-text"><b data-t="png"></b><small data-t="pngSub"></small></span>
+            </button>
+            <button class="btn btn-blue" id="videoBtn" type="button">
+              <span class="btn-text"><b data-t="video"></b><small data-t="videoSub"></small></span>
+            </button>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="crt" id="crt" aria-hidden="true"></div>
+    <div class="drop" id="drop" hidden>
+      <div class="drop-box">
+        <b data-t="dropHere"></b>
+        <span data-t="dropSub"></span>
+      </div>
+    </div>
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+    <div class="fatal" id="fatal" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
