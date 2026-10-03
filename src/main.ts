@@ -102,7 +102,7 @@ function applyText() {
   document.querySelectorAll('.support-link').forEach((a) => a.setAttribute('title', t.supportOpen));
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
-  stage.setHandLabels(t.edition);
+  stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
   buildSegments();
   buildThumbs();
@@ -412,7 +412,7 @@ async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null 
 
 async function loadFile(file: File) {
   if (!ACCEPT.test(file.type)) {
-    toast(t.errType, true);
+    toast(t.errType, true, true);
     return;
   }
   store.set({ loading: true });
@@ -433,7 +433,7 @@ async function loadFile(file: File) {
     useImage(-1);
   } catch (err) {
     console.error(err);
-    toast(t.errDecode, true);
+    toast(t.errDecode, true, true);
   } finally {
     store.set({ loading: false });
     document.body.classList.remove('is-loading');
@@ -517,9 +517,18 @@ function selectEdition(id: EditionId) {
   }
   const i = EDITIONS.findIndex((e) => e.id === id);
   store.set({ edition: id });
+  announce(t.applied.replace('{name}', t.edition[id]));
   sfx.select(i);
   stage.juice();
   stage.burst(editionById(id).color);
+}
+
+/** Tell screen readers which finish is on the card now. */
+function announce(msg: string) {
+  const live = $('announcer');
+  // Clear first so the same words are read again if they repeat.
+  live.textContent = '';
+  setTimeout(() => (live.textContent = msg), 60);
 }
 
 window.addEventListener('keydown', (e) => {
@@ -682,17 +691,57 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
 
 // ---------- Toasts ----------
 
-function toast(msg: string, error = false) {
+function dismissToast(el: HTMLElement) {
+  if (el.classList.contains('is-out')) return;
+  // Don't strand keyboard focus on a toast that's about to vanish.
+  if (el.contains(document.activeElement)) $('pickBtn').focus({ preventScroll: true });
+  el.classList.add('is-out');
+  el.addEventListener('animationend', () => el.remove());
+  setTimeout(() => el.remove(), 400);
+}
+
+/** Success toasts fade on their own; errors stay until dismissed, offering a way forward. */
+function toast(msg: string, error = false, pick = false) {
+  const box = $('toasts');
+  if (error) box.querySelectorAll<HTMLElement>('.toast.is-error').forEach(dismissToast);
   const el = document.createElement('div');
   el.className = `toast${error ? ' is-error' : ''}`;
-  el.textContent = msg;
-  $('toasts').appendChild(el);
-  setTimeout(() => {
-    el.classList.add('is-out');
-    el.addEventListener('animationend', () => el.remove());
-    setTimeout(() => el.remove(), 400);
-  }, error ? 5200 : 2400);
+  const text = document.createElement('p');
+  text.className = 'toast-msg';
+  text.setAttribute('role', error ? 'alert' : 'status');
+  text.textContent = msg;
+  el.appendChild(text);
+  if (error) {
+    if (pick) {
+      const again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'toast-btn';
+      again.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg><span></span>';
+      again.lastElementChild!.textContent = t.pickAnother;
+      again.addEventListener('click', () => {
+        sfx.tick();
+        dismissToast(el);
+        fileInput.click();
+      });
+      el.appendChild(again);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'toast-close';
+    close.setAttribute('aria-label', t.close);
+    close.title = t.close;
+    close.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2H3zm2 2h2v2H5zm2 2h2v2H7zm2 2h2v2H9zm2 2h2v2h-2zM11 3h2v2h-2zM9 5h2v2H9zM5 9h2v2H5zM3 11h2v2H3z" /></svg>';
+    close.addEventListener('click', () => dismissToast(el));
+    el.appendChild(close);
+  } else {
+    setTimeout(() => dismissToast(el), 2400);
+  }
+  box.appendChild(el);
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') $('toasts').querySelectorAll<HTMLElement>('.toast.is-error').forEach(dismissToast);
+});
 
 // ---------- React to state ----------
 
