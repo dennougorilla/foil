@@ -143,9 +143,9 @@ const ja = {
     shadowbox: '絵が切り絵の層になり、箱の奥に並ぶ',
     shallows: '水底にゆらめく光の網。縁が虹にほどける',
     kintsugi: 'ひびを金で継いだ、一点もの',
-    opal: '絵の奥を、虹の帯がゆっくり流れる',
+    opal: '石の奥から色の斑が湧き、傾けるたび明滅する',
     eclipse: '黒い太陽と、燃えるコロナ',
-    raden: '真珠の縁と、角度で揺らぐ虹の膜',
+    raden: '漆黒に貝のモザイク。傾けると青・緑・桃・金に移ろう',
   } satisfies Record<EditionId, string>,
   rarityName: {
     common: 'コモン',
@@ -403,9 +403,9 @@ const en: Dict = {
     shadowbox: 'The picture as paper-cut layers, set deep in a box',
     shallows: 'Sunlight netting a pool floor, fraying into spectrum',
     kintsugi: 'Cracks mended in gold, one of a kind',
-    opal: 'Bands of rainbow light drifting through the stone',
+    opal: 'Patches of color welling up in the stone, flashing as you tilt',
     eclipse: 'A black sun with a blazing corona',
-    raden: 'A pearl edge and a rainbow film that sways with the angle',
+    raden: 'Shell mosaic on black lacquer, turning blue, green, pink and gold',
   },
   rarityName: {
     common: 'Common',
