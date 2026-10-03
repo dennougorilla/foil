@@ -187,7 +187,38 @@
 
 /* Rows */
 .tune-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto 26px;
+  grid-template-rows: minmax(24px, auto);
+  column-gap: 8px;
+  align-items: center;
   padding: 8px 0 2px;
+}
+
+.tune-head {
+  display: contents;
+}
+
+.tune-label {
+  grid-area: 1 / 1;
+}
+
+.tune-extra {
+  grid-area: 1 / 2;
+}
+
+.tune-out {
+  grid-area: 1 / 3;
+}
+
+.tune-reset {
+  grid-area: 1 / 4;
+}
+
+.tune-track,
+.tune-seg,
+.tune-help {
+  grid-column: 1 / -1;
 }
 
 .tune-row + .tune-row {
@@ -198,15 +229,7 @@
   display: none;
 }
 
-.tune-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-}
-
 .tune-label {
-  flex: 1;
   min-width: 0;
   font-size: 14px;
   color: var(--text-dim);
@@ -409,8 +432,50 @@
   color: var(--text-dim);
 }
 
-.tune-reset-all {
+.tune-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin-left: auto;
+}
+
+.tune-compare {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 3px 0 var(--edge);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.08s, background 0.15s;
+}
+
+.tune-compare:hover {
+  background: var(--panel-hi);
+}
+
+.tune-compare[aria-pressed='true'] {
+  transform: translateY(3px);
+  background: var(--gold);
+  color: #12181a;
+  box-shadow: 0 0 0 var(--edge);
+}
+
+.tune-compare[hidden] {
+  display: none;
+}
+
+/* While comparing, the changed markers dim so it's clear the card shows the defaults. */
+.tune.is-comparing .tune-row.is-changed .tune-label::before {
+  opacity: 0.25;
+}
+
+.tune-reset-all {
   display: inline-flex;
   align-items: center;
   gap: 6px;

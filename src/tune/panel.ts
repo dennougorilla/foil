@@ -138,13 +138,17 @@ export function mountTune(store: Store, after: Element): void {
         <div class="tune-panes"></div>
         <div class="tune-foot">
           <p class="tune-hint"></p>
-          <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
+          <div class="tune-actions">
+            <button class="tune-compare" type="button" aria-pressed="false"><span></span></button>
+            <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
+          </div>
         </div>
       </div>`;
     toggle.querySelector('.tune-toggle-label')!.textContent = t.toggleShort;
     toggle.title = t.toggle;
     root.querySelector('.tune-hint')!.textContent = t.hint;
     root.querySelector('.tune-reset-all span')!.textContent = t.resetAll;
+    bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
     const tabs = root.querySelector<HTMLElement>('.tune-tabs')!;
     tabs.setAttribute('aria-label', t.toggle);
     const panes = root.querySelector<HTMLElement>('.tune-panes')!;
@@ -208,6 +212,32 @@ export function mountTune(store: Store, after: Element): void {
     sync();
   }
 
+  /** Press and hold (pointer, Space or Enter) to see the card with the defaults. */
+  function bindCompare(b: HTMLButtonElement) {
+    b.querySelector('span')!.textContent = t.compare;
+    b.title = t.compareHelp;
+    const hold = (on: boolean) => {
+      if (motion.comparing === on) return;
+      motion.comparing = on;
+      b.setAttribute('aria-pressed', String(on));
+      root.classList.toggle('is-comparing', on);
+    };
+    b.addEventListener('pointerdown', (e) => {
+      b.setPointerCapture(e.pointerId);
+      hold(true);
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur'] as const) b.addEventListener(ev, () => hold(false));
+    b.addEventListener('keydown', (e) => {
+      if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+        e.preventDefault();
+        hold(true);
+      }
+    });
+    b.addEventListener('keyup', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') hold(false);
+    });
+  }
+
   function head(k: Key, forId: string | null) {
     const h = document.createElement('div');
     h.className = 'tune-head';
@@ -266,6 +296,8 @@ export function mountTune(store: Store, after: Element): void {
     notch.setAttribute('aria-hidden', 'true');
     wrap.append(notch);
     row.appendChild(wrap);
+    // Reset comes after the control in tab order; CSS still shows it beside the value.
+    row.appendChild(row.querySelector('.tune-reset')!);
     return row;
   }
 
@@ -312,6 +344,7 @@ export function mountTune(store: Store, after: Element): void {
     const help = document.createElement('p');
     help.className = 'tune-help';
     row.appendChild(help);
+    row.appendChild(row.querySelector('.tune-reset')!);
     return row;
   }
 
@@ -360,6 +393,7 @@ export function mountTune(store: Store, after: Element): void {
     // The badge is just a number on screen; spell it out for screen readers.
     toggle.setAttribute('aria-label', changed.length ? `${t.toggle} (${t.changed.replace('{n}', String(changed.length))})` : t.toggle);
     root.querySelector<HTMLElement>('.tune-reset-all')!.hidden = !changed.length;
+    root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
 
     for (const def of TABS) {
       const n = def.keys.filter((k) => changed.includes(k)).length;

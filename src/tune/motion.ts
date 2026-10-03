@@ -24,6 +24,10 @@ export const gyroAvailable = () =>
   typeof window !== 'undefined' && 'DeviceOrientationEvent' in window && matchMedia('(pointer: coarse)').matches;
 
 class LiveMotion {
+  /** While held, the stage shows the untouched defaults for a before/after comparison. */
+  comparing = false;
+  /** The tune the stage should draw right now. */
+  view = (t: Tune): Tune => (this.comparing ? TUNE_DEFAULTS : t);
   /** Clock for the finishes' own animation (shader time). Stops under reduced motion. */
   fx = 0;
   private idleT = 0;

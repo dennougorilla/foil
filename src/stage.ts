@@ -347,7 +347,7 @@ export class Stage {
     this.time += dt;
     if (this.motion) this.bgTime += dt;
     const state = this.o.store.get();
-    const tune = state.tune;
+    const tune = motion.view(state.tune);
     if (tune !== this.lastTune) {
       this.lastTune = tune;
       this.cards.tune = tuneGl(tune);
