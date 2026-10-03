@@ -6,6 +6,7 @@ import { RangeLayer } from './range';
 import { ReliefGL } from '../relief';
 import { HeatLayer } from '../touch/layer';
 import type { HeatSource } from '../touch/heat';
+import type { LayerMap } from '../depth/layers';
 
 export type RGB = [number, number, number];
 
@@ -113,6 +114,11 @@ export class CardRenderer {
   private heat: HeatLayer;
   private faceTexels = 1;
   private relief: ReliefGL;
+  private layers: WebGLTexture;
+  private plate: WebGLTexture;
+  private layerCuts = 0;
+  /** 0..1: how far the Shadowbox sheets stand up (they lie flat while a new cut is made). */
+  layersRise = 1;
   /** Where on the face the finish applies. */
   readonly range: RangeLayer;
   cssW = 1;
@@ -157,6 +163,8 @@ export class CardRenderer {
     this.face = createTexture(gl, true);
     this.mask = createTexture(gl, false);
     this.back = createTexture(gl, true);
+    this.layers = createTexture(gl, true);
+    this.plate = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
     this.relief = new ReliefGL(gl, !opts.settled);
     this.range = new RangeLayer(gl);
@@ -168,6 +176,17 @@ export class CardRenderer {
     uploadTexture(this.gl, this.mask, mask, false);
     this.relief.setFace(face);
     this.faceTexels = face.width;
+  }
+
+  /** The Shadowbox sheets over the art window. Alpha carries depth, so it is never premultiplied. */
+  setLayers(map: LayerMap): void {
+    const { gl } = this;
+    for (const [t, data] of [[this.layers, map.data], [this.plate, map.plate]] as const) {
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, map.w, map.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      gl.generateMipmap(gl.TEXTURE_2D);
+    }
+    this.layerCuts = map.cuts;
   }
 
   setBack(back: TexImageSource): void {
@@ -231,6 +250,14 @@ export class CardRenderer {
     this.relief.bind(p, 5);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
     this.heat.bind(p, 6, d.heat);
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, this.layers);
+    gl.uniform1i(p.u.uLayers, 7);
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D, this.plate);
+    gl.uniform1i(p.u.uPlateBack, 8);
+    gl.uniform1f(p.u.uLayerCuts, this.layerCuts);
+    gl.uniform1f(p.u.uLayerRise, this.layersRise);
 
     // Hard pixel drop shadow first, then the card itself.
     gl.uniform1f(p.u.uShadow, 1);

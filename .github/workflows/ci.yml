@@ -1,6 +1,6 @@
 name: CI
 
-# Type-check and build only. Deploys happen from release tags (see release.yml).
+# Type-check, test and build only. Deploys happen from release tags (see release.yml).
 on:
   push:
     branches: [main]
@@ -24,4 +24,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npx vite build

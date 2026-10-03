@@ -6,6 +6,7 @@ import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
+import { SHADOWBOX_GLSL } from './shadowboxShader';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -399,6 +400,7 @@ ${RELIEF_GLSL}
 
 ${SPONSOR_GLSL}
 ${TOUCH_GLSL}
+${SHADOWBOX_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -448,8 +450,9 @@ void main() {
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
-  else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
+  else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
+  else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;

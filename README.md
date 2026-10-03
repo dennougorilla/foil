@@ -5,9 +5,10 @@ Turn any picture into a collectible card and give it a rare finish.
 **Live:** https://dennougorilla.github.io/foil/
 
 - Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). Animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
-- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura, Relief, Warmth, Shallows. Keys 1–9 and 0 pick the first ten, ← → step through them all.
+- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview: Base, Foil, Holographic, Polychrome, Negative, Gold, Prism, Galaxy, Glitch, Aurora, Frost, Magma, Halftone, Crystal, Sakura, Relief, Warmth, Shadowbox, Shallows. Keys 1–9 and 0 pick the first ten, ← → step through them all.
 - Relief strikes the picture in metal like a proof coin: the subject stands up as a matte relief in a few flat levels with crisp steps, the background becomes a flat mirror field that flashes as the card tilts, and line work sinks into grooves. Dark pictures are lifted rather than crushed. The frame gets a stamped dot texture and the name a mirror foil on a matte plate. Gold by default; silver is a choice under Light & motion.
 - Warmth reacts to touch: untouched, the art is printed as a blue cyanotype in thermochromic ink. Hover with a mouse or drag a finger across it and the ink flushes rose, coral and peach, then turns clear to show the picture in its own colors, and slowly cools back. Press and hold to leave a fingerprint. The card arrives with an unseen finger swiping it once, as a hint. On this finish a drag strokes the card instead of tossing it. Exports play the whole story (cold, a swipe, a press, cooling) and aim the swipe at the busiest part of the picture.
+- Shadowbox cuts the picture into paper layers along its depth and stands them up inside a lit box, so the layers slide apart and cast shadows as the card tilts. It reads the picture's depth with a small depth model that runs on your device (WebGPU when available, otherwise WebAssembly). The first time it is chosen it downloads the model once (about 19–27 MB, then cached by the browser); a chip on the card shows the progress. Until then, or if the model can't run, the layers are guessed from color. With the browser's data saver on, it waits until you ask.
 - Shallows sinks the art like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports.
 - Opening one of the support links in the header quietly adds a few extra finishes to the hand in this browser, as a thank-you. It is an honor system with no payment check.
 - Edit the name, line and rarity right in the tag beside the card. Tune the frame, effect strength and pixelation.
@@ -48,6 +49,10 @@ The build exposes `__APP_VERSION__` and `__APP_COMMIT__` (short SHA) as globals.
 FOIL is an unofficial fan project inspired by the card editions in [Balatro](https://www.playbalatro.com/) by LocalThunk. It is not affiliated with, or endorsed by, LocalThunk or Playstack. No code, art, fonts or other assets from the game are used.
 
 Balatro is a registered trademark of LocalThunk LLC.
+
+## Third-party
+
+The Shadowbox finish uses [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small) (Apache-2.0), fetched at run time from the [onnx-community conversion](https://huggingface.co/onnx-community/depth-anything-v2-small) pinned to one revision and checked against its SHA-256, and [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). The model is not part of this repository.
 
 ## Support
 
