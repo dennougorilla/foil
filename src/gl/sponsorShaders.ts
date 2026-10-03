@@ -53,45 +53,6 @@ vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 
-vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
-  // The picture stays the subject: dusk only settles on its darker parts and
-  // edges, while a small eclipse hangs in the upper corner and backlights it.
-  vec2 q = (uv - 0.5) * vec2(1.0, 1.4);
-  float keep = max(smoothstep(0.3, 0.68, L), (1.0 - smoothstep(0.15, 0.55, length(q))) * 0.6);
-  vec3 col = mix(c * vec3(0.42, 0.44, 0.62), c * vec3(0.97, 0.96, 1.02), keep);
-  // The sun sits behind the card, so it slides against the tilt.
-  vec2 ctr = vec2(0.76, 0.17) - t * vec2(0.03, 0.025);
-  vec2 d = (uv - ctr) * vec2(1.0, 1.4);
-  float r = length(d);
-  float a = atan(d.y, d.x);
-  float R = 0.075;
-  float stream = fbm(vec2(a * 2.6, r * 5.0 - uTime * 0.12)) + 0.55 * fbm(vec2(a * 7.0 + 3.0, r * 12.0 - uTime * 0.22));
-  float corona = exp(-max(r - R, 0.0) * 16.0 / (0.35 + stream)) * step(R, r);
-  vec3 hot = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.94, 0.84), smoothstep(0.35, 1.0, corona));
-  // The corona brightens what is behind it rather than painting over it.
-  col = screen(col, hot * corona * 0.95);
-  // Its glow grazes the picture, warmest towards the sun.
-  col += vec3(1.0, 0.55, 0.25) * exp(-r * 3.2) * (1.0 - keep * 0.5) * 0.2;
-  // Chromosphere: a thin red-gold ring hugging the moon.
-  col += vec3(1.0, 0.62, 0.42) * (1.0 - smoothstep(0.0, 0.01, abs(r - R))) * 0.9;
-  // Diamond ring: one bead of sunlight on the rim, swinging round as you tilt.
-  float ba = atan(t.y + 0.6, t.x + 0.0001) + uTime * 0.05;
-  vec2 bead = vec2(cos(ba), sin(ba)) * R;
-  // The moon: near black with a faint earthshine, its limb catching a little
-  // light on the side where the sun breaks through.
-  float disc = (1.0 - smoothstep(R - 0.003, R + 0.003, r));
-  float limb = smoothstep(R * 0.35, R, r);
-  float side = 0.5 + 0.5 * dot(d / max(r, 1e-4), bead / R);
-  vec3 moon = c * 0.16 + vec3(0.008, 0.008, 0.02) + vec3(0.16, 0.12, 0.1) * limb * limb * side * side;
-  col = mix(col, moon, disc);
-  vec2 bd = d - bead;
-  float glow = exp(-length(bd) * 50.0);
-  float flare = ((1.0 - smoothstep(0.0, 0.005, abs(bd.x))) * (1.0 - smoothstep(0.0, 0.1, abs(bd.y)))
-               + (1.0 - smoothstep(0.0, 0.005, abs(bd.y))) * (1.0 - smoothstep(0.0, 0.14, abs(bd.x))));
-  col += vec3(1.0, 0.97, 0.9) * (glow * 1.3 + flare * 0.6);
-  return col;
-}
-
 vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Mother-of-pearl: the picture stays as it is under a thin film whose colour
   // sways with the angle, and the frame turns to a band of pearl with fine growth lines.
@@ -122,7 +83,6 @@ export const SPONSOR_DISPATCH = /* glsl */ `
   // Gold seams stay off the nameplate so the title reads cleanly.
   else if (e == 40) col = mix(c, kintsugi(c, uv, uTilt, L), 0.25 + 0.75 * m.r);
   else if (e == 41) col = opal(c, uv, uTilt, L);
-  else if (e == 42) col = eclipse(c, uv, uTilt, L);
   // Raden inlays the art; the frame only takes a light coat so the nameplate stays readable.
   else if (e == 43) { artMask = m.r; col = raden(c, uv, uTilt, L); }
 `;

@@ -1,12 +1,12 @@
 // Secret finishes for supporters.
 //
-// The hand opens with the original game's editions only (see src/secrets.ts); every other
-// finish is a secret and leaves no trace in the UI until it is unlocked. Each time either of
-// the app's support links (GitHub Sponsors or Buy Me a Coffee, in the header's Support menu)
-// is opened, one secret still locked, picked at random, quietly joins the hand in this
-// browser; once all are out, nothing more happens. This is an honour system with no server:
-// nothing checks that a payment happened, and the list lives in localStorage, so clearing
-// site data locks them again.
+// The hand opens with the seven open finishes (the original game's editions plus Prism and
+// Glitch, see src/secrets.ts); every other finish is a secret and leaves no trace in the UI
+// until it is unlocked. Each time either of the app's support links (GitHub Sponsors or Buy
+// Me a Coffee, in the header's Support menu) is opened, one secret still locked, picked at
+// random, quietly joins the hand in this browser; once all are out, nothing more happens.
+// This is an honour system with no server: nothing checks that a payment happened, and the
+// list lives in localStorage, so clearing site data locks them again.
 //
 // The list is kept under its own key rather than in the State store so that undo, resets
 // or a store schema change can never take an unlock back.

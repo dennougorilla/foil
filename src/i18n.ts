@@ -119,7 +119,6 @@ const ja = {
     shallows: '水底',
     kintsugi: '金継ぎ',
     opal: 'オパール',
-    eclipse: 'エクリプス',
     raden: '螺鈿',
   } satisfies Record<EditionId, string>,
   look: {
@@ -144,7 +143,6 @@ const ja = {
     shallows: '水底にゆらめく光の網。縁が虹にほどける',
     kintsugi: 'ひびを金で継いだ、一点もの',
     opal: '絵の奥を、虹の帯がゆっくり流れる',
-    eclipse: '黒い太陽と、燃えるコロナ',
     raden: '真珠の縁と、角度で揺らぐ虹の膜',
   } satisfies Record<EditionId, string>,
   rarityName: {
@@ -379,7 +377,6 @@ const en: Dict = {
     shallows: 'Shallows',
     kintsugi: 'Kintsugi',
     opal: 'Opal',
-    eclipse: 'Eclipse',
     raden: 'Raden',
   },
   look: {
@@ -404,7 +401,6 @@ const en: Dict = {
     shallows: 'Sunlight netting a pool floor, fraying into spectrum',
     kintsugi: 'Cracks mended in gold, one of a kind',
     opal: 'Bands of rainbow light drifting through the stone',
-    eclipse: 'A black sun with a blazing corona',
     raden: 'A pearl edge and a rainbow film that sways with the angle',
   },
   rarityName: {

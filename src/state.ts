@@ -1,4 +1,4 @@
-import type { EditionId, FrameId, RarityId } from './editions';
+import { EDITIONS, type EditionId, type FrameId, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
@@ -107,6 +107,8 @@ export function createStore() {
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
     state.adjustOpen = state.adjustOpen === true;
+    // A finish that no longer exists (a retired one) starts over on the default.
+    if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;
