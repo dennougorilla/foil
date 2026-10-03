@@ -1,4 +1,5 @@
 import type { EditionId, FrameId, RarityId } from './editions';
+import type { FoilTone, LetterStyle } from './lettering';
 
 export type Lang = 'ja' | 'en';
 
@@ -116,6 +117,34 @@ const ja = {
     '満ちる夜に、いちばん静かな一枚。',
     '最後に笑うのは、いつもこのカード。',
   ],
+  lt: {
+    title: '文字の加工',
+    target: 'カードの名前に',
+    styles: 'カードの名前の刷り方',
+    style: { ink: 'インク', deboss: '掘り込み', emboss: '浮き出し', foil: '箔押し', spot: 'スポットUV' } satisfies Record<LetterStyle, string>,
+    help: {
+      ink: '平らに刷った、いつもの文字。',
+      deboss: '紙に彫り込んだ、くぼんだ文字。縁に影が落ちます。',
+      emboss: '裏から押し上げた、ふくらんだ文字。',
+      foil: '金属箔を押した文字。傾けると光が走ります。',
+      spot: '透明なニス。正面では消え、角度によってだけ光ります。',
+    } satisfies Record<LetterStyle, string>,
+    ink: '文字色',
+    foil: '箔の色',
+    depth: { ink: '深さ', deboss: '深さ', emboss: '高さ', foil: '押し', spot: 'ニスの厚み' } satisfies Record<LetterStyle, string>,
+    gloss: '光沢',
+    inkName: { auto: '枠に合わせる', none: '色なし (素押し)', white: '白', black: '黒', red: '朱', navy: '藍', custom: '好きな色' },
+    foilName: {
+      gold: '金',
+      silver: '銀',
+      rose: 'ローズゴールド',
+      copper: '銅',
+      rainbow: '虹',
+      custom: '好きな色',
+    } satisfies Record<FoilTone, string>,
+    tilt: 'カードを傾けると光が動きます',
+    reset: '元に戻す',
+  },
 };
 
 type Dict = typeof ja;
@@ -234,6 +263,34 @@ const en: Dict = {
     'The quietest card on the fullest night.',
     'Always the one laughing last.',
   ],
+  lt: {
+    title: 'Lettering',
+    target: 'for the card name',
+    styles: 'How the card name is printed',
+    style: { ink: 'Ink', deboss: 'Deboss', emboss: 'Emboss', foil: 'Foiled', spot: 'Spot UV' },
+    help: {
+      ink: 'Flat printed type, as usual.',
+      deboss: 'Pressed into the card, with shadow along the walls.',
+      emboss: 'Raised from behind, standing off the card.',
+      foil: 'Stamped in metal foil. Tilt to run the light across it.',
+      spot: 'Clear varnish. Gone head-on, it only shines at an angle.',
+    },
+    ink: 'Colour',
+    foil: 'Foil',
+    depth: { ink: 'Depth', deboss: 'Depth', emboss: 'Height', foil: 'Press', spot: 'Coat' },
+    gloss: 'Gloss',
+    inkName: { auto: 'Match the frame', none: 'No ink (blind)', white: 'White', black: 'Black', red: 'Vermilion', navy: 'Indigo', custom: 'Any colour' },
+    foilName: {
+      gold: 'Gold',
+      silver: 'Silver',
+      rose: 'Rose gold',
+      copper: 'Copper',
+      rainbow: 'Rainbow',
+      custom: 'Any colour',
+    },
+    tilt: 'Tilt the card to move the light',
+    reset: 'Reset',
+  },
 };
 
 export const DICTS: Record<Lang, Dict> = { ja, en };

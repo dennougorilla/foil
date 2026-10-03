@@ -1,6 +1,7 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
+import { DEFAULT_LETTERING, type Lettering } from './lettering';
 
 export interface State {
   lang: Lang;
@@ -20,6 +21,8 @@ export interface State {
   sample: number;
   crop: Crop;
   loading: boolean;
+  /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
+  text: Lettering;
 }
 
 type Listener = (s: State, changed: Set<keyof State>) => void;
@@ -40,6 +43,7 @@ const PERSIST: (keyof State)[] = [
   'descEdited',
   'sample',
   'crop',
+  'text',
 ];
 
 
@@ -60,6 +64,7 @@ export function createStore() {
     sample: 0,
     crop: { zoom: 1, x: 0.5, y: 0.5 },
     loading: false,
+    text: { ...DEFAULT_LETTERING },
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;

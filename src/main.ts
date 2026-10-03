@@ -9,6 +9,7 @@ import { setSound, sfx } from './audio';
 import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
+import { mountLettering } from './letteringPanel';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -801,6 +802,14 @@ store.on((s, changed) => {
 // ---------- Boot ----------
 
 setSound(store.get().sound);
+mountLettering({
+  store,
+  host: $('intensity').closest<HTMLElement>('.sec')!,
+  dict: () => t,
+  name: () => store.get().name || fallback().name,
+  repaint: () => redrawFace(),
+  onPick: () => stage.juice(0.35),
+});
 applyText();
 const boot = () => {
   redrawFace();

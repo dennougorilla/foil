@@ -1,4 +1,5 @@
 import { rarityById, type FrameId, type RarityId } from '../editions';
+import { paintLettering } from '../lettering';
 
 export const FACE_W = 900;
 export const FACE_H = 1260;
@@ -153,9 +154,7 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   const pipsW = 4 * (pipSize + gap);
   const name = spec.name.trim() || ' ';
   fitName(ctx, name, ART.w - pipsW - 24 * S, 40 * S);
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = f.ink;
-  ctx.fillText(name, ART.x + 4 * S, plateY + plateH / 2 + S);
+  paintLettering(ctx, name, ART.x + 4 * S, plateY + plateH / 2 + S, f.ink);
   // Rarity pips: diamonds in the rarity colour with a dark outline
   const rc = rarityById(spec.rarity).color;
   for (let i = 0; i < 4; i++) {
