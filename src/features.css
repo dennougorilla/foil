@@ -20,7 +20,9 @@
   display: grid;
   justify-items: center;
   gap: 4px;
-  padding: 8px 4px 6px;
+  padding: 8px 2px 6px;
+  font-size: 13px;
+  letter-spacing: -0.02em;
 }
 
 .rgn {
@@ -335,9 +337,17 @@
   background: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255, 90, 79, 0.18) 4px 6px);
 }
 
-/* The tag beside the card steps aside for the brush tools while painting. */
-.stage.is-painting .info {
+/* The tag beside the card (and the phone's pick button) step aside for the brush tools while painting. */
+.stage.is-painting .info,
+.stage.is-painting .btn.stage-pick {
   display: none;
+}
+
+/* Shortcut hints mean nothing without a keyboard. */
+@media (pointer: coarse) {
+  .brush-keys {
+    display: none;
+  }
 }
 
 .stage.is-painting .card-slot {
@@ -508,7 +518,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px 12px;
 }
 
 /* Under the four frame presets, inside the same radio group. */
@@ -745,4 +755,29 @@
   .cover-bar i {
     transition: none;
   }
+}
+
+/* The backdrop row holds the most chips, so it runs a size smaller to stay on one line. */
+.sw-strip-stage {
+  gap: 10px 9px;
+}
+
+.sw-strip-stage .sw-chip:not(.sw-auto),
+.sw-strip-stage .sw-add {
+  width: 30px;
+  height: 30px;
+}
+
+.sw-strip-stage .sw-auto {
+  height: 30px;
+  padding: 0 8px 0 3px;
+}
+
+.sw-strip-stage .sw-auto i {
+  width: 24px;
+  height: 24px;
+}
+
+.sw-strip-stage .sw-sep {
+  margin: 0;
 }
