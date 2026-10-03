@@ -7,6 +7,20 @@
     <title>FOIL</title>
     <meta name="description" content="Turn any picture into a collectible card and give it a rare finish — foil, holographic, polychrome, gold, prism and more. Save it as a PNG or a looping clip." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 14'%3E%3Crect width='10' height='14' rx='1.5' fill='%23161c1f'/%3E%3Crect x='1' y='1' width='8' height='12' rx='1' fill='%23f3eee2'/%3E%3Crect x='2' y='2' width='6' height='7' fill='%23ff5a4f'/%3E%3Crect x='2' y='5' width='6' height='4' fill='%231a9cff'/%3E%3C/svg%3E" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FOIL" />
+    <meta property="og:title" content="FOIL — turn any picture into a rare foil card" />
+    <meta property="og:description" content="Give any picture a rare finish — foil, holographic, polychrome, gold, prism and more. Free, right in your browser. Save it as a PNG or a looping clip." />
+    <meta property="og:url" content="https://dennougorilla.github.io/foil/" />
+    <meta property="og:image" content="https://dennougorilla.github.io/foil/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A pixel-art card with a holographic finish beside a fanned hand of foil finishes, under the FOIL logo." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FOIL — turn any picture into a rare foil card" />
+    <meta name="twitter:description" content="Give any picture a rare finish — foil, holographic, polychrome, gold, prism and more. Free, right in your browser." />
+    <meta name="twitter:image" content="https://dennougorilla.github.io/foil/og.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
@@ -41,6 +55,10 @@
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h10v1h2v4h-2v2h-1v1H4v-1H3v-1H2zm10 2v2h1V7zM4 1h1v2H4zm3 0h1v2H7zm3 0h1v2h-1z" /></svg>
                 <span><b>Buy Me a Coffee</b><small data-t="supportBmc"></small></span>
               </a>
+              <div class="support-foot">
+                <p class="app-credit"><span data-t="creditPre"></span><a id="creditLink" href="https://www.playbalatro.com/" target="_blank" rel="noopener">Balatro</a><span data-t="creditPost"></span></p>
+                <p class="app-version"><a id="versionLink" href="https://github.com/dennougorilla/foil/releases" target="_blank" rel="noopener"></a></p>
+              </div>
             </div>
           </div>
           <button class="chip" id="langBtn" type="button"></button>
@@ -81,8 +99,10 @@
           </aside>
         </div>
         <div class="hand-wrap">
-          <p class="hand-caption" id="handCaption" aria-hidden="true"><b></b><span></span></p>
-          <div class="hand" id="hand" role="radiogroup"></div>
+          <div class="hand" id="hand" role="radiogroup">
+            <p class="hand-peek" id="handPeek" aria-hidden="true" hidden></p>
+          </div>
+          <p class="hand-caption" id="handCaption" aria-hidden="true"><i data-t="finishLabel"></i><b></b><span></span></p>
           <p class="hand-hint" data-t="handHint"></p>
         </div>
       </main>
@@ -138,6 +158,9 @@
             <button class="btn btn-red" id="pngBtn" type="button">
               <span class="btn-text"><b data-t="png"></b><small data-t="pngSub"></small></span>
             </button>
+            <button class="btn btn-orange" id="gifBtn" type="button">
+              <span class="btn-text"><b data-t="gif"></b><small data-t="gifSub"></small></span>
+            </button>
             <button class="btn btn-blue" id="videoBtn" type="button">
               <span class="btn-text"><b data-t="video"></b><small data-t="videoSub"></small></span>
             </button>
@@ -153,7 +176,8 @@
         <span data-t="dropSub"></span>
       </div>
     </div>
-    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+    <div class="toasts" id="toasts"></div>
+    <p class="sr-only" id="announcer" aria-live="polite"></p>
     <div class="fatal" id="fatal" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

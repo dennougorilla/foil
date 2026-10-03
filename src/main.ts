@@ -6,8 +6,9 @@ import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face'
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
-import { exportPng, exportVideo, videoSupported } from './exporter';
+import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
+import { decodeGif, frameAt, type Anim } from './gifDecode';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -19,7 +20,15 @@ let t: Dict = DICTS[store.get().lang];
 type Img = HTMLCanvasElement;
 const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSample(i));
 let userImage: Img | null = null;
-const currentImage = (): Img => (store.get().sample >= 0 ? samples[store.get().sample] : userImage ?? samples[0]);
+/** Set when the person's image is an animated GIF; userImage then holds its first frame. */
+let userAnim: Anim | null = null;
+let animFrame = 0;
+const currentImage = (): Img => {
+  const s = store.get();
+  if (s.sample >= 0) return samples[s.sample];
+  if (userAnim) return userAnim.frames[animFrame] ?? userAnim.frames[0];
+  return userImage ?? samples[0];
+};
 
 const face = document.createElement('canvas');
 const mask = document.createElement('canvas');
@@ -50,19 +59,20 @@ try {
 }
 stage.cards.setBack(back);
 
-function redrawFace() {
+function faceSpec(image: Img) {
   const s = store.get();
-  drawFace(face, mask, {
-    image: currentImage(),
-    crop: s.crop,
-    frame: s.frame,
-    rarity: s.rarity,
-    name: s.name || fallback().name,
-  });
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name };
+}
+
+function redrawFace() {
+  drawFace(face, mask, faceSpec(currentImage()));
   stage.cards.setFace(face, mask);
 }
 
 // ---------- Text ----------
+
+/** "v0.2.0 · 1a2b3c4", shown quietly at the foot of the support menu. */
+const APP_VERSION_LABEL = __APP_COMMIT__ === 'unknown' ? `v${__APP_VERSION__}` : `v${__APP_VERSION__} · ${__APP_COMMIT__}`;
 
 /** Placeholder title and line: samples carry their own, uploads get a generic one. */
 function fallback() {
@@ -91,9 +101,13 @@ function applyText() {
   $('crtBtn').setAttribute('aria-label', s.crt ? t.crtOn : t.crtOff);
   $('cardSlot').setAttribute('aria-label', t.stageLabel);
   document.querySelectorAll('.support-link').forEach((a) => a.setAttribute('title', t.supportOpen));
+  $('creditLink').title = t.creditLink;
+  $('versionLink').textContent = APP_VERSION_LABEL;
+  $('versionLink').title = t.version.replace('{v}', APP_VERSION_LABEL);
+  $('versionLink').setAttribute('aria-label', $('versionLink').title);
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
-  stage.setHandLabels(t.edition);
+  stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
   buildSegments();
   buildThumbs();
@@ -115,12 +129,18 @@ function renderInfo() {
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
 }
 
+/**
+ * The caption always names the finish that is applied. A finish you are only
+ * pointing at gets a small tag right above its card, so the two never mix up.
+ */
 function renderCaption(id: EditionId | null) {
   const s = store.get();
-  const show = id ?? s.edition;
   const cap = $('handCaption');
-  cap.querySelector('b')!.textContent = t.edition[show];
-  cap.querySelector('span')!.textContent = t.look[show];
+  cap.querySelector('b')!.textContent = t.edition[s.edition];
+  cap.querySelector('span')!.textContent = t.look[s.edition];
+  const peek = $('handPeek');
+  peek.hidden = !id || id === s.edition;
+  if (id) peek.textContent = t.edition[id];
 }
 
 // ---------- Panel controls ----------
@@ -204,6 +224,7 @@ function buildThumbs() {
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-label', label);
     b.style.backgroundImage = `url(${thumbUrl(img)})`;
+    if (idx < 0 && userAnim) b.dataset.badge = 'GIF';
     radio(b, s.sample === idx);
     b.onclick = () => {
       if (store.get().sample === idx) return;
@@ -212,10 +233,10 @@ function buildThumbs() {
     th.appendChild(b);
   };
   samples.forEach((img, i) => add(img, t.samplesName[i], i));
-  if (userImage) add(userImage, t.yourImage, -1);
+  if (userImage) add(userImage, userAnim ? `${t.yourImage} (GIF)` : t.yourImage, -1);
   const label = document.createElement('span');
   label.className = 'thumb-label';
-  label.textContent = s.sample >= 0 ? t.sampleNow : t.yourImage;
+  label.textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif : t.yourImage;
   th.appendChild(label);
 }
 
@@ -258,8 +279,8 @@ function syncInputs() {
   setRangeFill(inten);
   const px = $<HTMLInputElement>('pixel');
   px.value = String(s.pixel);
-  $('pixelOut').textContent = s.pixel ? `${s.pixel}` : t.off;
-  px.setAttribute('aria-valuetext', s.pixel ? String(s.pixel) : t.off);
+  $('pixelOut').textContent = t.pixelLevels[s.pixel] ?? t.off;
+  px.setAttribute('aria-valuetext', t.pixelLevels[s.pixel] ?? t.off);
   setRangeFill(px);
   const zoom = $<HTMLInputElement>('zoom');
   zoom.value = String(s.crop.zoom);
@@ -376,25 +397,37 @@ function setCrop(c: Crop) {
 const ACCEPT = /^image\/(png|jpe?g|webp|gif|avif|bmp)$/;
 const MAX_SIDE = 2048;
 
+/** Decodes a still image (downscaled), or every frame of an animated GIF. */
+async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null }> {
+  if (blob.type === 'image/gif') {
+    const anim = decodeGif(await blob.arrayBuffer());
+    if (anim) return { still: anim.frames[0], anim };
+  }
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  const x = c.getContext('2d')!;
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
+  return { still: c, anim: null };
+}
+
 async function loadFile(file: File) {
   if (!ACCEPT.test(file.type)) {
-    toast(t.errType, true);
+    toast(t.errType, true, true);
     return;
   }
   store.set({ loading: true });
   document.body.classList.add('is-loading');
   try {
-    const bmp = await createImageBitmap(file);
-    const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(bmp.width * k);
-    c.height = Math.round(bmp.height * k);
-    const x = c.getContext('2d')!;
-    x.imageSmoothingQuality = 'high';
-    x.drawImage(bmp, 0, 0, c.width, c.height);
-    bmp.close();
-    userImage = c;
-    void saveUserImage(c);
+    const { still, anim } = await decodeImage(file);
+    userImage = still;
+    userAnim = anim;
+    animFrame = 0;
+    void saveUserImage(anim ? file : still);
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
     const s = store.get();
     if (!s.nameEdited && base && !/^(image|img|photo|IMG_|DSC|screenshot|スクリーンショット)/i.test(base)) {
@@ -405,7 +438,7 @@ async function loadFile(file: File) {
     useImage(-1);
   } catch (err) {
     console.error(err);
-    toast(t.errDecode, true);
+    toast(t.errDecode, true, true);
   } finally {
     store.set({ loading: false });
     document.body.classList.remove('is-loading');
@@ -489,17 +522,37 @@ function selectEdition(id: EditionId) {
   }
   const i = EDITIONS.findIndex((e) => e.id === id);
   store.set({ edition: id });
+  announce(t.applied.replace('{name}', t.edition[id]));
   sfx.select(i);
   stage.juice();
   stage.burst(editionById(id).color);
 }
 
+/** Tell screen readers which finish is on the card now. */
+function announce(msg: string) {
+  const live = $('announcer');
+  // Clear first so the same words are read again if they repeat.
+  live.textContent = '';
+  setTimeout(() => (live.textContent = msg), 60);
+}
+
 window.addEventListener('keydown', (e) => {
   const tag = (e.target as HTMLElement).tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+  // 1–9 then 0 pick the first ten finishes, like a keyboard row.
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= EDITIONS.length) {
-    selectEdition(EDITIONS[n - 1].id);
+  if (!Number.isNaN(n) && e.key.length === 1) {
+    const i = n === 0 ? 9 : n - 1;
+    if (EDITIONS[i]) selectEdition(EDITIONS[i].id);
+    return;
+  }
+  // Arrows step through finishes when nothing else on the page wants them.
+  const free = document.activeElement === document.body || document.activeElement?.id === 'cardSlot';
+  if (free && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+    const cur = EDITIONS.findIndex((x) => x.id === store.get().edition);
+    const next = (cur + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
+    selectEdition(EDITIONS[next].id);
   }
 });
 
@@ -549,32 +602,73 @@ function exportInput() {
     intensity: s.intensity,
     pixel: s.pixel,
     name: s.name || fallback().name,
+    ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
   };
 }
 
-async function busy(btn: HTMLButtonElement, label: string, job: () => Promise<void>) {
+/** Lets GIF and video exports step through the person's animated GIF frame by frame. */
+function animatedExport(anim: Anim) {
+  // Settings are fixed when the export starts, so edits made meanwhile don't change it midway.
+  const spec = faceSpec(anim.frames[0]);
+  const crop = { ...spec.crop };
+  return {
+    loopMs: anim.duration,
+    faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) =>
+      drawFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] }),
+  };
+}
+
+/** While a job runs, the sub-label names the step and the title counts up; the button fills like a bar. */
+async function busy(
+  btn: HTMLButtonElement,
+  label: string,
+  job: (progress: (p: number) => void) => Promise<string>,
+  fail = t.errDecode,
+) {
   const b = btn.querySelector('b')!;
-  const prev = b.textContent;
-  btn.disabled = true;
+  const small = btn.querySelector('small')!;
+  // One export at a time: the other buttons rest while this one works.
+  const all = [...document.querySelectorAll<HTMLButtonElement>('.export .btn')];
+  all.forEach((x) => (x.disabled = true));
   btn.setAttribute('aria-busy', 'true');
-  b.textContent = label;
+  small.textContent = label;
+  const progress = (p: number) => {
+    b.textContent = `${Math.round(p * 100)}%`;
+    btn.style.setProperty('--p', p.toFixed(3));
+  };
   try {
-    await job();
+    const file = await job(progress);
     sfx.coin();
-    toast(t.saved);
+    toast(`${t.saved}: ${file}`);
   } catch (err) {
     console.error(err);
     sfx.error();
-    toast((err as Error).message === 'video-unsupported' ? t.errVideo : t.errDecode, true);
+    toast((err as Error).message === 'video-unsupported' ? t.errVideo : fail, true);
   } finally {
-    btn.disabled = false;
+    all.forEach((x) => (x.disabled = false));
     btn.removeAttribute('aria-busy');
-    b.textContent = prev;
+    btn.style.removeProperty('--p');
+    // From the current dictionary, in case the language changed mid-export.
+    for (const el of [b, small]) el.textContent = t[el.dataset.t as keyof Dict] as string;
   }
 }
 
 $<HTMLButtonElement>('pngBtn').addEventListener('click', (e) => {
-  void busy(e.currentTarget as HTMLButtonElement, t.saving, () => exportPng(exportInput()));
+  void busy(e.currentTarget as HTMLButtonElement, t.saving, () => exportPng(exportInput()), t.errPng);
+});
+$<HTMLButtonElement>('gifBtn').addEventListener('click', (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  const small = btn.querySelector('small')!;
+  void busy(
+    btn,
+    t.saving,
+    (progress) =>
+      exportGif(exportInput(), (p, encoding) => {
+        small.textContent = encoding ? t.encoding : t.saving;
+        progress(p);
+      }),
+    t.errGif,
+  );
 });
 $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
@@ -583,12 +677,7 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
     toast(t.errVideo, true);
     return;
   }
-  const b = btn.querySelector('b')!;
-  void busy(btn, t.recording, () =>
-    exportVideo(exportInput(), (p) => {
-      b.textContent = `${t.recording} ${Math.round(p * 100)}%`;
-    }),
-  );
+  void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
 });
 
 // ---------- Logo ----------
@@ -643,17 +732,61 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
 
 // ---------- Toasts ----------
 
-function toast(msg: string, error = false) {
+function dismissToast(el: HTMLElement) {
+  if (el.classList.contains('is-out')) return;
+  // Don't strand keyboard focus on a toast that's about to vanish.
+  // Phones hide the panel's pick button, so land on whichever one is showing.
+  if (el.contains(document.activeElement)) {
+    const pick = [$('pickBtn'), $('pickBtnStage')].find((b) => b.getClientRects().length) ?? $('pickBtn');
+    pick.focus({ preventScroll: true });
+  }
+  el.classList.add('is-out');
+  el.addEventListener('animationend', () => el.remove());
+  setTimeout(() => el.remove(), 400);
+}
+
+/** Success toasts fade on their own; errors stay until dismissed, offering a way forward. */
+function toast(msg: string, error = false, pick = false) {
+  const box = $('toasts');
+  if (error) box.querySelectorAll<HTMLElement>('.toast.is-error').forEach(dismissToast);
   const el = document.createElement('div');
   el.className = `toast${error ? ' is-error' : ''}`;
-  el.textContent = msg;
-  $('toasts').appendChild(el);
-  setTimeout(() => {
-    el.classList.add('is-out');
-    el.addEventListener('animationend', () => el.remove());
-    setTimeout(() => el.remove(), 400);
-  }, error ? 5200 : 2400);
+  const text = document.createElement('p');
+  text.className = 'toast-msg';
+  text.setAttribute('role', error ? 'alert' : 'status');
+  text.textContent = msg;
+  el.appendChild(text);
+  if (error) {
+    if (pick) {
+      const again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'toast-btn';
+      again.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg><span></span>';
+      again.lastElementChild!.textContent = t.pickAnother;
+      again.addEventListener('click', () => {
+        sfx.tick();
+        dismissToast(el);
+        fileInput.click();
+      });
+      el.appendChild(again);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'toast-close';
+    close.setAttribute('aria-label', t.close);
+    close.title = t.close;
+    close.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2H3zm2 2h2v2H5zm2 2h2v2H7zm2 2h2v2H9zm2 2h2v2h-2zM11 3h2v2h-2zM9 5h2v2H9zM5 9h2v2H5zM3 11h2v2H3z" /></svg>';
+    close.addEventListener('click', () => dismissToast(el));
+    el.appendChild(close);
+  } else {
+    setTimeout(() => dismissToast(el), 2400);
+  }
+  box.appendChild(el);
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') $('toasts').querySelectorAll<HTMLElement>('.toast.is-error').forEach(dismissToast);
+});
 
 // ---------- React to state ----------
 
@@ -694,9 +827,11 @@ document.fonts.load('40px "DotGothic16"').then(boot, boot);
 boot();
 if (store.get().sample < 0) {
   // Bring back the image from last visit; if it's gone, fall back to the first sample.
-  void loadUserImage().then((img) => {
+  void loadUserImage().then(async (blob) => {
+    const img = blob ? await decodeImage(blob).catch(() => null) : null;
     if (img) {
-      userImage = img;
+      userImage = img.still;
+      userAnim = img.anim;
       buildThumbs();
       boot();
     } else {
@@ -708,3 +843,19 @@ if (store.get().sample < 0) {
   });
 }
 window.addEventListener('resize', () => drawCropPreview());
+
+// Animated GIFs: advance the card face whenever the GIF's next frame is due.
+{
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const tick = (now: number) => {
+    if (userAnim && store.get().sample < 0 && !reduced.matches) {
+      const i = frameAt(userAnim, now);
+      if (i !== animFrame) {
+        animFrame = i;
+        redrawFace();
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}

@@ -176,10 +176,8 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
     ctx.lineTo(cx, cy + pipSize / 2);
     ctx.lineTo(cx - pipSize / 2, cy);
     ctx.closePath();
-    ctx.fillStyle = i < pips ? (spec.frame === 'rarity' ? '#ffffff' : rc) : f.sub;
-    ctx.globalAlpha = i < pips ? 1 : 0.35;
+    ctx.fillStyle = i < pips ? (spec.frame === 'rarity' ? '#ffffff' : rc) : spec.frame === 'ink' ? '#3a4448' : '#e9e4d6';
     ctx.fill();
-    ctx.globalAlpha = 1;
   }
 
   // Mask: red = art window, green = frame, blue = ink outline

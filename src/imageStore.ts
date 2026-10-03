@@ -13,9 +13,10 @@ function open(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveUserImage(canvas: HTMLCanvasElement): Promise<void> {
+/** Keeps a still image as WebP, or an animated GIF as its original bytes so the motion survives. */
+export async function saveUserImage(src: HTMLCanvasElement | Blob): Promise<void> {
   try {
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/webp', 0.92));
+    const blob = src instanceof Blob ? src : await new Promise<Blob | null>((r) => src.toBlob(r, 'image/webp', 0.92));
     if (!blob) return;
     const db = await open();
     await new Promise<void>((resolve, reject) => {
@@ -30,7 +31,7 @@ export async function saveUserImage(canvas: HTMLCanvasElement): Promise<void> {
   }
 }
 
-export async function loadUserImage(): Promise<HTMLCanvasElement | null> {
+export async function loadUserImage(): Promise<Blob | null> {
   try {
     const db = await open();
     const blob = await new Promise<Blob | undefined>((resolve, reject) => {
@@ -39,14 +40,7 @@ export async function loadUserImage(): Promise<HTMLCanvasElement | null> {
       req.onerror = () => reject(req.error);
     });
     db.close();
-    if (!blob) return null;
-    const bmp = await createImageBitmap(blob);
-    const c = document.createElement('canvas');
-    c.width = bmp.width;
-    c.height = bmp.height;
-    c.getContext('2d')!.drawImage(bmp, 0, 0);
-    bmp.close();
-    return c;
+    return blob ?? null;
   } catch {
     return null;
   }
