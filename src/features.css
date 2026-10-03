@@ -77,19 +77,29 @@
   justify-content: space-between;
 }
 
-/* Two thumbs over one track: the gold window is the band of tones that keeps the finish. */
+/* Two thumbs over one track: the gold window is the band of tones that keeps the finish.
+   Above the track sits the card's own tones as a pixel histogram. */
 .tone {
   --lo: 0;
   --hi: 1;
   position: relative;
-  height: 32px;
+  height: 46px;
+}
+
+.tone-hist {
+  position: absolute;
+  left: 10px;
+  top: 0;
+  width: calc(100% - 20px);
+  height: 14px;
+  image-rendering: pixelated;
 }
 
 .tone-track {
   position: absolute;
   left: 10px;
   right: 10px;
-  top: 8px;
+  top: 20px;
   height: 16px;
   border-radius: 4px;
   background: linear-gradient(90deg, #07090a, #5d6466 50%, #f7f4ec);
@@ -99,7 +109,7 @@
 
 .tone-band {
   position: absolute;
-  top: -3px;
+  top: -23px;
   bottom: -3px;
   left: calc(var(--lo) * 100%);
   right: calc((1 - var(--hi)) * 100%);
@@ -108,14 +118,15 @@
   transition: left 0.08s, right 0.08s;
 }
 
-/* Outside the band (or inside it, when inverted) is hatched like the card overlay. */
+/* Outside the band (or inside it, when inverted) prints as matte paper, like the card overlay. */
 .tone-track::before,
 .tone-track::after {
   content: '';
   position: absolute;
   top: 2px;
   bottom: 2px;
-  background: repeating-linear-gradient(135deg, rgba(13, 19, 21, 0.78) 0 3px, rgba(242, 193, 78, 0.35) 3px 5px);
+  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
+  opacity: 0.92;
 }
 
 .tone-track::before {
@@ -136,34 +147,25 @@
   display: none;
 }
 
-.tone.is-invert:not(.is-full) .tone-band {
-  background: repeating-linear-gradient(135deg, rgba(13, 19, 21, 0.78) 0 3px, rgba(242, 193, 78, 0.35) 3px 5px);
+.tone.is-invert:not(.is-full) .tone-band::before {
+  content: '';
+  position: absolute;
+  inset: 22px 2px 2px;
+  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
+  opacity: 0.92;
 }
 
 .tone.is-invert .tone-band {
-  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--edge);
-  border-radius: 4px;
   outline: 2px dashed var(--edge);
   outline-offset: -2px;
 }
 
-/* The card's own tones, as a pixel histogram sitting on the track. */
-.tone-hist {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  bottom: 2px;
-  width: calc(100% - 4px);
-  height: 12px;
-  image-rendering: pixelated;
-  mix-blend-mode: screen;
-  opacity: 0.7;
-}
-
 .tone input[type='range'] {
   position: absolute;
-  inset: 0;
-  height: 32px;
+  left: 0;
+  right: 0;
+  top: 14px;
+  height: 28px;
   pointer-events: none;
   z-index: 2;
 }
@@ -171,7 +173,7 @@
 .tone input[type='range']::-webkit-slider-runnable-track {
   background: transparent;
   box-shadow: none;
-  height: 32px;
+  height: 28px;
 }
 
 .tone input[type='range']::-moz-range-track {
@@ -183,19 +185,40 @@
   background: transparent;
 }
 
+/* Each handle is a half-flag leaning into the band, so two close handles sit side by side. */
 .tone input[type='range']::-webkit-slider-thumb {
   pointer-events: auto;
-  margin-top: 2px;
+  margin-top: 0;
   height: 28px;
-  width: 14px;
+  width: 12px;
   cursor: ew-resize;
 }
 
 .tone input[type='range']::-moz-range-thumb {
   pointer-events: auto;
   height: 28px;
-  width: 14px;
+  width: 12px;
   cursor: ew-resize;
+}
+
+.tone .tone-lo::-webkit-slider-thumb {
+  border-radius: 6px 2px 2px 6px;
+  translate: -5px 0;
+}
+
+.tone .tone-hi::-webkit-slider-thumb {
+  border-radius: 2px 6px 6px 2px;
+  translate: 5px 0;
+}
+
+.tone .tone-lo::-moz-range-thumb {
+  border-radius: 6px 2px 2px 6px;
+  translate: -5px 0;
+}
+
+.tone .tone-hi::-moz-range-thumb {
+  border-radius: 2px 6px 6px 2px;
+  translate: 5px 0;
 }
 
 .tone input[type='range']:focus-visible::-webkit-slider-thumb {
@@ -209,15 +232,19 @@
 }
 
 .tone-presets {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-top: 4px;
 }
 
 .tone-chip {
+  min-width: 0;
   min-height: 30px;
-  padding: 2px 10px;
+  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border: 0;
   border-radius: 6px;
   background: var(--panel-lo);
@@ -266,12 +293,46 @@
 }
 
 .where-tag {
-  padding: 0 6px;
-  border-radius: 4px;
-  background: var(--panel-lo);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--gold);
   font-size: 12px;
   line-height: 20px;
+}
+
+.where-tag svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+
+/* Inverted: the chosen region is the part left plain, so it prints as matte paper with an "except" tab. */
+.seg-region.is-invert .region-btn[aria-checked='true'] {
+  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
+  color: var(--gold);
+  box-shadow: inset 0 0 0 2px var(--gold), 0 4px 0 var(--edge);
+}
+
+.seg-region.is-invert .region-btn[aria-checked='true'] .rgn .on {
+  fill: var(--gold);
+}
+
+.seg-region.is-invert .region-btn[aria-checked='true']::after {
+  content: attr(data-except);
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 10px;
+  line-height: 15px;
+  box-shadow: 0 0 0 2px var(--edge);
 }
 
 .where-tag[hidden] {
@@ -314,6 +375,60 @@
   color: var(--text-dim);
 }
 
+.range-cover p {
+  margin: 0;
+}
+
+.cover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.cover-val {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.cover-empty {
+  color: var(--gold);
+  line-height: 1.45;
+}
+
+.cover-empty[hidden] {
+  display: none;
+}
+
+.cover-fix {
+  font-size: 13px;
+}
+
+/* What the card overlay means: foil sheen versus matte paper. */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.lg {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.lg-foil {
+  background: linear-gradient(135deg, #ff6b8b, #f2c14e 30%, #59f2b0 55%, #5fb4ff 75%, #c58bff);
+}
+
+.lg-paper {
+  margin-left: 8px;
+  background: repeating-conic-gradient(#8f8d86 0 25%, #77756f 0 50%) 0 0 / 4px 4px;
+}
+
 .cover-bar {
   height: 10px;
   border-radius: 2px;
@@ -326,7 +441,7 @@
   display: block;
   width: var(--cover, 100%);
   height: 100%;
-  background: var(--gold);
+  background: linear-gradient(90deg, #ff6b8b, #f2c14e 30%, #59f2b0 55%, #5fb4ff 75%, #c58bff) 0 0 / 300px 100%;
   box-shadow: inset 0 0 0 2px var(--edge);
   transition: width 0.25s var(--ease-out);
 }
@@ -688,13 +803,13 @@
 
 .sw-del {
   position: absolute;
-  top: -8px;
-  right: -7px;
+  top: -9px;
+  right: -8px;
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 0;
   border-radius: 5px;
@@ -859,4 +974,251 @@
 
 .sw-strip-stage .sw-sep {
   margin: 0;
+}
+
+/* ---------- Foil flakes, brush previews, key hints, colour undo ---------- */
+
+.flake {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c);
+  pointer-events: none;
+  animation: flake 0.7s var(--ease-out) forwards;
+}
+
+.flake:nth-child(3n) {
+  width: 7px;
+  height: 7px;
+  margin: -3px 0 0 -3px;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+.flake.is-dust {
+  box-shadow: none;
+  opacity: 0.8;
+}
+
+@keyframes flake {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(90deg);
+    opacity: 0;
+  }
+}
+
+.brush .dot-out {
+  display: grid;
+  place-items: center;
+  height: 30px;
+}
+
+.dot-out i {
+  width: var(--d, 12px);
+  height: var(--d, 12px);
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 1.5px var(--edge);
+}
+
+.dot-out.is-soft i {
+  width: 18px;
+  height: 18px;
+  box-shadow: none;
+  filter: blur(var(--blur, 2px));
+}
+
+.brush input[type='range']::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(var(--gold), var(--gold)) 0 0 / var(--fill, 50%) 100% no-repeat,
+    var(--panel-lo);
+}
+
+.brush input[type='range']::-moz-range-progress {
+  background: var(--gold);
+}
+
+.brush-keys kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin-right: 2px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--panel-hi);
+  box-shadow: 0 2px 0 var(--edge);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+}
+
+.brush-done small {
+  opacity: 0.85;
+}
+
+.brush-done.is-nudge {
+  animation: nudge 0.45s var(--ease-back);
+}
+
+@keyframes nudge {
+  30% {
+    transform: translateY(-4px) scale(1.04);
+  }
+}
+
+.toast.is-swatch {
+  pointer-events: auto;
+}
+
+.toast.is-swatch::before {
+  display: none;
+}
+
+.toast-sw {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 5px;
+  background: var(--sw);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.toast.is-swatch .toast-btn {
+  min-height: 32px;
+}
+
+@media (pointer: coarse) {
+  .sw-del {
+    width: 26px;
+    height: 26px;
+    top: -11px;
+    right: -10px;
+  }
+}
+
+/* ---------- Phones: a floating live card while the Finish area is on screen ---------- */
+
+.mini {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 60;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 6px 6px 4px;
+  border-radius: 12px;
+  background: rgba(13, 19, 21, 0.86);
+  box-shadow: 0 0 0 3px var(--edge), 0 6px 0 3px rgba(0, 0, 0, 0.45);
+  animation: mini-in 0.3s var(--ease-back);
+}
+
+.mini[hidden] {
+  display: none;
+}
+
+@keyframes mini-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+  }
+}
+
+.mini-card {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+}
+
+.mini-card canvas {
+  display: block;
+  width: 104px;
+  height: 146px;
+}
+
+.mini-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.mini-hide {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text-dim);
+}
+
+.mini-hide svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+}
+
+/* Phones: the brush tools dock to the bottom as a sheet, with the card above them. */
+@media (max-width: 900px) {
+  .brush {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    width: auto;
+    animation-name: sheet-in;
+  }
+  .brush-box {
+    gap: 8px;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
+  }
+  .brush-lead,
+  .brush-keys {
+    display: none;
+  }
+  .brush .row {
+    grid-template-columns: 76px 1fr 32px;
+  }
+  .stage.is-painting {
+    padding-bottom: 320px;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini,
+  .brush-done.is-nudge,
+  .flake {
+    animation: none;
+  }
+}
+
+/* The header's phone rule dims unpressed chips and hides their lamp; these toggles keep both. */
+@media (max-width: 420px) {
+  .chip.range-chip[aria-pressed='false'] {
+    opacity: 1;
+  }
+  .chip.range-chip[aria-pressed]::after {
+    display: block;
+  }
 }

@@ -56,11 +56,37 @@ export function initSwatches(host: SwatchHost) {
 
   function forget(strip: Strip, hex: string) {
     const s = store.get();
+    const before = { [strip.list]: s[strip.list], [strip.field]: s[strip.field] } as Partial<State>;
     const patch: Partial<State> = { [strip.list]: s[strip.list].filter((c) => c !== hex) } as Partial<State>;
     if (s[strip.field] === hex) (patch as Record<string, string>)[strip.field] = '';
     sfx.tick();
     store.set(patch);
-    host.announce(host.t().colorRemoved.replace('{hex}', hex.toUpperCase()));
+    undoToast(host.t().colorRemoved.replace('{hex}', hex.toUpperCase()), hex, () => store.set(before));
+  }
+
+  /** A removal can be taken back for a few seconds from a toast, in the app's own toast style. */
+  function undoToast(msg: string, hex: string, undo: () => void) {
+    const box = document.getElementById('toasts');
+    if (!box) return host.announce(msg);
+    box.querySelectorAll('.toast.is-swatch').forEach((e) => e.remove());
+    const el = document.createElement('div');
+    el.className = 'toast is-swatch';
+    el.innerHTML = `<i class="toast-sw" style="--sw:${hex}" aria-hidden="true"></i><p class="toast-msg" role="status"></p><button class="toast-btn" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 2 6l3 3M2.5 6H10a4 4 0 0 1 0 8H7" /></svg><span></span></button>`;
+    el.querySelector('.toast-msg')!.textContent = msg;
+    el.querySelector('.toast-btn span')!.textContent = host.t().colorUndo;
+    const close = () => {
+      if (el.classList.contains('is-out')) return;
+      el.classList.add('is-out');
+      setTimeout(() => el.remove(), 400);
+    };
+    el.querySelector('.toast-btn')!.addEventListener('click', () => {
+      sfx.tick();
+      undo();
+      host.announce(host.t().colorAdded.replace('{hex}', hex.toUpperCase()));
+      close();
+    });
+    box.appendChild(el);
+    setTimeout(close, 6000);
   }
 
   /** One saved colour: a radio, with a small remove button that shows on hover or when chosen. */

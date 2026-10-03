@@ -6,7 +6,7 @@ export const RANGE_GLSL = /* glsl */ `
 uniform sampler2D uRange;  // r: region preset, g: painted in, b: painted out
 uniform vec4 uRangeKey;    // brightness low, high, softness, invert (0 or 1)
 uniform float uRangeView;  // 0..1: shade what is left out and trace the edge
-uniform float uRangeAnts;  // marching-ants phase
+uniform float uRangeAnts;  // animation phase for the proof overlay (0 when motion is reduced)
 float foilRange(vec2 uv, float L) {
   // Thumbnail cards paint their nameplate plain, so read the range there from the plain frame too.
   if (uPlate < 0.5 && uv.y > 0.885) uv = vec2(0.04, 0.5);
@@ -21,15 +21,21 @@ float foilRange(vec2 uv, float L) {
 }
 vec3 showRange(vec3 col, vec2 uv, float sel) {
   if (uRangeView <= 0.0) return col;
-  // Left-out areas sink to grey under a gold hatch; the 50% contour gets marching ants.
-  float hatch = step(0.62, fract((uv.x * 0.714 + uv.y) * 48.0));
-  vec3 dim = vec3(luma(col)) * 0.32 + 0.035;
-  dim = mix(dim, vec3(0.95, 0.76, 0.31), hatch * 0.2);
-  vec3 o = mix(col, dim, (1.0 - sel) * 0.85);
+  // A foil-stamping proof: left-out areas print as matte paper (pixel dither), the foil gets a
+  // travelling sheen, and the edge is a gold die line with a glint running along it.
+  vec2 cell = floor(uv * vec2(110.0, 154.0));
+  float checker = mod(cell.x + cell.y, 2.0);
+  vec3 paper = mix(vec3(luma(col)), vec3(0.95, 0.93, 0.87), 0.45) * mix(0.62, 0.52, checker);
+  vec3 o = mix(col, paper, (1.0 - sel) * 0.92);
+  float diag = uv.x * 0.714 + uv.y;
+  float sweep = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(diag * 7.0 - uRangeAnts * 1.3));
+  o += hsv2rgb(vec3(fract(diag * 0.8 + uRangeAnts * 0.05), 0.55, 1.0)) * sweep * 0.22 * sel;
   float w = max(fwidth(sel), 1e-4);
-  float edge = 1.0 - smoothstep(0.7, 1.7, abs(sel - 0.5) / w);
-  float dash = step(0.5, fract((uv.x * 0.714 + uv.y) * 30.0 - uRangeAnts));
-  o = mix(o, mix(vec3(0.07, 0.1, 0.11), vec3(1.0), dash), edge);
+  float edge = 1.0 - smoothstep(0.8, 1.9, abs(sel - 0.5) / w);
+  float dash = step(0.35, fract(diag * 34.0));
+  float glint = smoothstep(0.9, 1.0, 0.5 + 0.5 * sin(diag * 5.0 - uRangeAnts * 2.2));
+  vec3 die = mix(vec3(0.95, 0.76, 0.31), vec3(1.0), glint);
+  o = mix(o, mix(vec3(0.07, 0.1, 0.11), die, dash), edge);
   return mix(col, o, uRangeView);
 }
 `;

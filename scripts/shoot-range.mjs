@@ -34,6 +34,11 @@ const shots = [
   { name: 'mobile-ja', w: 390, h: 844, lang: 'ja', full: true, dpr: 2, state: saved },
   { name: 'mobile-en', w: 390, h: 844, lang: 'en', full: true, dpr: 2, state: saved },
   { name: 'mobile-paint', w: 390, h: 844, lang: 'ja', dpr: 2, act: 'paint' },
+  { name: 'mobile-range', w: 390, h: 844, lang: 'ja', dpr: 2, state: { rangeRegion: 'art', rangeLo: 0.55, rangeHi: 1 }, act: 'mobileRange' },
+  { name: 'mobile-range-en', w: 390, h: 844, lang: 'en', dpr: 2, state: { rangeRegion: 'frame', rangeInvert: true }, act: 'mobileRange' },
+  { name: 'paint-mid', w: 1440, h: 900, lang: 'ja', state: { rangeRegion: 'none' }, act: 'paintMid' },
+  { name: 'remove-undo', w: 1440, h: 900, lang: 'en', state: { ...saved, frameColor: '#e86a92' }, act: 'removeColor' },
+  { name: 'range-narrow-en', w: 1440, h: 900, lang: 'en', state: { rangeRegion: 'text', rangeLo: 0.42, rangeHi: 0.5, rangeInvert: true }, act: 'scrollPanel' },
 ].filter((s) => s.name.includes(filter));
 
 const errors = [];
@@ -96,6 +101,24 @@ for (const s of shots) {
     await strokes(page, false);
   } else if (s.act === 'paintErase') {
     await strokes(page, true);
+  } else if (s.act === 'mobileRange') {
+    await page.locator('.sec-range .tone').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(1200);
+  } else if (s.act === 'paintMid') {
+    await page.locator('.range-paint').click();
+    await page.waitForTimeout(900);
+    const b = await page.locator('.paint-layer').boundingBox();
+    await page.mouse.move(b.x + b.width * 0.25, b.y + b.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width * 0.7, b.y + b.height * 0.45, { steps: 16 });
+    await page.waitForTimeout(120);
+    await page.screenshot({ path: `${out}/${s.name}.png` });
+    await page.mouse.up();
+  } else if (s.act === 'removeColor') {
+    await page.locator('.sw-strip-frame .sw-item').nth(1).hover();
+    await page.waitForTimeout(300);
+    await page.locator('.sw-strip-frame .sw-del').nth(1).click();
+    await page.waitForTimeout(500);
   } else if (s.act === 'exportPng') {
     const dl = page.waitForEvent('download');
     await page.locator('#pngBtn').click();
@@ -103,7 +126,7 @@ for (const s of shots) {
     await d.saveAs(`${out}/export-range.png`);
     await page.waitForTimeout(300);
   }
-  if (s.act !== 'exportPng') await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
+  if (s.act !== 'exportPng' && s.act !== 'paintMid') await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
   await ctx.close();
 }
 await browser.close();

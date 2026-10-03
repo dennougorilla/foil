@@ -2,6 +2,7 @@
 import { RangeModel } from './range';
 import { RANGE_H, RANGE_W } from './gl/range';
 import { sfx } from './audio';
+import { MiniPreview } from './miniPreview';
 import type { FaceSpec } from './card/face';
 import type { RangeRegion } from './featureState';
 import type { Dict } from './i18n';
@@ -23,7 +24,7 @@ const TONES: [number, number][] = [
   [0.3, 0.7],
   [0, 0.4],
 ];
-const MIN_BAND = 0.05;
+const MIN_BAND = 0.08;
 const SIZE_MIN = 6;
 const SIZE_MAX = 120;
 
@@ -96,7 +97,7 @@ export function initRangePanel(host: RangeHost) {
     <div class="field">
       <div class="field-head">
         <span class="field-label" id="rangeWhereLabel" data-r="rangeWhere"></span>
-        <span class="where-tag" data-r="whereBrushed" hidden></span>
+        <span class="where-tag" hidden>${svg('<path d="M10 2l4 4-6 6-4-4zM4 8l-2 6 6-2" />')}<span data-r="whereBrushed"></span></span>
       </div>
       <div class="seg seg-region" role="radiogroup" aria-labelledby="rangeWhereLabel" aria-describedby="rangeRegionHint"></div>
       <p class="hint region-hint" id="rangeRegionHint"></p>
@@ -107,7 +108,8 @@ export function initRangePanel(host: RangeHost) {
         <output class="tone-out" aria-hidden="true"></output>
       </div>
       <div class="tone">
-        <div class="tone-track" aria-hidden="true"><canvas class="tone-hist" width="160" height="12"></canvas><i class="tone-band"></i></div>
+        <canvas class="tone-hist" width="160" height="14" aria-hidden="true"></canvas>
+        <div class="tone-track" aria-hidden="true"><i class="tone-band"></i></div>
         <input type="range" class="tone-lo" min="0" max="1" step="0.01" />
         <input type="range" class="tone-hi" min="0" max="1" step="0.01" />
       </div>
@@ -127,7 +129,12 @@ export function initRangePanel(host: RangeHost) {
       ${svg(ICON.brush)}
       <span class="btn-text"><b data-r="paint"></b><small data-r="paintSub"></small></span>
     </button>
-    <p class="range-cover" aria-live="polite"><span></span><i class="cover-bar" aria-hidden="true"><i></i></i></p>
+    <div class="range-cover">
+      <p class="cover-head" aria-live="polite"><span data-r="coverLabel"></span><b class="cover-val"></b></p>
+      <i class="cover-bar" aria-hidden="true"><i></i></i>
+      <p class="cover-empty" hidden><span data-r="rangeNone"></span> <button class="link cover-fix" type="button"></button></p>
+      <p class="legend" aria-hidden="true"><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
+    </div>
   `;
   const panel = document.getElementById('panel')!;
   panel.insertBefore(sec, panel.querySelector('.sec-export'));
@@ -208,7 +215,24 @@ export function initRangePanel(host: RangeHost) {
     push();
   });
 
-  paintBtn.addEventListener('click', () => (painting ? exitPaint() : enterPaint()));
+  // While painting, the panel button points to the brush tools; Done (or Esc) is the one way out.
+  paintBtn.addEventListener('click', () => {
+    if (!painting) return enterPaint();
+    const done = q<HTMLElement>('.brush-done', bar);
+    done.focus({ preventScroll: true });
+    done.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
+    done.classList.remove('is-nudge');
+    void done.offsetWidth;
+    done.classList.add('is-nudge');
+  });
+
+  q('.cover-fix').addEventListener('click', () => {
+    sfx.tick();
+    const s = store.get();
+    if (s.rangeInvert) store.set({ rangeInvert: false });
+    else if (s.rangeRegion === 'none') enterPaint();
+    else store.set({ rangeLo: 0, rangeHi: 1 });
+  });
 
   // ---------- Overlay: shown while the section is in use, while painting, or when pinned ----------
 
@@ -260,19 +284,19 @@ export function initRangePanel(host: RangeHost) {
       <div class="row">
         <label class="field-label" for="brushSize" data-r="brushSize"></label>
         <input type="range" id="brushSize" min="${SIZE_MIN}" max="${SIZE_MAX}" step="1" />
-        <output for="brushSize"></output>
+        <output for="brushSize" class="dot-out"><i></i></output>
       </div>
       <div class="row">
         <label class="field-label" for="brushSoft" data-r="brushSoft"></label>
         <input type="range" id="brushSoft" min="0" max="1" step="0.01" />
-        <output for="brushSoft"></output>
+        <output for="brushSoft" class="dot-out is-soft"><i></i></output>
       </div>
       <div class="brush-tools">
         <button class="tool" type="button" data-a="undo" aria-keyshortcuts="Control+Z">${svg(ICON.undo)}<span data-r="undo"></span></button>
         <button class="tool" type="button" data-a="redo" aria-keyshortcuts="Control+Shift+Z">${svg(ICON.redo)}<span data-r="redo"></span></button>
         <button class="tool" type="button" data-a="clear">${svg(ICON.clear)}<span data-r="brushClear"></span></button>
       </div>
-      <button class="btn btn-green brush-done" type="button"><span class="btn-text"><b data-r="brushDone"></b></span></button>
+      <button class="btn btn-green brush-done" type="button"><span class="btn-text"><b data-r="brushDone"></b><small data-r="brushDoneSub"></small></span></button>
     </div>
     <p class="card-hint brush-keys"></p>
   `;
@@ -293,6 +317,8 @@ export function initRangePanel(host: RangeHost) {
   q('.brush-done', bar).addEventListener('click', () => exitPaint());
 
   let painting = false;
+  const narrow = matchMedia('(max-width: 900px)');
+  const preview = new MiniPreview({ store, section: sec, card: cardSlot, isPainting: () => painting, reduced });
 
   function enterPaint() {
     painting = true;
@@ -307,6 +333,9 @@ export function initRangePanel(host: RangeHost) {
     placeLayer();
     sfx.tick();
     host.announce(host.t().brushOn);
+    preview.hide();
+    // On phones the tools dock at the bottom; bring the whole card into view above them.
+    if (narrow.matches) cardSlot.scrollIntoView({ block: 'start', behavior: reduced.matches ? 'auto' : 'smooth' });
     modeSeg.querySelector<HTMLElement>('[aria-checked=true]')?.focus({ preventScroll: true });
   }
 
@@ -320,6 +349,7 @@ export function initRangePanel(host: RangeHost) {
     bar.hidden = true;
     paintBtn.setAttribute('aria-pressed', 'false');
     sync();
+    preview.hide();
     sfx.tick();
     host.announce(host.t().brushOff);
     paintBtn.focus({ preventScroll: true });
@@ -373,6 +403,7 @@ export function initRangePanel(host: RangeHost) {
     [lastX, lastY] = toTex(e);
     const s = store.get();
     model.dab(lastX, lastY, s.brushSize, s.brushSoft, s.brushMode);
+    sparkle(e, true);
     sfx.tick();
     push();
   });
@@ -384,8 +415,40 @@ export function initRangePanel(host: RangeHost) {
     model.stroke(lastX, lastY, x, y, s.brushSize, s.brushSoft, s.brushMode);
     lastX = x;
     lastY = y;
+    sparkle(e, false);
     push();
   });
+  // Foil flakes fly off the brush as it lays the finish down; erasing sheds grey dust instead.
+  const HOLO = ['#ff6b8b', '#f2c14e', '#59f2b0', '#5fb4ff', '#c58bff', '#ffffff'];
+  let lastSpark = 0;
+  let sparks = 0;
+  function sparkle(e: PointerEvent, burst: boolean) {
+    if (reduced.matches) return;
+    const now = performance.now();
+    if (!burst && now - lastSpark < 28) return;
+    lastSpark = now;
+    const r = layer.getBoundingClientRect();
+    const rad = ((store.get().brushSize / RANGE_W) * r.width) / 2;
+    const erase = store.get().brushMode === 'erase';
+    for (let i = 0; i < (burst ? 6 : 2) && sparks < 60; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.sqrt(Math.random()) * rad;
+      const f = el('i', `flake${erase ? ' is-dust' : ''}`);
+      f.style.left = `${e.clientX - r.left + Math.cos(a) * d}px`;
+      f.style.top = `${e.clientY - r.top + Math.sin(a) * d}px`;
+      f.style.setProperty('--c', erase ? '#8a9a9c' : HOLO[Math.floor(Math.random() * HOLO.length)]);
+      f.style.setProperty('--dx', `${(Math.random() - 0.5) * 36}px`);
+      f.style.setProperty('--dy', `${erase ? 18 + Math.random() * 20 : -16 - Math.random() * 26}px`);
+      f.style.animationDelay = `${Math.random() * 60}ms`;
+      sparks++;
+      f.addEventListener('animationend', () => {
+        f.remove();
+        sparks--;
+      });
+      layer.appendChild(f);
+    }
+  }
+
   const up = () => {
     if (!down) return;
     down = false;
@@ -431,7 +494,9 @@ export function initRangePanel(host: RangeHost) {
     if (pending) return;
     pending = requestAnimationFrame(() => {
       pending = 0;
-      stage.cards.range.set(model.snapshot(store.get()));
+      const snap = model.snapshot(store.get());
+      stage.cards.range.set(snap);
+      preview.setRange(snap);
       syncBrush();
       sync();
       measure();
@@ -444,11 +509,15 @@ export function initRangePanel(host: RangeHost) {
     coverTimer = window.setTimeout(() => {
       coverTimer = 0;
       const t = host.t();
-      const f = model.coverage(store.get());
+      const s = store.get();
+      const f = model.coverage(s);
       const n = Math.round(f * 100);
-      cover.querySelector('span')!.textContent =
-        f >= 0.995 ? t.rangeAllCover : f <= 0.0005 ? t.rangeNone : n < 1 ? t.rangeTiny : t.rangeCover.replace('{n}', String(n));
-      cover.classList.toggle('is-none', f <= 0.0005);
+      const none = f <= 0.0005;
+      q('.cover-val').textContent = none ? '0%' : n < 1 ? t.rangeTiny : `${n}%`;
+      cover.classList.toggle('is-none', none);
+      q('.cover-empty').hidden = !none;
+      // Offer the one change most likely to bring the finish back.
+      q('.cover-fix').textContent = s.rangeInvert ? t.fixInvert : s.rangeRegion === 'none' ? t.fixPaint : t.fixTone;
       drawHistogram(model.histogram());
       cover.style.setProperty('--cover', `${n}%`);
     }, 140);
@@ -482,6 +551,7 @@ export function initRangePanel(host: RangeHost) {
     tone.style.setProperty('--hi', String(s.rangeHi));
     tone.classList.toggle('is-invert', s.rangeInvert);
     tone.classList.toggle('is-full', s.rangeLo <= 0 && s.rangeHi >= 1);
+    regionSeg.classList.toggle('is-invert', s.rangeInvert);
     const tt = host.t();
     q('.region-hint').textContent = s.rangeInvert ? tt.invertHint.replace('{x}', tt.region[s.rangeRegion]) : tt.regionHint[s.rangeRegion];
     q('.where-tag').hidden = !model.painted;
@@ -505,9 +575,15 @@ export function initRangePanel(host: RangeHost) {
     fill(size);
     fill(soft);
     const sizePct = Math.round(((s.brushSize * 2) / RANGE_W) * 100);
-    size.nextElementSibling!.textContent = `${sizePct}%`;
+    // The outputs draw the brush itself: a dot as wide as the stroke, blurred by the softness.
+    const sizeOut = size.nextElementSibling as HTMLElement;
+    sizeOut.style.setProperty('--d', `${6 + ((s.brushSize - SIZE_MIN) / (SIZE_MAX - SIZE_MIN)) * 22}px`);
+    sizeOut.title = host.t().sizeOf.replace('{n}', String(sizePct));
     size.setAttribute('aria-valuetext', host.t().sizeOf.replace('{n}', String(sizePct)));
-    soft.nextElementSibling!.textContent = pct(s.brushSoft);
+    const softOut = soft.nextElementSibling as HTMLElement;
+    softOut.style.setProperty('--blur', `${(s.brushSoft * 5).toFixed(1)}px`);
+    softOut.title = pct(s.brushSoft);
+    soft.setAttribute('aria-valuetext', pct(s.brushSoft));
     const custom = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
     q<HTMLButtonElement>('.range-reset').hidden = !custom;
   }
@@ -525,7 +601,14 @@ export function initRangePanel(host: RangeHost) {
     tonePresets.querySelectorAll<HTMLButtonElement>('.tone-chip').forEach((c) => (c.textContent = t.tonePresets[+c.dataset.i!]));
     const keys = q('.brush-keys', bar);
     keys.textContent = '';
-    for (const k of t.brushKeys) keys.appendChild(el('span', '', '')).textContent = k;
+    for (const [ks, label] of t.brushKeys) {
+      const item = el('span');
+      ks.forEach((k) => (item.appendChild(el('kbd')).textContent = k));
+      item.append(` ${label}`);
+      keys.appendChild(item);
+    }
+    regionSeg.querySelectorAll<HTMLElement>('[role=radio]').forEach((b) => (b.dataset.except = t.invertBadge));
+    preview.applyText(t);
     lo.setAttribute('aria-label', t.rangeLo);
     hi.setAttribute('aria-label', t.rangeHi);
     modeSeg.setAttribute('aria-label', t.brushMode);
@@ -545,6 +628,7 @@ export function initRangePanel(host: RangeHost) {
   /** Hook for the live face: called after every redraw. */
   function onFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec) {
     model.onFace(face, mask, spec);
+    preview.setFace(face, mask);
     const { image, ...rest } = spec;
     void image;
     const key = JSON.stringify(rest);
