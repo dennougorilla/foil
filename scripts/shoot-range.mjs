@@ -27,7 +27,7 @@ const shots = [
   { name: 'paint-en', w: 1440, h: 900, lang: 'en', act: 'paint' },
   { name: 'paint-erase', w: 1440, h: 900, lang: 'ja', act: 'paintErase' },
   { name: 'paint-reduced', w: 1440, h: 900, lang: 'ja', act: 'paint', reduced: true },
-  { name: 'export-range', w: 1440, h: 900, lang: 'ja', state: { rangeRegion: 'art', rangeLo: 0.5, rangeHi: 1 }, act: 'exportPng' },
+  { name: 'export-range', w: 1440, h: 900, lang: 'ja', state: { rangeRegion: 'art', rangeLo: 0, rangeHi: 0.4 }, act: 'exportPng' },
   { name: 'tablet-1024', w: 1024, h: 768, lang: 'ja', state: saved, act: 'scrollPanel' },
   { name: 'tablet-paint', w: 1024, h: 768, lang: 'en', act: 'paint' },
   { name: 'scale-125', w: 1152, h: 720, lang: 'ja', dpr: 1.25, state: saved, act: 'scrollPanel' },

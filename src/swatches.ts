@@ -61,7 +61,10 @@ export function initSwatches(host: SwatchHost) {
     if (s[strip.field] === hex) (patch as Record<string, string>)[strip.field] = '';
     sfx.tick();
     store.set(patch);
-    undoToast(host.t().colorRemoved.replace('{hex}', hex.toUpperCase()), hex, () => store.set(before));
+    // Say what the choice fell back to when the removed colour was the one in use.
+    const t = host.t();
+    const msg = s[strip.field] !== hex ? t.colorRemoved : strip === FRAME ? t.colorRemovedFrame.replace('{x}', t.frameName[s.frame]) : t.colorRemovedStage;
+    undoToast(msg, hex, () => store.set(before));
   }
 
   /** A removal can be taken back for a few seconds from a toast, in the app's own toast style. */
@@ -268,6 +271,12 @@ export function initSwatches(host: SwatchHost) {
     sep.className = 'sw-sep';
     sep.setAttribute('aria-hidden', 'true');
     bdGroup.appendChild(sep);
+    if (s.stageSwatches.length) {
+      const label = document.createElement('span');
+      label.className = 'sw-label';
+      label.textContent = t.myColors;
+      bdGroup.appendChild(label);
+    }
     for (const hex of s.stageSwatches) bdGroup.appendChild(chip(STAGE, hex, 'sw-stage', swirlVars(swirlFrom(hex))));
     bdGroup.appendChild(addButton(STAGE, false));
     // Previewing an unsaved colour: keep one radio reachable by Tab.

@@ -7,7 +7,7 @@ import type { Dict } from './i18n';
 import type { Store } from './state';
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
-const W = 72;
+const W = 84;
 const H = Math.round((W * 7) / 5);
 /** Height of the band, kept free at the top when the page scrolls a control into view. */
 const BAND = H + 20;
@@ -45,7 +45,7 @@ export class MiniPreview {
         <button class="mini-jump link" type="button"></button>
       </div>
       <button class="mini-hide" type="button">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2H3zm2 2h2v2H5zm2 2h2v2H7zm2 2h2v2H9zm2 2h2v2h-2zM11 3h2v2h-2zM9 5h2v2H9zM5 9h2v2H5zM3 11h2v2H3z" /></svg>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2H3zm2 2h2v2H5zm2 2h2v2H7zm2 2h2v2H9zm2 2h2v2h-2zM11 3h2v2h-2zM9 5h2v2H9zM5 9h2v2H5zM3 11h2v2H3z" /></svg><span></span>
       </button>`;
     document.body.appendChild(this.el);
     this.el.querySelector('.mini-jump')!.addEventListener('click', () => {
@@ -78,6 +78,7 @@ export class MiniPreview {
     const hide = this.el.querySelector('.mini-hide')!;
     hide.setAttribute('aria-label', t.previewHide);
     hide.setAttribute('title', t.previewHide);
+    hide.querySelector('span')!.textContent = t.previewHideShort;
     this.label();
   }
 

@@ -1325,3 +1325,67 @@
     font-size: 12px;
   }
 }
+
+/* ---------- Round 10: one "selected" look, proof strip, quieter details ---------- */
+
+/* Selected or switched on reads the same everywhere in the section: a gold fill with dark ink. */
+.tone-chip[aria-pressed='true'],
+.chip.range-chip[aria-pressed='true'] {
+  background: var(--gold);
+  color: var(--paper-ink);
+  text-shadow: none;
+  box-shadow: 0 3px 0 #a8801f;
+}
+
+.chip.range-chip[aria-pressed='true']::after {
+  background: var(--paper-ink);
+  box-shadow: none;
+}
+
+/* The proof strip shows the whole foil run however short it is. */
+.cover-bar i {
+  background-size: 100% 100%;
+}
+
+.mini {
+  background: var(--ink-900);
+}
+
+.mini-canvas {
+  width: 84px;
+  height: 118px;
+}
+
+.mini-hide {
+  display: inline-flex;
+  gap: 6px;
+  width: auto;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.brush-keys {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  gap: 4px 16px;
+}
+
+.sw-strip {
+  gap: 10px 14px;
+}
+
+.tool[data-a='clear']:not([disabled]) {
+  color: #ff8a80;
+}
+
+.seg-region {
+  container-type: inline-size;
+}
+
+@container (max-width: 300px) {
+  .seg-region .region-btn {
+    font-size: 12px;
+    letter-spacing: -0.04em;
+  }
+}

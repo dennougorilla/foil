@@ -2,6 +2,7 @@
 import { RangeModel } from './range';
 import { RANGE_H, RANGE_W } from './gl/range';
 import { sfx } from './audio';
+import { editionById } from './editions';
 import { MiniPreview } from './miniPreview';
 import type { FaceSpec } from './card/face';
 import type { RangeRegion } from './featureState';
@@ -226,12 +227,21 @@ export function initRangePanel(host: RangeHost) {
     done.classList.add('is-nudge');
   });
 
+  /** What is holding the finish back, most direct cause first. */
+  const blocker = () => {
+    const s = store.get();
+    if (s.rangeInvert) return 'invert';
+    if (s.rangeLo > 0 || s.rangeHi < 1) return 'tone';
+    if (s.rangeRegion === 'none') return painting ? 'painting' : 'paint';
+    return 'region';
+  };
   q('.cover-fix').addEventListener('click', () => {
     sfx.tick();
-    const s = store.get();
-    if (s.rangeInvert) store.set({ rangeInvert: false });
-    else if (s.rangeRegion === 'none') enterPaint();
-    else store.set({ rangeLo: 0, rangeHi: 1 });
+    const b = blocker();
+    if (b === 'invert') store.set({ rangeInvert: false });
+    else if (b === 'tone') store.set({ rangeLo: 0, rangeHi: 1 });
+    else if (b === 'paint') enterPaint();
+    else if (b === 'region') store.set({ rangeRegion: 'all' });
   });
 
   // ---------- Overlay: shown while the section is in use, while painting, or when pinned ----------
@@ -311,7 +321,10 @@ export function initRangePanel(host: RangeHost) {
     };
   });
   roving(modeSeg);
-  size.addEventListener('input', () => store.set({ brushSize: +size.value }));
+  size.addEventListener('input', () => {
+    store.set({ brushSize: +size.value });
+    showRingAtCentre();
+  });
   soft.addEventListener('input', () => store.set({ brushSoft: +soft.value }));
   bar.querySelectorAll<HTMLButtonElement>('.tool').forEach((b) => b.addEventListener('click', () => act(b.dataset.a!)));
   q('.brush-done', bar).addEventListener('click', () => exitPaint());
@@ -387,6 +400,18 @@ export function initRangePanel(host: RangeHost) {
     const r = layer.getBoundingClientRect();
     return [((e.clientX - r.left) / r.width) * RANGE_W, ((e.clientY - r.top) / r.height) * RANGE_H] as const;
   };
+  // While the size slider moves, the real brush ring sits in the middle of the card.
+  let ringTimer = 0;
+  function showRingAtCentre() {
+    const r = layer.getBoundingClientRect();
+    if (!r.width) return;
+    const d = ((store.get().brushSize * 2) / RANGE_W) * r.width;
+    ring.style.width = ring.style.height = `${d}px`;
+    ring.style.transform = `translate(${r.width / 2 - d / 2}px, ${r.height / 2 - d / 2}px)`;
+    layer.classList.add('has-ring');
+    clearTimeout(ringTimer);
+    ringTimer = window.setTimeout(() => layer.classList.remove('has-ring'), 900);
+  }
   const moveRing = (e: PointerEvent) => {
     const r = layer.getBoundingClientRect();
     const d = ((store.get().brushSize * 2) / RANGE_W) * r.width;
@@ -511,15 +536,19 @@ export function initRangePanel(host: RangeHost) {
       const t = host.t();
       const s = store.get();
       const f = model.coverage(s);
-      const n = Math.round(f * 100);
+      // Never round a partial area up to 100% or down to 0%.
+      const n = f >= 0.9995 ? 100 : Math.min(99, Math.round(f * 100));
       const none = f <= 0.0005;
       const few = f < 0.02;
-      q('.cover-val').textContent = none ? '0%' : n < 1 ? t.rangeTiny : `${n}%`;
+      q('.cover-val').textContent = none ? '0%' : f < 0.01 ? t.rangeTiny : `${n}%`;
       cover.classList.toggle('is-none', few);
       q('.cover-empty').hidden = !few;
-      q('.cover-empty > span').textContent = none ? t.rangeNone : t.rangeFew;
-      // Offer the one change most likely to bring the finish back.
-      q('.cover-fix').textContent = s.rangeInvert ? t.fixInvert : s.rangeRegion === 'none' ? t.fixPaint : t.fixTone;
+      // Name the thing that is holding the finish back, and offer the change that undoes it.
+      const b = blocker();
+      q('.cover-empty > span').textContent = b === 'painting' ? t.fixPainting : none ? t.rangeNone : t.rangeFew;
+      const fix = q<HTMLButtonElement>('.cover-fix');
+      fix.hidden = b === 'painting';
+      fix.textContent = { invert: t.fixInvert, tone: t.fixTone, paint: t.fixPaint, region: t.fixRegion, painting: '' }[b];
       drawHistogram(model.histogram());
       cover.style.setProperty('--cover', `${n}%`);
     }, 140);
@@ -531,19 +560,24 @@ export function initRangePanel(host: RangeHost) {
     const x = hist.getContext('2d')!;
     x.clearRect(0, 0, hist.width, hist.height);
     const w = hist.width / h.length;
-    // A stepped skyline: a faint baseline, then solid columns with a brighter cap.
-    x.fillStyle = 'rgba(242, 193, 78, 0.25)';
+    // A stepped skyline in the finish's own colour: a faint baseline, then columns with a light cap.
+    const c = editionById(store.get().edition).color;
+    x.fillStyle = c;
+    x.globalAlpha = 0.3;
     x.fillRect(0, hist.height - 1, hist.width, 1);
     h.forEach((v, i) => {
       const bh = Math.max(v > 0 ? 2 : 0, Math.round(Math.sqrt(v) * hist.height));
       if (!bh) return;
       const x0 = Math.round(i * w);
       const x1 = Math.round((i + 1) * w);
-      x.fillStyle = 'rgba(242, 193, 78, 0.7)';
+      x.fillStyle = c;
+      x.globalAlpha = 0.75;
       x.fillRect(x0, hist.height - bh, x1 - x0, bh);
-      x.fillStyle = '#ffe9a8';
+      x.fillStyle = '#fff';
+      x.globalAlpha = 0.85;
       x.fillRect(x0, hist.height - bh, x1 - x0, 1);
     });
+    x.globalAlpha = 1;
   }
 
   function syncBrush() {
@@ -567,7 +601,7 @@ export function initRangePanel(host: RangeHost) {
     const narrowed = s.rangeLo > 0 || s.rangeHi < 1;
     const what = narrowed
       ? tt.toneAt.replace('{r}', tt.region[s.rangeRegion]).replace('{lo}', String(Math.round(s.rangeLo * 100))).replace('{hi}', String(Math.round(s.rangeHi * 100)))
-      : tt.region[s.rangeRegion];
+      : tt.regionQ.replace('{r}', tt.region[s.rangeRegion]);
     q('.region-hint').textContent = s.rangeInvert ? tt.invertHint.replace('{x}', what) : tt.regionHint[s.rangeRegion];
     q('.where-tag').hidden = !model.painted;
     paintBtn.querySelector('b')!.textContent = painting ? host.t().paintActive : host.t().paint;
@@ -635,6 +669,7 @@ export function initRangePanel(host: RangeHost) {
   const RANGE_KEYS: (keyof State)[] = ['rangeRegion', 'rangeLo', 'rangeHi', 'rangeInvert'];
   store.on((_s, changed) => {
     if (changed.has('lang')) applyText();
+    if (changed.has('edition')) measure();
     if (RANGE_KEYS.some((k) => changed.has(k))) push();
     sync();
   });

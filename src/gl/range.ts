@@ -26,7 +26,9 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   vec2 cell = floor(uv * vec2(110.0, 154.0));
   float checker = mod(cell.x + cell.y, 2.0);
   float grain = vnoise(uv * vec2(260.0, 30.0)) * 0.6 + vnoise(uv * vec2(40.0, 360.0)) * 0.4;
-  vec3 paper = mix(vec3(luma(col)), vec3(0.95, 0.93, 0.87), 0.5) * (mix(0.6, 0.53, checker) + (grain - 0.5) * 0.08);
+  // Cream stock with the picture printed faintly in ink: a blind proof, not a greyed-out mask.
+  vec3 stock = vec3(0.93, 0.9, 0.82) * (0.96 + (grain - 0.5) * 0.1 - checker * 0.035);
+  vec3 paper = mix(stock, stock * vec3(0.36, 0.38, 0.42), 1.0 - luma(col));
   vec3 o = mix(col, paper, (1.0 - sel) * 0.92);
   float diag = uv.x * 0.714 + uv.y;
   float sweep = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(diag * 7.0 - uRangeAnts * 1.3));
@@ -39,6 +41,16 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   vec3 die = mix(vec3(0.95, 0.76, 0.31), vec3(1.0, 0.97, 0.85), glint);
   o = mix(o, vec3(0.07, 0.1, 0.11), keyline * 0.85);
   o = mix(o, die, edge);
+  // Registration marks in the corners, as on a printer's proof.
+  vec2 q = vec2(uv.x * 0.714, uv.y);
+  for (int i = 0; i < 4; i++) {
+    vec2 c = vec2(i % 2 == 0 ? 0.045 : 0.714 - 0.045, i < 2 ? 0.032 : 0.968);
+    vec2 d = q - c;
+    float ring = 1.0 - smoothstep(0.0015, 0.004, abs(length(d) - 0.012));
+    float cross = (1.0 - smoothstep(0.0012, 0.0035, abs(d.x))) * step(abs(d.y), 0.02)
+                + (1.0 - smoothstep(0.0012, 0.0035, abs(d.y))) * step(abs(d.x), 0.02);
+    o = mix(o, vec3(0.95, 0.76, 0.31), clamp(ring + cross, 0.0, 1.0) * 0.9);
+  }
   return mix(col, o, uRangeView);
 }
 `;
