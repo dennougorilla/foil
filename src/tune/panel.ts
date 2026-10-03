@@ -60,7 +60,7 @@ function format(k: NumKey, v: number, t: Dict['tune']): string {
     case 'scale':
     case 'sharp':
     case 'sparkleSize':
-      return `×${v.toFixed(2)}`;
+      return `${Math.round(v * 100)}%`;
     case 'angle':
     case 'hue':
       return `${sign(Math.round(v))}°`;
@@ -75,7 +75,7 @@ function format(k: NumKey, v: number, t: Dict['tune']): string {
     case 'temp':
       return `${Math.round(v)}K`;
     case 'speed':
-      return v <= 0 ? t.stopped : `×${v.toFixed(2)}`;
+      return v <= 0 ? t.stopped : `${Math.round(v * 100)}%`;
   }
 }
 
@@ -115,7 +115,7 @@ export function mountTune(store: Store, after: Element): void {
   let undo: Tune | null = null;
   let undoTimer = 0;
   const touch = matchMedia('(pointer: coarse)').matches;
-  const peek = mountPeek(() => sync());
+  const peek = mountPeek(() => sync(), () => Math.cos(motion.spinAngle));
   const sun = mountSunHandle((deg) => set({ lightAngle: deg }), () => Math.cos(motion.spinAngle));
   // A stamp on the card while "Hold to compare" shows the defaults.
   const stamp = document.createElement('span');
@@ -155,16 +155,16 @@ export function mountTune(store: Store, after: Element): void {
       <div class="tune-body" id="tuneBody">
         <div class="tune-tabs" role="tablist"></div>
         <div class="tune-panes"></div>
-        <div class="tune-foot">
-          <p class="tune-hint"></p>
-        </div>
         <div class="tune-dock">
+          <p class="tune-hint"></p>
+          <div class="tune-dock-row">
           <span class="tune-dock-peek"></span>
           <div class="tune-actions">
-            <button class="tune-compare" type="button" aria-pressed="false">${svg('eye')}<span></span></button>
+            <button class="tune-compare" type="button" aria-pressed="false">${svg('eye')}<span class="tune-long"></span><span class="tune-short"></span></button>
             <p class="tune-undo-msg" hidden><b></b><small></small></p>
             <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
             <button class="tune-undo" type="button" hidden>${svg('reset')}<span></span></button>
+          </div>
           </div>
         </div>
       </div>`;
@@ -262,7 +262,10 @@ export function mountTune(store: Store, after: Element): void {
 
   /** Press and hold (pointer, Space or Enter) to see the card with the defaults. */
   function bindCompare(b: HTMLButtonElement) {
-    b.querySelector('span')!.textContent = t.compare;
+    b.querySelector('.tune-long')!.textContent = t.compare;
+    b.querySelector('.tune-short')!.textContent = t.compareShort;
+    // Phones show a shorter label (or just the eye); the full words stay the accessible name.
+    b.setAttribute('aria-label', t.compare);
     b.title = t.compareHelp;
     const hold = (on: boolean) => {
       if (motion.comparing === on) return;
@@ -345,6 +348,11 @@ export function mountTune(store: Store, after: Element): void {
     notch.className = 'tune-notch';
     notch.setAttribute('aria-hidden', 'true');
     wrap.append(notch);
+    // While comparing, a ghost thumb shows where the default sits.
+    const ghost = document.createElement('i');
+    ghost.className = 'tune-ghost';
+    ghost.setAttribute('aria-hidden', 'true');
+    wrap.append(ghost);
     const ends = (t.ends as Partial<Record<NumKey, string[]>>)[k];
     if (ends) {
       // Plain words for the two ends of a multiplier, so ×2.20 has something to mean.
@@ -381,6 +389,7 @@ export function mountTune(store: Store, after: Element): void {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'seg-btn tune-opt';
+      b.classList.toggle('is-default', v === TUNE_DEFAULTS[k]);
       b.dataset.value = v;
       b.setAttribute('role', 'radio');
       b.innerHTML = `${svg(v)}<span></span>`;
@@ -478,7 +487,8 @@ export function mountTune(store: Store, after: Element): void {
     done.querySelector('b')!.textContent = t.resetDone;
     done.querySelector('small')!.textContent = t.undoHint;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
-    root.querySelector<HTMLElement>('.tune-dock')!.hidden = !changed.length && !undo && !peek.shown;
+    // The dock always carries the hint; its button row only when there is something to do.
+    root.querySelector<HTMLElement>('.tune-dock-row')!.hidden = !changed.length && !undo && !peek.shown;
     peek.setActive(s.tuneOpen);
 
     for (const def of TABS) {

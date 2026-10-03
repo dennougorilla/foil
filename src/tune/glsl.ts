@@ -53,6 +53,15 @@ float tuneGlare(float d, float reach, float power, float amount) {
   return pow(max(1.0 - d * reach * pow(k, 0.6), 0.0), power * k) * amount * uTGlare * pow(k, 0.35);
 }
 
+/**
+ * Where glitter may land: the art window, or the whole card for finishes that cover the frame
+ * too (Negative, Gold, Halftone). Never on the ink outline.
+ */
+float tuneGlitterArea(int e, vec3 m) {
+  float area = (e == 4 || e == 5 || e == 12) ? 1.0 : m.r;
+  return area * (1.0 - m.b);
+}
+
 /** Pixel glitter: square flecks with a little cross, each catching the light at its own angle. */
 vec3 tuneGlitter(vec2 uv, vec2 t) {
   if (uTSparkle <= 0.0) return vec3(0.0);

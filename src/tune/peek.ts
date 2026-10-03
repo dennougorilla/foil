@@ -9,7 +9,8 @@ export interface Peek {
   setLabel(text: string): void;
 }
 
-export function mountPeek(onShow: (shown: boolean) => void): Peek {
+/** `facing` is how squarely the card face looks at us; the preview holds its last face-on frame while a spin shows the back. */
+export function mountPeek(onShow: (shown: boolean) => void, facing: () => number): Peek {
   const slot = document.getElementById('cardSlot');
   const source = document.getElementById('cards') as HTMLCanvasElement | null;
   const btn = document.createElement('button');
@@ -56,6 +57,7 @@ export function mountPeek(onShow: (shown: boolean) => void): Peek {
 
   function draw() {
     raf = requestAnimationFrame(draw);
+    if (facing() < 0.35 && view.width) return;
     const c = source!.getBoundingClientRect();
     const s = slot!.getBoundingClientRect();
     if (!c.width || !s.width) return;

@@ -453,7 +453,7 @@ void main() {
     spec = tuneGlare(d, 1.6, 4.0, 0.1);
   }
   col += spec * uTLight;
-  if (e != 0) col += tuneGlitter(uv, uTilt) * uIntensity * (1.0 - m.b);
+  if (e != 0) col += tuneGlitter(uv, uTilt) * uIntensity * tuneGlitterArea(e, m);
   // Tilting away darkens a touch; tilting towards brightens.
   col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
