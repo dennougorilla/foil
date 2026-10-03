@@ -22,7 +22,17 @@ npm run shoot -- <outDir> [filter]   # with the dev server running: capture the 
 
 Rendering is WebGL2 (swirl backdrop, cards, particles). Shaders live in `src/gl/shaders.ts`; the card face is composed in `src/card/face.ts`.
 
-Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
+Pushes to `main` and pull requests are type-checked and built by `.github/workflows/ci.yml`; they do not deploy.
+
+## Releasing
+
+```sh
+npm run release -- patch            # or minor / major / an exact x.y.z; add --dry-run to only run the checks
+```
+
+From a clean `main` that is up to date with `origin`, this builds, bumps the version (commit + tag `vX.Y.Z`) and pushes both. The tag runs `.github/workflows/release.yml`, which deploys to GitHub Pages and publishes a GitHub Release with auto-generated notes (grouped by PR label, see `.github/release.yml`) and the built site as a zip. To redeploy without a release, run the Release workflow by hand from the Actions tab.
+
+The build exposes `__APP_VERSION__` and `__APP_COMMIT__` (short SHA) as globals.
 
 ## Support
 

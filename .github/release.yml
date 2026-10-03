@@ -1,0 +1,16 @@
+# Categories for GitHub's auto-generated release notes. Only merged PRs are
+# listed, grouped by their labels; commits pushed straight to main are not.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: Breaking changes
+      labels: [breaking-change]
+    - title: New
+      labels: [enhancement, feature]
+    - title: Fixes
+      labels: [bug, fix]
+    - title: Docs
+      labels: [documentation]
+    - title: Other changes
+      labels: ['*']
