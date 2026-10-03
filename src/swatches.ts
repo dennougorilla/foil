@@ -57,13 +57,15 @@ export function initSwatches(host: SwatchHost) {
   function forget(strip: Strip, hex: string) {
     const s = store.get();
     const before = { [strip.list]: s[strip.list], [strip.field]: s[strip.field] } as Partial<State>;
+    // The store hands out its live state, so read what we need before changing it.
+    const inUse = s[strip.field] === hex;
+    const t = host.t();
+    const msg = !inUse ? t.colorRemoved : strip === FRAME ? t.colorRemovedFrame.replace('{x}', t.frameName[s.frame]) : t.colorRemovedStage;
     const patch: Partial<State> = { [strip.list]: s[strip.list].filter((c) => c !== hex) } as Partial<State>;
-    if (s[strip.field] === hex) (patch as Record<string, string>)[strip.field] = '';
+    if (inUse) (patch as Record<string, string>)[strip.field] = '';
     sfx.tick();
     store.set(patch);
     // Say what the choice fell back to when the removed colour was the one in use.
-    const t = host.t();
-    const msg = s[strip.field] !== hex ? t.colorRemoved : strip === FRAME ? t.colorRemovedFrame.replace('{x}', t.frameName[s.frame]) : t.colorRemovedStage;
     undoToast(msg, hex, () => store.set(before));
   }
 
