@@ -71,7 +71,7 @@ const ja = {
   sponsorCta: '応援メニューを開く',
   sponsorCtaSub: 'どちらのリンクでも解放されます',
   sponsorLater: 'あとで',
-  sponsorHonor: '支払いの確認はしていません。リンクを開いた時点で解放されます。',
+  sponsorHonor: '支払いの確認はしません。リンクを開けば解放されます。',
   sponsorUnlocked: 'ありがとうございます！ 隠しフォイル 4 種がめくれました',
   sponsorMenuHint: 'どちらかを開くと、隠しフォイルが解放されます',
   sponsorMenuDone: '隠しフォイル解放済み。ありがとう！',

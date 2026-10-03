@@ -312,6 +312,11 @@ export function initSponsor(o: SponsorOptions) {
 
   function celebrate() {
     if (dlg.open) shut();
+    // Coming back from the support page: fold the menu away so the card is in full view.
+    if (menu && !menu.hidden) {
+      menu.hidden = true;
+      btn?.setAttribute('aria-expanded', 'false');
+    }
     syncMenu();
     syncSlots();
     // The secret card turns over, the other three are dealt in, and the first one lands on the card.
