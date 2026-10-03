@@ -125,7 +125,7 @@ export function initSponsor(o: SponsorOptions) {
   dlg.innerHTML = `
     <div class="sp-preview">
       <canvas class="sp-canvas" aria-hidden="true"></canvas>
-      <p class="sp-glimpse" aria-hidden="true"><b></b><span class="sp-count"></span><span class="sp-dots">${SPONSOR_EDITIONS.map(() => '<i></i>').join('')}</span></p>
+      <p class="sp-glimpse" aria-hidden="true"><b></b><span class="sp-count"></span><span class="sp-dots">${SPONSOR_EDITIONS.map((id) => `<i style="--c:${editionById(id).color}"></i>`).join('')}</span></p>
     </div>
     <div class="sp-copy">
       <p class="sp-eyebrow">${STAR_SVG}<span></span></p>
@@ -309,7 +309,7 @@ export function initSponsor(o: SponsorOptions) {
         rz: motion ? Math.sin(time * 0.9) * 0.02 : 0,
         scale: 1,
         edition: editionById(id).shader,
-        intensity: Math.max(store.get().intensity, 0.6),
+        intensity: store.get().intensity,
         pixel: 0,
         tilt: [Math.sin(ry) * 1.2, rx / 0.28],
         light: [0.5 - Math.sin(ry) * 0.4, 0.38 - rx * 1.2],
