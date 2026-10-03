@@ -80,6 +80,7 @@ export function initSponsor(o: SponsorOptions) {
     if (!secret) return;
     const locked = isLocked(SPONSOR_EDITIONS[0]);
     secret.toggleAttribute('data-secret', locked);
+    for (const id of SPONSOR_EDITIONS) slot(id)?.toggleAttribute('data-hidden-finish', !locked);
     if (locked) {
       secret.setAttribute('aria-haspopup', 'dialog');
       secret.setAttribute('aria-label', t.sponsorSecret);

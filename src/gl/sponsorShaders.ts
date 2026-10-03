@@ -40,13 +40,13 @@ vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
   float facing = sin(dot(n, t) * 2.6 + hash12(id + 2.0) * 6.28 + uTime * 0.2);
   float fire = smoothstep(0.3, 1.0, facing);
   float hue = fract(hash12(id + 7.0) + dot(q - floor(q) - local, n) * 0.22 + dot(n, t) * 0.12);
-  float edge = smoothstep(0.0, 0.14, v.y - v.x);
-  vec3 flash = hsv2rgb(vec3(hue, 0.85, 1.0)) * fire * edge;
-  // A milky, slightly blue body that the fire glows through.
+  // Soft-edged flecks that glow brightest at their heart, so the colour sits inside the stone.
+  float body = smoothstep(0.75, 0.05, v.x) * smoothstep(0.0, 0.2, v.y - v.x);
+  vec3 flash = hsv2rgb(vec3(hue, 0.72, 1.0)) * fire * (0.25 + 0.75 * body);
+  // A milky, slightly blue body with a slow opalescent bloom that the fire glows through.
   vec3 milk = mix(c, vec3(0.8, 0.86, 0.95) * (0.5 + 0.55 * L), 0.42) * 0.92;
-  vec3 col = screen(milk, flash * 0.95);
-  col += flash * fire * 0.18;
-  return col;
+  milk += vec3(0.45, 0.6, 0.85) * (fbm(p * 2.5 + t * 0.15) - 0.4) * 0.22;
+  return screen(milk, flash * 0.78);
 }
 
 vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
@@ -64,12 +64,16 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
   col += hot * corona * 1.05;
   // Chromosphere: a thin red-gold ring hugging the moon.
   col += vec3(1.0, 0.62, 0.42) * smoothstep(0.014, 0.0, abs(r - R)) * 0.9;
-  // The moon: near black, with the faintest earthshine of the picture.
-  float disc = smoothstep(R + 0.003, R - 0.003, r);
-  col = mix(col, c * 0.07 + vec3(0.008, 0.008, 0.02), disc);
   // Diamond ring: one bead of sunlight on the rim, swinging round as you tilt.
   float ba = atan(t.y + 0.6, t.x + 0.0001) + uTime * 0.05;
   vec2 bead = vec2(cos(ba), sin(ba)) * R;
+  // The moon: near black with the faintest earthshine of the picture, its limb
+  // catching a little light on the side where the sun breaks through.
+  float disc = smoothstep(R + 0.003, R - 0.003, r);
+  float limb = smoothstep(R * 0.35, R, r);
+  float side = 0.5 + 0.5 * dot(d / max(r, 1e-4), bead / R);
+  vec3 moon = c * 0.08 + vec3(0.008, 0.008, 0.02) + vec3(0.16, 0.12, 0.1) * limb * limb * side * side;
+  col = mix(col, moon, disc);
   vec2 bd = d - bead;
   float glow = exp(-length(bd) * 38.0);
   float flare = (smoothstep(0.006, 0.0, abs(bd.x)) * smoothstep(0.16, 0.0, abs(bd.y))
@@ -80,7 +84,7 @@ vec3 eclipse(vec3 c, vec2 uv, vec2 t, float L) {
 
 vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Black lacquer with crushed shell inlaid wherever the picture is bright.
-  vec3 lacquer = vec3(0.03, 0.012, 0.018) + c * 0.14;
+  vec3 lacquer = vec3(0.03, 0.012, 0.018) + c * 0.32;
   vec2 p = uv * vec2(1.0, 1.4);
   vec2 w = p + (vec2(vnoise(p * 6.0), vnoise(p * 6.0 + 9.0)) - 0.5) * 0.06;
   vec4 v = voronoi(w * 15.0);
@@ -94,7 +98,7 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Shell only shifts through teal, blue, violet and pink, never orange.
   vec3 nacre = hsv2rgb(vec3(mix(0.42, 0.98, film), 0.5, 1.0)) * (0.7 + 0.3 * sin(s * 2.2));
   float lean = 0.55 + 0.45 * sin(dot(hash22(id + 4.0) * 2.0 - 1.0, t) * 3.0 + hash12(id + 5.0) * 6.28);
-  float shell = smoothstep(0.16, 0.5, L) * cut;
+  float shell = smoothstep(0.2, 0.55, L) * cut;
   vec3 inlay = nacre * (0.45 + 0.7 * L) * (0.55 + 0.6 * lean);
   vec3 col = mix(lacquer, inlay, shell);
   // One long wet highlight across the lacquer.
@@ -109,5 +113,6 @@ export const SPONSOR_DISPATCH = /* glsl */ `
   else if (e == 40) col = kintsugi(c, uv, uTilt, L);
   else if (e == 41) col = opal(c, uv, uTilt, L);
   else if (e == 42) col = eclipse(c, uv, uTilt, L);
-  else if (e == 43) col = raden(c, uv, uTilt, L);
+  // Raden inlays the art; the frame only takes a light coat so the nameplate stays readable.
+  else if (e == 43) col = mix(c, raden(c, uv, uTilt, L), 0.4 + 0.6 * m.r);
 `;
