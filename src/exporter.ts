@@ -5,6 +5,7 @@ import type { GifRequest, GifResponse } from './gifWorker';
 import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
+import { AUTO_STILL, AutoTouch } from './touch/heat';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -69,6 +70,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
+      // A finish that reacts to touch shows a stroke drawn for it, caught while it is warm.
+      heat: input.edition.touch ? autoTouch(3 + AUTO_STILL) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
       ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
       alpha: 1,
@@ -81,6 +84,12 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.gl.getExtension('WEBGL_lose_context')?.loseContext();
   if (!blob) throw new Error('png');
   return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
+}
+
+function autoTouch(phase: number): AutoTouch {
+  const a = new AutoTouch();
+  a.at(phase);
+  return a;
 }
 
 export interface Scene {
@@ -115,6 +124,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   // Animated sources repaint their own face canvases so the live card is left alone.
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
+  // Touch finishes get a finger that strokes the card once per loop (seamless after a run-up).
+  const touch = input.edition.touch ? new AutoTouch() : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
   const ch = 640 * k;
@@ -130,6 +141,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
+      touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL : p));
       if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const { rx, ry } = pose;
@@ -151,6 +163,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           alpha: 1,
           flash: 0,
           shadow: [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k],
+          heat: touch ?? undefined,
         },
         cardTime * tune.speed,
       );
