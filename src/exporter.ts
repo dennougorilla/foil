@@ -3,6 +3,7 @@ import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/rende
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
 import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { stillPose } from './lettering';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -62,8 +63,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
-      tilt: [0.35, -0.25],
-      light: tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22],
+      // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
+      ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
       alpha: 1,
       flash: 0,
       shadow: [0, 0],

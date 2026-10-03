@@ -1,5 +1,6 @@
 // GLSL sources. Every effect is written from scratch for this project.
 import { TUNE_GLSL } from '../tune/glsl';
+import { LETTERING_GLSL } from '../lettering';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -386,7 +387,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   }
   return col;
 }
-
+${LETTERING_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -445,6 +446,7 @@ void main() {
   if (e == 13) amt *= m.r; // facets only cut the art, never the nameplate
   amt *= 1.0 - m.b; // the ink outline always stays ink
   col = mix(c, col, amt);
+  col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
   if (e != 0) {

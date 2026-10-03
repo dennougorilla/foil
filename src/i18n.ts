@@ -1,4 +1,5 @@
 import type { EditionId, FrameId, RarityId } from './editions';
+import type { FoilTone, LetterStyle } from './lettering';
 
 export type Lang = 'ja' | 'en';
 
@@ -202,6 +203,38 @@ const ja = {
     sunHelp: 'カード上の太陽をドラッグしても動かせます',
     gyroWait: '端末を傾けてみてください',
     gyroDenied: 'モーションセンサーを使えなかったため、ポインターに戻しました',
+  },
+  lt: {
+    title: '文字の加工',
+    target: '',
+    styles: 'カードの名前の刷り方',
+    style: { ink: '印刷', deboss: '型押し', emboss: '浮き出し', foil: '箔押し', spot: 'スポットUV' } satisfies Record<LetterStyle, string>,
+    help: {
+      ink: '平らに刷った、いつもの文字。',
+      deboss: '型で押して紙をへこませた文字。',
+      emboss: '裏から押し上げた、ふくらんだ文字。',
+      foil: '金属の箔を熱で押しつけた、きらめく文字。',
+      spot: '透明ニスの文字。角度が合うと光ります。',
+    } satisfies Record<LetterStyle, string>,
+    ink: '文字色',
+    inkShort: { auto: '枠色', none: 'なし' },
+    foil: '箔の色',
+    depth: '凹凸',
+    gloss: '光沢',
+    level: ['弱い', 'ふつう', '強い'],
+    glossLevel: ['マット', '半光沢', '鏡面'],
+    inkName: { auto: '枠に合わせる', none: 'インクなし (紙のみ)', white: '白', black: '黒', red: '朱', navy: '藍', custom: '好きな色' },
+    foilName: {
+      gold: '金',
+      silver: '銀',
+      rose: 'ローズゴールド',
+      copper: '銅',
+      rainbow: '虹 (ホログラム)',
+      custom: '好きな色',
+    } satisfies Record<FoilTone, string>,
+    tilt: 'カードを傾ける・上をなぞると光が動きます',
+    jump: '文字の加工: {style} — クリックで変更',
+    reset: '初期値に戻す',
   },
 };
 
@@ -407,6 +440,38 @@ const en: Dict = {
     sunHelp: 'You can also drag the sun on the card',
     gyroWait: 'Try tilting your device',
     gyroDenied: "Couldn't use the motion sensor, so the light follows your pointer again",
+  },
+  lt: {
+    title: 'Lettering',
+    target: '',
+    styles: 'How the card name is printed',
+    style: { ink: 'Print', deboss: 'Deboss', emboss: 'Emboss', foil: 'Hot foil', spot: 'Spot UV' },
+    help: {
+      ink: 'Flat printed type, as usual.',
+      deboss: 'Pressed into the card with a die.',
+      emboss: 'Pushed up from behind to stand off the card.',
+      foil: 'Metal foil stamped on with heat, so it glints.',
+      spot: 'Clear varnish that flares at the right angle.',
+    },
+    ink: 'Color',
+    inkShort: { auto: 'Frame', none: 'None' },
+    foil: 'Foil',
+    depth: 'Relief',
+    gloss: 'Gloss',
+    level: ['Low', 'Mid', 'High'],
+    glossLevel: ['Matte', 'Satin', 'Mirror'],
+    inkName: { auto: 'Match the frame', none: 'No ink (paper only)', white: 'White', black: 'Black', red: 'Vermilion', navy: 'Indigo', custom: 'Any color' },
+    foilName: {
+      gold: 'Gold',
+      silver: 'Silver',
+      rose: 'Rose gold',
+      copper: 'Copper',
+      rainbow: 'Holographic',
+      custom: 'Any color',
+    },
+    tilt: 'Tilt the card or run the pointer over it to move the light',
+    jump: 'Lettering: {style} — click to change',
+    reset: 'Reset to default',
   },
 };
 

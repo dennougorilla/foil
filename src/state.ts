@@ -2,6 +2,7 @@ import type { EditionId, FrameId, RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
+import { DEFAULT_LETTERING, type Lettering } from './lettering';
 
 export interface State {
   lang: Lang;
@@ -25,6 +26,8 @@ export interface State {
   tune: Tune;
   /** Whether the "More" drawer with the fine-tuning is open. */
   tuneOpen: boolean;
+  /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
+  text: Lettering;
 }
 
 type Listener = (s: State, changed: Set<keyof State>) => void;
@@ -47,6 +50,7 @@ const PERSIST: (keyof State)[] = [
   'crop',
   'tune',
   'tuneOpen',
+  'text',
 ];
 
 
@@ -69,6 +73,7 @@ export function createStore() {
     loading: false,
     tune: { ...TUNE_DEFAULTS },
     tuneOpen: false,
+    text: { ...DEFAULT_LETTERING },
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;

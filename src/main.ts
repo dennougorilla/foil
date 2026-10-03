@@ -12,6 +12,7 @@ import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
+import { mountLettering } from './letteringPanel';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -842,6 +843,15 @@ store.on((s, changed) => {
 // ---------- Boot ----------
 
 setSound(store.get().sound);
+mountLettering({
+  store,
+  host: $('intensity').closest<HTMLElement>('.sec')!,
+  dict: () => t,
+  name: () => store.get().name || fallback().name,
+  repaint: () => redrawFace(),
+  onPick: () => stage.juice(0.35),
+  tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
+});
 applyText();
 const boot = () => {
   redrawFace();

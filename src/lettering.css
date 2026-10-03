@@ -1,0 +1,643 @@
+/* ---------- Lettering finishes (panel block) ---------- */
+
+.lt {
+  /* Rest light: raking from the upper left. */
+  --mx: 0.15;
+  --my: 0.1;
+  container-type: inline-size;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 2px dashed var(--panel-lo);
+}
+
+.lt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+
+.lt-target {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.lt-reset {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.lt-reset[hidden] {
+  /* Keep its space so the header never shifts. */
+  display: inline;
+  visibility: hidden;
+}
+
+/* Style chips: each one prints your card's first letter in that finish. */
+.lt-styles {
+  --lx: calc((var(--mx) - 0.5) * 2);
+  --ly: calc((var(--my) - 0.5) * 2);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.lt-style {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 3px 2px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 4px 0 var(--edge);
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.1;
+  transition: transform 0.08s, background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.lt-style:hover {
+  color: var(--text);
+}
+
+.lt-style:hover .lt-chip {
+  transform: translateY(-2px) rotate(-2deg);
+}
+
+.lt-style[aria-checked='true'] {
+  background: var(--panel-hi);
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  /* Same gold ring as the picked image thumbnail. */
+  box-shadow: inset 0 0 0 3px var(--gold), 0 4px 0 var(--edge);
+}
+
+.lt-style[aria-checked='true'] .lt-chip {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lt-style:active {
+  transform: translateY(4px);
+  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 0 0 var(--edge);
+}
+
+[data-style='spot'] .lt-style-name {
+  font-size: 11px;
+  letter-spacing: -0.06em;
+  white-space: nowrap;
+}
+
+.lt-style-name {
+  padding-inline: 1px;
+}
+
+@container (max-width: 320px) {
+  [data-style='spot'] .lt-style-name {
+    letter-spacing: -0.09em;
+  }
+}
+
+.lt-style-name {
+  display: grid;
+  place-items: center;
+  min-height: 1.6em;
+  max-width: 100%;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* Narrow panels (1024px and down to phones): tighter labels so words never split. */
+@container (max-width: 320px) {
+  .lt-style {
+    font-size: 11px;
+    letter-spacing: -0.03em;
+  }
+  .lt-chip {
+    height: 40px;
+  }
+}
+
+.lt-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 46px;
+  border-radius: 5px;
+  background: var(--lt-paper);
+  box-shadow: 0 0 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.25), inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  transition: transform 0.18s var(--ease-back);
+}
+
+.lt-chip b {
+  position: relative;
+  font-family: 'DotGothic16', monospace;
+  font-size: 36px;
+  /* Faux bold: the pixel font is thin, and relief needs a letter with some body. */
+  font-weight: 700;
+  line-height: 1;
+  color: var(--lt-ink);
+}
+
+/* Print: flat. */
+
+/*
+ * Deboss and emboss chips are lit by a fixed raking light from the upper left
+ * (the angle that shows a press best); the pointer swings it around. The stroke
+ * widens the die past the letter, as on a real card, so the walls show even
+ * around dark ink.
+ */
+.lt {
+  --lt-sh: rgba(0, 0, 0, 0.55);
+  --lt-hl: rgba(255, 255, 255, 0.95);
+  --lt-trough: rgba(0, 0, 0, 0.2);
+  --lt-pillow: rgba(255, 255, 255, 0.85);
+}
+
+.is-dark-stock {
+  --lt-sh: rgba(0, 0, 0, 0.95);
+  --lt-hl: rgba(255, 255, 255, 0.4);
+  --lt-trough: rgba(0, 0, 0, 0.45);
+  --lt-pillow: rgba(255, 255, 255, 0.14);
+}
+
+[data-style='deboss'] .lt-chip b,
+[data-style='emboss'] .lt-chip b {
+  -webkit-text-stroke: 6px var(--lt-trough);
+  paint-order: stroke fill;
+}
+
+/* Deboss: a sunken trough; the wall towards the light in shadow, a lit lip on the far side. */
+[data-style='deboss'] .lt-chip b {
+  color: color-mix(in srgb, var(--lt-ink) 85%, #000);
+  text-shadow:
+    calc(var(--lx) * 2px) calc(var(--ly) * 2px) 0 var(--lt-sh),
+    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 var(--lt-hl);
+}
+
+/* Emboss: a raised pillow; lit shoulder towards the light, a long soft shadow away from it. */
+[data-style='emboss'] .lt-chip b {
+  -webkit-text-stroke-color: var(--lt-pillow);
+  text-shadow:
+    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 var(--lt-hl),
+    calc(var(--lx) * -3.5px) calc(var(--ly) * -3.5px) 0 var(--lt-sh);
+}
+
+/* Blind (no ink): the letter is the card stock itself; the die's edges carry it. */
+.is-blind {
+  --lt-trough: rgba(0, 0, 0, 0.3);
+}
+
+.is-blind[data-style='deboss'] .lt-chip b,
+.is-blind[data-style='emboss'] .lt-chip b,
+.is-blind [data-style='deboss'] .lt-chip b,
+.is-blind [data-style='emboss'] .lt-chip b {
+  color: var(--lt-stock);
+}
+
+/* Foil: metal ramp that slides as the light moves. */
+[data-style='foil'] .lt-chip b {
+  color: transparent;
+  background: linear-gradient(115deg, var(--lt-lo) 10%, var(--lt-hi) 30%, var(--lt-lo) 48%, var(--lt-hi) 64%, var(--lt-lo) 86%);
+  background-size: 320% 100%;
+  background-position: calc(var(--mx) * 100%) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+
+.is-rainbow[data-style='foil'] .lt-chip b,
+.is-rainbow [data-style='foil'] .lt-chip b {
+  background-image: linear-gradient(115deg, #ff8aa8, #ffe28a 18%, #9cf7c8 34%, #8ad4ff 50%, #c99cff 66%, #ff8aa8 84%, #ffe28a);
+}
+
+/* Spot UV: the glyph barely shows; a hard gloss band crosses it. */
+[data-style='spot'] .lt-chip b {
+  color: color-mix(in srgb, var(--lt-ink) 85%, #000);
+}
+
+[data-style='spot'] .lt-chip b::after {
+  content: attr(data-g);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background: linear-gradient(115deg, transparent 42%, #fff 46% 50%, transparent 54%);
+  background-size: 300% 100%;
+  /* At rest the band crosses the glyph's right side; moving the pointer sweeps it across. */
+  background-position: calc((var(--mx) * 0.6 + 0.2) * 100%) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.is-blind[data-style='spot'] .lt-chip b,
+.is-blind [data-style='spot'] .lt-chip b {
+  /* Clear varnish on bare stock: only its edge and the gloss band show. */
+  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.14);
+  color: color-mix(in srgb, var(--lt-ink) 10%, transparent);
+}
+
+.lt-help {
+  min-height: 2.6em;
+  text-wrap: pretty;
+  margin: 10px 0 0;
+  line-height: 1.3;
+}
+
+/* Tuning */
+.lt-detail .row {
+  margin-top: 10px;
+}
+
+.lt-detail > :first-child {
+  margin-top: 4px;
+}
+
+.lt-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lt-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lt-picked {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.lt-picked:not(:empty)::before {
+  content: '— ';
+  color: var(--text-dim);
+}
+
+.lt-row[hidden],
+.lt-slider[hidden],
+.lt-tilt[hidden] {
+  display: none;
+}
+
+.lt-swatches {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lt-swatch {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--sw, var(--panel-hi));
+  box-shadow: 0 0 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+  transition: transform 0.12s var(--ease-back), box-shadow 0.12s;
+}
+
+.lt-swatch[hidden] {
+  display: none;
+}
+
+.lt-swatch:hover {
+  transform: translateY(-2px);
+}
+
+.lt-swatch[aria-checked='true'] {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 4px var(--text), 0 0 0 6px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Auto: the frame's own ink, shown as a letter on the card stock. */
+/* "Frame" and "None" are words on the card stock, not colour chips. */
+.lt-ink-auto,
+.lt-ink-none {
+  width: auto;
+  min-width: 26px;
+  padding: 0 8px;
+  background: var(--lt-paper);
+  font-size: 12px;
+  line-height: 26px;
+}
+
+.lt-ink-auto {
+  color: var(--sw);
+}
+
+.lt-ink-none {
+  color: #4f5a5e;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 5px, rgba(0, 0, 0, 0.08) 5px 7px),
+    var(--lt-paper);
+}
+
+.is-dark-stock .lt-ink-none {
+  color: var(--text);
+}
+
+.lt-swatch:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Custom: a colour wheel with a plus, or the chosen colour as a dot once set. */
+.lt-ink-custom,
+.lt-foil-custom:not([aria-checked='true']) {
+  background: conic-gradient(#ff5a4f, #ffd84a, #3fc28f, #1a9cff, #b26cd8, #ff5a4f);
+}
+
+.lt-ink-custom:not(.is-set)::after,
+.lt-foil-custom:not([aria-checked='true'])::after {
+  content: '+';
+  position: absolute;
+  inset: 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  background: var(--panel-lo);
+  box-shadow: 0 0 0 2px var(--edge);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.lt-ink-custom.is-set::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 3px;
+  background: var(--sw);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.lt-foil {
+  background: linear-gradient(135deg, var(--lo) 0%, var(--hi) 42%, var(--lo) 70%, var(--hi) 100%);
+}
+
+.lt-foil-rainbow {
+  background: linear-gradient(135deg, #ff8aa8, #ffe28a 25%, #9cf7c8 45%, #8ad4ff 65%, #c99cff 85%);
+}
+
+.lt-picker {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lt-tilt {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  position: relative;
+}
+
+/* A small tilting card glyph before the tilt hint. */
+.lt-tilt::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.2em;
+  width: 9px;
+  height: 12px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, var(--lt-lo), var(--lt-hi) 50%, var(--lt-lo));
+  box-shadow: 0 0 0 1.5px var(--edge);
+  transform: rotate(-12deg);
+  animation: lt-tilt 2.4s var(--ease-out) infinite alternate;
+}
+
+@keyframes lt-tilt {
+  from { transform: rotate(-12deg); }
+  to { transform: rotate(10deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-style,
+  .lt-chip,
+  .lt-swatch {
+    transition: none;
+  }
+  .lt-style:hover .lt-chip {
+    transform: none;
+  }
+  .lt-tilt::before {
+    animation: none;
+  }
+}
+
+/* ---------- Shortcut under the card's name tag ---------- */
+
+/* A chunky button like the rest of the app: the finish preview, its name, and an arrow. */
+.lt-jump {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px 12px 6px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--panel-lo);
+  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 5px 0 3px var(--edge);
+  color: var(--text);
+  text-align: left;
+  transition: transform 0.08s, background 0.15s;
+}
+
+.lt-jump:hover {
+  background: var(--panel-hi);
+}
+
+.lt-jump:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 1px 0 3px var(--edge);
+}
+
+.lt-jump .lt-chip {
+  flex: none;
+  width: 40px;
+  height: 34px;
+  border-radius: 6px;
+}
+
+.lt-jump .lt-chip b {
+  font-size: 24px;
+}
+
+.lt-jump-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.lt-jump-text small {
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.75;
+}
+
+/* On phones the controls are further down the page, so the arrow points down. */
+@media (max-width: 900px) {
+  .lt-jump-arrow {
+    transform: rotate(90deg);
+  }
+  .lt-jump:hover .lt-jump-arrow {
+    transform: rotate(90deg) translateY(-3px);
+  }
+}
+
+.lt-jump-text b {
+  font-weight: 400;
+  font-size: 17px;
+  text-shadow: 0 2px 0 var(--edge);
+}
+
+.lt-jump-arrow {
+  margin-left: auto;
+  font-family: var(--display);
+  font-size: 20px;
+  color: var(--gold);
+  transition: transform 0.15s var(--ease-back);
+}
+
+.lt-jump:hover .lt-jump-arrow {
+  transform: translateX(3px);
+}
+
+/* A small sparkle on the preview marks it as a finish. */
+.lt-jump .lt-chip::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 9px;
+  height: 9px;
+  background: var(--gold);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+/* Focus and scroll targets clear the sticky export bar at the bottom of the panel. */
+.lt button,
+.lt input {
+  scroll-margin-block: 24px 170px;
+}
+
+.lt {
+  scroll-margin-block: 24px 170px;
+}
+
+/* A brief glow when the shortcut brings you here. */
+.lt {
+  position: relative;
+}
+
+/* The jump highlight is a frame drawn inside the block's own padding, so it
+   never runs into the divider or the next control. */
+.lt::before {
+  content: '';
+  position: absolute;
+  inset: -8px -10px 6px;
+  border: 3px solid var(--gold);
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lt.is-called::before {
+  animation: lt-called 1.8s var(--ease-out);
+}
+
+@keyframes lt-called {
+  0%, 40% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-jump,
+  .lt-jump-arrow {
+    transition: none;
+  }
+  .lt-jump:hover .lt-jump-arrow {
+    transform: none;
+  }
+  .lt.is-called::before {
+    animation-duration: 0.01s;
+  }
+}
+
+/* Touch: bigger swatches. */
+@media (pointer: coarse) {
+  .lt-swatch {
+    width: 34px;
+    height: 34px;
+  }
+  .lt-swatches {
+    gap: 10px;
+  }
+}
+
+
+/* The tile you pick gets stamped: a quick press and spring back. */
+.lt-style.is-stamped .lt-chip {
+  animation: lt-stamp 0.32s var(--ease-back);
+}
+
+@keyframes lt-stamp {
+  0% { transform: translateY(-2px) scale(1); }
+  35% { transform: translateY(3px) scale(0.9); filter: brightness(0.9); }
+  100% { transform: translateY(-2px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-style.is-stamped .lt-chip {
+    animation: none;
+  }
+}
+
+.lt-target:empty {
+  display: none;
+}
+
+/* Keyboard focus is white, so it never reads as the gold "selected" ring. */
+.lt-style:focus-visible,
+.lt-swatch:focus-visible,
+.lt-jump:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+}
+
+/* Value words: same column as the panel's other sliders, never wrapping. */
+.lt .lt-slider output {
+  font-family: var(--font);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Controls that don't apply to the chosen style stay in place, greyed out. */
+.lt-slider.is-off {
+  opacity: 0.38;
+}
+
+.lt-slider.is-off input {
+  cursor: not-allowed;
+}
+
+.lt-tilt.is-off {
+  visibility: hidden;
+}
