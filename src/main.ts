@@ -9,6 +9,7 @@ import { setSound, sfx } from './audio';
 import { exportGif, exportPng, exportVideo, videoSupported } from './exporter';
 import { loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
+import { initRangeColors } from './features';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -61,12 +62,14 @@ stage.cards.setBack(back);
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor };
 }
 
 function redrawFace() {
-  drawFace(face, mask, faceSpec(currentImage()));
+  const spec = faceSpec(currentImage());
+  drawFace(face, mask, spec);
   stage.cards.setFace(face, mask);
+  rangeColors.onFace(face, mask, spec);
 }
 
 // ---------- Text ----------
@@ -203,6 +206,7 @@ function buildSegments() {
     };
     fs.appendChild(b);
   }
+  rangeColors.decorateFrames(fs);
 }
 
 function buildThumbs() {
@@ -596,6 +600,7 @@ function exportInput() {
     pixel: s.pixel,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
+    ...rangeColors.exportExtras(),
   };
 }
 
@@ -800,6 +805,7 @@ store.on((s, changed) => {
 
 // ---------- Boot ----------
 
+const rangeColors = initRangeColors({ store, stage, t: () => t, announce, redrawFace, rebuildFrames: buildSegments });
 setSound(store.get().sound);
 applyText();
 const boot = () => {

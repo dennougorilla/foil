@@ -1,4 +1,5 @@
 import type { EditionId, FrameId, RarityId } from './editions';
+import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
 
 export type Lang = 'ja' | 'en';
 
@@ -116,6 +117,7 @@ const ja = {
     '満ちる夜に、いちばん静かな一枚。',
     '最後に笑うのは、いつもこのカード。',
   ],
+  ...RANGE_COLOR_JA,
 };
 
 type Dict = typeof ja;
@@ -234,6 +236,7 @@ const en: Dict = {
     'The quietest card on the fullest night.',
     'Always the one laughing last.',
   ],
+  ...RANGE_COLOR_EN,
 };
 
 export const DICTS: Record<Lang, Dict> = { ja, en };

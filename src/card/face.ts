@@ -1,4 +1,5 @@
 import { rarityById, type FrameId, type RarityId } from '../editions';
+import { customFrame } from '../palette';
 
 export const FACE_W = 900;
 export const FACE_H = 1260;
@@ -18,6 +19,8 @@ export interface FaceSpec {
   frame: FrameId;
   rarity: RarityId;
   name: string;
+  /** Custom frame colour ('#rrggbb'); overrides the frame preset when set. */
+  frameColor?: string;
 }
 
 const OUTLINE = '#161c1f';
@@ -109,7 +112,7 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   ctx.fill();
 
   // Frame body
-  const f = frameFill(ctx, spec.frame, spec.rarity);
+  const f = spec.frameColor ? customFrame(spec.frameColor) : frameFill(ctx, spec.frame, spec.rarity);
   ctx.fillStyle = f.fill;
   roundRect(ctx, LINE, LINE, FACE_W - LINE * 2, FACE_H - LINE * 2, RADIUS - LINE);
   ctx.fill();

@@ -1,4 +1,5 @@
 // GLSL sources. Every effect is written from scratch for this project.
+import { RANGE_GLSL } from './range';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -141,6 +142,7 @@ uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 out vec4 o;
 ${COMMON}
+${RANGE_GLSL}
 
 vec4 face(vec2 uv, float lod) { return textureLod(uFace, uv, lod); }
 
@@ -433,6 +435,8 @@ void main() {
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;
   if (e == 13) amt *= m.r; // facets only cut the art, never the nameplate
   amt *= 1.0 - m.b; // the ink outline always stays ink
+  float sel = foilRange(uv, L);
+  amt *= sel;
   col = mix(c, col, amt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
@@ -443,10 +447,11 @@ void main() {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = pow(max(1.0 - d * 1.6, 0.0), 4.0) * 0.1;
   }
-  col += spec;
+  col += spec * sel;
   // Tilting away darkens a touch; tilting towards brightens.
   col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
+  col = showRange(col, uv, sel);
   col = mix(col, vec3(1.0), uFlash);
   o = vec4(clamp(col, 0.0, 1.0) * base.a, base.a) * uAlpha;
 }

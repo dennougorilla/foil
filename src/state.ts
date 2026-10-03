@@ -1,8 +1,9 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
+import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, type RangeColorState } from './featureState';
 
-export interface State {
+export interface State extends RangeColorState {
   lang: Lang;
   sound: boolean;
   crt: boolean;
@@ -40,6 +41,7 @@ const PERSIST: (keyof State)[] = [
   'descEdited',
   'sample',
   'crop',
+  ...RANGE_COLOR_PERSIST,
 ];
 
 
@@ -60,6 +62,7 @@ export function createStore() {
     sample: 0,
     crop: { zoom: 1, x: 0.5, y: 0.5 },
     loading: false,
+    ...RANGE_COLOR_DEFAULTS,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;

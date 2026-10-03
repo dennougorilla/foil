@@ -78,6 +78,12 @@ export class Stage {
   private palette: [RGB, RGB, RGB];
   private bgPointer: [number, number] = [0.5, 0.5];
   private focus: [number, number] = [0.4, 0.55];
+  /** Hold the card flat and still, facing the viewer (brush mode). */
+  hold = false;
+  /** Backdrop swirl that replaces the finish's own, or null to follow the finish. */
+  backdrop: [string, string, string] | null = null;
+  /** 0..1: overlay on the main card showing where the finish lands. */
+  rangeView = 0;
 
   constructor(o: StageOptions) {
     this.o = o;
@@ -354,7 +360,7 @@ export class Stage {
     // Background palette eases to the selected edition
     const ed = EDITIONS.find((e) => e.id === state.edition) ?? EDITIONS[0];
     const k = 1 - Math.exp(-dt * 3);
-    ed.swirl.forEach((hex, i) => {
+    (this.backdrop ?? ed.swirl).forEach((hex, i) => {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });
@@ -380,7 +386,11 @@ export class Stage {
       const over = this.pointer.inside && Math.abs(nx) < 1.05 && Math.abs(ny) < 1.05;
       this.pointer.overCard = over || this.drag.active;
       const amp = this.motion ? 1 : 0.5;
-      if (this.drag.active) {
+      if (this.hold) {
+        this.rx.target = 0;
+        this.ry.target = 0;
+        this.rz.target = 0;
+      } else if (this.drag.active) {
         this.ry.target = clamp(this.drag.vx * 0.00025, -0.5, 0.5) * amp;
         this.rx.target = clamp(-this.drag.vy * 0.00025, -0.5, 0.5) * amp;
         this.rz.target = clamp(this.drag.vx * 0.00018, -0.35, 0.35) * amp;
@@ -399,7 +409,7 @@ export class Stage {
       }
       // Idle float
       const t = this.time;
-      const idle = this.motion && !this.drag.active ? 1 : 0;
+      const idle = this.motion && !this.drag.active && !this.hold ? 1 : 0;
       const sub = 4;
       for (let i = 0; i < sub; i++) {
         for (const s of [this.ox, this.oy, this.rx, this.ry, this.rz, this.sc]) s.step(dt / sub);
@@ -435,7 +445,7 @@ export class Stage {
         (this.rx.x + rxIdle) / 0.28 + Math.cos(t * 0.38) * 0.3 * idle,
       ];
       let light: [number, number];
-      if (over && !this.drag.active) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
+      if (over && !this.drag.active && !this.hold) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
       else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
 
       const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
@@ -457,6 +467,7 @@ export class Stage {
           alpha: 1,
           flash: this.flash,
           shadow: [10 + lift * 0.3 - RY * 18, 16 + lift * 0.5 + RX * 10],
+          rangeView: this.rangeView,
         },
         this.time,
       );

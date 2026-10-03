@@ -2,6 +2,7 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
+import type { RangeSnapshot } from './gl/range';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -15,6 +16,10 @@ export interface ExportInput {
   faceAt?: (ms: number, face: HTMLCanvasElement, mask: HTMLCanvasElement) => void;
   /** Length of one loop of the animated source, in ms. */
   loopMs?: number;
+  /** Where on the face the finish lands; whole card when absent. */
+  range?: RangeSnapshot;
+  /** Backdrop swirl for clips; the finish's own when absent. */
+  swirl?: [string, string, string];
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -41,6 +46,7 @@ export async function exportPng(input: ExportInput): Promise<void> {
   const r = new CardRenderer(canvas, { preserve: true });
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
+  if (input.range) r.range.set(input.range);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
   r.begin();
   r.drawCard(
@@ -91,8 +97,9 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
   const cards = new CardRenderer(cardCanvas);
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
+  if (input.range) cards.range.set(input.range);
   cards.resize(W, H, 1);
-  const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
+  const colors = (input.swirl ?? input.edition.swirl).map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
