@@ -4,6 +4,8 @@ import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { RangeLayer } from './range';
 import { ReliefGL } from '../relief';
+import { HeatLayer } from '../touch/layer';
+import type { HeatSource } from '../touch/heat';
 
 export type RGB = [number, number, number];
 
@@ -80,6 +82,8 @@ export interface CardDraw {
   rangeView?: number;
   /** Length of an exported loop in shader seconds, so a finish's own motion can close on itself; 0 or absent live. */
   loop?: number;
+  /** Where the card was touched, for finishes that react to it. */
+  heat?: HeatSource;
 }
 
 export interface Particle {
@@ -106,6 +110,7 @@ export class CardRenderer {
   private mask: WebGLTexture;
   private back: WebGLTexture;
   private lettering: LetteringGL;
+  private heat: HeatLayer;
   private faceTexels = 1;
   private relief: ReliefGL;
   /** Where on the face the finish applies. */
@@ -155,6 +160,7 @@ export class CardRenderer {
     this.lettering = new LetteringGL(gl, opts.settled);
     this.relief = new ReliefGL(gl, !opts.settled);
     this.range = new RangeLayer(gl);
+    this.heat = new HeatLayer(gl);
   }
 
   setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement): void {
@@ -224,6 +230,7 @@ export class CardRenderer {
     applyTune(gl, p.u, this.tune);
     this.relief.bind(p, 5);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
+    this.heat.bind(p, 6, d.heat);
 
     // Hard pixel drop shadow first, then the card itself.
     gl.uniform1f(p.u.uShadow, 1);

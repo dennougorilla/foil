@@ -26,7 +26,7 @@ const shots = [
   { name: 'mobile-en', w: 390, h: 844, lang: 'en', full: true, dpr: 2 },
 ].filter((s) => s.name.includes(filter));
 
-const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch', 'aurora', 'frost', 'magma', 'halftone', 'crystal', 'sakura', 'relief', 'shallows'];
+const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch', 'aurora', 'frost', 'magma', 'halftone', 'crystal', 'sakura', 'relief', 'warmth', 'shallows'];
 const errors = [];
 
 for (const s of shots) {

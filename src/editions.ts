@@ -16,6 +16,7 @@ export type EditionId =
   | 'sakura'
   | 'shallows'
   | 'relief'
+  | 'warmth'
   // Sponsor-only, see src/sponsor.ts
   | 'kintsugi'
   | 'opal'
@@ -33,6 +34,8 @@ export interface Edition {
   value: number;
   /** Smooth gradients that band in 256 colours: its GIF is dithered. */
   dither?: boolean;
+  /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a heat field. */
+  touch?: boolean;
 }
 
 export const EDITIONS: Edition[] = [
@@ -53,6 +56,7 @@ export const EDITIONS: Edition[] = [
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
   { id: 'relief', shader: 15, color: '#e3bf72', swirl: ['#07090d', '#1c2633', '#4d6274'], value: 7, dither: true },
+  { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: true },
   // Sponsor-only finishes (locked until unlocked in src/sponsor.ts).
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

@@ -5,6 +5,7 @@ import { RANGE_GLSL } from './range';
 import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
 import { RELIEF_GLSL } from '../relief';
+import { TOUCH_GLSL } from '../touch/glsl';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -397,6 +398,7 @@ ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
 ${SPONSOR_GLSL}
+${TOUCH_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -448,10 +450,11 @@ void main() {
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
+  else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
-  if (e != 0) col = tuneColor(col, c);
+  if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;
