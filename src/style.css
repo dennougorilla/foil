@@ -1106,7 +1106,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 /* Each picture is a small print with a white border, the chosen one pulled up and ticked. */
@@ -1166,7 +1166,7 @@ button {
 /* While a sample shows, opening your own picture is the vermilion step; after that, a ruled one. */
 .pick {
   justify-content: flex-start;
-  min-height: 56px;
+  min-height: 52px;
   background: transparent;
   color: var(--ink);
   box-shadow: inset 0 0 0 2px var(--ink);
@@ -1204,15 +1204,15 @@ button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 18px;
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .crop-view {
   position: relative;
   display: grid;
   place-items: center;
-  width: 120px;
-  height: 136px;
+  width: 108px;
+  height: 120px;
   border-radius: 2px;
   background:
     repeating-linear-gradient(45deg, rgba(42, 36, 30, 0.09) 0 2px, transparent 2px 7px),
@@ -1784,8 +1784,8 @@ button {
 /* Formats: one of four, each with a word for what it makes (a still, a loop...); the chosen
    one is inked. */
 .seg.seg-format {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .panel .seg-format .seg-btn {
@@ -2705,18 +2705,23 @@ input[type='range']:disabled {
   .crop {
     margin-top: 12px;
   }
-  .crop-side .hint {
+  /* The hand's caption already says how the finish looks. */
+  .crop-side .hint,
+  .finish-look {
     display: none;
   }
   .finish-row .finish-proof {
     width: 38px;
     height: 53px;
   }
+  .sec-adjust {
+    padding-block: 4px;
+  }
   .thumbs {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .thumb {
-    width: 36px;
+    width: 34px;
   }
   .pick {
     min-height: 46px;
