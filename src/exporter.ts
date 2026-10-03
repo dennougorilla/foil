@@ -2,6 +2,7 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
+import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -15,6 +16,8 @@ export interface ExportInput {
   faceAt?: (ms: number, face: HTMLCanvasElement, mask: HTMLCanvasElement) => void;
   /** Length of one loop of the animated source, in ms. */
   loopMs?: number;
+  /** Fine-tuning of light and motion; defaults when left out. */
+  tune?: Tune;
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -39,6 +42,8 @@ export async function exportPng(input: ExportInput): Promise<void> {
   const pad = 24;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true });
+  const tune = input.tune ?? TUNE_DEFAULTS;
+  r.tune = tuneGl(tune);
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
@@ -57,7 +62,7 @@ export async function exportPng(input: ExportInput): Promise<void> {
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
       tilt: [0.35, -0.25],
-      light: [0.32, 0.22],
+      light: tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22],
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
@@ -89,6 +94,8 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
   bg.resize(W / 4, H / 4);
   const cardCanvas = document.createElement('canvas');
   const cards = new CardRenderer(cardCanvas);
+  const tune = input.tune ?? TUNE_DEFAULTS;
+  cards.tune = tuneGl(tune);
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   cards.resize(W, H, 1);
@@ -105,35 +112,35 @@ function createScene(input: ExportInput, W: number, H: number, readback = false)
     out,
     ctx,
     draw(p, bgTime, cardTime, sourceMs) {
-      const a = p * Math.PI * 2;
+      // The card's motion and light follow the tune; the defaults give the classic orbit.
+      const pose = loopPose(tune, p);
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
       bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
-      const rx = Math.sin(a) * 0.22;
-      const ry = Math.cos(a) * 0.3;
+      const { rx, ry } = pose;
       cards.drawCard(
         {
           cx: W / 2,
-          cy: H / 2 + Math.sin(a * 2) * 8 * k,
+          cy: H / 2 + pose.dy * k,
           w: cw,
           h: ch,
           rx,
           ry,
-          rz: Math.sin(a) * 0.03,
-          scale: 1,
+          rz: pose.rz,
+          scale: pose.scale,
           edition: input.edition.shader,
           intensity: input.intensity,
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
-          tilt: [ry / 0.32, rx / 0.28],
-          light: [0.5 - Math.cos(a) * 0.3, 0.4 - Math.sin(a) * 0.25],
+          tilt: pose.tilt,
+          light: pose.light,
           alpha: 1,
           flash: 0,
-          shadow: [(12 - ry * 18) * k, (18 + rx * 10) * k],
+          shadow: [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k],
         },
-        cardTime,
+        cardTime * tune.speed,
       );
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(bgCanvas, 0, 0, W, H);

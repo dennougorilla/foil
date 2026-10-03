@@ -1,6 +1,7 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
+import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 
 export interface State {
   lang: Lang;
@@ -20,6 +21,10 @@ export interface State {
   sample: number;
   crop: Crop;
   loading: boolean;
+  /** Fine-tuning of light and motion, shared by every finish. */
+  tune: Tune;
+  /** Whether the "More" drawer with the fine-tuning is open. */
+  tuneOpen: boolean;
 }
 
 type Listener = (s: State, changed: Set<keyof State>) => void;
@@ -40,6 +45,8 @@ const PERSIST: (keyof State)[] = [
   'descEdited',
   'sample',
   'crop',
+  'tune',
+  'tuneOpen',
 ];
 
 
@@ -60,10 +67,13 @@ export function createStore() {
     sample: 0,
     crop: { zoom: 1, x: 0.5, y: 0.5 },
     loading: false,
+    tune: { ...TUNE_DEFAULTS },
+    tuneOpen: false,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
+    state.tune = sanitizeTune(state.tune);
   } catch {
     /* storage unavailable: defaults are fine */
   }

@@ -1,5 +1,6 @@
 import { BG_FS, CARD_FS, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './shaders';
 import { createProgram, createTexture, hexToRgb, quadBuffer, uploadTexture, type Program } from './gl';
+import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 
 export type RGB = [number, number, number];
 
@@ -101,6 +102,8 @@ export class CardRenderer {
   cssW = 1;
   cssH = 1;
   dpr = 1;
+  /** Fine-tuning shared by every card this renderer draws. */
+  tune: TuneGl = TUNE_GL_DEFAULT;
 
   constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas, opts: { preserve?: boolean } = {}) {
     const gl = canvas.getContext('webgl2', {
@@ -200,6 +203,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uFlash, d.flash);
     gl.uniform1f(p.u.uFaceTexels, this.faceTexels);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
+    applyTune(gl, p.u, this.tune);
 
     // Hard pixel drop shadow first, then the card itself.
     gl.uniform1f(p.u.uShadow, 1);

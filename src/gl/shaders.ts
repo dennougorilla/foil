@@ -1,4 +1,5 @@
 // GLSL sources. Every effect is written from scratch for this project.
+import { TUNE_GLSL } from '../tune/glsl';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -141,8 +142,9 @@ uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 out vec4 o;
 ${COMMON}
+${TUNE_GLSL}
 
-vec4 face(vec2 uv, float lod) { return textureLod(uFace, uv, lod); }
+vec4 face(vec2 uv, float lod) { return textureLod(uFace, tuneFaceUv(uv), lod); }
 
 vec3 foil(vec3 c, vec2 uv, vec2 t, float L) {
   vec2 p = (uv - 0.5) * vec2(1.0, 1.4);
@@ -414,6 +416,10 @@ void main() {
   float L = luma(c);
   vec3 col = c;
   int e = uEdition;
+  // Finishes draw their pattern in tuned coordinates (zoom, rotation); the real uv comes back after.
+  vec2 artUv = uv;
+  uv = tunePattern(uv);
+  tPattern = true;
   if (e == 1) col = foil(c, uv, uTilt, L);
   else if (e == 2) col = holo(c, uv, uTilt, L);
   else if (e == 3) col = poly(c, uv, uTilt, L);
@@ -428,6 +434,9 @@ void main() {
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
+  tPattern = false;
+  uv = artUv;
+  if (e != 0) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;
@@ -438,12 +447,13 @@ void main() {
   float spec = 0.0;
   if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
-    spec = pow(max(1.0 - d * 1.35, 0.0), 3.0) * 0.32 * uIntensity;
+    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
-    spec = pow(max(1.0 - d * 1.6, 0.0), 4.0) * 0.1;
+    spec = tuneGlare(d, 1.6, 4.0, 0.1);
   }
-  col += spec;
+  col += spec * uTLight;
+  if (e != 0) col += tuneGlitter(uv, uTilt) * uIntensity * (1.0 - m.b);
   // Tilting away darkens a touch; tilting towards brightens.
   col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
