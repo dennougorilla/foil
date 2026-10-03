@@ -14,6 +14,7 @@ export type EditionId =
   | 'halftone'
   | 'crystal'
   | 'sakura'
+  | 'shallows'
   // Sponsor-only, see src/sponsor.ts
   | 'kintsugi'
   | 'opal'
@@ -47,6 +48,7 @@ export const EDITIONS: Edition[] = [
   { id: 'halftone', shader: 12, color: '#ffd84a', swirl: ['#151518', '#d83a6a', '#2aa8d8'], value: 3 },
   { id: 'crystal', shader: 13, color: '#e8f6ff', swirl: ['#101522', '#5a6ea8', '#d8e6ff'], value: 6 },
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
+  { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
   // Sponsor-only finishes (locked until unlocked in src/sponsor.ts).
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
