@@ -105,7 +105,7 @@ export async function exportApng(
     send({ type: 'start', width: plan.width, height: plan.height });
     for (let i = 0; i < frames; i++) {
       await nextFrame(signal);
-      scene.draw(at / loopMs, 0, at / 1000, (at / loopMs) * plan.sourceSpan);
+      scene.draw(at / loopMs, 0, loopMs / 1000, (at / loopMs) * plan.sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, plan.width, plan.height);
       send({ type: 'frame', data: data.buffer, delay: plan.delays[i] }, [data.buffer]);
       at += plan.delays[i];
