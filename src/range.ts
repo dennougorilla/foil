@@ -271,7 +271,11 @@ export class RangeModel {
       });
       db.close();
       const saved = v as (Layers & { w: number; h: number }) | null | undefined;
+      const n = RANGE_W * RANGE_H;
+      // Both layers must be whole; anything else is discarded rather than half-loaded.
       if (!saved || saved.w !== RANGE_W || saved.h !== RANGE_H) return false;
+      if (!(saved.add instanceof Uint8Array) || !(saved.erase instanceof Uint8Array)) return false;
+      if (saved.add.length !== n || saved.erase.length !== n) return false;
       this.layers = { add: new Uint8Array(saved.add), erase: new Uint8Array(saved.erase) };
       return true;
     } catch {

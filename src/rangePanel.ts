@@ -1,11 +1,11 @@
 // "Foil area" panel section and brush mode: choose where on the card the finish lands.
 import { RangeModel } from './range';
+import { BRUSH_MAX, BRUSH_MIN, MIN_BAND, type RangeRegion } from './featureState';
 import { RANGE_H, RANGE_W } from './gl/range';
 import { sfx } from './audio';
 import { editionById } from './editions';
 import { MiniPreview } from './miniPreview';
 import type { FaceSpec } from './card/face';
-import type { RangeRegion } from './featureState';
 import type { Dict } from './i18n';
 import type { Stage } from './stage';
 import type { State, Store } from './state';
@@ -25,9 +25,8 @@ const TONES: [number, number][] = [
   [0.3, 0.7],
   [0, 0.4],
 ];
-const MIN_BAND = 0.08;
-const SIZE_MIN = 6;
-const SIZE_MAX = 120;
+const SIZE_MIN = BRUSH_MIN;
+const SIZE_MAX = BRUSH_MAX;
 
 /** Tiny card pictograms: the lit part is where the finish goes. */
 const CARD = '<rect class="off" x="1" y="1" width="16" height="22" rx="2"/>';
@@ -355,7 +354,8 @@ export function initRangePanel(host: RangeHost) {
   function exitPaint() {
     if (!painting) return;
     painting = false;
-    down = false;
+    // A stroke still under way when painting ends (Esc) is finished and saved, not dropped.
+    up();
     stage.hold = false;
     stageEl.classList.remove('is-painting');
     layer.hidden = true;

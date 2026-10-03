@@ -7,7 +7,7 @@ import type { Dict } from './i18n';
 import type { FrameId } from './editions';
 import { rarityById } from './editions';
 import { sfx } from './audio';
-import { customFrame, isHex, luminance } from './palette';
+import { customFrame, isDark, isHex } from './palette';
 import {
   DEFAULT_LETTERING,
   FOIL_RAMP,
@@ -414,7 +414,7 @@ export function mountLettering(o: Options): void {
       host.style.setProperty('--lt-hi', hi);
       host.classList.toggle('is-blind', l.ink === 'none' && c.blind);
       host.classList.toggle('is-rainbow', l.foil === 'rainbow');
-      host.classList.toggle('is-dark-stock', isHex(s.frameColor) ? luminance(s.frameColor) <= 0.36 : s.frame === 'ink');
+      host.classList.toggle('is-dark-stock', isHex(s.frameColor) ? isDark(s.frameColor) : s.frame === 'ink');
     }
     styleBtns.forEach((b) => {
       radio(b, b.dataset.style === l.style);

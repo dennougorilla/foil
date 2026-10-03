@@ -39,9 +39,17 @@ function fromHsl(h: number, s: number, l: number): string {
   return `#${[f(0), f(8), f(4)].map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** A custom frame colour with ink that stays readable on it. */
+const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+
+/** True when light ink reads better than dark ink on this colour. */
+export function isDark(hex: string): boolean {
+  const bg = luminance(hex);
+  return contrast(bg, luminance('#f3eee2')) > contrast(bg, luminance('#262d31'));
+}
+
+/** A custom frame colour with ink that stays readable on it: whichever ink contrasts more. */
 export function customFrame(hex: string): { fill: string; ink: string; sub: string } {
-  const light = luminance(hex) > 0.36;
+  const light = !isDark(hex);
   return light
     ? { fill: hex, ink: '#262d31', sub: 'rgba(38,45,49,.55)' }
     : { fill: hex, ink: '#f3eee2', sub: 'rgba(243,238,226,.6)' };

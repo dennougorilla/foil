@@ -1160,6 +1160,7 @@ output {
 }
 
 .hint {
+  text-wrap: pretty;
   margin: 0;
   font-size: 13px;
   color: var(--text-dim);

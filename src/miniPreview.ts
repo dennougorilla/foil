@@ -1,6 +1,7 @@
 // On phones the Finish area controls sit far below the card. While they are on screen and the card is not,
 // a slim band across the top carries a small live copy of the card, so every change can be seen as it happens.
 import { CardRenderer } from './gl/renderers';
+import { tuneGl } from './tune/model';
 import { editionById } from './editions';
 import type { RangeSnapshot } from './gl/range';
 import type { Dict } from './i18n';
@@ -57,7 +58,8 @@ export class MiniPreview {
     });
     const watch = (target: Element, set: (v: boolean) => void, threshold: number) =>
       new IntersectionObserver((es) => {
-        set(es[0].isIntersecting);
+        // isIntersecting alone is true for any sliver; hold it to the threshold.
+        set(es[0].isIntersecting && es[0].intersectionRatio >= threshold);
         this.update();
       }, { threshold }).observe(target);
     watch(o.section, (v) => {
@@ -126,6 +128,7 @@ export class MiniPreview {
     const r = this.renderer;
     if (!this.shown || !r) return;
     const s = this.o.store.get();
+    r.tune = tuneGl(s.tune);
     const motion = !this.o.reduced.matches;
     r.range.motion = motion;
     const t = motion ? (now - this.t0) / 1000 : 0;

@@ -3,7 +3,7 @@ import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
-import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, type RangeColorState } from './featureState';
+import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 export interface State extends RangeColorState {
   lang: Lang;
@@ -83,6 +83,7 @@ export function createStore() {
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
     state.tuneOpen = state.tuneOpen === true;
+    Object.assign(state, sanitizeRangeColors(state));
   } catch {
     /* storage unavailable: defaults are fine */
   }
