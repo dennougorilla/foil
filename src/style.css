@@ -403,7 +403,7 @@ button {
   fill: currentColor;
 }
 
-.support-link:last-child svg {
+.support-link + .support-link svg {
   color: var(--gold);
 }
 
@@ -419,6 +419,43 @@ button {
 .support-link small {
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.support-foot {
+  margin: 12px 4px 0;
+  padding-top: 10px;
+  border-top: 2px solid var(--panel-hi);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.support-foot p {
+  margin: 0;
+}
+
+.support-foot a {
+  color: inherit;
+}
+
+.app-credit a {
+  color: var(--text);
+}
+
+.support-foot .app-version {
+  margin-top: 6px;
+  text-align: right;
+}
+
+.app-version a {
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.app-version a:hover,
+.app-version a:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 /* ---------- Stage ---------- */

@@ -71,6 +71,9 @@ function redrawFace() {
 
 // ---------- Text ----------
 
+/** "v0.2.0 · 1a2b3c4", shown quietly at the foot of the support menu. */
+const APP_VERSION_LABEL = __APP_COMMIT__ === 'unknown' ? `v${__APP_VERSION__}` : `v${__APP_VERSION__} · ${__APP_COMMIT__}`;
+
 /** Placeholder title and line: samples carry their own, uploads get a generic one. */
 function fallback() {
   const i = store.get().sample;
@@ -98,6 +101,10 @@ function applyText() {
   $('crtBtn').setAttribute('aria-label', s.crt ? t.crtOn : t.crtOff);
   $('cardSlot').setAttribute('aria-label', t.stageLabel);
   document.querySelectorAll('.support-link').forEach((a) => a.setAttribute('title', t.supportOpen));
+  $('creditLink').title = t.creditLink;
+  $('versionLink').textContent = APP_VERSION_LABEL;
+  $('versionLink').title = t.version.replace('{v}', APP_VERSION_LABEL);
+  $('versionLink').setAttribute('aria-label', $('versionLink').title);
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
   stage.setHandLabels(t.edition, t.look);
@@ -644,7 +651,7 @@ async function busy(
 }
 
 $<HTMLButtonElement>('pngBtn').addEventListener('click', (e) => {
-  void busy(e.currentTarget as HTMLButtonElement, t.saving, () => exportPng(exportInput()));
+  void busy(e.currentTarget as HTMLButtonElement, t.saving, () => exportPng(exportInput()), t.errPng);
 });
 $<HTMLButtonElement>('gifBtn').addEventListener('click', (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
@@ -667,7 +674,7 @@ $<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
     toast(t.errVideo, true);
     return;
   }
-  void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress));
+  void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
 });
 
 // ---------- Logo ----------

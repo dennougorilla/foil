@@ -34,6 +34,12 @@ From a clean `main` that is up to date with `origin`, this builds, bumps the ver
 
 The build exposes `__APP_VERSION__` and `__APP_COMMIT__` (short SHA) as globals.
 
+## Inspiration
+
+FOIL is an unofficial fan project inspired by the card editions in [Balatro](https://www.playbalatro.com/) by LocalThunk. It is not affiliated with, or endorsed by, LocalThunk or Playstack. No code, art, fonts or other assets from the game are used.
+
+Balatro is a registered trademark of LocalThunk LLC.
+
 ## Support
 
 If FOIL made you smile: [GitHub Sponsors](https://github.com/sponsors/dennougorilla) · [Buy Me a Coffee](https://buymeacoffee.com/dennougorip)

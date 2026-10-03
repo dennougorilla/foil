@@ -177,6 +177,8 @@ export async function exportVideo(input: ExportInput, onProgress?: (p: number) =
   rec.stop();
   await done;
   scene.dispose();
+  // Some encoders hand back nothing at all; fail loudly rather than saving an empty file.
+  if (!chunks.length) throw new Error('video-empty');
   const ext = mime.includes('mp4') ? 'mp4' : 'webm';
   return download(new Blob(chunks, { type: mime.split(';')[0] }), `${fileSafe(input.name)}-${input.edition.id}.${ext}`);
 }
