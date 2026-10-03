@@ -89,8 +89,6 @@ export class Stage {
   private lastTune: unknown = null;
   /** Hold the card flat and still, facing the viewer (brush mode). */
   hold = false;
-  /** Backdrop swirl that replaces the finish's own, or null to follow the finish. */
-  backdrop: [string, string, string] | null = null;
   /** 0..1: overlay on the main card showing where the finish lands. */
   rangeView = 0;
 
@@ -404,7 +402,7 @@ export class Stage {
     // Background palette eases to the selected edition
     const ed = EDITIONS.find((e) => e.id === state.edition) ?? EDITIONS[0];
     const k = 1 - Math.exp(-dt * 3);
-    (this.backdrop ?? ed.swirl).forEach((hex, i) => {
+    ed.swirl.forEach((hex, i) => {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });

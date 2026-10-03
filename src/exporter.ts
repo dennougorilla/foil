@@ -22,8 +22,6 @@ export interface ExportInput {
   tune?: Tune;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
-  /** Backdrop swirl for clips; the finish's own when absent. */
-  swirl?: [string, string, string];
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -93,9 +91,9 @@ export interface Scene {
 
 /**
  * The shared stage for video and GIF: a pixel swirl upscaled nearest, with the card composited on top.
- * `transparent` leaves the swirl out so only the card and its shadow are drawn (APNG).
+ * `transparent` leaves the swirl out so only the card (and its shadow, unless `shadow` is off) is drawn.
  */
-export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false): Scene {
+export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false, shadow = true): Scene {
   const out = document.createElement('canvas');
   out.width = W;
   out.height = H;
@@ -111,7 +109,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
   cards.resize(W, H, 1);
-  const colors = (input.swirl ?? input.edition.swirl).map(hexToRgb) as [RGB, RGB, RGB];
+  const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
@@ -150,7 +148,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           light: pose.light,
           alpha: 1,
           flash: 0,
-          shadow: [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k],
+          shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
         },
         cardTime * tune.speed,
       );
@@ -220,6 +218,16 @@ const GIF_DELAY = 50;
 /** Share of the progress bar spent drawing frames; the worker's encode fills the rest. */
 const GIF_DRAW_SHARE = 0.35;
 
+export interface GifOptions {
+  /**
+   * Leave the backdrop out. GIF keeps one fully clear colour and nothing in between, so the
+   * shadow is dropped and every edge pixel is either clear or solid.
+   */
+  clear: boolean;
+  /** 'auto' keeps the card's own edge colour on solid edge pixels; a '#rrggbb' blends them into it. */
+  matte: string;
+}
+
 /**
  * Renders the orbit frame by frame (not in real time) and encodes it in a worker.
  * One frame is drawn per animation frame, so the stage keeps moving throughout.
@@ -227,6 +235,7 @@ const GIF_DRAW_SHARE = 0.35;
 export async function exportGif(
   input: ExportInput,
   onProgress?: (p: number, encoding: boolean) => void,
+  opts: GifOptions = { clear: false, matte: 'auto' },
 ): Promise<string> {
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
@@ -247,7 +256,7 @@ export async function exportGif(
   const DUR = (frames * GIF_DELAY) / 1000;
   let scene: Scene | undefined;
   try {
-    scene = createScene(input, GIF_W, GIF_H, true);
+    scene = createScene(input, GIF_W, GIF_H, true, opts.clear, !opts.clear);
     for (let i = 0; i < frames; i++) {
       await nextFrame();
       const p = i / frames;
@@ -258,7 +267,8 @@ export async function exportGif(
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY });
+    const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
+    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {

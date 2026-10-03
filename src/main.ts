@@ -1,5 +1,5 @@
 import './style.css';
-import { createStore, type State } from './state';
+import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { EDITIONS, FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face';
@@ -13,6 +13,8 @@ import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
+import { changedKeys } from './tune/model';
+import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { handMode, initSponsor, isLocked, releaseLockedEdition } from './sponsor';
 
@@ -119,8 +121,14 @@ function applyText() {
   $('hand').setAttribute('aria-label', t.handLabel);
   stage.setHandLabels(t.edition, t.look);
   $('cropView').setAttribute('aria-label', t.cropHint);
+  $('cropView').title = t.cropHint;
+  $('pickBtn').title = t.pickSub;
   buildSegments();
   buildThumbs();
+  buildTabs();
+  buildFormats();
+  buildSaveOpts();
+  renderSave();
   syncInputs();
   renderInfo();
   renderCaption(null);
@@ -246,11 +254,8 @@ function buildThumbs() {
   };
   samples.forEach((img, i) => add(img, t.samplesName[i], i));
   if (userImage) add(userImage, userAnim ? `${t.yourImage} (${animKind(userAnim)})` : t.yourImage, -1);
-  const label = document.createElement('span');
-  label.className = 'thumb-label';
-  label.textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif.replace('GIF', animKind(userAnim)) : t.yourImage;
+  $('thumbLabel').textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif.replace('GIF', animKind(userAnim)) : t.yourImage;
   apngExport.refresh();
-  th.appendChild(label);
 }
 
 const thumbCache = new WeakMap<Img, string>();
@@ -299,6 +304,8 @@ function syncInputs() {
   zoom.value = String(s.crop.zoom);
   $('zoomOut').textContent = `${Math.round(s.crop.zoom * 100)}%`;
   setRangeFill(zoom);
+  // The way back only shows once there is something to go back from.
+  $('cropReset').hidden = s.crop.zoom === 1 && s.crop.x === 0.5 && s.crop.y === 0.5;
   $('soundBtn').setAttribute('aria-pressed', String(s.sound));
   $('crtBtn').setAttribute('aria-pressed', String(s.crt));
   $('crt').classList.toggle('is-off', !s.crt);
@@ -613,8 +620,103 @@ $('crtBtn').addEventListener('click', () => {
 rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('thumbs'));
-// Fine-tuning drawer for light and motion, right under the Tune section's sliders.
-mountTune(store, $('pixel').closest('.row')!);
+rovingKeys($('formatSeg'));
+mountTune(store, $('pane-light'));
+
+// ---------- Fine-tune: closed until asked for, then four tabs ----------
+
+const adjustToggle = $<HTMLButtonElement>('adjustToggle');
+const tabBar = $('panelTabs');
+let rangeChanged = false;
+
+/** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
+function tabChanged(id: PanelTab): boolean {
+  const s = store.get();
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor;
+  if (id === 'light') return changedKeys(s.tune).length > 0;
+  if (id === 'text') return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING);
+  return rangeChanged;
+}
+
+function buildTabs() {
+  tabBar.textContent = '';
+  tabBar.setAttribute('aria-label', t.adjust);
+  for (const id of PANEL_TABS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tab';
+    b.id = `tab-${id}`;
+    b.dataset.tab = id;
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-controls', `pane-${id}`);
+    b.innerHTML = '<span></span><i class="tab-dot" hidden></i>';
+    b.firstElementChild!.textContent = t.tabs[id];
+    b.onclick = () => {
+      if (store.get().panelTab === id) return;
+      sfx.tick();
+      store.set({ panelTab: id });
+      revealTabs();
+    };
+    tabBar.appendChild(b);
+    $(`pane-${id}`).setAttribute('aria-labelledby', b.id);
+  }
+  syncAdjust();
+}
+
+tabBar.addEventListener('keydown', (e) => {
+  const i = PANEL_TABS.indexOf(store.get().panelTab);
+  const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: PANEL_TABS.length - 1 }[e.key];
+  if (n === undefined) return;
+  e.preventDefault();
+  const id = PANEL_TABS[(n + PANEL_TABS.length) % PANEL_TABS.length];
+  sfx.tick();
+  store.set({ panelTab: id });
+  $(`tab-${id}`).focus();
+  revealTabs();
+});
+
+/** Scrolls so the tabs sit at the top and their tab gets the panel's whole height. */
+function revealTabs() {
+  const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  requestAnimationFrame(() => {
+    const panel = $('panel');
+    const top = $('adjustBody').getBoundingClientRect().top;
+    // The panel scrolls on its own beside the stage; on phones the page does.
+    if (getComputedStyle(panel).overflowY === 'visible') window.scrollBy({ top, behavior });
+    else panel.scrollBy({ top: top - panel.getBoundingClientRect().top, behavior });
+  });
+}
+
+function syncAdjust() {
+  // The range tab reports in while it is still being built, before the tabs exist.
+  if (!tabBar.children.length) return;
+  const s = store.get();
+  adjustToggle.setAttribute('aria-expanded', String(s.adjustOpen));
+  $('adjustBody').hidden = !s.adjustOpen;
+  $('adjust').classList.toggle('is-open', s.adjustOpen);
+  const changed = PANEL_TABS.filter(tabChanged);
+  for (const id of PANEL_TABS) {
+    const b = $(`tab-${id}`);
+    const on = s.panelTab === id;
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
+    b.querySelector<HTMLElement>('.tab-dot')!.hidden = !changed.includes(id);
+    b.title = changed.includes(id) ? t.adjustChanged.replace('{list}', t.tabs[id]) : '';
+    $(`pane-${id}`).hidden = !on;
+  }
+  const summary = $('adjustSummary');
+  summary.textContent = changed.length
+    ? t.adjustChanged.replace('{list}', changed.map((id) => t.tabs[id]).join(s.lang === 'ja' ? '・' : ', '))
+    : t.adjustSub;
+  summary.classList.toggle('is-changed', changed.length > 0);
+}
+
+adjustToggle.addEventListener('click', () => {
+  sfx.tick();
+  const open = !store.get().adjustOpen;
+  store.set({ adjustOpen: open });
+  if (open) revealTabs();
+});
 
 // ---------- Export ----------
 
@@ -646,23 +748,129 @@ function animatedExport(anim: Anim) {
   };
 }
 
+const saveBtn = $<HTMLButtonElement>('saveBtn');
+
+function buildFormats() {
+  const fs = $('formatSeg');
+  fs.textContent = '';
+  fs.setAttribute('aria-label', t.formatLabel);
+  for (const f of EXPORT_FORMATS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.format = f;
+    b.setAttribute('role', 'radio');
+    b.textContent = t.format[f];
+    radio(b, store.get().exportFormat === f);
+    b.disabled = saveBtn.hasAttribute('aria-busy');
+    b.onclick = () => {
+      if (store.get().exportFormat === f) return;
+      sfx.tick();
+      store.set({ exportFormat: f });
+    };
+    fs.appendChild(b);
+  }
+}
+
+/** The Save button names what it will write; APNG adds its size and length (see anim/apngUi). */
+function renderSave() {
+  if (saveBtn.hasAttribute('aria-busy')) return;
+  const f = store.get().exportFormat;
+  saveBtn.dataset.format = f;
+  if (f === 'apng') return apngExport.refresh();
+  saveBtn.querySelector('.btn-text b')!.textContent = t.save.replace('{f}', t.format[f]);
+  saveBtn.querySelector('.btn-text small')!.textContent = f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f];
+  for (const el of saveBtn.querySelectorAll('.save-meta > *')) el.textContent = '';
+  saveBtn.removeAttribute('title');
+}
+
+// GIF options: closed until asked for; the defaults keep the swirl backdrop.
+const MATTES = ['auto', '#ffffff', '#000000'];
+
+function buildSaveOpts() {
+  const s = store.get();
+  $('saveOpts').hidden = s.exportFormat !== 'gif';
+  $('saveOptsToggle').setAttribute('aria-expanded', String(s.saveOptsOpen));
+  $('saveOptsBody').hidden = !s.saveOptsOpen;
+  $('saveOpts').classList.toggle('is-open', s.saveOptsOpen);
+  $('saveOptsSummary').textContent = `${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`;
+  const bg = $('gifBgSeg');
+  bg.textContent = '';
+  for (const clear of [false, true]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = clear ? 'clear' : 'swirl';
+    b.setAttribute('role', 'radio');
+    b.textContent = clear ? t.gifBgName.clear : t.gifBgName.swirl;
+    radio(b, s.gifClear === clear);
+    b.onclick = () => {
+      if (store.get().gifClear === clear) return;
+      sfx.tick();
+      store.set({ gifClear: clear });
+    };
+    bg.appendChild(b);
+  }
+  $('matteField').hidden = !s.gifClear;
+  $('gifClearNote').hidden = !s.gifClear;
+  const ms = $('matteSeg');
+  ms.textContent = '';
+  const custom = !MATTES.includes(s.gifMatte);
+  for (const m of [...MATTES, 'custom']) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `matte-sw matte-${m === 'auto' || m === 'custom' ? m : m === '#ffffff' ? 'white' : 'black'}`;
+    b.setAttribute('role', 'radio');
+    b.dataset.v = m;
+    const name = t.matteName[m];
+    const help = t.matteHelp[m === 'auto' ? 'auto' : m === '#ffffff' ? 'white' : m === '#000000' ? 'black' : 'custom'];
+    b.setAttribute('aria-label', name);
+    b.title = `${name} — ${help}`;
+    if (m === 'auto') b.textContent = name;
+    if (m === 'custom' && custom) b.style.setProperty('--sw', s.gifMatte);
+    b.classList.toggle('is-set', m === 'custom' && custom);
+    radio(b, m === 'custom' ? custom : s.gifMatte === m);
+    b.onclick = () => {
+      sfx.tick();
+      if (m !== 'custom') return store.set({ gifMatte: m });
+      const picker = $<HTMLInputElement>('mattePicker');
+      picker.value = custom ? s.gifMatte : '#7f8c8d';
+      store.set({ gifMatte: picker.value });
+      try {
+        picker.showPicker();
+      } catch {
+        picker.click();
+      }
+    };
+    ms.appendChild(b);
+  }
+}
+
+$('saveOptsToggle').addEventListener('click', () => {
+  sfx.tick();
+  store.set({ saveOptsOpen: !store.get().saveOptsOpen });
+});
+$<HTMLInputElement>('mattePicker').addEventListener('input', (e) => store.set({ gifMatte: (e.target as HTMLInputElement).value }));
+$('toApng').addEventListener('click', () => {
+  sfx.tick();
+  store.set({ exportFormat: 'apng' });
+  saveBtn.focus();
+});
+rovingKeys($('gifBgSeg'));
+rovingKeys($('matteSeg'));
+
 /** While a job runs, the sub-label names the step and the title counts up; the button fills like a bar. */
-async function busy(
-  btn: HTMLButtonElement,
-  label: string,
-  job: (progress: (p: number) => void) => Promise<string>,
-  fail = t.errDecode,
-) {
-  const b = btn.querySelector('b')!;
-  const small = btn.querySelector('small')!;
-  // One export at a time: the other buttons rest while this one works.
-  const all = [...document.querySelectorAll<HTMLButtonElement>('.export .btn')];
+async function busy(label: string, job: (progress: (p: number) => void) => Promise<string>, fail = t.errDecode) {
+  const b = saveBtn.querySelector('.btn-text b')!;
+  const small = saveBtn.querySelector('.btn-text small')!;
+  // One export at a time: the button and the format choice rest while this one works.
+  const all = [saveBtn, ...$('formatSeg').querySelectorAll<HTMLButtonElement>('button')];
   all.forEach((x) => (x.disabled = true));
-  btn.setAttribute('aria-busy', 'true');
+  saveBtn.setAttribute('aria-busy', 'true');
   small.textContent = label;
   const progress = (p: number) => {
     b.textContent = `${Math.round(p * 100)}%`;
-    btn.style.setProperty('--p', p.toFixed(3));
+    saveBtn.style.setProperty('--p', p.toFixed(3));
   };
   try {
     const file = await job(progress);
@@ -674,44 +882,59 @@ async function busy(
     toast((err as Error).message === 'video-unsupported' ? t.errVideo : fail, true);
   } finally {
     all.forEach((x) => (x.disabled = false));
-    btn.removeAttribute('aria-busy');
-    btn.style.removeProperty('--p');
+    saveBtn.removeAttribute('aria-busy');
+    saveBtn.style.removeProperty('--p');
     // From the current dictionary, in case the language changed mid-export.
-    for (const el of [b, small]) el.textContent = t[el.dataset.t as keyof Dict] as string;
+    renderSave();
   }
 }
 
-$<HTMLButtonElement>('pngBtn').addEventListener('click', (e) => {
-  void busy(e.currentTarget as HTMLButtonElement, t.saving, () => exportPng(exportInput()), t.errPng);
-});
-$<HTMLButtonElement>('gifBtn').addEventListener('click', (e) => {
-  const btn = e.currentTarget as HTMLButtonElement;
-  const small = btn.querySelector('small')!;
-  void busy(
-    btn,
-    t.saving,
-    (progress) =>
-      exportGif(exportInput(), (p, encoding) => {
-        small.textContent = encoding ? t.encoding : t.saving;
-        progress(p);
-      }),
-    t.errGif,
-  );
-});
-$<HTMLButtonElement>('videoBtn').addEventListener('click', (e) => {
-  const btn = e.currentTarget as HTMLButtonElement;
-  if (!videoSupported()) {
-    sfx.error();
-    toast(t.errVideo, true);
-    return;
+saveBtn.addEventListener('click', () => {
+  const f = store.get().exportFormat;
+  if (f === 'png') void busy(t.saving, () => exportPng(exportInput()), t.errPng);
+  else if (f === 'gif') {
+    const small = saveBtn.querySelector('.btn-text small')!;
+    void busy(
+      t.saving,
+      (progress) =>
+        exportGif(
+          exportInput(),
+          (p, encoding) => {
+            small.textContent = encoding ? t.encoding : t.saving;
+            progress(p);
+          },
+          { clear: store.get().gifClear, matte: store.get().gifMatte },
+        ),
+      t.errGif,
+    );
+  } else if (f === 'video') {
+    if (!videoSupported()) {
+      sfx.error();
+      toast(t.errVideo, true);
+      return;
+    }
+    void busy(t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
   }
-  void busy(btn, t.recording, (progress) => exportVideo(exportInput(), progress), t.errVideoFail);
+  // APNG runs from its own module, which also handles stopping it.
 });
 
-// Before the APNG tile: its first refresh already reads the export input, which includes the range.
-const rangeColors = initRangeColors({ store, stage, t: () => t, announce, redrawFace, rebuildFrames: buildSegments });
+// Before the APNG export: its first refresh already reads the export input, which includes the range.
+const rangeColors = initRangeColors({
+  store,
+  stage,
+  t: () => t,
+  announce,
+  redrawFace,
+  rebuildFrames: buildSegments,
+  onRangeChanged: (changed) => {
+    if (changed === rangeChanged) return;
+    rangeChanged = changed;
+    syncAdjust();
+  },
+});
 const apngExport = mountApngExport({
-  btn: $<HTMLButtonElement>('apngBtn'),
+  btn: saveBtn,
+  active: () => store.get().exportFormat === 'apng',
   lang: () => store.get().lang,
   input: exportInput,
   toast: (msg, error) => toast(msg, error),
@@ -769,6 +992,23 @@ const apngExport = mountApngExport({
 }
 
 // ---------- Toasts ----------
+
+// The Export bar is sticky and grows with its options; docked controls sit above it.
+const exportSec = document.querySelector<HTMLElement>('.sec-export')!;
+new ResizeObserver(([e]) =>
+  document.documentElement.style.setProperty('--export-h', `${Math.round(e.borderBoxSize[0].blockSize)}px`),
+).observe(exportSec);
+
+/** Toasts rise from just above the Export bar, wherever it is now, so they never cover Save. */
+function placeToasts() {
+  const top = exportSec.getBoundingClientRect().top;
+  const bottom = Math.max(12, Math.min(innerHeight - top + 12, innerHeight - 160));
+  $('toasts').style.bottom = `${Math.round(bottom)}px`;
+}
+new ResizeObserver(placeToasts).observe($('panel'));
+$('panel').addEventListener('scroll', placeToasts, { passive: true });
+addEventListener('scroll', placeToasts, { passive: true });
+addEventListener('resize', placeToasts);
 
 function dismissToast(el: HTMLElement) {
   if (el.classList.contains('is-out')) return;
@@ -847,6 +1087,12 @@ store.on((s, changed) => {
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
   if (changed.has('sample')) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
+  if (changed.has('exportFormat')) buildFormats();
+  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) {
+    buildSaveOpts();
+    renderSave();
+  }
+  syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
     $('crtBtn').setAttribute('aria-label', s.crt ? t.crtOn : t.crtOff);
@@ -858,7 +1104,8 @@ store.on((s, changed) => {
 setSound(store.get().sound);
 mountLettering({
   store,
-  host: $('intensity').closest<HTMLElement>('.sec')!,
+  host: $('pane-text'),
+  open: () => store.set({ adjustOpen: true, panelTab: 'text' }),
   dict: () => t,
   name: () => store.get().name || fallback().name,
   repaint: () => redrawFace(),

@@ -5,6 +5,12 @@ import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
+/** Tabs of the Fine-tune area in the side panel. */
+export type PanelTab = 'card' | 'light' | 'text' | 'range';
+export const PANEL_TABS: PanelTab[] = ['card', 'light', 'text', 'range'];
+export type ExportFormat = 'png' | 'gif' | 'video' | 'apng';
+export const EXPORT_FORMATS: ExportFormat[] = ['png', 'gif', 'video', 'apng'];
+
 export interface State extends RangeColorState {
   lang: Lang;
   sound: boolean;
@@ -25,8 +31,16 @@ export interface State extends RangeColorState {
   loading: boolean;
   /** Fine-tuning of light and motion, shared by every finish. */
   tune: Tune;
-  /** Whether the "More" drawer with the fine-tuning is open. */
-  tuneOpen: boolean;
+  /** Whether the Fine-tune area of the panel is open, and which of its tabs shows. */
+  adjustOpen: boolean;
+  panelTab: PanelTab;
+  /** The format the Save button writes. */
+  exportFormat: ExportFormat;
+  /** Whether the save options are open, and the GIF's own: a clear background and its edge colour. */
+  saveOptsOpen: boolean;
+  gifClear: boolean;
+  /** 'auto' keeps the card's own edge colour; otherwise '#rrggbb' to blend the edge into. */
+  gifMatte: string;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
 }
@@ -50,7 +64,12 @@ const PERSIST: (keyof State)[] = [
   'sample',
   'crop',
   'tune',
-  'tuneOpen',
+  'adjustOpen',
+  'panelTab',
+  'exportFormat',
+  'saveOptsOpen',
+  'gifClear',
+  'gifMatte',
   'text',
   ...RANGE_COLOR_PERSIST,
 ];
@@ -74,7 +93,12 @@ export function createStore() {
     crop: { zoom: 1, x: 0.5, y: 0.5 },
     loading: false,
     tune: { ...TUNE_DEFAULTS },
-    tuneOpen: false,
+    adjustOpen: false,
+    panelTab: 'card',
+    exportFormat: 'png',
+    saveOptsOpen: false,
+    gifClear: false,
+    gifMatte: 'auto',
     text: { ...DEFAULT_LETTERING },
     ...RANGE_COLOR_DEFAULTS,
   };
@@ -82,7 +106,12 @@ export function createStore() {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
-    state.tuneOpen = state.tuneOpen === true;
+    state.adjustOpen = state.adjustOpen === true;
+    if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
+    if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
+    state.saveOptsOpen = state.saveOptsOpen === true;
+    state.gifClear = state.gifClear === true;
+    if (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte)) state.gifMatte = 'auto';
     Object.assign(state, sanitizeRangeColors(state));
   } catch {
     /* storage unavailable: defaults are fine */

@@ -2,7 +2,6 @@
 import type { RangeRegion } from './featureState';
 
 export const RANGE_COLOR_JA = {
-  secRange: '加工の範囲',
   rangeReset: '範囲をリセット',
   rangeWhere: '場所',
   region: {
@@ -27,7 +26,6 @@ export const RANGE_COLOR_JA = {
   regionQ: '「{r}」',
   toneAt: '「{r}」の明るさ {lo}〜{hi}% の部分',
   rangeFew: 'ほとんど加工がかかっていません。',
-  myColors: 'マイカラー',
   rangeTone: '明るさ',
   rangeLo: '明るさの下限',
   rangeHi: '明るさの上限',
@@ -42,7 +40,7 @@ export const RANGE_COLOR_JA = {
   fixPaint: 'ブラシで塗る',
   fixRegion: '全体にする',
   fixPainting: 'カードをなぞると塗り足せます。',
-  legendTitle: '校正:',
+  legendTitle: '見方:',
   legendFoil: '加工あり',
   legendPaper: 'そのまま',
   paint: 'ブラシで塗る',
@@ -73,12 +71,7 @@ export const RANGE_COLOR_JA = {
   brushCleared: '塗った範囲を全部消しました',
   brushUndone: '取り消しました',
   brushRedone: 'やり直しました',
-  backdrop: '背景',
-  backdropAuto: '自動 (加工に合わせる)',
-  backdropAutoShort: '自動',
-  backdropName: { felt: 'フェルト', night: 'ナイト', ember: 'エンバー' } as Record<string, string>,
   addFrameColor: '枠の色を追加',
-  addStageColor: '背景の色を追加',
   addColor: '色を追加',
   myColor: 'マイカラー {hex}',
   removeColor: '{hex} を削除',
@@ -86,14 +79,12 @@ export const RANGE_COLOR_JA = {
   colorAdded: '{hex} を追加しました',
   colorRemoved: '色を削除しました',
   colorRemovedFrame: '色を削除し、枠を「{x}」に戻しました',
-  colorRemovedStage: '色を削除し、背景を自動に戻しました',
   colorFull: 'マイカラーは {n} 色まで。いちばん古い色と入れ替えました',
 };
 
 export type RangeColorDict = typeof RANGE_COLOR_JA;
 
 export const RANGE_COLOR_EN: RangeColorDict = {
-  secRange: 'Finish area',
   rangeReset: 'Reset area',
   rangeWhere: 'Where',
   region: {
@@ -118,13 +109,12 @@ export const RANGE_COLOR_EN: RangeColorDict = {
   regionQ: '{r}',
   toneAt: 'the {lo}–{hi}% tones of {r}',
   rangeFew: 'Almost nothing gets the finish.',
-  myColors: 'My colors',
   rangeTone: 'Brightness',
   rangeLo: 'Darkest tone',
   rangeHi: 'Lightest tone',
   tonePresets: ['Full range', 'Highlights', 'Midtones', 'Shadows'],
   rangeInvert: 'Invert',
-  rangeShow: 'Pin the proof',
+  rangeShow: 'Always show',
   coverLabel: 'Coverage',
   rangeTiny: '<1%',
   rangeNone: 'Nothing gets the finish yet.',
@@ -133,7 +123,7 @@ export const RANGE_COLOR_EN: RangeColorDict = {
   fixPaint: 'Paint some in',
   fixRegion: 'Use the whole card',
   fixPainting: 'Trace the card to paint some in.',
-  legendTitle: 'Proof:',
+  legendTitle: 'Overlay:',
   legendFoil: 'Finished',
   legendPaper: 'Left plain',
   paint: 'Paint with a brush',
@@ -164,12 +154,7 @@ export const RANGE_COLOR_EN: RangeColorDict = {
   brushCleared: 'Cleared everything you painted',
   brushUndone: 'Undone',
   brushRedone: 'Redone',
-  backdrop: 'Backdrop',
-  backdropAuto: 'Auto (matches the finish)',
-  backdropAutoShort: 'Auto',
-  backdropName: { felt: 'Felt', night: 'Night', ember: 'Ember' },
   addFrameColor: 'Add a frame color',
-  addStageColor: 'Add a backdrop color',
   addColor: 'Add color',
   myColor: 'My color {hex}',
   removeColor: 'Remove {hex}',
@@ -177,6 +162,5 @@ export const RANGE_COLOR_EN: RangeColorDict = {
   colorAdded: 'Added {hex}',
   colorRemoved: 'Color removed',
   colorRemovedFrame: 'Color removed; the frame is back to {x}',
-  colorRemovedStage: 'Color removed; the backdrop is back to Auto',
   colorFull: 'Up to {n} colors. Swapped out the oldest one',
 };
