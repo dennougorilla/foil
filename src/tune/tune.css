@@ -2,6 +2,12 @@
 
 .tune {
   --tune-fill: var(--red);
+  /* "Changed" has its own colour, shared with the reset arrows, so it never reads as a slider fill. */
+  --tune-changed: var(--gold);
+}
+
+.tune-toggle {
+  --tune-changed: var(--gold);
 }
 
 .tune svg {
@@ -80,7 +86,7 @@
   min-width: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--tune-changed);
   color: #12181a;
   font-size: 12px;
   line-height: 18px;
@@ -118,6 +124,12 @@
 
 /* Tabs */
 .tune-tabs {
+  /* Tabs stay in reach while a long tab scrolls under them. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel-lo);
+  border-radius: 10px 10px 0 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   margin: 0 -12px 4px;
@@ -177,7 +189,7 @@
 .tune-dot {
   width: 6px;
   height: 6px;
-  background: var(--accent);
+  background: var(--tune-changed);
   box-shadow: 0 0 0 2px var(--edge);
 }
 
@@ -247,7 +259,7 @@
   width: 6px;
   height: 6px;
   margin: 0 7px 2px 0;
-  background: var(--accent);
+  background: var(--tune-changed);
   vertical-align: middle;
 }
 
@@ -283,7 +295,8 @@
 }
 
 .tune-reset:hover:not(:disabled) {
-  background: var(--panel);
+  background: var(--panel-hi);
+  box-shadow: inset 0 0 0 2px var(--gold);
 }
 
 .tune-reset:active:not(:disabled) {
@@ -305,28 +318,6 @@
   box-shadow: 0 0 0 2px var(--edge);
 }
 
-.tune-mini {
-  position: relative;
-  display: block;
-  width: 14px;
-  height: 20px;
-  border-radius: 2px;
-  background: var(--paper);
-  box-shadow: 0 0 0 2px var(--edge);
-}
-
-.tune-mini::after {
-  content: '';
-  position: absolute;
-  left: var(--x);
-  top: var(--y);
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  background: var(--gold);
-  box-shadow: 0 0 0 1px var(--edge);
-}
-
 /* Range with a default notch underneath */
 .tune-track {
   position: relative;
@@ -334,6 +325,13 @@
 
 .tune-range {
   display: block;
+}
+
+/* Keyboard focus rings the whole track, not just the thumb. */
+.tune-track:has(.tune-range:focus-visible) {
+  border-radius: 8px;
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .tune .tune-range::-webkit-slider-runnable-track {
@@ -425,18 +423,23 @@
 }
 
 .tune-hint {
-  flex: 1 1 190px;
+  flex: 1 1 100%;
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-dim);
 }
 
+.tune-foot:not(.has-actions) .tune-actions {
+  display: none;
+}
+
 .tune-actions {
   display: flex;
+  flex: 1 1 100%;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
-  margin-left: auto;
 }
 
 .tune-compare {
@@ -490,13 +493,134 @@
   text-underline-offset: 3px;
 }
 
-.tune-reset-all[hidden] {
+.tune-reset-all[hidden],
+.tune-undo[hidden] {
   display: none;
 }
 
+.tune-reset-all,
+.tune-undo {
+  margin-left: auto;
+}
+
+.tune-undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--gold);
+  box-shadow: 0 3px 0 var(--edge);
+  color: #12181a;
+  font-size: 13px;
+  white-space: nowrap;
+  animation: tune-in 0.25s var(--ease-back);
+}
+
+.tune-undo svg {
+  transform: scaleX(-1);
+}
+
+/* Light direction pad: a mini card with the light on it; drag to aim. */
+.tune-pad {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 34px;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at var(--x) var(--y), rgba(255, 244, 200, 0.95) 0 3px, rgba(242, 193, 78, 0.45) 4px, transparent 15px),
+    var(--paper-ink);
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--panel-hi);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.tune-pad b {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: var(--gold);
+  box-shadow: 0 0 0 1px var(--edge);
+}
+
+.tune-pad:hover,
+.tune-pad.is-dragging {
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--gold);
+}
+
+/* "Default" stamp on the card while comparing. */
+.tune-stamp {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  padding: 4px 14px 5px;
+  border: 3px solid var(--gold);
+  border-radius: 6px;
+  background: rgba(13, 19, 21, 0.82);
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -6px) rotate(-7deg) scale(1.15);
+  transition: opacity 0.12s, transform 0.18s var(--ease-back);
+}
+
+.tune-stamp.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0) rotate(-7deg) scale(1);
+}
+
+/* Phones: a live window onto the card while the drawer is open and the card is out of view. */
+.tune-peek {
+  position: fixed;
+  right: 16px;
+  bottom: calc(100px + env(safe-area-inset-bottom));
+  z-index: 60;
+  width: 84px;
+  height: 112px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(13, 19, 21, 0.88);
+  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 8px 0 3px rgba(0, 0, 0, 0.4);
+  animation: tune-in 0.25s var(--ease-out);
+}
+
+/* Room under the drawer for the preview, so the footer can always scroll clear of it. */
+@media (max-width: 900px) {
+  .tune.is-open {
+    padding-bottom: 116px;
+  }
+}
+
+.tune-peek[hidden] {
+  display: none;
+}
+
+.tune-peek canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tune-body {
+  .tune-body,
+  .tune-undo,
+  .tune-peek {
     animation: none;
+  }
+  .tune-stamp {
+    transition: none;
   }
   .tune-chev,
   .tune-tab::after {

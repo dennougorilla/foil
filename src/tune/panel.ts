@@ -19,6 +19,7 @@ import {
   type Tune,
 } from './model';
 import { gyroAvailable, motion } from './motion';
+import { mountPeek } from './peek';
 
 type Tab = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
@@ -103,6 +104,16 @@ export function mountTune(store: Store, after: Element): void {
   let tab: Tab = 'pattern';
   let t = DICTS[store.get().lang].tune;
   let gyroNote: 'wait' | 'denied' | null = null;
+  /** What "Reset all" replaced, offered back for a few seconds. */
+  let undo: Tune | null = null;
+  let undoTimer = 0;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const peek = mountPeek();
+  // A stamp on the card while "Hold to compare" shows the defaults.
+  const stamp = document.createElement('span');
+  stamp.className = 'tune-stamp';
+  stamp.setAttribute('aria-hidden', 'true');
+  document.getElementById('cardSlot')?.appendChild(stamp);
 
   // The drawer opens under the section's last slider; its toggle sits in the section's title
   // row, so a closed drawer adds no height and every control still fits above Export.
@@ -141,13 +152,17 @@ export function mountTune(store: Store, after: Element): void {
           <div class="tune-actions">
             <button class="tune-compare" type="button" aria-pressed="false"><span></span></button>
             <button class="tune-reset-all" type="button">${svg('reset')}<span></span></button>
+            <button class="tune-undo" type="button" hidden>${svg('reset')}<span></span></button>
           </div>
         </div>
       </div>`;
     toggle.querySelector('.tune-toggle-label')!.textContent = t.toggleShort;
     toggle.title = t.toggle;
-    root.querySelector('.tune-hint')!.textContent = t.hint;
+    root.querySelector('.tune-hint')!.textContent = touch ? t.hintTouch : t.hint;
     root.querySelector('.tune-reset-all span')!.textContent = t.resetAll;
+    root.querySelector('.tune-undo span')!.textContent = t.undo;
+    stamp.textContent = t.stamp;
+    peek.setLabel(t.peek);
     bindCompare(root.querySelector<HTMLButtonElement>('.tune-compare')!);
     const tabs = root.querySelector<HTMLElement>('.tune-tabs')!;
     tabs.setAttribute('aria-label', t.toggle);
@@ -201,11 +216,31 @@ export function mountTune(store: Store, after: Element): void {
     root.querySelector('.tune-reset-all')!.addEventListener('click', () => {
       if (!changedKeys(tuneNow()).length) return;
       sfx.tick();
+      const before = tuneNow();
       store.set({ tune: { ...TUNE_DEFAULTS } });
       gyroNote = null;
       announce(t.resetDone);
-      // The button hides once nothing is changed, so keep focus inside the drawer.
-      root.querySelector<HTMLElement>(`#tuneTab-${tab}`)?.focus();
+      // Offer the old settings back for a moment; focus moves to that offer.
+      undo = before;
+      clearTimeout(undoTimer);
+      undoTimer = window.setTimeout(() => {
+        const had = root.contains(document.activeElement) && document.activeElement?.classList.contains('tune-undo');
+        undo = null;
+        sync();
+        if (had) root.querySelector<HTMLElement>(`#tuneTab-${tab}`)?.focus();
+      }, 8000);
+      sync();
+      root.querySelector<HTMLElement>('.tune-undo')?.focus();
+    });
+    root.querySelector('.tune-undo')!.addEventListener('click', () => {
+      if (!undo) return;
+      sfx.tick();
+      const back = undo;
+      undo = null;
+      clearTimeout(undoTimer);
+      store.set({ tune: back });
+      announce(t.undoDone);
+      root.querySelector<HTMLElement>('.tune-reset-all')?.focus();
     });
     root.classList.toggle('is-open', open);
     selectTab(tab, true);
@@ -221,6 +256,7 @@ export function mountTune(store: Store, after: Element): void {
       motion.comparing = on;
       b.setAttribute('aria-pressed', String(on));
       root.classList.toggle('is-comparing', on);
+      stamp.classList.toggle('is-on', on);
     };
     b.addEventListener('pointerdown', (e) => {
       b.setPointerCapture(e.pointerId);
@@ -369,6 +405,12 @@ export function mountTune(store: Store, after: Element): void {
   function selectTab(id: Tab, quiet = false) {
     if (!quiet && id !== tab) sfx.tick();
     tab = id;
+    if (!quiet) {
+      // Show the new tab's controls, not just its label, when the drawer runs past the fold.
+      requestAnimationFrame(() =>
+        root.querySelector('.tune-panes')?.scrollIntoView({ block: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' }),
+      );
+    }
     root.querySelectorAll<HTMLButtonElement>('.tune-tab').forEach((b) => {
       const on = b.dataset.tab === id;
       b.setAttribute('aria-selected', String(on));
@@ -392,8 +434,16 @@ export function mountTune(store: Store, after: Element): void {
     badge.textContent = String(changed.length);
     // The badge is just a number on screen; spell it out for screen readers.
     toggle.setAttribute('aria-label', changed.length ? `${t.toggle} (${t.changed.replace('{n}', String(changed.length))})` : t.toggle);
+    if (undo && changed.length) {
+      // Anything changed after a reset makes the undo offer stale.
+      undo = null;
+      clearTimeout(undoTimer);
+    }
     root.querySelector<HTMLElement>('.tune-reset-all')!.hidden = !changed.length;
+    root.querySelector<HTMLElement>('.tune-undo')!.hidden = !undo;
     root.querySelector<HTMLElement>('.tune-compare')!.hidden = !changed.length;
+    root.querySelector<HTMLElement>('.tune-foot')!.classList.toggle('has-actions', !!changed.length || !!undo);
+    peek.setActive(s.tuneOpen);
 
     for (const def of TABS) {
       const n = def.keys.filter((k) => changed.includes(k)).length;
@@ -431,7 +481,9 @@ export function mountTune(store: Store, after: Element): void {
         if (k === 'temp') extra.innerHTML = `<i class="tune-swatch" style="--sw:${lightCss(v)}"></i>`;
         else if (k === 'lightAngle') {
           const [x, y] = fixedLight(v);
-          extra.innerHTML = `<i class="tune-mini" style="--x:${(x * 100).toFixed(1)}%;--y:${(y * 100).toFixed(1)}%"></i>`;
+          const pad = extra.querySelector<HTMLElement>('.tune-pad') ?? lightPad(extra);
+          pad.style.setProperty('--x', `${(x * 100).toFixed(1)}%`);
+          pad.style.setProperty('--y', `${(y * 100).toFixed(1)}%`);
         }
       }
       btn.title = btn.getAttribute('aria-label')!;
@@ -452,6 +504,36 @@ export function mountTune(store: Store, after: Element): void {
     else if (tune.light === 'gyro' && gyroNote === 'wait' && !motion.gyroLive()) msg = t.gyroWait;
     note.textContent = msg;
     note.hidden = !msg;
+  }
+
+  /**
+   * A tiny card you can drag the light around. Pointer-only shortcut: the slider beside it
+   * stays the accessible control, so the pad is hidden from assistive tech.
+   */
+  function lightPad(host: HTMLElement) {
+    const pad = document.createElement('i');
+    pad.className = 'tune-pad';
+    pad.innerHTML = '<b></b>';
+    host.appendChild(pad);
+    const aim = (e: PointerEvent) => {
+      const r = pad.getBoundingClientRect();
+      const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
+      const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+      if (Math.hypot(dx, dy) < 0.04) return;
+      const deg = (Math.round((Math.atan2(dx, -dy) * 180) / Math.PI) + 360) % 360;
+      set({ lightAngle: deg });
+    };
+    pad.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      pad.setPointerCapture(e.pointerId);
+      pad.classList.add('is-dragging');
+      aim(e);
+    });
+    pad.addEventListener('pointermove', (e) => pad.hasPointerCapture(e.pointerId) && aim(e));
+    const end = () => pad.classList.remove('is-dragging');
+    pad.addEventListener('pointerup', end);
+    pad.addEventListener('pointercancel', end);
+    return pad;
   }
 
   function announce(msg: string) {
