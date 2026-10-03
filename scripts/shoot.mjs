@@ -94,6 +94,7 @@ for (const s of shots) {
     await page.waitForTimeout(3000);
   } else if (s.act === 'pixel') {
     await page.keyboard.press('7');
+    await page.locator('#adjustToggle').click();
     await page.locator('#pixel').fill('3');
     await page.waitForTimeout(1200);
   }

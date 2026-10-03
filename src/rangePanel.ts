@@ -1,4 +1,4 @@
-// "Foil area" panel section and brush mode: choose where on the card the finish lands.
+// The panel's Area tab and brush mode: choose where on the card the finish lands.
 import { RangeModel } from './range';
 import { BRUSH_MAX, BRUSH_MIN, MIN_BAND, type RangeRegion } from './featureState';
 import { RANGE_H, RANGE_W } from './gl/range';
@@ -15,6 +15,8 @@ export interface RangeHost {
   stage: Stage;
   t: () => Dict;
   announce: (msg: string) => void;
+  /** Told whether the area differs from the default (whole card, no brush), after every change. */
+  onRangeChanged: (changed: boolean) => void;
 }
 
 const REGIONS: RangeRegion[] = ['all', 'art', 'frame', 'text', 'none'];
@@ -88,12 +90,11 @@ export function initRangePanel(host: RangeHost) {
   stage.cards.range.motion = !reduced.matches;
   reduced.addEventListener('change', () => (stage.cards.range.motion = !reduced.matches));
 
-  // ---------- Section ----------
+  // ---------- Tab ----------
 
-  const sec = el('section', 'sec sec-range');
+  const sec = document.getElementById('pane-range')!;
   sec.innerHTML = `
-    <h3 class="sec-title"><i></i><span data-r="secRange"></span>
-      <button class="link range-reset" type="button" data-r="rangeReset"></button></h3>
+    <div class="pane-tools"><button class="link range-reset" type="button" data-r="rangeReset"></button></div>
     <div class="field">
       <div class="field-head">
         <span class="field-label" id="rangeWhereLabel" data-r="rangeWhere"></span>
@@ -116,16 +117,10 @@ export function initRangePanel(host: RangeHost) {
       <div class="tone-presets" role="group" aria-labelledby="rangeToneLabel"></div>
     </div>
     <div class="range-row">
-      <button class="chip range-chip" type="button" data-k="rangeInvert" aria-pressed="false">
-        ${svg('<path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z" /><path class="solid" d="M8 2a6 6 0 0 1 0 12z" />')}
-        <span data-r="rangeInvert"></span>
-      </button>
-      <button class="chip range-chip" type="button" data-k="rangeShow" aria-pressed="false">
-        ${svg('<path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" /><path d="M6 8a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" />')}
-        <span data-r="rangeShow"></span>
-      </button>
+      <button class="chip range-chip" type="button" data-k="rangeInvert" aria-pressed="false"><span data-r="rangeInvert"></span></button>
+      <button class="chip range-chip" type="button" data-k="rangeShow" aria-pressed="false"><span data-r="rangeShow"></span></button>
     </div>
-    <button class="btn btn-green range-paint" type="button">
+    <button class="btn btn-quiet range-paint" type="button">
       ${svg(ICON.brush)}
       <span class="btn-text"><b data-r="paint"></b><small data-r="paintSub"></small></span>
     </button>
@@ -133,13 +128,9 @@ export function initRangePanel(host: RangeHost) {
       <p class="cover-head" aria-live="polite"><span data-r="coverLabel"></span><b class="cover-val"></b></p>
       <i class="cover-bar" aria-hidden="true"><i></i></i>
       <p class="cover-empty" hidden><span></span> <button class="link cover-fix" type="button"></button></p>
-      <p class="legend" aria-hidden="true"><b data-r="legendTitle"></b><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
+      <p class="legend" aria-hidden="true"><i class="lg lg-foil"></i><span data-r="legendFoil"></span><i class="lg lg-paper"></i><span data-r="legendPaper"></span></p>
     </div>
   `;
-  const panel = document.getElementById('panel')!;
-  panel.insertBefore(sec, panel.querySelector('.sec-export'));
-  // Number the panel's sections in order, so they stay 01, 02, … whatever else gets added.
-  panel.querySelectorAll<HTMLElement>('.sec-title > i').forEach((i, n) => (i.textContent = String(n + 1).padStart(2, '0')));
 
   const q = <T extends HTMLElement>(s: string, root: ParentNode = sec) => root.querySelector<T>(s)!;
   const regionSeg = q('.seg-region');
@@ -305,7 +296,7 @@ export function initRangePanel(host: RangeHost) {
         <button class="tool" type="button" data-a="redo" aria-keyshortcuts="Control+Shift+Z">${svg(ICON.redo)}<span data-r="redo"></span></button>
         <button class="tool" type="button" data-a="clear">${svg(ICON.clear)}<span data-r="brushClear"></span></button>
       </div>
-      <button class="btn btn-green brush-done" type="button"><span class="btn-text"><b data-r="brushDone"></b><small data-r="brushDoneSub"></small></span></button>
+      <button class="btn btn-quiet brush-done" type="button"><span class="btn-text"><b data-r="brushDone"></b><small data-r="brushDoneSub"></small></span></button>
     </div>
     <p class="card-hint brush-keys"></p>
   `;
@@ -641,7 +632,8 @@ export function initRangePanel(host: RangeHost) {
     softOut.title = pct(s.brushSoft);
     soft.setAttribute('aria-valuetext', pct(s.brushSoft));
     const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
-    q<HTMLButtonElement>('.range-reset').hidden = !changed;
+    q<HTMLElement>('.pane-tools').hidden = !changed;
+    host.onRangeChanged(changed);
   }
 
   function applyText() {
