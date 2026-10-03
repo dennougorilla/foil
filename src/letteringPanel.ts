@@ -25,8 +25,10 @@ import {
 
 interface Options {
   store: Store;
-  /** The section the block is appended to. */
+  /** The panel tab the controls live in. */
   host: HTMLElement;
+  /** Brings that tab into view (opening Fine-tune if needed). */
+  open: () => void;
   dict: () => Dict;
   /** The name as printed on the card (typed or fallback). */
   name: () => string;
@@ -114,27 +116,10 @@ export function mountLettering(o: Options): void {
   // ---------- DOM ----------
   const root = el('div', 'lt');
   root.setAttribute('role', 'group');
-  root.setAttribute('aria-labelledby', 'ltTitle');
-
-  // Folded to one summary row by default, so the Tune section fits above Export; the row (or
-  // the name-tag chip) opens it.
-  const head = el('div', 'lt-head');
-  const toggle = el('button', 'lt-toggle');
-  toggle.type = 'button';
-  toggle.setAttribute('aria-controls', 'ltBody');
-  const title = el('span', 'field-label');
-  title.id = 'ltTitle';
-  const summary = el('b', 'lt-summary');
-  const chev = el('span', 'lt-chev');
-  chev.setAttribute('aria-hidden', 'true');
-  chev.textContent = '›';
-  toggle.append(title, summary, chev);
-  const target = el('span', 'lt-target');
+  const tools = el('div', 'pane-tools');
   const reset = el('button', 'link lt-reset');
   reset.type = 'button';
-  head.append(toggle, target, reset);
-  const body = el('div', 'lt-body');
-  body.id = 'ltBody';
+  tools.append(reset);
 
   const styles = el('div', 'lt-styles');
   styles.setAttribute('role', 'radiogroup');
@@ -280,21 +265,20 @@ export function mountLettering(o: Options): void {
 
   const detail = el('div', 'lt-detail');
   detail.append(foil.row, ink.row, depth.row, gloss.row, tilt);
-  body.append(styles, help, detail);
-  root.append(head, body);
-  // Last in its section: frame, strength and pixelation stay in view, and the jump chip on the
-  // name tag brings this block up when wanted.
+  root.append(tools, styles, help, detail);
   o.host.append(root);
   roving(styles);
 
-  // The panel's export bar is sticky; never leave a control hidden behind it.
+  // The panel's tabs and export bar are sticky; never leave a control hidden behind them.
   const reveal = (target: HTMLElement, smooth = false) => {
     const bar = document.querySelector('.sec-export');
     const panel = root.closest<HTMLElement>('.panel');
-    const inPanel = !!panel && panel.scrollHeight > panel.clientHeight && getComputedStyle(panel).overflowY !== 'visible';
+    // Beside the stage the panel scrolls on its own (never the page); on phones the page does.
+    const inPanel = !!panel && getComputedStyle(panel).overflowY !== 'visible';
     const r = target.getBoundingClientRect();
     const floor = bar ? bar.getBoundingClientRect().top - 16 : innerHeight - 16;
-    const ceil = (inPanel ? panel!.getBoundingClientRect().top : 0) + 16;
+    const tabs = document.getElementById('panelTabs')!.getBoundingClientRect();
+    const ceil = Math.max(inPanel ? panel!.getBoundingClientRect().top : 0, tabs.bottom) + 16;
     // Above the view: bring the top into it. Below: bring the bottom above the bar, but never
     // push the top out of view.
     let by = 0;
@@ -306,18 +290,6 @@ export function mountLettering(o: Options): void {
   };
   root.addEventListener('focusin', (e) => reveal(e.target as HTMLElement));
 
-  const setOpen = (open: boolean) => {
-    body.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
-    root.classList.toggle('is-open', open);
-  };
-  setOpen(false);
-  toggle.addEventListener('click', () => {
-    sfx.tick();
-    const open = !root.classList.contains('is-open');
-    setOpen(open);
-    if (open) reveal(root, true);
-  });
 
   // Pointer over the chips moves their light together, like tilting the card.
   styles.addEventListener('pointermove', (e) => {
@@ -346,7 +318,7 @@ export function mountLettering(o: Options): void {
   o.tag?.after(jump);
   jump.addEventListener('click', () => {
     sfx.tick();
-    setOpen(true);
+    o.open();
     const on = styles.querySelector<HTMLButtonElement>('[aria-checked=true]');
     // Off-screen (phones: the panel is far below) jump there first, then fit the whole block.
     const r = root.getBoundingClientRect();
@@ -372,8 +344,7 @@ export function mountLettering(o: Options): void {
 
   function labels() {
     const t = o.dict().lt;
-    title.textContent = t.title;
-    target.textContent = t.target;
+    root.setAttribute('aria-label', t.title);
     reset.textContent = t.reset;
     styles.setAttribute('aria-label', t.styles);
     styleBtns.forEach((b) => {
@@ -423,7 +394,6 @@ export function mountLettering(o: Options): void {
       g.dataset.g = glyph;
     });
     help.textContent = t.help[l.style];
-    summary.textContent = t.style[l.style].replace('​', '');
     const jumpLabel = t.jump.replace('{style}', t.style[l.style].replace('​', ''));
     jump.setAttribute('aria-label', jumpLabel);
     jump.title = jumpLabel;
@@ -433,22 +403,20 @@ export function mountLettering(o: Options): void {
     const jg = jumpChip.querySelector('b')!;
     jg.textContent = jg.dataset.g = glyph;
 
-    // Ink and foil rows swap (same height); sliders that don't apply are greyed
-    // out rather than removed, so the panel never changes height.
+    // Only the tuning the style actually has is shown.
     ink.row.hidden = !c.ink;
     foil.row.hidden = !c.foil;
-    for (const [sl, on] of [[depth, c.depth], [gloss, c.gloss]] as const) {
-      sl.input.disabled = !on;
-      sl.row.classList.toggle('is-off', !on);
-    }
-    tilt.classList.toggle('is-off', l.style === 'ink');
+    depth.row.hidden = !c.depth;
+    gloss.row.hidden = !c.gloss;
+    tilt.hidden = l.style === 'ink';
     detail.dataset.style = l.style;
 
     const ik = inkKeyOf(l.ink);
     const shownInk = ik === 'none' && !c.blind ? 'auto' : ik;
     INK_KEYS.forEach((k, i) => {
       const b = inkBtns[i];
-      b.disabled = k === 'none' && !c.blind;
+      // "No ink" only exists for presses; elsewhere it isn't offered at all.
+      b.hidden = k === 'none' && !c.blind;
       // Blind only exists for presses; ink style falls back to the frame's ink, so one radio is on.
       radio(b, k === shownInk);
     });
@@ -474,7 +442,7 @@ export function mountLettering(o: Options): void {
     gloss.out.textContent = c.gloss ? word(l.gloss, t.glossLevel) : '—';
     gloss.input.setAttribute('aria-valuetext', `${gloss.out.textContent} (${Math.round(l.gloss * 100)}%)`);
     fill(gloss.input);
-    reset.hidden = JSON.stringify(l) === JSON.stringify(DEFAULT_LETTERING);
+    tools.hidden = JSON.stringify(l) === JSON.stringify(DEFAULT_LETTERING);
     lastFill = `${l.style}|${shown}`;
   }
 

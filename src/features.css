@@ -1,28 +1,27 @@
-/* Foil area section, brush mode and custom colour swatches. Uses the tokens from style.css. */
+/* The Area tab, brush mode and custom frame colours. Uses the tokens from style.css. */
 
-/* ---------- Foil area ---------- */
-
-.sec-range .sec-title .range-reset {
-  margin-left: auto;
-  font-size: 13px;
-}
-
-.sec-range .range-reset[hidden] {
-  display: none;
-}
+/* ---------- Area tab ---------- */
 
 .seg.seg-region {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
+  container-type: inline-size;
 }
 
 .seg-region .region-btn {
   display: grid;
   justify-items: center;
-  gap: 4px;
-  padding: 8px 2px 6px;
+  gap: 6px;
+  padding: 10px 2px 8px;
   font-size: 13px;
   letter-spacing: -0.02em;
+}
+
+@container (max-width: 300px) {
+  .seg-region .region-btn {
+    font-size: 12px;
+    letter-spacing: -0.04em;
+  }
 }
 
 .rgn {
@@ -52,13 +51,6 @@
   fill: var(--text);
 }
 
-.region-btn[aria-checked='true'] {
-  --c: var(--gold);
-  --lo: #a8801f;
-  color: var(--paper-ink);
-  text-shadow: none;
-}
-
 .region-btn[aria-checked='true'] .rgn .on {
   fill: var(--paper-ink);
 }
@@ -68,7 +60,45 @@
 }
 
 .region-btn[aria-checked='true'] .rgn .line {
-  stroke: var(--gold);
+  stroke: var(--paper);
+}
+
+/* Inverted or brushed, the chosen region is only the base: it shows outlined, with a tab saying so. */
+.seg-region:is(.is-invert, .is-custom) .region-btn[aria-checked='true'] {
+  background: var(--panel-lo);
+  color: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--paper), 0 4px 0 var(--edge);
+}
+
+.seg-region.is-invert .region-btn[aria-checked='true'] {
+  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
+}
+
+.seg-region:is(.is-invert, .is-custom) .region-btn[aria-checked='true'] .rgn .on {
+  fill: var(--paper);
+}
+
+.seg-region:is(.is-invert, .is-custom) .region-btn[aria-checked='true'] :is(.rgn .off, .rgn .line) {
+  stroke: var(--paper);
+}
+
+.seg-region.is-invert .region-btn[aria-checked='true']::after,
+.seg-region.is-custom .region-btn[aria-checked='true']::after {
+  content: attr(data-except);
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 16px;
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.seg-region.is-custom .region-btn[aria-checked='true']::after {
+  content: attr(data-base);
 }
 
 .field-head {
@@ -77,8 +107,42 @@
   justify-content: space-between;
 }
 
-/* Two thumbs over one track: the gold window is the band of tones that keeps the finish.
+.where-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 20px;
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.where-tag[hidden] {
+  display: none;
+}
+
+.where-tag svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+
+.region-hint {
+  min-height: 1.5em;
+}
+
+/* Two handles over one track: the window is the band of tones that keeps the finish.
    Above the track sits the card's own tones as a pixel histogram. */
+.tone-field {
+  container-type: inline-size;
+}
+
 .tone {
   --lo: 0;
   --hi: 1;
@@ -114,7 +178,7 @@
   left: calc(var(--lo) * 100%);
   right: calc((1 - var(--hi)) * 100%);
   border-radius: 4px;
-  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--edge);
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--edge);
   transition: left 0.08s, right 0.08s;
 }
 
@@ -160,20 +224,22 @@
   outline-offset: -2px;
 }
 
+/* Handles travel exactly over the track, so at 0% and 100% they stay inside the window. */
 .tone input[type='range'] {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 4px;
+  right: 4px;
   top: 14px;
+  width: auto;
   height: 28px;
   pointer-events: none;
   z-index: 2;
 }
 
 .tone input[type='range']::-webkit-slider-runnable-track {
+  height: 28px;
   background: transparent;
   box-shadow: none;
-  height: 28px;
 }
 
 .tone input[type='range']::-moz-range-track {
@@ -189,194 +255,171 @@
 .tone input[type='range']::-webkit-slider-thumb {
   pointer-events: auto;
   margin-top: 0;
-  height: 28px;
   width: 12px;
+  height: 28px;
   cursor: ew-resize;
 }
 
 .tone input[type='range']::-moz-range-thumb {
   pointer-events: auto;
-  height: 28px;
   width: 12px;
+  height: 28px;
   cursor: ew-resize;
 }
 
 .tone .tone-lo::-webkit-slider-thumb {
   border-radius: 6px 2px 2px 6px;
-  translate: -5px 0;
 }
 
 .tone .tone-hi::-webkit-slider-thumb {
   border-radius: 2px 6px 6px 2px;
-  translate: 5px 0;
 }
 
 .tone .tone-lo::-moz-range-thumb {
   border-radius: 6px 2px 2px 6px;
-  translate: -5px 0;
 }
 
 .tone .tone-hi::-moz-range-thumb {
   border-radius: 2px 6px 6px 2px;
-  translate: 5px 0;
 }
 
+/* Keyboard focus: the handle grows, turns gold and gets a white-and-ink ring the window can't swallow. */
 .tone input[type='range']:focus-visible::-webkit-slider-thumb {
+  scale: 1.18;
   background: var(--gold);
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 7px var(--edge);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 8px var(--edge);
 }
 
 .tone input[type='range']:focus-visible::-moz-range-thumb {
+  scale: 1.18;
   background: var(--gold);
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 7px var(--edge);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 8px var(--edge);
 }
 
 .tone-presets {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 4px;
 }
 
-.tone-chip {
+@container (max-width: 318px) {
+  .tone-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Presets and switches share the segmented look: paper-white when on. */
+.tone-chip,
+.chip.range-chip {
   min-width: 0;
-  min-height: 30px;
-  padding: 2px 4px;
+  min-height: 34px;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px #4b6068, 0 4px 0 var(--edge);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border: 0;
-  border-radius: 6px;
-  background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 3px 0 var(--edge);
-  color: var(--text-dim);
-  font-size: 13px;
-  line-height: 1.2;
+  text-shadow: none;
   transition: transform 0.08s, color 0.15s, background 0.15s;
 }
 
-.tone-chip:hover {
+.tone-chip:hover,
+.chip.range-chip:hover {
   color: var(--text);
 }
 
-.tone-chip:active {
-  transform: translateY(3px);
+.tone-chip:active,
+.chip.range-chip:active {
+  transform: translateY(4px);
   box-shadow: inset 0 0 0 2px var(--panel-hi);
 }
 
-.tone-chip[aria-pressed='true'] {
-  background: var(--panel-hi);
-  color: var(--gold);
-  box-shadow: inset 0 0 0 2px var(--gold), 0 3px 0 var(--edge);
+.tone-chip[aria-pressed='true'],
+.chip.range-chip[aria-pressed='true'] {
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 4px 0 var(--edge);
 }
 
 .range-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-bottom: 12px;
 }
 
 .chip.range-chip {
-  flex: 1;
-  justify-content: center;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 10px 2px 12px;
+  height: auto;
 }
 
-.chip.range-chip[aria-pressed='false'] {
+/* A small switch at the end says on or off in shape as well as colour. */
+.chip.range-chip::after {
+  content: '';
+  position: static;
+  display: block;
+  flex: none;
+  width: 22px;
+  height: 12px;
+  margin-left: 2px;
+  border-radius: 6px;
+  background: radial-gradient(circle at 6px 6px, var(--text-dim) 0 4px, transparent 4.5px), var(--panel);
+  box-shadow: inset 0 0 0 1.5px var(--panel-hi);
+}
+
+.chip.range-chip[aria-pressed='true']::after {
+  background: radial-gradient(circle at 16px 6px, var(--paper) 0 4px, transparent 4.5px), var(--paper-ink);
+  box-shadow: none;
+}
+
+.chip.range-chip[aria-pressed] {
+  opacity: 1;
   text-decoration: none;
 }
 
-.chip.range-chip[aria-pressed='true'] {
-  color: var(--gold);
-  background: var(--panel-hi);
-  box-shadow: 0 3px 0 var(--edge), inset 0 0 0 2px var(--gold);
+
+.range-paint {
+  justify-content: flex-start;
 }
 
-.where-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--gold);
-  font-size: 12px;
-  line-height: 20px;
-}
-
-.where-tag svg {
-  width: 12px;
-  height: 12px;
+.range-paint svg {
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.75;
   stroke-linejoin: round;
 }
 
-/* Inverted: the chosen region is the part left plain, so it prints as matte paper with an "except" tab. */
-.seg-region.is-invert .region-btn[aria-checked='true'] {
-  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
-  color: var(--gold);
-  box-shadow: inset 0 0 0 2px var(--gold), 0 4px 0 var(--edge);
-}
-
-.seg-region.is-invert .region-btn[aria-checked='true'] .rgn .on {
-  fill: var(--gold);
-}
-
-.seg-region.is-invert .region-btn[aria-checked='true']::after {
-  content: attr(data-except);
-  position: absolute;
-  top: -8px;
-  right: -4px;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--gold);
-  color: var(--paper-ink);
-  font-size: 10px;
-  line-height: 15px;
-  box-shadow: 0 0 0 2px var(--edge);
-}
-
-.where-tag[hidden] {
-  display: none;
-}
-
-.region-hint {
-  margin-top: 2px;
-  min-height: 1.5em;
-}
-
-.chip.range-chip svg path:first-child {
-  fill: none;
-}
-
-.chip.range-chip svg .solid {
-  fill: currentColor;
-  stroke: none;
-}
-
-.btn-green {
-  --c: var(--green);
-  --lo: var(--green-lo);
-}
-
-.range-paint {
-  min-height: 48px;
-}
-
+/* While painting, the panel button is a status, not a call to action. */
 .range-paint[aria-pressed='true'] {
-  transform: translateY(5px);
-  box-shadow: 0 0 0 var(--lo), inset 0 0 0 3px rgba(255, 255, 255, 0.5);
+  transform: none;
+  background: var(--panel-lo);
+  text-shadow: none;
+  box-shadow: inset 0 0 0 2px var(--paper), 0 4px 0 var(--edge);
 }
 
 .range-cover {
   display: grid;
-  gap: 6px;
-  margin: 12px 0 0;
+  gap: 8px;
   font-size: 13px;
   color: var(--text-dim);
 }
 
 .range-cover p {
   margin: 0;
+}
+
+.range-cover.is-none {
+  color: var(--gold);
 }
 
 .cover-head {
@@ -386,9 +429,8 @@
 }
 
 .cover-val {
-  font-family: var(--display);
   font-weight: 400;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text);
 }
 
@@ -405,12 +447,45 @@
   font-size: 13px;
 }
 
+/* Coverage: a chunky game meter, foil segments on proof paper. */
+.cover-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 4px;
+  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
+  box-shadow: 0 0 0 2px var(--edge);
+  overflow: hidden;
+}
+
+.cover-bar i {
+  display: block;
+  width: var(--cover, 100%);
+  height: 100%;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(90deg, #ff6b8b, #f2c14e 30%, #59f2b0 55%, #5fb4ff 75%, #c58bff);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+  transition: width 0.25s var(--ease-out);
+}
+
+.cover-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 10px, rgba(13, 19, 21, 0.55) 10px 12px);
+  pointer-events: none;
+}
+
 /* What the card overlay means: foil sheen versus matte paper. */
 .legend {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+}
+
+.legend b {
+  font-weight: 400;
+  color: var(--text-dim);
 }
 
 .lg {
@@ -427,27 +502,6 @@
 .lg-paper {
   margin-left: 8px;
   background: repeating-conic-gradient(#8f8d86 0 25%, #77756f 0 50%) 0 0 / 4px 4px;
-}
-
-.cover-bar {
-  height: 10px;
-  border-radius: 2px;
-  background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--edge);
-  overflow: hidden;
-}
-
-.cover-bar i {
-  display: block;
-  width: var(--cover, 100%);
-  height: 100%;
-  background: linear-gradient(90deg, #ff6b8b, #f2c14e 30%, #59f2b0 55%, #5fb4ff 75%, #c58bff) 0 0 / 300px 100%;
-  box-shadow: inset 0 0 0 2px var(--edge);
-  transition: width 0.25s var(--ease-out);
-}
-
-.range-cover.is-none {
-  color: var(--gold);
 }
 
 /* ---------- Brush mode ---------- */
@@ -585,8 +639,7 @@
   font-weight: 400;
 }
 
-.brush-title svg,
-.range-paint svg {
+.brush-title svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -623,21 +676,9 @@
   stroke-width: 2.5;
 }
 
-.seg-brush [data-m='add'][aria-checked='true'] {
-  --c: var(--gold);
-  --lo: #a8801f;
-  color: var(--paper-ink);
-  text-shadow: none;
-}
-
-.seg-brush [data-m='erase'][aria-checked='true'] {
-  --c: var(--red);
-  --lo: var(--red-lo);
-}
-
 .brush .row {
-  margin-top: 0;
   grid-template-columns: 80px 1fr 40px;
+  grid-template-areas: 'label input out';
 }
 
 .brush-tools {
@@ -705,36 +746,17 @@
   white-space: nowrap;
 }
 
-/* ---------- Custom colours ---------- */
 
+/* ---------- Custom frame colours ---------- */
+
+/* Under the four frame presets, inside the same radio group: saved colours, then "+ Add color". */
 .sw-strip {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
-}
-
-/* Under the four frame presets, inside the same radio group. */
-.sw-strip-frame {
-  grid-column: 1 / -1;
-  margin-top: 4px;
-}
-
-/* With no saved colors yet, the lone "Add color" button sits on the Frame label's row instead of
-   taking a row of its own, so the Tune sliders and the backdrop stay above Export. */
-.field:has(> #frameSeg) {
-  position: relative;
-}
-
-.sw-strip-frame:not(:has(.sw-item)) {
-  position: absolute;
-  top: -8px;
-  right: 0;
-  margin: 0;
-}
-
-.sw-strip-frame:not(:has(.sw-item)) .sw-add {
-  height: 28px;
+  gap: 12px;
+  margin-top: 6px;
 }
 
 .sw-item {
@@ -742,35 +764,20 @@
   display: inline-flex;
 }
 
+/* Saved colours read as tiny cards, like the preset swatches above them. */
 .sw-chip {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: 5px;
+  background: var(--sw);
   box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
   transition: transform 0.2s var(--ease-back), box-shadow 0.15s;
 }
 
-.sw-chip:hover {
-  transform: translateY(-2px) rotate(-3deg);
-}
-
-.sw-chip[aria-checked='true'] {
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--gold), 0 6px 0 5px var(--edge);
-  transform: translateY(-2px);
-}
-
-/* Frame colours read as tiny cards, like the preset swatches above them. */
-.sw-frame {
-  width: 28px;
-  height: 36px;
-  border-radius: 5px;
-  background: var(--sw);
-}
-
-.sw-frame::after {
+.sw-chip::after {
   content: '';
   position: absolute;
   inset: 4px 4px 10px;
@@ -779,45 +786,16 @@
   box-shadow: 0 0 0 1.5px rgba(13, 19, 21, 0.55);
 }
 
-/* Backdrop colours show the swirl they paint: three tones wound around a light core. */
-.sw-stage {
-  background:
-    radial-gradient(circle at 38% 40%, var(--c) 0 16%, var(--b) 17% 34%, var(--a) 35% 50%, var(--b) 51% 64%, var(--a) 65%);
-  image-rendering: pixelated;
+.sw-chip:hover {
+  transform: translateY(-2px) rotate(-3deg);
 }
 
-.sw-auto {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: auto;
-  padding: 0 10px 0 4px;
-  background: var(--panel-lo);
-  color: var(--text-dim);
-  font-size: 13px;
+.sw-chip[aria-checked='true'] {
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--paper), 0 6px 0 5px var(--edge);
+  transform: translateY(-2px);
 }
 
-.sw-auto i {
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  background:
-    radial-gradient(circle at 38% 40%, var(--c) 0 16%, var(--b) 17% 34%, var(--a) 35% 50%, var(--b) 51% 64%, var(--a) 65%);
-  box-shadow: 0 0 0 1.5px var(--edge);
-}
-
-.sw-auto[aria-checked='true'] {
-  color: var(--text);
-}
-
-.sw-sep {
-  width: 2px;
-  height: 26px;
-  margin: 0 2px;
-  border-radius: 1px;
-  background: var(--panel-hi);
-}
-
+/* The remove badge shows on hover or keyboard focus only (touch: on the chosen chip). */
 .sw-del {
   position: absolute;
   top: -9px;
@@ -851,33 +829,39 @@
 }
 
 .sw-item:hover .sw-del,
-.sw-chip[aria-checked='true'] + .sw-del,
 .sw-chip:focus-visible + .sw-del {
   opacity: 1;
   transform: none;
   pointer-events: auto;
 }
 
+@media (pointer: coarse) {
+  .sw-chip[aria-checked='true'] + .sw-del {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .sw-del {
+    width: 26px;
+    height: 26px;
+    top: -11px;
+    right: -10px;
+  }
+}
+
 .sw-add {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  width: 34px;
-  height: 34px;
-  padding: 0;
+  height: 36px;
+  padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 7px;
-  background: transparent;
-  box-shadow: inset 0 0 0 2px var(--panel-hi);
-  background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(255, 255, 255, 0.04) 5px 7px);
-  color: var(--text-dim);
+  border-radius: 4px;
+  background: none;
+  box-shadow: inset 0 0 0 2px #4b6068;
+  color: var(--text);
   font-size: 13px;
   transition: color 0.15s, box-shadow 0.15s, transform 0.08s;
-}
-
-.sw-strip-frame .sw-add {
-  height: 36px;
 }
 
 .sw-add svg {
@@ -887,29 +871,16 @@
   fill: currentColor;
 }
 
-.sw-add span {
-  display: none;
-}
-
-.sw-add.is-wide {
-  width: auto;
-  padding: 0 12px 0 10px;
-}
-
-.sw-add.is-wide span {
-  display: inline;
-}
-
 .sw-add:hover {
-  color: var(--gold);
-  box-shadow: inset 0 0 0 2px var(--gold);
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--text-dim);
 }
 
 .sw-add:active {
   transform: translateY(2px);
 }
 
-/* The one colour input, parked over whichever "+" opened it so the picker appears there. */
+/* The colour input, parked over the "+" that opened it so the picker appears there. */
 .sw-input {
   position: fixed;
   z-index: -1;
@@ -919,81 +890,28 @@
   padding: 0;
 }
 
-/* ---------- Responsive ---------- */
-
-@media (min-width: 901px) and (max-height: 820px) {
-  .seg-region .region-btn {
-    padding: 5px 4px 4px;
-  }
-  .rgn {
-    width: 15px;
-    height: 20px;
-  }
-  .sw-chip {
-    width: 30px;
-    height: 30px;
-  }
-  .sw-frame {
-    width: 24px;
-    height: 32px;
-  }
-  .sw-auto {
-    width: auto;
-  }
+.toast.is-swatch {
+  pointer-events: auto;
 }
 
-@media (max-width: 1180px) {
-  .brush {
-    width: 260px;
-  }
+.toast.is-swatch::before {
+  display: none;
 }
 
-@media (max-width: 900px) {
-  .brush {
-    width: min(100%, 340px);
-  }
-  .paint-layer {
-    border-radius: 6%;
-  }
+.toast-sw {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 5px;
+  background: var(--sw);
+  box-shadow: 0 0 0 2px var(--edge);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .brush,
-  .paint-layer[data-mode='add'] .paint-ring::before {
-    animation: none;
-  }
-  .tone-band,
-  .cover-bar i {
-    transition: none;
-  }
+.toast.is-swatch .toast-btn {
+  min-height: 32px;
 }
 
-/* The backdrop row holds the most chips, so it runs a size smaller to stay on one line. */
-.sw-strip-stage {
-  gap: 10px 7px;
-}
-
-.sw-strip-stage .sw-chip:not(.sw-auto),
-.sw-strip-stage .sw-add {
-  width: 30px;
-  height: 30px;
-}
-
-.sw-strip-stage .sw-auto {
-  height: 30px;
-  padding: 0 8px 0 3px;
-}
-
-.sw-strip-stage .sw-auto i {
-  width: 24px;
-  height: 24px;
-}
-
-.sw-strip-stage .sw-sep {
-  margin: 0;
-}
-
-/* ---------- Foil flakes, brush previews, key hints, colour undo ---------- */
+/* ---------- Foil flakes, brush previews, key hints ---------- */
 
 .flake {
   position: absolute;
@@ -1039,7 +957,7 @@
   width: var(--d, 12px);
   height: var(--d, 12px);
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--paper);
   box-shadow: 0 0 0 1.5px var(--edge);
 }
 
@@ -1048,16 +966,6 @@
   height: 18px;
   box-shadow: none;
   filter: blur(var(--blur, 2px));
-}
-
-.brush input[type='range']::-webkit-slider-runnable-track {
-  background:
-    linear-gradient(var(--gold), var(--gold)) 0 0 / var(--fill, 50%) 100% no-repeat,
-    var(--panel-lo);
-}
-
-.brush input[type='range']::-moz-range-progress {
-  background: var(--gold);
 }
 
 .brush-keys kbd {
@@ -1089,35 +997,6 @@
   }
 }
 
-.toast.is-swatch {
-  pointer-events: auto;
-}
-
-.toast.is-swatch::before {
-  display: none;
-}
-
-.toast-sw {
-  width: 22px;
-  height: 22px;
-  flex: none;
-  border-radius: 5px;
-  background: var(--sw);
-  box-shadow: 0 0 0 2px var(--edge);
-}
-
-.toast.is-swatch .toast-btn {
-  min-height: 32px;
-}
-
-@media (pointer: coarse) {
-  .sw-del {
-    width: 26px;
-    height: 26px;
-    top: -11px;
-    right: -10px;
-  }
-}
 
 /* ---------- Phones: a slim band with a live card while the Finish area is on screen ---------- */
 
@@ -1226,6 +1105,10 @@
   .stage.is-painting {
     padding-bottom: 320px;
   }
+  /* The brush sheet takes the bottom of the screen while painting. */
+  body:has(.stage.is-painting) .sec-export {
+    display: none;
+  }
 }
 
 @keyframes sheet-in {
@@ -1242,143 +1125,38 @@
   }
 }
 
-/* The header's phone rule dims unpressed chips and hides their lamp; these toggles keep both. */
-@media (max-width: 420px) {
-  .chip.range-chip[aria-pressed='false'] {
-    opacity: 1;
-  }
-  .chip.range-chip[aria-pressed]::after {
-    display: block;
+@media (max-width: 1180px) {
+  .brush {
+    width: 260px;
   }
 }
 
-/* ---------- Round 8 ---------- */
-
-.tone-field {
-  container-type: inline-size;
-}
-
-@container (max-width: 318px) {
-  .tone-presets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 900px) {
+  .brush {
+    width: min(100%, 340px);
+  }
+  .paint-layer {
+    border-radius: 6%;
   }
 }
 
-/* Selected means gold everywhere, Erase included; red stays for danger. */
-.seg-brush [data-m='erase'][aria-checked='true'] {
-  --c: var(--gold);
-  --lo: #a8801f;
-  color: var(--paper-ink);
-  text-shadow: none;
+@media (prefers-reduced-motion: reduce) {
+  .brush,
+  .paint-layer[data-mode='add'] .paint-ring::before {
+    animation: none;
+  }
+  .tone-band,
+  .cover-bar i {
+    transition: none;
+  }
 }
 
+/* Erasing: a dashed paper ring over matte proof paper. */
 .paint-layer[data-mode='erase'] .paint-ring {
   box-shadow: 0 0 0 1.5px var(--edge), inset 0 0 0 1.5px #fff;
   outline: 2px dashed rgba(243, 238, 226, 0.9);
   outline-offset: 1px;
   background: repeating-conic-gradient(rgba(143, 141, 134, 0.35) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
-}
-
-/* While painting, the panel button is a status, not a call to action. */
-.range-paint[aria-pressed='true'] {
-  transform: none;
-  background: var(--panel-lo);
-  color: var(--green);
-  text-shadow: none;
-  box-shadow: inset 0 0 0 2px var(--green), 0 4px 0 var(--edge);
-}
-
-.seg-region.is-invert .region-btn[aria-checked='true']::after {
-  top: -10px;
-  right: -6px;
-  padding: 1px 6px;
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.seg-region.is-invert .region-btn[aria-checked='true'] .rgn .off,
-.seg-region.is-invert .region-btn[aria-checked='true'] .rgn .line {
-  stroke: var(--gold);
-}
-
-/* The remove badge shows on hover or keyboard focus only (touch: on the chosen chip). */
-.sw-chip[aria-checked='true'] + .sw-del {
-  opacity: 0;
-  transform: scale(0.6);
-  pointer-events: none;
-}
-
-.sw-item:hover .sw-del,
-.sw-chip:focus-visible + .sw-del {
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-}
-
-@media (pointer: coarse) {
-  .sw-chip[aria-checked='true'] + .sw-del {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-  }
-}
-
-.sw-label {
-  margin-right: 2px;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-/* The coverage strip is a proof: foil where the finish lands, matte paper for the rest. */
-.cover-bar {
-  height: 12px;
-  background: repeating-conic-gradient(#3d4446 0 25%, #2c3335 0 50%) 0 0 / 4px 4px;
-}
-
-@media (max-width: 900px) {
-  .brush-lead {
-    display: block;
-    margin: -2px 0 0;
-    font-size: 12px;
-  }
-}
-
-/* ---------- Round 10: one "selected" look, proof strip, quieter details ---------- */
-
-/* Selected or switched on reads the same everywhere in the section: a gold fill with dark ink. */
-.tone-chip[aria-pressed='true'],
-.chip.range-chip[aria-pressed='true'] {
-  background: var(--gold);
-  color: var(--paper-ink);
-  text-shadow: none;
-  box-shadow: 0 3px 0 #a8801f;
-}
-
-.chip.range-chip[aria-pressed='true']::after {
-  background: var(--paper-ink);
-  box-shadow: none;
-}
-
-/* The proof strip shows the whole foil run however short it is. */
-.cover-bar i {
-  background-size: 100% 100%;
-}
-
-.mini {
-  background: var(--ink-900);
-}
-
-.mini-canvas {
-  width: 84px;
-  height: 118px;
-}
-
-.mini-hide {
-  display: inline-flex;
-  gap: 6px;
-  width: auto;
-  padding: 0 10px;
-  font-size: 13px;
 }
 
 .brush-keys {
@@ -1388,127 +1166,8 @@
   gap: 4px 16px;
 }
 
-.sw-strip {
-  gap: 10px 14px;
-}
-
 .tool[data-a='clear']:not([disabled]) {
   color: #ff8a80;
-}
-
-.seg-region {
-  container-type: inline-size;
-}
-
-@container (max-width: 300px) {
-  .seg-region .region-btn {
-    font-size: 12px;
-    letter-spacing: -0.04em;
-  }
-}
-
-/* ---------- Finishing pass ---------- */
-
-/* Handles travel exactly over the track, so at 0% and 100% they stay inside the window. */
-.tone input[type='range'] {
-  left: 4px;
-  right: 4px;
-}
-
-.tone .tone-lo::-webkit-slider-thumb,
-.tone .tone-hi::-webkit-slider-thumb {
-  translate: 0 0;
-}
-
-.tone .tone-lo::-moz-range-thumb,
-.tone .tone-hi::-moz-range-thumb {
-  translate: 0 0;
-}
-
-/* Keyboard focus: the handle grows, turns gold and gets a white-and-ink ring the gold window can't swallow. */
-.tone input[type='range']:focus-visible::-webkit-slider-thumb {
-  scale: 1.18;
-  background: var(--gold);
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 8px var(--edge);
-}
-
-.tone input[type='range']:focus-visible::-moz-range-thumb {
-  scale: 1.18;
-  background: var(--gold);
-  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px #fff, 0 0 0 8px var(--edge);
-}
-
-/* Brush strokes make the area custom: the chosen preset shows as the base, outlined with a tab. */
-.where-tag {
-  padding: 0 7px;
-  border-radius: 4px;
-  background: var(--gold);
-  color: var(--paper-ink);
-  font-size: 12px;
-  line-height: 20px;
-  box-shadow: 0 0 0 2px var(--edge);
-}
-
-.seg-region.is-custom .region-btn[aria-checked='true'] {
-  background: var(--panel-lo);
-  color: var(--gold);
-  box-shadow: inset 0 0 0 2px var(--gold), 0 4px 0 var(--edge);
-}
-
-.seg-region.is-custom .region-btn[aria-checked='true'] .rgn .on {
-  fill: var(--gold);
-}
-
-.seg-region.is-custom .region-btn[aria-checked='true'] .rgn .off,
-.seg-region.is-custom .region-btn[aria-checked='true'] .rgn .line {
-  stroke: var(--gold);
-}
-
-.seg-region.is-custom .region-btn[aria-checked='true']::after {
-  content: attr(data-base);
-  position: absolute;
-  top: -10px;
-  right: -6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--gold);
-  color: var(--paper-ink);
-  font-size: 12px;
-  line-height: 16px;
-  box-shadow: 0 0 0 2px var(--edge);
-}
-
-.legend b {
-  font-weight: 400;
-  color: var(--text-dim);
-}
-
-/* Backdrop: a clear divider between presets and saved colours. */
-.sw-sep,
-.sw-strip-stage .sw-sep {
-  width: 3px;
-  height: 28px;
-  margin: 0 2px;
-  border-radius: 1px;
-  background: var(--text-dim);
-  opacity: 0.55;
-}
-
-.field-backdrop {
-  container-type: inline-size;
-  /* Below Pixelate now: a little air so it reads as its own control. */
-  margin-top: 12px;
-}
-
-@container (max-width: 340px) {
-  .sw-strip-stage {
-    gap: 8px 6px;
-  }
-  .sw-strip-stage .sw-chip:not(.sw-auto),
-  .sw-strip-stage .sw-add {
-    width: 28px;
-    height: 28px;
-  }
 }
 
 /* The brush box wears the card tag's look: a paper nameplate on a dark body, with a pixel drop shadow. */
@@ -1530,33 +1189,27 @@
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), 0 0 0 2px var(--edge);
 }
 
-/* Coverage: a chunky game meter, foil segments on proof paper. */
-.cover-bar {
-  position: relative;
-  height: 16px;
-  border-radius: 4px;
-  box-shadow: 0 0 0 3px var(--edge), 0 4px 0 3px rgba(0, 0, 0, 0.35);
+.mini {
+  background: var(--ink-900);
 }
 
-.cover-bar i {
-  border-radius: 2px 0 0 2px;
-  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+.mini-canvas {
+  width: 84px;
+  height: 118px;
 }
 
-.cover-bar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(90deg, transparent 0 10px, rgba(13, 19, 21, 0.55) 10px 12px);
-  pointer-events: none;
+.mini-hide {
+  display: inline-flex;
+  gap: 6px;
+  width: auto;
+  padding: 0 10px;
+  font-size: 13px;
 }
 
-.range-cover {
-  gap: 8px;
-}
-
-@media (min-width: 901px) and (max-height: 820px) {
-  .field-backdrop {
-    margin-top: 4px;
+@media (max-width: 900px) {
+  .brush-lead {
+    display: block;
+    margin: -2px 0 0;
+    font-size: 12px;
   }
 }
