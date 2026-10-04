@@ -121,8 +121,11 @@ export function mountLettering(o: Options): void {
   reset.type = 'button';
   tools.append(reset);
 
+  const stylesLabel = el('span', 'field-label');
+  stylesLabel.id = 'ltStylesLabel';
   const styles = el('div', 'lt-styles');
   styles.setAttribute('role', 'radiogroup');
+  styles.setAttribute('aria-labelledby', stylesLabel.id);
   const styleBtns = LETTER_STYLES.map((id) => {
     const b = el('button', 'lt-style');
     b.type = 'button';
@@ -265,7 +268,7 @@ export function mountLettering(o: Options): void {
 
   const detail = el('div', 'lt-detail');
   detail.append(foil.row, ink.row, depth.row, gloss.row, tilt);
-  root.append(tools, styles, help, detail);
+  root.append(tools, stylesLabel, styles, help, detail);
   o.host.append(root);
   roving(styles);
 
@@ -346,7 +349,7 @@ export function mountLettering(o: Options): void {
     const t = o.dict().lt;
     root.setAttribute('aria-label', t.title);
     reset.textContent = t.reset;
-    styles.setAttribute('aria-label', t.styles);
+    stylesLabel.textContent = t.styles;
     styleBtns.forEach((b) => {
       const id = b.dataset.style as Lettering['style'];
       b.querySelector('.lt-style-name')!.textContent = t.style[id];

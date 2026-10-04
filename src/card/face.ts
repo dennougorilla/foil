@@ -1,6 +1,8 @@
 import { rarityById, type FrameId, type RarityId } from '../editions';
-import { paintLettering } from '../lettering';
+import { paintLettering, type TextRun } from '../lettering';
+import type { Message } from '../message';
 import { customFrame } from '../palette';
+import { paintMessage } from './messageFace';
 
 export const FACE_W = 900;
 export const FACE_H = 1260;
@@ -22,6 +24,10 @@ export interface FaceSpec {
   name: string;
   /** Custom frame colour ('#rrggbb'); overrides the frame preset when set. */
   frameColor?: string;
+  /** Printed on the picture when it has any text. */
+  message: Message;
+  /** Whether the nameplate carries the name and the rarity; off leaves the band plain. */
+  plate: boolean;
 }
 
 const OUTLINE = '#161c1f';
@@ -128,7 +134,8 @@ export function drawFlip(flip: HTMLCanvasElement, image: FaceSpec['image']): voi
 
 const RARITY_PIPS: Record<RarityId, number> = { common: 1, uncommon: 2, rare: 3, legendary: 4 };
 
-export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): void {
+/** Paints the face and its mask; returns the text it printed, for the lettering map (`setTextRuns`). */
+export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
   face.width = FACE_W;
   face.height = FACE_H;
   mask.width = FACE_W;
@@ -161,8 +168,9 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   roundRect(ctx, ART.x - 4 * S, ART.y - 4 * S, ART.w + 8 * S, ART.h + 8 * S, ART_R + 4 * S);
   ctx.fill();
   paintArt(ctx, spec.image, spec.crop);
+  const runs = paintMessage(ctx, spec.message, ART);
 
-  // Nameplate
+  // Nameplate (left plain when it is turned off)
   const plateY = ART.y + ART.h + 4 * S;
   const plateH = FACE_H - LINE - plateY;
   const pipSize = 15 * S;
@@ -171,11 +179,14 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   const pips = RARITY_PIPS[spec.rarity];
   const pipsW = 4 * (pipSize + gap);
   const name = spec.name.trim() || ' ';
-  fitName(ctx, name, ART.w - pipsW - 24 * S, 40 * S);
-  paintLettering(ctx, name, ART.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+  const size = fitName(ctx, name, ART.w - pipsW - 24 * S, 40 * S);
+  if (spec.plate) {
+    runs.push({ part: 'name', text: name, font: ctx.font, size, x: ART.x + 4 * S, y: plateY + plateH / 2 + S });
+    paintLettering(ctx, name, ART.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+  }
   // Rarity pips: diamonds in the rarity colour with a dark outline
   const rc = rarityById(spec.rarity).color;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (spec.plate ? 4 : 0); i++) {
     // Four slots read left to right, filled up to the rarity, matching the tag.
     const cx = ART.x + ART.w - 6 * S - pipSize / 2 - (3 - i) * (pipSize + gap);
     const cy = plateY + plateH / 2;
@@ -209,6 +220,7 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   m.fillStyle = '#ff0000';
   roundRect(m, ART.x, ART.y, ART.w, ART.h, ART_R);
   m.fill();
+  return runs;
 }
 
 /** Card back: deep teal with a pixel diamond lattice and a star seal. */

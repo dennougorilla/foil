@@ -14,8 +14,10 @@ import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
+import { bindMessageField, mountMessage } from './messagePanel';
+import { loadMessageFont } from './card/messageFace';
 import { changedKeys } from './tune/model';
-import { DEFAULT_LETTERING } from './lettering';
+import { DEFAULT_LETTERING, setTextRuns } from './lettering';
 import { initRangeColors } from './features';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
@@ -126,17 +128,24 @@ function artKey() {
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, message: s.message, plate: s.plate };
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
 let faceVersion = 0;
 const thumbKey = () => `${faceVersion}|${JSON.stringify(store.get().tune)}|${store.get().intensity}`;
 
+/** The message's typeface and words last asked for; the face is painted again once they can be drawn. */
+let fontAsked = '';
+
 function redrawFace() {
   faceVersion++;
   const spec = faceSpec(currentImage());
-  drawFace(face, mask, spec);
+  setTextRuns(face.width, face.height, drawFace(face, mask, spec));
+  const { font, text } = spec.message;
+  const ask = text.trim() ? `${font}|${text}` : '';
+  if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
+  fontAsked = ask;
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
   depth?.update(face, artKey());
@@ -147,12 +156,10 @@ function redrawFace() {
 /** "v0.2.0 · 1a2b3c4", shown quietly at the foot of the support menu. */
 const APP_VERSION_LABEL = __APP_COMMIT__ === 'unknown' ? `v${__APP_VERSION__}` : `v${__APP_VERSION__} · ${__APP_COMMIT__}`;
 
-/** Placeholder title and line: samples carry their own, uploads get a generic one. */
+/** Placeholder name: samples carry their own, uploads get a generic one. */
 function fallback() {
   const i = store.get().sample;
-  return i >= 0
-    ? { name: t.samplesName[i], desc: t.samplesDesc[i] }
-    : { name: t.myCard, desc: t.myDesc };
+  return { name: i >= 0 ? t.samplesName[i] : t.myCard };
 }
 
 function applyText() {
@@ -374,14 +381,15 @@ function setRangeFill(input: HTMLInputElement) {
 function syncInputs() {
   const s = store.get();
   const name = $<HTMLInputElement>('nameInput');
-  const desc = $<HTMLTextAreaElement>('descInput');
+  const msg = $<HTMLTextAreaElement>('messageInput');
   if (document.activeElement !== name) name.value = s.name;
-  if (document.activeElement !== desc) desc.value = s.desc;
+  syncMessageInput();
   name.placeholder = fallback().name;
-  desc.placeholder = fallback().desc;
-  desc.classList.toggle('is-hint', s.sample < 0);
+  msg.placeholder = t.msg.tag;
   name.setAttribute('aria-label', t.name);
-  desc.setAttribute('aria-label', t.desc);
+  // Off, the name stays in the tag but is not printed: it steps back.
+  name.classList.toggle('is-off', !s.plate);
+  msg.setAttribute('aria-label', t.msg.title);
   const inten = $<HTMLInputElement>('intensity');
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
@@ -581,7 +589,6 @@ function useImage(idx: number) {
   const patch: Partial<State> = { sample: idx, crop: { zoom: 1, x: 0.5, y: 0.5 } };
   if (idx >= 0) {
     if (!s.nameEdited) patch.name = '';
-    if (!s.descEdited) patch.desc = '';
   }
   stage.flipTo(() => {
     store.set(patch);
@@ -764,10 +771,7 @@ $<HTMLInputElement>('nameInput').addEventListener('input', (e) => {
   const v = (e.target as HTMLInputElement).value;
   store.set({ name: v, nameEdited: v.length > 0 });
 });
-$<HTMLTextAreaElement>('descInput').addEventListener('input', (e) => {
-  const v = (e.target as HTMLTextAreaElement).value;
-  store.set({ desc: v, descEdited: v.length > 0 });
-});
+const syncMessageInput = bindMessageField($<HTMLTextAreaElement>('messageInput'), store);
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
@@ -818,7 +822,7 @@ function tabChanged(id: PanelTab): boolean {
   const s = store.get();
   if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor;
   if (id === 'light') return changedKeys(s.tune).length > 0;
-  if (id === 'text') return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING);
+  if (id === 'text') return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate;
   return rangeChanged;
 }
 
@@ -1489,12 +1493,12 @@ store.on((s, changed) => {
     deck.render();
   }
   if (changed.has('rarity') || changed.has('frame')) buildSegments();
-  if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
-  if (changed.has('sample')) syncInputs();
+  if (['sample', 'message', 'plate'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
   if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) {
@@ -1511,6 +1515,12 @@ store.on((s, changed) => {
 // ---------- Boot ----------
 
 setSound(store.get().sound);
+mountMessage({
+  store,
+  host: $('pane-text'),
+  dict: () => t,
+  onPick: () => stage.juice(0.35),
+});
 mountLettering({
   store,
   host: $('pane-text'),

@@ -3,6 +3,7 @@ import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
+import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 /** Tabs of the Fine-tune area in the side panel. */
@@ -23,10 +24,12 @@ export interface State extends RangeColorState {
   intensity: number;
   pixel: number;
   name: string;
-  desc: string;
-  /** True once the person typed their own name/description; stops samples overwriting it. */
+  /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
-  descEdited: boolean;
+  /** The message printed on the picture (none while its text is empty). */
+  message: Message;
+  /** Whether the nameplate shows the name and the rarity. */
+  plate: boolean;
   /** Index of the sample in use, or -1 when showing the person's own image. */
   sample: number;
   crop: Crop;
@@ -61,9 +64,9 @@ const PERSIST: (keyof State)[] = [
   'intensity',
   'pixel',
   'name',
-  'desc',
   'nameEdited',
-  'descEdited',
+  'message',
+  'plate',
   'sample',
   'crop',
   'tune',
@@ -90,9 +93,9 @@ export function createStore() {
     intensity: 1,
     pixel: 0,
     name: '',
-    desc: '',
     nameEdited: false,
-    descEdited: false,
+    message: { ...DEFAULT_MESSAGE },
+    plate: true,
     sample: 0,
     crop: { zoom: 1, x: 0.5, y: 0.5 },
     loading: false,
@@ -111,6 +114,8 @@ export function createStore() {
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
     state.adjustOpen = state.adjustOpen === true;
+    state.message = normalizeMessage(state.message);
+    state.plate = state.plate !== false;
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';

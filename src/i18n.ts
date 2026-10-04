@@ -1,5 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { FoilTone, LetterStyle } from './lettering';
+import type { MessageFont, MessagePlace } from './message';
 import type { Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
 import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
@@ -34,8 +35,8 @@ const ja = {
   prevFinish: '前の加工',
   nextFinish: '次の加工',
   applied: '加工を「{name}」に切り替えました',
-  cardHint: '名前・説明・◆はクリックで変更。カードは投げて遊べます',
-  cardHintTouch: '名前・説明・◆はタップで変更。カードを左右にはじくと加工が切り替わります',
+  cardHint: '名前・メッセージ・◆はクリックで変更。カードは投げて遊べます',
+  cardHintTouch: '名前・メッセージ・◆はタップで変更。カードを左右にはじくと加工が切り替わります',
   secImage: '画像を選ぶ',
   secFinish: '加工を選ぶ',
   secExport: '書き出す',
@@ -85,7 +86,6 @@ const ja = {
   cropTip: 'ズームと枠のドラッグで、写す部分を決めます',
   cropReset: '位置をリセット',
   name: '名前',
-  desc: '説明',
   rarity: 'レアリティ',
   frame: '枠',
   intensity: '効果の強さ',
@@ -111,7 +111,6 @@ const ja = {
   depthGuess: '色から奥行きを推定中',
   depthAsk: '奥行きを詳しく読む',
   myCard: 'マイ・カード',
-  myDesc: 'ここに説明を書けます',
   edition: {
     base: 'ノーマル',
     foil: 'フォイル',
@@ -195,11 +194,6 @@ const ja = {
     rarity: 'レア色',
   } satisfies Record<FrameId, string>,
   samplesName: ['夕焼けの峠', '月の潮', 'ハートのA'],
-  samplesDesc: [
-    'お気に入りの一枚を、とっておきのレアに。',
-    '満ちる夜に、いちばん静かな一枚。',
-    '最後に笑うのは、いつもこのカード。',
-  ],
   tune: {
     sunKeys: '←→ で回す',
     peekCap: 'プレビュー',
@@ -265,7 +259,7 @@ const ja = {
   },
   lt: {
     title: '文字の加工',
-    styles: 'カードの名前の刷り方',
+    styles: '刷り方 (名前とメッセージ)',
     style: { ink: '印刷', deboss: '型押し', emboss: '浮き出し', foil: '箔押し', spot: 'スポット​UV' } satisfies Record<LetterStyle, string>,
     help: {
       ink: '平らに刷った、いつもの文字。',
@@ -293,6 +287,21 @@ const ja = {
     tilt: 'カードを傾ける・上をなぞると光が動きます',
     jump: '文字の加工: {style} — クリックで変更',
     reset: '初期値に戻す',
+  },
+  msg: {
+    title: 'メッセージ',
+    label: 'メッセージ (3行まで)',
+    tag: '＋ メッセージを入れる',
+    field: 'カードに入れる言葉',
+    phrasesLabel: 'ワンタップで入れる',
+    clear: '消す',
+    place: '位置',
+    placeName: { top: '上', middle: '中央', bottom: '下' } satisfies Record<MessagePlace, string>,
+    font: '書体',
+    fontName: { dot: 'ドット', hand: '手書き', serif: '明朝', pop: 'ポップ' } satisfies Record<MessageFont, string>,
+    plate: '名札 (カード名・レア度)',
+    plateOn: '表示',
+    plateOff: '非表示',
   },
   ...RANGE_COLOR_JA,
   pack: PACK_JA,
@@ -327,8 +336,8 @@ const en: Dict = {
   prevFinish: 'Previous finish',
   nextFinish: 'Next finish',
   applied: 'Finish changed to {name}',
-  cardHint: 'Click the name, text or ◆ to change them. Toss the card around',
-  cardHintTouch: 'Tap the name, text or ◆ to change them. Flick the card sideways to switch finishes',
+  cardHint: 'Click the name, message or ◆ to change them. Toss the card around',
+  cardHintTouch: 'Tap the name, message or ◆ to change them. Flick the card sideways to switch finishes',
   secImage: 'Choose a picture',
   secFinish: 'Choose a finish',
   secExport: 'Export',
@@ -378,7 +387,6 @@ const en: Dict = {
   cropTip: 'Zoom and drag the frame to choose what the card shows',
   cropReset: 'Reset position',
   name: 'Name',
-  desc: 'Description',
   rarity: 'Rarity',
   frame: 'Frame',
   intensity: 'Finish strength',
@@ -404,7 +412,6 @@ const en: Dict = {
   depthGuess: 'Guessing depth from color',
   depthAsk: 'Read the depth properly',
   myCard: 'My Card',
-  myDesc: 'Write a line about it here',
   edition: {
     base: 'Base',
     foil: 'Foil',
@@ -488,11 +495,6 @@ const en: Dict = {
     rarity: 'By rarity',
   },
   samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts'],
-  samplesDesc: [
-    'Your favorite picture, made gloriously rare.',
-    'The quietest card on the fullest night.',
-    'Always the one laughing last.',
-  ],
   tune: {
     sunKeys: '←→ to turn',
     peekCap: 'Preview',
@@ -558,7 +560,7 @@ const en: Dict = {
   },
   lt: {
     title: 'Lettering',
-    styles: 'How the card name is printed',
+    styles: 'Printing (name and message)',
     style: { ink: 'Print', deboss: 'Deboss', emboss: 'Emboss', foil: 'Hot foil', spot: 'Spot UV' },
     help: {
       ink: 'Flat printed type, as usual.',
@@ -586,6 +588,21 @@ const en: Dict = {
     tilt: 'Tilt the card or run the pointer over it to move the light',
     jump: 'Lettering: {style} — click to change',
     reset: 'Reset to default',
+  },
+  msg: {
+    title: 'Message',
+    label: 'Message (up to 3 lines)',
+    tag: '+ Add a message',
+    field: 'Words for the card',
+    phrasesLabel: 'One tap',
+    clear: 'Clear',
+    place: 'Position',
+    placeName: { top: 'Top', middle: 'Middle', bottom: 'Bottom' },
+    font: 'Typeface',
+    fontName: { dot: 'Pixel', hand: 'Marker', serif: 'Serif', pop: 'Pop' },
+    plate: 'Nameplate (card name & rarity)',
+    plateOn: 'Show',
+    plateOff: 'Hide',
   },
   ...RANGE_COLOR_EN,
   pack: PACK_EN,

@@ -117,10 +117,12 @@ let mapVersion = 0;
 let bevel = 1;
 /** How far the deboss/emboss plate reaches past the ink, plus its bevel, in face pixels. */
 let plateBevel = 1;
-/** Centre of the printed name in face uv (y down). */
-let nameCenter: [number, number] = [0.3, 0.94];
-/** Left and right edge of the printed name in face uv. */
-let nameSpan: [number, number] = [0.1, 0.5];
+/** Centre of the printed text in face uv (y down): the message when there is one, else the name. */
+let textCenter: [number, number] = [0.3, 0.94];
+/** Left and right edge of all the printed text in face uv. */
+let textSpan: [number, number] = [0.1, 0.5];
+/** A row of bare nameplate stock just above the name, in face uv; past the face when there is no name. */
+let stockY = 2;
 
 // ---------- Stamp moment ----------
 // Picking a style presses the die once: relief overshoots and settles, and foil
@@ -179,8 +181,25 @@ function blur(src: Float32Array, w: number, h: number, r: number): Float32Array 
   return a;
 }
 
-function paintMap(W: number, H: number, text: string, font: string, x: number, y: number, size: number, radius: number) {
-  const key = [W, H, text, font, x, y, radius].join('\u0000');
+/** One line of text on the face: the name, or a line of the message. `y` is its vertical middle. */
+export interface TextRun {
+  part: 'name' | 'message';
+  text: string;
+  font: string;
+  size: number;
+  x: number;
+  y: number;
+}
+
+type Box = { x0: number; y0: number; x1: number; y1: number };
+
+/**
+ * Redraws the lettering map from the face's text: each part (the name, the
+ * message) is worked on in its own box around its glyphs, and boxes that touch
+ * are merged, so the blur never reaches across from one part into another.
+ */
+function paintMap(W: number, H: number, runs: TextRun[], radius: number) {
+  const key = JSON.stringify([W, H, radius, runs]);
   if (key === mapKey) return;
   mapKey = key;
   if (map.width !== W || map.height !== H) {
@@ -188,25 +207,47 @@ function paintMap(W: number, H: number, text: string, font: string, x: number, y
     map.height = glyphs.height = H;
   }
   bevel = radius;
+  plateBevel = radius * 1.6;
   mapCtx.fillStyle = '#000';
   mapCtx.fillRect(0, 0, W, H);
   glyphCtx.clearRect(0, 0, W, H);
-  glyphCtx.font = font;
   glyphCtx.textBaseline = 'middle';
   glyphCtx.fillStyle = '#fff';
-  glyphCtx.fillText(text, x, y);
   const pad = radius * 5 + 2;
-  const rx = Math.max(0, Math.floor(x - pad));
-  const ry = Math.max(0, Math.floor(y - size * 0.75 - pad));
-  const rw = Math.min(W - rx, Math.ceil(glyphCtx.measureText(text).width + pad * 2));
-  const rh = Math.min(H - ry, Math.ceil(size * 1.5 + pad * 2));
-  if (rw <= 0 || rh <= 0) {
-    mapVersion++;
-    return;
+  const boxes: Box[] = [];
+  const parts = new Map<TextRun['part'], Box>();
+  for (const r of runs) {
+    glyphCtx.font = r.font;
+    glyphCtx.fillText(r.text, r.x, r.y);
+    const w = glyphCtx.measureText(r.text).width;
+    const b = { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + w, y1: r.y + r.size * 0.75 };
+    const p = parts.get(r.part);
+    parts.set(r.part, p ? { x0: Math.min(p.x0, b.x0), y0: Math.min(p.y0, b.y0), x1: Math.max(p.x1, b.x1), y1: Math.max(p.y1, b.y1) } : b);
   }
-  const tw = glyphCtx.measureText(text).width;
-  nameCenter = [(x + tw / 2) / W, y / H];
-  nameSpan = [x / W, (x + tw) / W];
+  for (const b of parts.values()) {
+    const grown = { x0: b.x0 - pad, y0: b.y0 - pad, x1: b.x1 + pad, y1: b.y1 + pad };
+    const hit = boxes.find((o) => o.x0 < grown.x1 && grown.x0 < o.x1 && o.y0 < grown.y1 && grown.y0 < o.y1);
+    if (hit) Object.assign(hit, { x0: Math.min(hit.x0, grown.x0), y0: Math.min(hit.y0, grown.y0), x1: Math.max(hit.x1, grown.x1), y1: Math.max(hit.y1, grown.y1) });
+    else boxes.push(grown);
+  }
+  const name = parts.get('name');
+  const hero = parts.get('message') ?? name;
+  const all = [...parts.values()];
+  if (hero) textCenter = [(hero.x0 + hero.x1) / 2 / W, (hero.y0 + hero.y1) / 2 / H];
+  if (all.length) textSpan = [Math.min(...all.map((b) => b.x0)) / W, Math.max(...all.map((b) => b.x1)) / W];
+  stockY = name ? (name.y0 + name.y1) / 2 / H - 0.042 : 2;
+  for (const b of boxes) {
+    const rx = Math.max(0, Math.floor(b.x0));
+    const ry = Math.max(0, Math.floor(b.y0));
+    const rw = Math.min(W - rx, Math.ceil(b.x1 - b.x0));
+    const rh = Math.min(H - ry, Math.ceil(b.y1 - b.y0));
+    if (rw > 0 && rh > 0) paintBox(rx, ry, rw, rh, radius);
+  }
+  mapVersion++;
+}
+
+/** Coverage, softened height and the press plate of one box of the glyph canvas, into the map. */
+function paintBox(rx: number, ry: number, rw: number, rh: number, radius: number) {
   const src = glyphCtx.getImageData(rx, ry, rw, rh).data;
   const cover = new Float32Array(rw * rh);
   for (let i = 0; i < cover.length; i++) cover[i] = src[i * 4 + 3] / 255;
@@ -216,7 +257,6 @@ function paintMap(W: number, H: number, text: string, font: string, x: number, y
   // cards: the walls land on bare stock, so they read even around dark ink.
   const grow = Math.max(1, Math.round(radius * 1.2));
   const plate = blur(dilate(cover, rw, rh, grow), rw, rh, Math.max(1, Math.round(radius / 1.6)));
-  plateBevel = radius * 1.6;
   const out = mapCtx.createImageData(rw, rh);
   for (let i = 0; i < cover.length; i++) {
     out.data[i * 4] = Math.round(cover[i] * 255);
@@ -226,13 +266,9 @@ function paintMap(W: number, H: number, text: string, font: string, x: number, y
     out.data[i * 4 + 3] = 255;
   }
   mapCtx.putImageData(out, rx, ry);
-  mapVersion++;
 }
 
-/**
- * Paints the name onto the face in the finish's flat colour and refreshes the
- * lettering map. Call with the context's font already set.
- */
+/** Paints the name onto the face in the finish's flat colour. Call with the context's font already set. */
 export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, frameInk: string): void {
   const fill = letterFill(active, frameInk);
   ctx.textBaseline = 'middle';
@@ -240,20 +276,31 @@ export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: n
     ctx.fillStyle = fill;
     ctx.fillText(text, x, y);
   }
-  const size = parseFloat(/(\d+(?:\.\d+)?)px/.exec(ctx.font)?.[1] ?? '40');
+}
+
+/** The name's size at which the bevel was tuned; the message shares the name's bevel. */
+const NAME_SIZE = 60;
+
+/**
+ * Refreshes the lettering map from the text a face painter laid out (drawFace
+ * returns it), so every printed word catches the light and tilt alike.
+ */
+export function setTextRuns(W: number, H: number, runs: TextRun[]): void {
+  const name = runs.find((r) => r.part === 'name');
   // A narrow bevel: the pixel font's strokes are only ~6 texels wide at face size.
-  paintMap(ctx.canvas.width, ctx.canvas.height, text, ctx.font, x, y, size, Math.max(1.5, size * 0.032));
+  // A die's bevel doesn't grow with its letters, so the message keeps the name's.
+  paintMap(W, H, runs, Math.max(1.5, (name?.size ?? NAME_SIZE) * 0.032));
 }
 
 /**
  * A still frame (PNG) freezes one light angle. Foil and spot UV only show at the
  * right one, so nudge the frozen tilt until their reflection band crosses the
- * middle of the name. Mirrors the band phases in the shader below.
+ * middle of the message (or the name). Mirrors the band phases in the shader below.
  */
 export function stillPose(tilt: [number, number], light: [number, number]): { tilt: [number, number]; light: [number, number] } {
   const s = active.style;
   if (s !== 'foil' && s !== 'spot') return { tilt, light };
-  const [cx, cy] = nameCenter;
+  const [cx, cy] = textCenter;
   const ty = tilt[1];
   // spot:  5u + 7v - 1.3 (3.4 tx + 2.2 ty) = pi/2 + 2pi k
   // foil:  9u + 13v + 3.2 tx + 2.4 ty      = pi/2 + 2pi k
@@ -311,9 +358,9 @@ export class LetteringGL {
     gl.uniform1f(p.u.uTextBevel, pressed ? plateBevel : bevel);
     gl.uniform1f(p.u.uTextBlind, blind ? 1 : 0);
     gl.uniform1f(p.u.uTextStamp, this.settled ? 1 : Math.min(1, (performance.now() - stampAt) / STAMP_MS));
-    gl.uniform2f(p.u.uTextSpan, nameSpan[0], nameSpan[1]);
+    gl.uniform2f(p.u.uTextSpan, textSpan[0], textSpan[1]);
     // Bare stock just above the name, for foil that hasn't been laid down yet.
-    gl.uniform1f(p.u.uTextStockY, nameCenter[1] - 0.042);
+    gl.uniform1f(p.u.uTextStockY, stockY);
   }
 }
 
@@ -328,7 +375,7 @@ uniform float uTextGloss;
 uniform float uTextBevel;    // bevel radius in map texels
 uniform float uTextStamp;    // 0..1 progress of the stamp moment; 1 = at rest
 uniform vec2 uTextSpan;      // name's left and right edge in uv
-uniform float uTextStockY;   // a row of bare nameplate stock just above the name
+uniform float uTextStockY;   // a row of bare nameplate stock just above the name (past the face: no name)
 uniform float uTextBlind;    // 1 = no ink: presses use the letter itself as the die
 
 float letterLod;  // set per pixel in lettering()
@@ -445,8 +492,9 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     col *= 1.0 - (0.3 + 0.25 * uTextDepth) * ring * (1.0 - cover);
     col *= 1.0 + clamp(lam, -0.2, 0.15) * (1.0 - cover) * uTextDepth;
     metal += hi * flare * 1.6;
-    if (laid < 1.0) {
-      // Not yet stamped: the letter is bare, faintly pressed stock.
+    if (laid < 1.0 && uv.y > uTextStockY) {
+      // Not yet stamped: the name is bare, faintly pressed stock. (The message
+      // keeps its flat print until the foil reaches it.)
       vec4 st = face(vec2(uv.x, uTextStockY), 0.0);
       vec3 bare = st.rgb / max(st.a, 1e-4) * (1.0 + clamp(lam, -0.3, 0.2));
       col = mix(col, bare, cover * (1.0 - laid));

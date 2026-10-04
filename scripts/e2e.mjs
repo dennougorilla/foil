@@ -196,6 +196,78 @@ await step('lettering from the name tag', async () => {
   expect((await state()).text.style === 'foil', 'lettering style not applied');
 });
 
+/** Saves a PNG and returns its bytes (base64). */
+const savePng = async () => {
+  await page.click('#formatSeg [role=radio][data-format=png]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#saveBtn')]);
+  const png = readFileSync(await dl.path()).toString('base64');
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return png;
+};
+/** Mean colour difference (0–255) of two PNGs inside each rect, given as fractions of the image [x0, y0, x1, y1]. */
+const pngDiff = (a, b, rects) =>
+  page.evaluate(async ([a, b, rects]) => {
+    const load = async (s) => {
+      const bm = await createImageBitmap(await (await fetch(`data:image/png;base64,${s}`)).blob());
+      const x = new OffscreenCanvas(bm.width, bm.height).getContext('2d');
+      x.drawImage(bm, 0, 0);
+      return x;
+    };
+    const [A, B] = await Promise.all([load(a), load(b)]);
+    const { width: W, height: H } = A.canvas;
+    return rects.map(([x0, y0, x1, y1]) => {
+      const r = [Math.round(x0 * W), Math.round(y0 * H), Math.round((x1 - x0) * W), Math.round((y1 - y0) * H)];
+      const p = A.getImageData(...r).data;
+      const q = B.getImageData(...r).data;
+      let d = 0;
+      for (let i = 0; i < p.length; i += 4) d += Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]);
+      return d / (p.length / 4) / 3;
+    });
+  }, [a, b, rects]);
+// Card regions (fractions of the saved PNG): a message at the bottom of the art, the top of the art, the nameplate.
+const MSG = [0.25, 0.68, 0.75, 0.8];
+const TOP = [0.25, 0.12, 0.75, 0.3];
+const PLATE = [0.15, 0.9, 0.6, 0.95];
+
+await step('a ready phrase puts a message on the card and in every export; the nameplate can go', async () => {
+  // Base and plain ink, so only the words differ between the saves.
+  await page.locator('#cardSlot').focus();
+  await page.keyboard.press('1');
+  await tab('text');
+  await page.click('.lt-style[data-style=ink]');
+  expect(!(await page.isVisible('.msg-detail')), 'place and typeface show before there are any words');
+  const bare = await savePng();
+  await page.click('.msg-phrase >> nth=0');
+  await page.click('.msg-places [data-v=bottom]');
+  await page.click('.msg-fonts [data-v=serif]');
+  const s = await state();
+  expect(s.message.text === 'Happy\nBirthday' && s.message.place === 'bottom' && s.message.font === 'serif', `message saved as ${JSON.stringify(s.message)}`);
+  expect((await page.inputValue('#messageInput')) === 'Happy\nBirthday', 'the tag beside the card does not show the message');
+  await page.waitForFunction(() => document.fonts.check('800 40px "Shippori Mincho"', 'Happy'), null, { timeout: 15000 });
+  const said = await savePng();
+  const [msg, top] = await pngDiff(bare, said, [MSG, TOP]);
+  expect(msg > 12 && top < 1, `the message did not land at the bottom of the art (bottom ${msg.toFixed(1)}, top ${top.toFixed(1)})`);
+
+  // Typing in the tag edits the same message, three lines at most.
+  await page.fill('#messageInput', 'a\nb\nc\nd');
+  expect((await state()).message.text === 'a\nb\nc d', 'a fourth line was kept');
+  await page.click('.msg-phrase >> nth=0');
+
+  // Message only: the nameplate leaves the band plain.
+  await page.click('.msg-plate [data-v=off]');
+  expect((await state()).plate === false, 'nameplate still on');
+  const only = await savePng();
+  const [plate, kept] = await pngDiff(said, only, [PLATE, MSG]);
+  expect(plate > 4 && kept < 1, `turning the nameplate off (plate ${plate.toFixed(1)}, message ${kept.toFixed(1)})`);
+
+  // Hot foil prints the message too: metal, not the flat ink.
+  await page.click('.lt-style[data-style=foil]');
+  const foil = await savePng();
+  const [metal] = await pngDiff(only, foil, [MSG]);
+  expect(metal > 6, `the foil did not reach the message (${metal.toFixed(1)})`);
+  await page.click('.msg-plate [data-v=on]');
+});
+
 await step('finish area tab and brush', async () => {
   await tab('range');
   await page.click('#pane-range .region-btn[data-v=art]');
@@ -464,7 +536,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const back = document.createElement('canvas');
     face.width = mask.width = back.width = 900;
     face.height = mask.height = back.height = 1260;
-    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako' });
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', message: { text: '', place: 'top', font: 'pop' }, plate: true });
     drawBack(back);
     // A flat card (no idle motion) so the art and the nameplate land on known pixels.
     const W = 360;
