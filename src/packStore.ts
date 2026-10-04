@@ -4,7 +4,7 @@
 // The design is in docs/packs.md.
 
 import type { EditionId } from './editions';
-import { available, fromSecrets, mergePacks, parsePacks, type Opened, type PackId } from './packs';
+import { available, fromSecrets, mergePacks, normalizeHand, parsePacks, type Opened, type PackId } from './packs';
 import type { Store } from './state';
 
 const KEY = 'foil:packs';
@@ -60,7 +60,9 @@ export const packs = {
 export function releaseSealedEdition(store: Store) {
   const s = store.get();
   if (!available(s.edition, opened)) store.set({ edition: FALLBACK });
-  if (s.drawn && !available(s.drawn, opened)) store.set({ drawn: null });
+  // Cards of a pack sealed again leave the hand; the starters fill in.
+  const hand = normalizeHand(s.hand, opened);
+  if (hand.join() !== s.hand.join()) store.set({ hand });
 }
 
 /** Support links put the Supporter pack on the shelf; other tabs' opens and clears show up here. */

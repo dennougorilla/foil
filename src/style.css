@@ -864,7 +864,7 @@ button {
 .deck-pile i {
   position: absolute;
   left: 0;
-  bottom: calc(var(--i) * 3px);
+  bottom: calc(var(--i) * 2px);
   width: 60px;
   height: 84px;
   margin-left: calc(var(--i) * -1px);
@@ -1026,41 +1026,6 @@ button {
   0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
   20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
   100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
-}
-
-/* The drawn card's mark: a gold tab on its top edge saying it came from the deck. */
-.drawn-mark {
-  position: absolute;
-  left: 50%;
-  top: -11px;
-  z-index: 1;
-  padding: 0 6px;
-  border-radius: 5px;
-  background: var(--gold);
-  color: var(--paper-ink);
-  font-style: normal;
-  font-size: 11px;
-  line-height: 16px;
-  white-space: nowrap;
-  transform: translateX(-50%);
-  box-shadow: 0 0 0 2px #05080a;
-}
-
-.drawn-mark::before {
-  content: var(--drawn-word, 'DRAWN');
-}
-
-/* The drawn card: the hand's eighth slot, set a little apart. */
-.hand-slot.is-drawn::before {
-  content: '';
-  position: absolute;
-  left: -9px;
-  top: 14%;
-  bottom: 14%;
-  width: 4px;
-  border-radius: 2px;
-  background: var(--gold);
-  box-shadow: 0 0 0 1px #05080a;
 }
 
 @media (prefers-reduced-motion: reduce) {

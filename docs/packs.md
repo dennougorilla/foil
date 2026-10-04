@@ -11,16 +11,22 @@ summary is in `README.md`; this note is the design behind it.
 - Every other finish sits in a **theme pack**. A pack holds every finish of its theme, so its size
   is the size of the theme. It is opened **once**, and opening it shows everything inside — there
   is no random draw. The excitement comes from the order: the rarest finish waits until last.
-- The hand never grows past the seven, plus one **drawn card**. Everything an opened pack holds
-  goes into the **deck**, which sits at the right end of the hand like a draw pile: a stack of
-  face-down pixel card backs that gets thicker with each finish in it, its count, and the word
-  "Deck" under it. At the end of an opening the cards fly into it and "+3" floats up from it. The
-  drawn card sits a little apart after the seven, with a gold bar and a gold "引いた / DRAWN" tab.
-- Pressing the deck opens **View deck**: every finish owned, grouped pack by pack under a small
-  mark in the pack's color, as small still thumbnails on the person's own picture (made only when
-  the list is opened). Choosing one puts it in the hand's eighth slot — the drawn card — and onto
-  the card; choosing another swaps it. The drawn card is remembered. Putting a pack finish on the
-  card any other way (a pick in the haul, a saved card) also makes it the drawn card.
+- The **hand** is always seven cards; it starts as the seven above. Every finish owned that is
+  not in the hand is in the **deck**, which sits at the hand's right end like a draw pile: a few
+  face-down pixel card backs (a couple of steps of thickness at most) and the count, which falls
+  when a card goes to the hand and rises when one comes back. Opening a pack adds its finishes to
+  the deck; at the end of an opening the cards fly into it and "+3" floats up from it.
+- Pressing the deck opens **View deck**: the cards in it, grouped (the starter finishes swapped
+  out, then pack by pack under a small mark in the pack's color), each drawn as the same mini card
+  as in the hand — the person's own picture in that finish. Choosing one shows the hand underneath
+  ("swap with which?"); choosing a hand card swaps the two: the hand card flies into the deck, the
+  deck card flies into its place in the hand, and it goes onto the card. Base never leaves the
+  hand. The hand's order is remembered. Putting a deck finish on the card any other way (a pick in
+  the haul, a saved card) swaps it in for the last card that is not Base.
+- The mini cards are still pictures, drawn one by one with a single WebGL context when View deck
+  opens and kept until the picture, the frame or the light changes; nothing in the list animates.
+- From the earlier "drawn card" slot (saved as `drawn`): that finish takes the hand's last place,
+  so nobody loses the card they had out.
 - The way to new packs is a small pixel pack beside the deck. It glows gently while a pack is still
   sealed (with the number sealed) and opens the **pack shop**, which holds every pack; an opened one
   offers "Watch again" there. (Earlier versions had folders and a shelf of chips under the hand;
@@ -73,7 +79,7 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
 
 ## Loading (weight budget)
 
-Nothing of a pack loads before the shop or View deck is opened, or a pack finish is the drawn card:
+Nothing of a pack loads before the shop or View deck is opened, or a pack finish is in the hand:
 
 - `src/packs.ts` is plain data (ids, order, colors, a `load()` that dynamic-imports the module).
 - Each pack module (`src/gl/finishes/<pack>.ts`) carries its finishes' GLSL and their helpers
@@ -101,8 +107,8 @@ art, sprite or font from the game is used — only the grammar):
 
 | Balatro | FOIL before | FOIL now |
 |---|---|---|
-| Packs are pixel art: a coarse grid scaled up, hard edges, dithered shading. | Smooth vector art at full resolution. | Each wrapper is drawn on a 128 × 192 pixel grid (2 : 3) and scaled up with hard pixels; the wrapper finish is computed on the same grid, so its sheen moves in blocks. |
-| A pack holds a stack of cards: silver crimp seals top and bottom with ridges that catch the light, a face kept nearly flat by the cards inside, only the edges and the ends near the seals rounding off, darker left and right edges, a slightly wavy outline. | A flat rectangle with grey stripes for seals. | Silver seals with zig-zag teeth and ridge highlights; the body is a mesh that stays flat across the face and rounds off only at its edges and toward the seals (it holds a stack of cards; it is not inflated), lit per pixel: dark rolled edges, the seals' step, foil wrinkles and a highlight that runs along them as it tilts; a back sheet shows the pack's thickness at the edges in perspective. |
+| Packs are pixel art: a coarse grid scaled up, hard edges, dithered shading. | Smooth vector art at full resolution. | Each wrapper is drawn on a 128 × 208 pixel grid (about 1 : 1.6, the proportions of a real booster pack); its outline is nearly rectangular and the seals are as wide as the body or a pixel wider — no waist and scaled up with hard pixels; the wrapper finish is computed on the same grid, so its sheen moves in blocks. |
+| A pack holds a stack of cards: silver crimp seals top and bottom with ridges that catch the light, a face kept flat by the cards inside, only the very edges rounding off, darker left and right edges, a slightly wavy outline. | A flat rectangle with grey stripes for seals. | Silver seals with zig-zag teeth and ridge highlights; the body is a mesh that stays flat across the face and rounds off only in a narrow band at its edges (it holds a stack of cards; it is not inflated), lit per pixel: dark rolled edges, the seals' step, foil wrinkles and a highlight that runs along them as it tilts; a back sheet shows the pack's thickness at the edges in perspective. |
 | Each pack has its own big illustration on a theme color, and a huge white outlined title in an arc or a speech bubble. Higher tiers get a wavy word on top and a silver-white holo body. | The same fan of cards on every pack; a small title. | A big pixel illustration per theme (gem and coin, star, blossom branch, palette and brush, crowned heart) on its color, the title in an arc of outlined letters and "ALL 3 INSIDE" / 「全3種入り」 under it; the Supporter pack is the top tier: silver-white body in Opal's rainbow, a wavy THANK YOU on top and SUPPORT as its title. |
 | Thick dark outline, a hard dark drop shadow. | No outline; a faint soft shadow. | A 2-pixel ink outline in the art, a hard offset shadow under every pack, and a dark back sheet behind the bulge so tilting shows the bag's thickness; once torn, the bag shows a dark mouth under a silver lip. |
 | The shop: items sit on a dark rounded tray with a thin light rim, each bobbing and slightly tilted; hovering springs it up with a wobble and leans it to the pointer. | One pack in an empty room. | The pack button at the end of the hand opens the **pack shop** (the first sealed pack chosen): every pack on a dark rounded tray, tilted a little, bobbing; hover or focus springs one up with a wobble and leans it to the pointer; the chosen one is lifted and stands in a pool of gold light. Four packs make a 2 × 2 square on a phone, five go three over two. |
@@ -159,14 +165,14 @@ follows the sound toggle.
 | # | Beat | Motion | Light / particles | Sound | Vibrate |
 |---|---|---|---|---|---|
 | 0 | **Summon** (0–520) | Overlay fades in (220, ease-out). The pack flies from its place on the shop's tray to the centre: scale 0.3 → 1 on a spring 170/13 (one overshoot), a decaying wobble ±0.22 rad. Title drops in (200, delay 220). | The room becomes FOIL's swirl in the pack's colors. | Whoosh (noise 400 → 2400 Hz, 280) | 8 |
-| 1 | **Invite** (until touched) | Pack floats (±6 px, 0.5 Hz) and leans to the pointer or gyro (spring 210/17, ±0.3 rad); its foil follows the tilt. | A bead of light runs along the dotted cut guide every 1.6 s; after 2.2 s of nothing, a ghost finger traces it once. | — | — |
-| 2 | **Trace** (finger) | Press in the top band (top 24 % of the pack, generous) and slide: progress = furthest x reached, never goes back. The pack leans toward the finger (≤0.1 rad) and trembles with finger speed. Release before 82 % → the line drains back (260, ease-in). Tap, Enter/Space or the Tear open button under the hint → an automatic trace (480, ease-in-out). The perforation glows and a gold arrow nudges at its left end; the hint and button appear once the pack has landed. | A white-hot line from the left edge to the finger, with bloom; 2–3 sparks per frame from the tip (gravity). | A noise tick every 4 % with pitch rising with progress ("riiip"); a fizzle on cancel. | 6 every 12 % |
+| 1 | **Invite** (until touched) | Pack floats (±6 px, 0.5 Hz) and leans to the pointer or gyro (spring 210/17, ±0.3 rad); its foil follows the tilt. | The perforation glows softly, pulsing. | — | — |
+| 2 | **Trace** (finger) | Press in the top band (top 24 % of the pack, generous) and slide: progress = furthest x reached, never goes back. The pack leans toward the finger (≤0.1 rad) and trembles with finger speed. Release before 82 % → the line drains back (260, ease-in). Tap the pack, Enter/Space or the one short line under it ("なぞって開封 →", a button) → an automatic trace (480, ease-in-out). The perforation glows and a gold arrow nudges at its left end; nothing else sits under the pack, and Skip / × are small in the top corner. The line appears once the pack has landed. | A white-hot line from the left edge to the finger, with bloom; 2–3 sparks per frame from the tip (gravity). | A noise tick every 4 % with pitch rising with progress ("riiip"); a fizzle on cancel. | 6 every 12 % |
 | 3 | **Rip** (0–350) | The top strip flies off (up and to the side, spin, gravity, fades by 700). The body punches 1 → 1.06 → 1 (spring 320/14). Screen shake 220, 10 px, exponential decay. | White flash on the pack (0.6, gone in about 0.12 s), light pours from the opening, 40 sparks upward. | Rip (noise 700 → 5000 Hz, 320) + low thump (90 Hz) | 18, 30, 40 |
 | 4 | **Draw** (350–1250) | The stack rises out of the pack while the pack slides down (both springs), so the cards come up in full view, never past the top of the screen; at 420 the pack lets go and falls away under gravity with a little spin, and 100 later the stack settles where it was, landing at 900. | Pack flash fades; background deepens. | Slide + thock (140 Hz) | 10 |
 | 5 | **Swipe** (per card) | Face-up stack; the top card follows the finger (rubber band, leans rz = dx·0.0012). Past 28 % of its width or a flick > 800 px/s it flies off that way (260, ease-in); else it snaps back (spring 260/18). The next card pops (scale 0.94 → 1, spring 320/14). Tap / → / Enter sends it off automatically. | Name and line of the finish under the stack, swapped with a short pop; "1 / 3" above the name says how far along it is. Second-to-last card (rare): a light sweep across it and 18 sparkles when it surfaces. | Swish per card; pop on the next; rare: two-note chime | 8 (rare: 14) |
 | 6 | **Showpiece** | The last card comes face-down on a back printed in the pack's colors and emblem, edges glowing, trembling, sparks rising off it. Press (or →/Enter): "Revealing…" — it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. Then, held a little larger, a light sweeps across it once (1.6 s) while the rays hold back to a third, so its own finish is the peak; then the rays come up and it keeps rocking slowly. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
-| 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Try Magma" (the showpiece by name) — closes, sends the other cards into the deck and puts this one in the hand as the drawn card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "Done" (カードに戻る). Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
+| 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Use Magma" (the showpiece by name) — closes, sends the other cards into the deck and swaps this one into the hand for its last card that is not Base, and onto the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "To the deck". Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
 
 **Skip reveal** (top right, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
 A replay starts at beat 0 too. Escape closes from the haul and skips the reveal from anywhere else; the

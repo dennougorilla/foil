@@ -1,5 +1,5 @@
-// The wrapper of a pack, painted as pixel art: a 128 × 192 grid (2 : 3) scaled up with hard
-// pixels. A pillow-shaped foil bag with silver crimp seals, a wavy inked outline, darker sides, the
+// The wrapper of a pack, painted as pixel art: a 128 × 208 grid (about 1 : 1.6, a real booster
+// pack's proportions) scaled up with hard pixels. A nearly rectangular foil bag with silver crimp seals, a wavy inked outline, darker sides, the
 // theme's big illustration on its color and its name in an arc of outlined letters. The card shader
 // then prints it in the pack's wrapper finish, and the pillow mesh (pillow.ts) lights it. The mask
 // keeps the letters in plain ink (blue channel). Every drawing here is original.
@@ -8,7 +8,10 @@ import type { Pack, PackId } from '../packs';
 
 /** The pixel grid, and the scale it is blown up by. */
 export const GRID_W = 128;
-export const GRID_H = 192;
+export const GRID_H = 208;
+/** Rows the art and the words move down by from where they were laid out (on a 192-row bag). */
+const ART_DY = 6;
+const WORD_DY = 14;
 const SCALE = 5;
 export const PACK_W = GRID_W * SCALE;
 export const PACK_H = GRID_H * SCALE;
@@ -98,8 +101,14 @@ class Layer {
     });
   }
   /** Copies onto the grid with an ink contour (`outline` pixels thick); `kind` 2 keeps it out of the finish. */
-  stamp(g: Grid, outline = 1, kind = 1) {
+  stamp(g: Grid, outline = 1, kind = 1, shift = 0) {
     const ink = rgb(INK);
+    if (shift) {
+      // Moves the whole layer down by `shift` rows first.
+      const moved = new Array<RGB | null>(this.c.length).fill(null);
+      for (let i = 0; i < this.c.length; i++) if (this.c[i] && i + shift * GRID_W < moved.length) moved[i + shift * GRID_W] = this.c[i];
+      this.c = moved;
+    }
     const on = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID_W && y < GRID_H && !!this.c[y * GRID_W + x];
     for (let y = 0; y < GRID_H; y++)
       for (let x = 0; x < GRID_W; x++) {
@@ -139,11 +148,11 @@ function textLayer(text: string, font: string, x: number, y: number, color: (px:
   return L;
 }
 
-/** The bag's left and right edges on row y: a slightly wavy outline, like a pillow pressed by hand. */
+/** The bag's left and right edges on row y: nearly straight, barely wavy; the seals a pixel wider than the body. */
 const edges = (y: number): [number, number] => {
-  const w = Math.round(Math.sin(y * 0.19) * 0.7 + Math.sin(y * 0.071 + 1) * 0.8);
-  const bulge = y > SEAL && y < GRID_H - SEAL ? 0 : 1;
-  return [4 + bulge - w, GRID_W - 5 - bulge + Math.round(Math.sin(y * 0.17 + 2) * 0.7 + Math.sin(y * 0.063) * 0.8)];
+  const seal = y < SEAL || y >= GRID_H - SEAL ? 1 : 0;
+  const w = Math.round(Math.sin(y * 0.11) * 0.5);
+  return [4 - seal - w, GRID_W - 5 + seal + Math.round(Math.sin(y * 0.09 + 2) * 0.5)];
 };
 
 interface Look {
@@ -306,7 +315,7 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   // The illustration, inked.
   const art = new Layer();
   look.art(art, look.accent.map(rgb));
-  art.stamp(g, 1);
+  art.stamp(g, 1, 1, ART_DY);
 
   // A small FOIL plate under the seal.
   const tiles: [string, string][] = top ? [['F', '#d9a441'], ['O', '#d9a441'], ['I', '#d9a441'], ['L', '#d9a441']] : [['F', '#ff6b5f'], ['O', '#ffb341'], ['I', '#4fd3a3'], ['L', '#4ab0ff']];
@@ -329,12 +338,12 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   // The name in an arc of big outlined letters, on a speech-bubble plate in the body's dark tone.
   const bubble = new Layer();
   bubble.poly([12, 132, 22, 120, 64, 116, 106, 120, 116, 132, 112, 166, 64, 171, 16, 166], (_x, y) => (y < 128 ? md : dk));
-  bubble.stamp(g, 1);
+  bubble.stamp(g, 1, 1, WORD_DY);
   // Silkscreen is drawn on an 8-pixel grid: sizes in steps of 8 keep every stroke (M is not H).
   const size = words.big.length > 5 ? 16 : 24;
-  const title = textLayer(words.big, `${size}px Silkscreen`, 64, 138, (_x, y) => (y < 136 ? rgb('#ffffff') : rgb(top ? '#ffe9a8' : PAPER)), 5);
+  const title = textLayer(words.big, `${size}px Silkscreen`, 64, 138 + WORD_DY, (_x, y) => (y < 136 + WORD_DY ? rgb('#ffffff') : rgb(top ? '#ffe9a8' : PAPER)), 5);
   title.stamp(g, 2, 2);
-  const line = textLayer(words.line, /[^\x00-\x7f]/.test(words.line) ? '16px DotGothic16' : '8px Silkscreen', 64, 160, () => rgb(top ? '#ffe9a8' : PAPER), 0);
+  const line = textLayer(words.line, /[^\x00-\x7f]/.test(words.line) ? '16px DotGothic16' : '8px Silkscreen', 64, 160 + WORD_DY, () => rgb(top ? '#ffe9a8' : PAPER), 0);
   line.stamp(g, 1, 2);
 
   // The bag's own outline, two pixels of ink.

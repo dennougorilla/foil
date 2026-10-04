@@ -109,14 +109,37 @@ export function mergePacks(a: Opened, b: Opened): Opened {
 /** The packs on the shelf: the theme packs, and the supporter pack once a support link was opened. */
 export const shelf = (o: Opened): Pack[] => PACKS.filter((p) => !p.supporter || o.supporter);
 
-/** The hand: the open finishes, plus the drawn card when it is a finish of an opened pack. */
-export function handOf(drawn: EditionId | null, o: Opened): EditionId[] {
-  const extra = drawn && !OPEN_EDITIONS.includes(drawn) && available(drawn, o) ? [drawn] : [];
-  return [...OPEN_EDITIONS, ...extra];
+/** The hand's size; Base is always one of them. */
+export const HAND_SIZE = 7;
+/** Every finish is open or in exactly one pack (tested), so these are all the finishes there are. */
+const isEdition = (id: unknown): id is EditionId => OPEN_EDITIONS.includes(id as EditionId) || PACKS.some((p) => p.finishes.includes(id as EditionId));
+
+/** A saved hand made valid: owned finishes once each, Base among them, seven in all (gaps filled from the starters). */
+export function normalizeHand(saved: unknown, o: Opened): EditionId[] {
+  const list = Array.isArray(saved) ? saved : [];
+  let hand = list.filter((id, i): id is EditionId => isEdition(id) && available(id, o) && list.indexOf(id) === i);
+  if (!hand.includes('base')) hand = [...hand.slice(0, HAND_SIZE - 1), 'base'];
+  hand = hand.slice(0, HAND_SIZE);
+  for (const id of OPEN_EDITIONS) if (hand.length < HAND_SIZE && !hand.includes(id)) hand.push(id);
+  return hand;
 }
 
-/** The deck: every opened pack, in pack order (their finishes are what can be drawn). */
-export const deckOf = (o: Opened): Pack[] => PACKS.filter((p) => o.opened.includes(p.id));
+/** The deck: every owned finish not in the hand, the starters swapped out first, then pack by pack. */
+export function deckOf(hand: readonly EditionId[], o: Opened): { group: PackId | 'open'; finishes: EditionId[] }[] {
+  const groups = [
+    { group: 'open' as const, finishes: OPEN_EDITIONS.filter((id) => !hand.includes(id)) },
+    ...PACKS.filter((p) => o.opened.includes(p.id)).map((p) => ({ group: p.id, finishes: p.finishes.filter((id) => !hand.includes(id)) })),
+  ];
+  return groups.filter((g) => g.finishes.length);
+}
+
+/** Swaps a deck card into the hand in place of `out` (or, without one, the last card that is not Base). Base stays. */
+export function swapIn(hand: readonly EditionId[], out: EditionId | null, into: EditionId): EditionId[] {
+  if (hand.includes(into) || out === 'base') return [...hand];
+  const at = out ? hand.indexOf(out) : hand.map((id) => id !== 'base').lastIndexOf(true);
+  if (at < 0) return [...hand];
+  return hand.map((id, i) => (i === at ? into : id));
+}
 
 /** The first pack on the shelf that is still sealed: the one the shop offers first. */
 export const firstSealed = (o: Opened): Pack | undefined => shelf(o).find((p) => !o.opened.includes(p.id));

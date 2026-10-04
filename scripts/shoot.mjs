@@ -39,7 +39,7 @@ for (const s of shots) {
   const page = await ctx.newPage();
   page.on('console', (m) => m.type() === 'error' && errors.push(`${s.name}: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`${s.name}: ${e.message}`));
-  // Every theme pack opened, so each finish can be drawn from the deck.
+  // Every theme pack opened, so each finish can be swapped in from the deck.
   await page.addInitScript(() => {
     localStorage.clear();
     localStorage.setItem('foil:packs', JSON.stringify({ opened: ['metal', 'light', 'nature', 'studio'], supporter: false }));
@@ -104,11 +104,12 @@ for (const s of shots) {
   }
   await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
   if (s.name === 'desktop-ja') {
-    // One frame per edition, cropped to the card; a pack's finish is drawn from the deck first.
+    // One frame per edition, cropped to the card; a pack's finish is swapped in from the deck first.
     for (let i = 0; i < editions.length; i++) {
       if (!(await page.$(`.hand-slot[data-id=${editions[i]}]`))) {
         await page.click('#deckBtn');
-        await page.click(`.dv-card[data-id=${editions[i]}]`);
+        await page.click(`.dv-body .dv-card[data-id=${editions[i]}]`);
+        await page.click('.dv-hand .dv-card:not([disabled]) >> nth=-1');
         await page.waitForTimeout(1500);
       }
       await page.$eval(`.hand-slot[data-id=${editions[i]}]`, (el) => el.click());

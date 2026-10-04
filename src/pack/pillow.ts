@@ -1,8 +1,8 @@
-// The pack as a filled foil pillow. The wrapper is first printed with its finish (the card shader,
-// into an offscreen texture), then drawn on a grid mesh that bulges toward the viewer: when it
-// tilts the bulge shows in perspective, the sides fall into shade and a sharp highlight runs along
-// the bulge and the foil's wrinkles. Light is worked out on the wrapper's own pixel grid, so it
-// moves in blocks like the art. The crimp seals stay flat and catch light along their ridges.
+// The pack as a foil bag holding a stack of cards. The wrapper is first printed with its finish
+// (the card shader, into an offscreen texture), then drawn on a grid mesh whose face stays flat and
+// rounds off only in a narrow band at its edges; a back sheet behind it shows the pack's thickness
+// when it tilts. Light is worked out on the wrapper's own pixel grid, so it moves in blocks like the
+// art: dark rolled edges, foil wrinkles, and the crimp seals' ridges catching it.
 
 import { startProgram, type PendingProgram } from '../gl/gl';
 import type { CardRenderer, RGB } from '../gl/renderers';
@@ -29,9 +29,9 @@ float height(vec2 uv) {
   vec2 q = uv * 2.0 - 1.0;
   // A stack of cards inside keeps the face flat; only the edges roll off, and the ends ease down
   // into the crimp seals. Flat across the seals themselves.
-  float sx = smoothstep(0.0, 0.11, min(uv.x, 1.0 - uv.x));
-  float sy = smoothstep(uSeal, uSeal + 0.09, uv.y) * smoothstep(uSeal, uSeal + 0.09, 1.0 - uv.y);
-  return sx * sy * (1.0 - 0.06 * q.x * q.x);
+  float sx = smoothstep(0.0, 0.06, min(uv.x, 1.0 - uv.x));
+  float sy = smoothstep(uSeal, uSeal + 0.035, uv.y) * smoothstep(uSeal, uSeal + 0.035, 1.0 - uv.y);
+  return sx * sy * (1.0 - 0.03 * q.x * q.x);
 }
 
 vec3 rot(vec3 p) {
@@ -47,9 +47,7 @@ vec3 rot(vec3 p) {
 void main() {
   vec2 uv = vec2(aGrid.x, mix(uV.x, uV.y, aGrid.y));
   float h = height(uv) * (1.0 - uFlat) - uDepth / max(uBulge, 1.0);
-  // Filled, the bag swells: its sides bow out a little where it is fullest.
-  vec2 bow = vec2(1.0 + 0.012 * h, 1.0);
-  vec3 p = vec3((uv - 0.5) * uSize * bow * uScale, h * uBulge * uScale);
+  vec3 p = vec3((uv - 0.5) * uSize * uScale, h * uBulge * uScale);
   // The surface's slope, for its normal.
   float e = 0.01;
   float hx = (height(uv + vec2(e, 0.0)) - height(uv - vec2(e, 0.0))) * uBulge / (2.0 * e * uSize.x);
@@ -255,7 +253,7 @@ export class Pillow {
     gl.uniform1f(u.uScale, d.scale);
     const rows = d.rows ?? [0, 1];
     gl.uniform2f(u.uV, rows[0], rows[1]);
-    gl.uniform1f(u.uBulge, d.w * 0.05);
+    gl.uniform1f(u.uBulge, d.w * 0.03);
     gl.uniform1f(u.uMouth, rows[0] > 0 ? rows[0] : 0);
     gl.uniform1f(u.uSeal, 15 / GRID_H);
     gl.uniform2f(u.uGrid, GRID_W, GRID_H);

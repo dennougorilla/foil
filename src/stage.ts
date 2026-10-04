@@ -1,5 +1,4 @@
 import { EDITIONS, editionById, type EditionId } from './editions';
-import { OPEN_EDITIONS } from './packs';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
 import { sfx } from './audio';
 import type { Store } from './state';
@@ -31,6 +30,19 @@ interface HandCard {
   tiltX: Spring;
   tiltY: Spring;
   dealAt: number;
+  /** Coming in from the deck: its offset from its place, closing to nothing. */
+  fromDeck: boolean;
+  dx: Spring;
+  dy: Spring;
+  /** Where it was last drawn (canvas px), so a card leaving for the deck starts from there. */
+  at: { x: number; y: number; w: number; h: number; rz: number };
+}
+
+/** A card on its way from the hand into the deck. */
+interface Leaving {
+  shader: number;
+  from: { x: number; y: number; w: number; h: number; rz: number };
+  t: number;
 }
 
 const TAU = Math.PI * 2;
@@ -47,8 +59,10 @@ export interface StageOptions {
   info: HTMLElement;
   onSelect: (id: EditionId) => void;
   onHover: (id: EditionId | null) => void;
-  /** The finishes in the hand, in order: the open ones, then the chosen folder's. */
+  /** The finishes in the hand, in order. */
   handIds: () => EditionId[];
+  /** Where the deck sits on the page: swapped cards fly between it and the hand. */
+  deckRect?: () => DOMRect | null;
 }
 
 export class Stage {
@@ -90,6 +104,7 @@ export class Stage {
   private demo = new AutoTouch();
 
   private hand: HandCard[] = [];
+  private leaving: Leaving[] = [];
   private hovered = -1;
   private focused = -1;
   private particles: Particle[] = [];
@@ -156,18 +171,22 @@ export class Stage {
       old.delete(id);
       if (!h) {
         h = this.handCard(id);
-        // On boot the whole hand deals in after the card; later, only the newcomers.
-        h.dealAt = fresh ? this.time + 0.05 + dealt++ * 0.07 : 0.35 + n * 0.04;
+        // On boot the whole hand deals in after the card; later a newcomer flies in from the deck.
+        if (fresh && this.o.deckRect?.() && this.motion) {
+          h.fromDeck = true;
+          h.deal.x = h.deal.target = 0;
+          h.dealAt = this.time + 0.12 + dealt++ * 0.07;
+        } else h.dealAt = fresh ? this.time + 0.05 + dealt++ * 0.07 : 0.35 + n * 0.04;
       }
       h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
-      // The card drawn from the deck sits a little apart, after the seven.
-      h.el.classList.toggle('is-drawn', !OPEN_EDITIONS.includes(id));
-      // A small card back on the drawn card: it came from the deck.
-      if (!OPEN_EDITIONS.includes(id)) h.el.insertAdjacentHTML('beforeend', '<i class="drawn-mark" aria-hidden="true"></i>');
       hand.appendChild(h.el);
       return h;
     });
-    for (const h of old.values()) h.el.remove();
+    // Cards no longer in the hand fly back into the deck.
+    for (const h of old.values()) {
+      h.el.remove();
+      if (this.motion && h.at.w) this.leaving.push({ shader: editionById(h.id).shader, from: { ...h.at }, t: 0 });
+    }
     this.hovered = this.focused = -1;
     this.syncHandChecked();
     this.applyHandLabels();
@@ -216,6 +235,10 @@ export class Stage {
       tiltX: new Spring(0, 0, 200, 16),
       tiltY: new Spring(0, 0, 200, 16),
       dealAt: 0,
+      fromDeck: false,
+      dx: new Spring(0, 0, 150, 15),
+      dy: new Spring(0, 0, 150, 15),
+      at: { x: 0, y: 0, w: 0, h: 0, rz: 0 },
     };
   }
 
@@ -399,7 +422,7 @@ export class Stage {
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
     // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
-    // Seven, or seven plus the drawn card, stay one fan; only a longer hand would need two rows.
+    // Seven cards stay one fan.
     const rows = hr.height > 240 && count > 8 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
@@ -472,6 +495,7 @@ export class Stage {
 
     this.cards.begin();
     this.stepHand(dt, state);
+    this.stepLeaving(dt, state);
 
     if (r) {
       // Pointer relative to the card
@@ -640,7 +664,7 @@ export class Stage {
         card.tiltX.target = 0;
         card.tiltY.target = 0;
       }
-      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY]) s.step(dt);
+      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY, card.dx, card.dy]) s.step(dt);
       order.push(i);
     });
     // Draw so the selected and hovered cards sit on top of their neighbours.
@@ -654,10 +678,20 @@ export class Stage {
       const { row, d } = slot(i);
       const fan = d * 0.045;
       const arc = d * d * arcK;
-      // A drawn card gets a small gap before it; the whole fan stays centred.
-      const drawnGap = this.hand.length > OPEN_EDITIONS.length ? spacing * 0.4 : 0;
-      const x = hr.width / 2 + d * spacing + (card.el.classList.contains('is-drawn') ? drawnGap / 2 : -drawnGap / 2);
-      const y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
+      let x = hr.width / 2 + d * spacing;
+      let y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
+      if (card.fromDeck) {
+        // Waiting on the deck until its moment, then springing to its place in the hand.
+        const deck = this.o.deckRect?.();
+        if (deck) {
+          card.dx.x = deck.left + deck.width / 2 - this.canvasRect.left - (ox + x);
+          card.dy.x = deck.top + deck.height / 2 - this.canvasRect.top - (oy + y);
+          card.scale.x = 0.55;
+        }
+        if (this.time > card.dealAt) card.fromDeck = false;
+      }
+      x += card.dx.x;
+      y += card.dy.x;
       const rot = fan * (1 - Math.min(card.lift.x / 40, 0.6));
       card.el.style.width = `${w}px`;
       card.el.style.height = `${h}px`;
@@ -670,6 +704,7 @@ export class Stage {
       }
       const t = this.time + i * 0.7;
       const idle = this.motion ? 1 : 0;
+      card.at = { x: ox + x, y: oy + y, w, h, rz: rot };
       this.cards.drawCard(
         {
           cx: ox + x,
@@ -690,6 +725,44 @@ export class Stage {
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],
           plate: false,
           heat: e.touch ? this.demoAt(motion.fx) : undefined,
+        },
+        motion.fx,
+      );
+    }
+  }
+
+  /** Cards leaving the hand: each shrinks along a short arc into the deck. */
+  private stepLeaving(dt: number, state: ReturnType<Store['get']>) {
+    const deck = this.o.deckRect?.();
+    for (let i = this.leaving.length - 1; i >= 0; i--) {
+      const c = this.leaving[i];
+      c.t += dt / 0.42;
+      if (c.t >= 1 || !deck) {
+        this.leaving.splice(i, 1);
+        continue;
+      }
+      const e = c.t * c.t * (3 - 2 * c.t);
+      const tx = deck.left + deck.width / 2 - this.canvasRect.left;
+      const ty = deck.top + deck.height / 2 - this.canvasRect.top;
+      this.cards.drawCard(
+        {
+          cx: c.from.x + (tx - c.from.x) * e,
+          cy: c.from.y + (ty - c.from.y) * e - Math.sin(Math.PI * c.t) * 50,
+          w: c.from.w,
+          h: c.from.h,
+          rx: 0,
+          ry: 0,
+          rz: c.from.rz * (1 - e) + 0.2 * e,
+          scale: 1 - 0.45 * e,
+          edition: c.shader,
+          intensity: state.intensity,
+          pixel: 0,
+          tilt: [0, 0],
+          light: [0.5, 0.35],
+          alpha: 1 - 0.7 * e,
+          flash: 0,
+          shadow: null,
+          plate: false,
         },
         motion.fx,
       );

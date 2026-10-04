@@ -250,28 +250,33 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.click('.pk-try');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
-  expect((await state()).drawn === 'crystal', 'the pick was not drawn into the hand');
-  expect((await handCount()) === 8, `the hand has ${await handCount()} cards, not the seven plus the drawn one`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '3', 'the deck does not hold the three finishes');
+  const hand = (await state()).hand;
+  expect(hand.includes('crystal') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
+  expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
+  expect((await page.textContent('#deckBtn .deck-count')) === '3', 'the deck does not hold Relief, Gold and the swapped-out Glitch');
 });
 
-await step('the deck lists what was opened; drawing another swaps the eighth card', async () => {
+await step('a deck card swaps with the hand card chosen for it; Base stays', async () => {
   await page.click('#deckBtn');
   await page.waitForSelector('.dv.is-in', { timeout: 15000 });
-  expect((await page.locator('.dv-group').count()) === 1 && (await page.locator('.dv-card').count()) === 3, 'the deck view does not show the Metal pack');
-  expect((await page.getAttribute('.dv-card[data-id=crystal]', 'aria-current')) === 'true', 'the drawn card is not marked in the deck');
-  await page.waitForSelector('.dv-card canvas.is-ready', { timeout: 30000 });
-  await page.click('.dv-card[data-id=relief]');
+  expect((await page.locator('.dv-body .dv-card').count()) === 3, 'the deck view does not show the three deck cards');
+  await page.waitForSelector('.dv-body .dv-pic canvas', { timeout: 30000 });
+  await page.click('.dv-body .dv-card[data-id=relief]');
+  await page.waitForSelector('.dv-hand:not([hidden])', { timeout: 5000 });
+  expect((await page.locator('.dv-hand .dv-card').count()) === 7, 'the hand to swap with does not show seven cards');
+  expect(await page.isDisabled('.dv-hand .dv-card[data-id=base]'), 'Base can be swapped out');
+  await page.click('.dv-hand .dv-card[data-id=holo]');
   await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'relief', null, { timeout: 10000 });
-  expect((await handCount()) === 8, 'drawing another card grew the hand');
-  expect((await page.getAttribute('.hand-slot >> nth=7', 'data-id')) === 'relief', 'the eighth card was not swapped');
+  const hand = (await state()).hand;
+  expect(hand[2] === 'relief' && !hand.includes('holo'), `Relief did not take Holographic's place: ${hand}`);
+  expect((await page.textContent('#deckBtn .deck-count')) === '3', 'the deck count changed on a swap');
   await page.locator('#cardSlot').focus();
-  await page.keyboard.press('2');
+  await page.keyboard.press('1');
   await page.waitForTimeout(300);
-  await page.keyboard.press('8');
+  await page.keyboard.press('3');
   await page.waitForTimeout(300);
-  expect((await state()).edition === 'relief', 'key 8 does not pick the drawn card');
+  expect((await state()).edition === 'relief', 'key 3 does not pick the swapped-in card');
 });
 
 await step('a replay from the shop can be skipped straight to the haul and closed', async () => {
@@ -299,7 +304,7 @@ await step('held still, the pack opens with a button and the haul fades in', asy
   await phase('haul');
   await page.click('.pk-name >> nth=0');
   await overlayGone();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).drawn === 'sakura', null, { timeout: 10000 });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
   expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck does not hold both packs');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 });
@@ -319,29 +324,31 @@ await step('finishes unlocked by the old support links carry over as opened pack
     localStorage.removeItem('foil:packs');
     localStorage.setItem('foil:secrets', '["shallows","kintsugi"]');
     const s = JSON.parse(localStorage.getItem('foil:v1'));
-    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'shallows', drawn: null }));
+    // The earlier "drawn card" save: no hand, a drawn finish.
+    const { hand, ...rest } = s;
+    localStorage.setItem('foil:v1', JSON.stringify({ ...rest, edition: 'holo', drawn: 'shallows' }));
   });
   await page.reload();
   await page.waitForTimeout(1500);
   const saved = await packsSaved();
   expect(saved.opened.join() === 'light,supporter' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
   expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
-  expect((await state()).edition === 'shallows', 'the carried-over finish was taken off the card');
+  const after = await state();
+  expect(after.hand.length === 7 && after.hand.includes('shallows') && !('drawn' in after), `the drawn card did not move into the hand: ${after.hand}`);
   expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the carried-over packs are not in the deck');
-  expect((await state()).drawn === 'shallows' && (await handCount()) === 8, 'the carried-over finish on the card is not the drawn card');
 });
 
 await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {
   await page.evaluate(() => {
     localStorage.setItem('foil:packs', '{"opened":[],"supporter":false}');
     const s = JSON.parse(localStorage.getItem('foil:v1'));
-    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'magma', drawn: 'magma' }));
+    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'magma', hand: ['base', 'magma', 'foil', 'holo', 'poly', 'negative', 'prism'] }));
   });
   await page.reload();
   await page.waitForTimeout(1500);
   const s = await state();
-  expect(s.edition === 'holo' && s.drawn === null, `got ${s.edition} / ${s.drawn}`);
-  expect((await handCount()) === 7, "a sealed pack's finish stayed in the hand");
+  expect(s.edition === 'holo' && !s.hand.includes('magma') && s.hand.length === 7, `got ${s.edition} / ${s.hand}`);
+  expect((await handCount()) === 7, 'the hand is not seven');
 });
 
 await browser.close();

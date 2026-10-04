@@ -16,8 +16,8 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
-  /** The finish drawn from the deck into the hand's eighth slot, if any. */
-  drawn: EditionId | null;
+  /** The seven finishes in the hand, in order (made valid against the opened packs in main.ts). */
+  hand: EditionId[];
   rarity: RarityId;
   frame: FrameId;
   intensity: number;
@@ -55,7 +55,7 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
-  'drawn',
+  'hand',
   'rarity',
   'frame',
   'intensity',
@@ -84,7 +84,7 @@ export function createStore() {
     sound: true,
     crt: true,
     edition: 'holo',
-    drawn: null,
+    hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
     rarity: 'rare',
     frame: 'paper',
     intensity: 1,
@@ -113,7 +113,6 @@ export function createStore() {
     state.adjustOpen = state.adjustOpen === true;
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
-    if (!EDITIONS.some((e) => e.id === state.drawn)) state.drawn = null;
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;

@@ -1,14 +1,17 @@
 // The deck beside the hand, Balatro-style: a pile of face-down card backs (thicker with each
-// finish in it) with its count, and a small pack beside it that opens the pack shop. The hand
-// itself stays at seven plus the drawn card. See docs/packs.md.
+// finish in it, a couple of steps at most) with its count, and a small pack beside it that opens
+// the pack shop. The hand is always seven; the deck holds every owned finish not in it. See docs/packs.md.
 
 import { sfx } from './audio';
 import type { Dict } from './i18n';
+import type { EditionId } from './editions';
 import { deckOf, shelf } from './packs';
 import { packs } from './packStore';
 
 export interface DeckOptions {
   host: HTMLElement;
+  /** The hand now: the deck holds every owned finish not in it. */
+  hand: () => EditionId[];
   dict: () => Dict;
   /** The deck was pressed: show what is in it. */
   onView: () => void;
@@ -18,8 +21,8 @@ export interface DeckOptions {
   onPrefetch: () => void;
 }
 
-/** At most this many backs show in the pile; past it the pile stops growing. */
-const MAX_LAYERS = 12;
+/** At most this many backs show in the pile: a couple of steps of thickness; the number says how many. */
+const MAX_LAYERS = 3;
 
 export function mountDeck(o: DeckOptions) {
   const { host } = o;
@@ -36,7 +39,7 @@ export function mountDeck(o: DeckOptions) {
   for (const ev of ['pointerenter', 'focus']) packsBtn.addEventListener(ev, () => o.onPrefetch(), { once: true });
 
   /** How many finishes the deck holds. */
-  const count = () => deckOf(packs.get()).reduce((n, p) => n + p.finishes.length, 0);
+  const count = () => deckOf(o.hand(), packs.get()).reduce((n, g) => n + g.finishes.length, 0);
 
   const render = () => {
     const t = o.dict().pack;

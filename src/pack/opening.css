@@ -1220,3 +1220,51 @@
   opacity: 0;
   transition: opacity 0.25s var(--ease-out);
 }
+
+/* ---------- Under the pack, before the tear: one short line, nothing else ---------- */
+
+/* The one line is a quiet button: tap it (or the pack, or Enter) to tear it open at once. */
+.pk-open {
+  top: calc(var(--hint-y, 80%) + 4px) !important;
+  min-width: 0 !important;
+  min-height: 36px !important;
+  padding: 4px 16px !important;
+  border-radius: 10px !important;
+  background: rgba(13, 19, 21, 0.72) !important;
+  color: var(--text) !important;
+  font-size: 17px !important;
+  text-shadow: 0 2px 0 #05080a !important;
+  box-shadow: none !important;
+}
+
+.pk-open:hover {
+  background: rgba(38, 50, 58, 0.9) !important;
+}
+
+.pk-open:active {
+  transform: translateX(-50%) translateY(2px) !important;
+}
+
+/* No ghost finger and no running bead: the glowing line and its arrow are the guide. */
+.pk-guide i,
+.pk-guide::after {
+  display: none;
+}
+
+/* Skip and close stay small in the corner while the pack is up. */
+.pk[data-phase='pack'] .pk-skip,
+.pk[data-phase='pack'] .pk-x,
+.pk[data-phase='deck'] .pk-skip,
+.pk[data-phase='deck'] .pk-x {
+  min-height: 36px;
+  font-size: 14px;
+}
+
+.pk[data-phase='pack'] .pk-x,
+.pk[data-phase='deck'] .pk-x {
+  width: 36px;
+}
+
+.pk[data-phase='pack'] .pk-title small {
+  display: none;
+}

@@ -5,8 +5,9 @@ import {
   available,
   fromSecrets,
   deckOf,
+  normalizeHand,
+  swapIn,
   firstSealed,
-  handOf,
   mergePacks,
   OPEN_EDITIONS,
   packOf,
@@ -85,17 +86,29 @@ test('the shelf shows the supporter pack only after a support link was opened', 
   assert.deepEqual(shelf({ opened: [], supporter: true }).map((p) => p.id), ['metal', 'light', 'nature', 'studio', 'supporter']);
 });
 
-test('the hand is the seven, plus the drawn card when its pack is opened', () => {
-  const opened = { opened: ['metal' as const], supporter: false };
-  assert.deepEqual(handOf(null, opened), [...OPEN_EDITIONS]);
-  assert.deepEqual(handOf('relief', opened), [...OPEN_EDITIONS, 'relief']);
-  assert.deepEqual(handOf('magma', opened), [...OPEN_EDITIONS]);
-  assert.deepEqual(handOf('holo', opened), [...OPEN_EDITIONS]);
+const M = { opened: ['metal' as const], supporter: false };
+
+test('a saved hand keeps seven owned finishes, Base among them, and fills gaps from the starters', () => {
+  assert.deepEqual(normalizeHand(null, M), [...OPEN_EDITIONS]);
+  assert.deepEqual(normalizeHand(['relief', 'foil', 'magma', 'relief', 'nope'], M), ['relief', 'foil', 'base', 'holo', 'poly', 'negative', 'prism']);
+  assert.deepEqual(normalizeHand(['holo', 'foil', 'poly', 'negative', 'prism', 'glitch', 'gold', 'crystal'], M), ['holo', 'foil', 'poly', 'negative', 'prism', 'glitch', 'base']);
 });
 
-test('the deck holds every opened pack, in pack order', () => {
-  assert.deepEqual(deckOf({ opened: ['studio', 'metal'], supporter: false }).map((p) => p.id), ['metal', 'studio']);
-  assert.equal(deckOf({ opened: [], supporter: false }).length, 0);
+test('the deck is every owned finish not in the hand: starters swapped out first, then pack by pack', () => {
+  const hand = ['base', 'relief', 'holo', 'poly', 'negative', 'prism', 'glitch'] as const;
+  assert.deepEqual(deckOf([...hand], M), [
+    { group: 'open', finishes: ['foil'] },
+    { group: 'metal', finishes: ['gold', 'crystal'] },
+  ]);
+  assert.deepEqual(deckOf([...OPEN_EDITIONS], { opened: [], supporter: false }), []);
+});
+
+test('a swap puts the deck card where the hand card was; Base cannot leave', () => {
+  assert.deepEqual(swapIn([...OPEN_EDITIONS], 'holo', 'gold'), ['base', 'foil', 'gold', 'poly', 'negative', 'prism', 'glitch']);
+  assert.deepEqual(swapIn([...OPEN_EDITIONS], 'base', 'gold'), [...OPEN_EDITIONS]);
+  // Without a choice, the last card that is not Base makes room.
+  assert.deepEqual(swapIn([...OPEN_EDITIONS], null, 'gold'), ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'gold']);
+  assert.deepEqual(swapIn(['gold', 'foil', 'holo', 'poly', 'negative', 'prism', 'base'], null, 'relief'), ['gold', 'foil', 'holo', 'poly', 'negative', 'relief', 'base']);
 });
 
 test('the first sealed pack on the shelf is the one the shop offers first', () => {

@@ -122,15 +122,25 @@
   transition: transform 0.15s var(--ease-out), background 0.15s;
 }
 
-.dv-card canvas {
-  width: 120px;
-  height: 168px;
-  border-radius: 9px;
-  background: repeating-linear-gradient(45deg, #1d262b 0 6px, #232e34 6px 12px);
-  box-shadow: 0 4px 0 #05080a;
+.dv-pic {
+  display: block;
+  width: 124px;
+  height: 171px;
 }
 
-.dv-card canvas:not(.is-ready) {
+.dv-pic canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Not drawn yet: a soft placeholder card. */
+.dv-pic:empty {
+  margin: 8px 8px 12px;
+  width: 108px;
+  height: 151px;
+  border-radius: 8px;
+  background: repeating-linear-gradient(45deg, #1d262b 0 6px, #232e34 6px 12px);
   animation: dv-wait 1s ease-in-out infinite;
 }
 
@@ -149,28 +159,56 @@
 }
 
 .dv-card:focus-visible,
+.dv-hand:focus-visible,
 .dv-x:focus-visible,
 .dv-shop:focus-visible {
   outline: 3px dashed #fff;
   outline-offset: 3px;
 }
 
-.dv-card.is-drawn {
+.dv-card.is-chosen {
   background: rgba(242, 193, 78, 0.16);
   box-shadow: inset 0 0 0 2px var(--gold);
+  transform: translateY(-4px);
 }
 
-.dv-tag {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 0 7px;
-  border-radius: 6px;
-  background: var(--gold);
-  color: var(--paper-ink);
-  font-size: 12px;
-  line-height: 20px;
-  box-shadow: 0 2px 0 #05080a;
+/* The hand, shown once a deck card is chosen: pick the one to swap. */
+.dv-hand {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 22px 18px;
+  background: #1a2328;
+  box-shadow: inset 0 4px 0 #05080a;
+}
+
+.dv-ask {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--gold);
+}
+
+.dv-hand .dv-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 4px;
+}
+
+.dv-hand .dv-pic {
+  width: 86px;
+  height: 119px;
+}
+
+.dv-hand .dv-card b {
+  font-size: 13px;
+}
+
+.dv-card[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dv-card[disabled]:hover {
+  transform: none;
 }
 
 .dv-empty {
@@ -202,9 +240,16 @@
   .dv-card {
     padding: 4px 4px 6px;
   }
-  .dv-card canvas {
-    width: 86px;
-    height: 120px;
+  .dv-pic {
+    width: 92px;
+    height: 127px;
+  }
+  .dv-hand {
+    padding: 10px 10px 14px;
+  }
+  .dv-hand .dv-pic {
+    width: 62px;
+    height: 86px;
   }
   .dv-head small {
     font-size: 13px;

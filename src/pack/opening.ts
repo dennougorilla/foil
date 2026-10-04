@@ -176,7 +176,7 @@ export function openPack(o: OpeningOptions) {
   skipBtn.querySelector('span')!.textContent = t.skip;
   $('.pk-x').setAttribute('aria-label', t.close);
   $('.pk-x').title = t.close;
-  openBtn.textContent = t.tearBtn;
+  openBtn.textContent = t.trace;
   hintEl.textContent = t.loading;
   $('.pk-close').textContent = t.close;
   document.body.appendChild(root);
@@ -267,11 +267,11 @@ export function openPack(o: OpeningOptions) {
       const gap = narrow ? 14 : 26;
       const room = Math.min(vw - 24, 1120) - (narrow ? 40 : 84);
       let sw = (room - gap * (perRow - 1)) / perRow;
-      let sh = sw * 1.5;
+      let sh = (sw * PACK_H) / PACK_W;
       const maxH = narrow ? (perRow === 2 ? vh * 0.19 : vh * 0.2) : vh * 0.42;
       if (sh > maxH) {
         sh = maxH;
-        sw = sh / 1.5;
+        sw = (sh * PACK_W) / PACK_H;
       }
       root.style.setProperty('--slot-w', `${Math.floor(sw)}px`);
       root.style.setProperty('--slot-h', `${Math.floor(sh)}px`);
@@ -955,7 +955,7 @@ export function openPack(o: OpeningOptions) {
       setPhase('pack');
       root.classList.remove('is-leaving');
       root.classList.add('is-opening');
-      hint(t.trace, 'Enter');
+      hint('');
       openBtn.hidden = false;
       // The words and button come in once the pack has landed, not while it flies.
       setTimeout(() => root.classList.add('is-settled'), reduced ? 0 : 520);
