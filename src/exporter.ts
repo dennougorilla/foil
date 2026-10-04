@@ -190,6 +190,10 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           alpha: 1,
           flash: pose.flash,
           glint: pose.glint,
+          beam: pose.beam,
+          spot: pose.spot,
+          dim: pose.dim,
+          star: pose.star,
           shadow: shadow ? [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u] : null,
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
@@ -198,7 +202,14 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
       );
       ctx.imageSmoothingEnabled = false;
       if (transparent) ctx.clearRect(0, 0, W, H);
-      else ctx.drawImage(bgCanvas, 0, 0, W, H);
+      else {
+        ctx.drawImage(bgCanvas, 0, 0, W, H);
+        // A light motion's dim room takes the backdrop down with the card.
+        if (pose.dim > 0) {
+          ctx.fillStyle = `rgba(6, 8, 20, ${Math.min(0.88, pose.dim * 1.15)})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
       ctx.drawImage(cardCanvas, 0, 0);
     },
     dispose() {

@@ -625,7 +625,8 @@ export class Stage {
       if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);
       else if (pointed) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
       else light = restLight(tilt);
-      light = motion.light(tune, light);
+      // A light motion moves the light itself until the pointer comes onto the card.
+      light = motion.light(tune, light, pointed || ed.torch ? undefined : pose);
 
       // The card's shadow drops further as it lifts or rises off the table.
       const lift = (this.sc.x * pose.scale - 1) * 120 - fy * 0.6 + (this.drag.active ? 14 : 0);
@@ -641,6 +642,10 @@ export class Stage {
           alpha: 1,
           flash: this.flash + pose.flash,
           glint: pose.glint,
+          beam: pose.beam,
+          spot: pose.spot,
+          dim: pose.dim,
+          star: pose.star,
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
