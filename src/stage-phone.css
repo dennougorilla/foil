@@ -13,7 +13,7 @@
     gap: 12px;
   }
   .stage:has(.hand[data-many]) {
-    --hand-h: clamp(200px, 34svh, 290px);
+    --hand-h: clamp(200px, 30svh, 290px);
   }
   /* The second row's fan curves past the hand's box; keep the name clear of it. */
   .hand[data-many] + .hand-bar {
@@ -26,7 +26,7 @@
      card and the hand, the header, the pick button, the caption and the gaps take about 200px. */
   .card-slot {
     margin-top: 12px;
-    width: clamp(96px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px));
+    width: clamp(64px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px));
   }
   .hand-wrap {
     order: 1;

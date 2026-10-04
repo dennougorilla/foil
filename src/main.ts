@@ -1074,6 +1074,8 @@ const apngExport = mountApngExport({
   input: exportInput,
   toast: (msg, error) => toast(msg, error),
   onSaved: (file) => celebrate(file),
+  // Like the other exports, an APNG's frames say nothing about the stage's own speed.
+  busy: (on) => stage?.holdQuality(on),
   sfx,
 });
 
