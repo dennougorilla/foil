@@ -2,7 +2,7 @@
 // The defaults reproduce the look FOIL had before these controls existed, so leaving the
 // "More" drawer closed changes nothing.
 
-export type LightMode = 'pointer' | 'orbit' | 'fixed' | 'gyro';
+export type LightMode = 'pointer' | 'orbit' | 'fixed';
 export type IdleMode = 'none' | 'sway' | 'spin' | 'breathe';
 /** The metal the Relief finish is struck in; other finishes ignore it. */
 export type Metal = 'gold' | 'silver';
@@ -81,7 +81,7 @@ export const RANGES: Record<NumKey, Range> = {
   tiltMax: { min: 0, max: 40, step: 1 },
 };
 
-export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed', 'gyro'];
+export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed'];
 export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'spin', 'breathe'];
 export const METALS: Metal[] = ['gold', 'silver'];
 

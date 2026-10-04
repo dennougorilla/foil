@@ -40,7 +40,8 @@ for (const s of shots) {
   page.on('console', (m) => m.type() === 'error' && errors.push(`${s.name}: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`${s.name}: ${e.message}`));
   await page.addInitScript(() => localStorage.clear());
-  await page.goto(`${URL}?lang=${s.lang}`);
+  // Pinned at full quality so a slow headless GPU never lowers what the shots show.
+  await page.goto(`${URL}?lang=${s.lang}&quality=0`);
   await page.waitForTimeout(2600);
   const card = page.locator('#cardSlot');
   if (s.act === 'hoverCard') {

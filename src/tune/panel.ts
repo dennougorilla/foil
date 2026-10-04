@@ -18,7 +18,7 @@ import {
   type NumKey,
   type Tune,
 } from './model';
-import { gyroAvailable, motion } from './motion';
+import { motion } from './motion';
 import { mountPeek } from './peek';
 import { mountSunHandle } from './handle';
 
@@ -38,7 +38,6 @@ const ICONS: Record<string, string> = {
   pointer: '<path d="M4 1h2v1h1v1h1v1h1v1h1v1h1v1h1v2H9v1h1v2H8v-2H7v1H6v1H4z"/>',
   orbit: '<path d="M6 2h4v1h2v1h1v2h1v4h-1v2h-1v1h-2v1H6v-1H4v-1H3v-2H2V6h1V4h1V3h2zm0 2v1H5v1H4v4h1v1h1v1h4v-1h1v-1h1V6h-1V5h-1V4zm1 3h2v2H7zm4-6h3v3h-3z"/>',
   fixed: '<path d="M3 2h10v12H3zm2 2v8h6V4zm4 1h2v2H9z"/>',
-  gyro: '<path d="M5 1h6v1h1v12h-1v1H5v-1H4V2h1zm1 2v9h4V3zm1 10h2v1H7z"/>',
   none: '<path d="M3 7h10v2H3z"/>',
   sway: '<path d="M1 8h2V6h2v2h2v2h2V8h2V6h2v2h2v2h-2v2h-2v-2H9v-2H7v2H5v2H3v-2H1z"/>',
   spin: '<path d="M6 2h5v1h1v1h1v3h-2V5h-1V4H6v1H5v2H3V4h1V3h2zm-3 7h2v2h1v1h4v-1h1V9h2v3h-1v1h-1v1H5v-1H4v-1H3z"/>',
@@ -112,9 +111,7 @@ function trackFor(k: NumKey, v: number): string {
 
 export function mountTune(store: Store, root: HTMLElement): void {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const hasGyro = gyroAvailable();
   let t = DICTS[store.get().lang].tune;
-  let gyroNote: 'wait' | 'denied' | null = null;
   /** What "Reset all" replaced, offered back for a few seconds. */
   let undo: Tune | null = null;
   let undoTimer = 0;
@@ -172,12 +169,6 @@ export function mountTune(store: Store, root: HTMLElement): void {
       if (def.id === 'pattern') group.appendChild(sampleRow());
       for (const k of def.keys)
         group.appendChild(k === 'light' || k === 'idle' || k === 'metal' ? choiceRow(k) : k === 'lightAngle' ? dialRow(k) : rangeRow(k));
-      if (def.id === 'motion') {
-        const note = document.createElement('p');
-        note.className = 'tune-note';
-        note.setAttribute('role', 'status');
-        group.appendChild(note);
-      }
       groups.appendChild(group);
     }
     root.querySelector('.tune-reset-all')!.addEventListener('click', () => {
@@ -185,7 +176,6 @@ export function mountTune(store: Store, root: HTMLElement): void {
       sfx.tick();
       const before = tuneNow();
       store.set({ tune: { ...TUNE_DEFAULTS } });
-      gyroNote = null;
       announce(t.resetDone);
       // Offer the old settings back for a moment; focus moves to that offer.
       undo = before;
@@ -382,7 +372,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
     group.className = 'seg tune-seg';
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', `tuneLabel-${k}`);
-    const options: string[] = k === 'light' ? LIGHT_MODES.filter((m) => m !== 'gyro' || hasGyro) : k === 'idle' ? IDLE_MODES : METALS;
+    const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? IDLE_MODES : METALS;
     group.style.gridTemplateColumns = `repeat(${options.length}, 1fr)`;
     for (const v of options) {
       const b = document.createElement('button');
@@ -424,9 +414,6 @@ export function mountTune(store: Store, root: HTMLElement): void {
   function choose(k: ChoiceKey, v: string) {
     if (tuneNow()[k] === v) return;
     sfx.tick();
-    // Picking Gyro starts the sensor from the store listener below (still inside this tap,
-    // which iOS needs for its permission prompt).
-    if (k === 'light') gyroNote = v === 'gyro' ? 'wait' : null;
     set({ [k]: v } as Partial<Tune>);
   }
 
@@ -534,13 +521,6 @@ export function mountTune(store: Store, root: HTMLElement): void {
       }
     }
     sun.update({ show: shown() && tune.light === 'fixed' && !motion.comparing, angle: tune.lightAngle, label: t.sun, title: t.sunHelp, keys: t.sunKeys });
-
-    const note = root.querySelector<HTMLElement>('.tune-note')!;
-    let msg = '';
-    if (gyroNote === 'denied') msg = t.gyroDenied;
-    else if (tune.light === 'gyro' && gyroNote === 'wait' && !motion.gyroLive()) msg = t.gyroWait;
-    note.textContent = msg;
-    note.hidden = !msg;
   }
 
   function whyLine(host: HTMLElement, id: string, before: Element | null) {
@@ -589,38 +569,9 @@ export function mountTune(store: Store, root: HTMLElement): void {
     new ResizeObserver(measure).observe(root);
     measure();
   }
-  if (tuneNow().light === 'gyro') {
-    // A gyro light saved last visit needs its sensor again. Where that takes a tap (iOS),
-    // fall back to the pointer and say why.
-    void motion.enableGyro().then((r) => {
-      if (r === 'ok') return;
-      gyroNote = 'denied';
-      set({ light: 'pointer' });
-    });
-  }
-  // The sensor runs only while Gyro is the light, however it got there (a pick, Reset all, Undo).
-  let lightWas = tuneNow().light;
-  store.on((s, changed) => {
-    if (changed.has('tune') && s.tune.light !== lightWas) {
-      lightWas = s.tune.light;
-      if (lightWas !== 'gyro') motion.disableGyro();
-      else
-        void motion.enableGyro().then((r) => {
-          if (r !== 'ok') {
-            gyroNote = 'denied';
-            set({ light: 'pointer' });
-          } else sync();
-        });
-    }
+  store.on((_, changed) => {
     if (changed.has('lang')) build();
     else if (['tune', 'adjustOpen', 'panelTab', 'edition', 'intensity'].some((k) => changed.has(k as keyof State))) sync();
   });
   reduced.addEventListener('change', sync);
-  // A gyro that starts reporting clears the "tilt your device" note.
-  setInterval(() => {
-    if (gyroNote === 'wait' && motion.gyroLive()) {
-      gyroNote = null;
-      sync();
-    }
-  }, 500);
 }

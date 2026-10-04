@@ -258,6 +258,74 @@ await step('phones: the live preview rides in the Save stub, never over the cont
   await phone.close();
 });
 
+// ---------- Phone: the hand on the first screen, flicking the card, gyro, drawing quality ----------
+
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const mob = await phone.newPage();
+mob.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
+mob.on('console', (m) => m.type() === 'error' && errors.push(`phone: ${m.text()}`));
+await mob.addInitScript(() => localStorage.clear());
+await mob.goto(`${URL}?lang=en`);
+await mob.waitForTimeout(3000);
+const edition = () => mob.evaluate(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').edition);
+
+await step('phone: the card and the whole hand fit above the Save bar', async () => {
+  const bar = await mob.locator('.sec-export').boundingBox();
+  for (const sel of ['#cardSlot', '#hand', '#handCaption']) {
+    const b = await mob.locator(sel).boundingBox();
+    expect(b.y >= 0 && b.y + b.height <= bar.y + 1, `${sel} is not on the first screen above Save`);
+  }
+  expect((await mob.evaluate(() => document.documentElement.scrollWidth)) <= 390, 'the page scrolls sideways');
+});
+
+await step('phone: flicking the card or tapping ‹ › steps through the hand; only a sideways flick does', async () => {
+  const cdp = await phone.newCDPSession(mob);
+  const b = await mob.locator('#cardSlot').boundingBox();
+  const flick = async (dx, dy) => {
+    const x = b.x + b.width / 2;
+    const y = b.y + b.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 6; i++) {
+      await mob.waitForTimeout(16);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (dx * i) / 6, y: y + (dy * i) / 6 }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await mob.waitForTimeout(500);
+    return edition();
+  };
+  const hand = await mob.locator('.hand-slot:not([hidden])').evaluateAll((els) => els.map((el) => el.dataset.id));
+  const at = hand.indexOf(await edition());
+  expect((await flick(-120, 6)) === hand[(at + 1) % hand.length], 'a flick left did not deal the next card');
+  expect((await flick(120, -4)) === hand[at], 'a flick right did not go back');
+  expect((await flick(8, 130)) === hand[at], 'a vertical drag changed the finish');
+  await mob.click('#handNext');
+  expect((await edition()) === hand[(at + 1) % hand.length], 'the › step did not deal the next card');
+  await mob.click('#handPrev');
+  expect((await edition()) === hand[at], 'the ‹ step did not go back');
+});
+
+await step('phone: tilting the device is taken without errors', async () => {
+  await mob.evaluate(async () => {
+    for (let i = 0; i < 20; i++) {
+      window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: 40 + i, gamma: i - 10 }));
+      await new Promise((r) => setTimeout(r, 16));
+    }
+  });
+});
+
+await step('phone: ?quality pins the drawing level and lowers the card resolution', async () => {
+  const width = async (q) => {
+    await mob.goto(`${URL}?lang=en&quality=${q}`);
+    await mob.waitForTimeout(1500);
+    const level = await mob.evaluate(() => document.documentElement.dataset.quality);
+    expect(level === String(q), `expected data-quality ${q}, got ${level}`);
+    return mob.evaluate(() => document.getElementById('cards').width);
+  };
+  const full = await width(0);
+  const low = await width(3);
+  expect(low < full * 0.6, `the lowest level drew ${low}px wide, full drew ${full}px`);
+});
+
 await browser.close();
 console.log(results.join('\n'));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
