@@ -1,4 +1,4 @@
-// Metal & Gem pack: Relief, Gold and Crystal (the showpiece). See docs/packs.md.
+// Metal & Gem pack: Relief, Gold, Platinum, Cosmo Holo and Crystal (the showpiece). See docs/packs.md.
 import { RELIEF_GLSL, ReliefGL } from '../../relief';
 import { PLATINUM_GLSL } from '../platinum';
 import { COSMOHOLO_GLSL } from '../cosmoholo';

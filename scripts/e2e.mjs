@@ -267,7 +267,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.up();
   await phase('deck');
   expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
-  for (const name of ['Relief', 'Gold']) {
+  for (const name of ['Relief', 'Gold', 'Platinum', 'Cosmo Holo']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
@@ -289,14 +289,14 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   }
   await page.keyboard.press('ArrowRight');
   await phase('haul');
-  expect((await page.locator('.pk-name').count()) === 3, 'the haul does not show all three');
+  expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
   await page.click('.pk-try');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
   const hand = (await state()).hand;
   expect(hand.includes('crystal') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
   expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '3', 'the deck does not hold Relief, Gold and the swapped-out Glitch');
+  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck does not hold the other four Metal finishes and the swapped-out Glitch');
 });
 
 await step('the deck builder: one tap moves a card, a full hand gives up its last card, undo, drag, reset', async () => {
@@ -310,7 +310,7 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   // Out of the hand: its slot stays open, and the next card goes there.
   await page.click('.db-hand .db-card[data-id=holo]');
   expect((await count()) === '6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
-  expect((await page.textContent('#deckBtn .deck-count')) === '4', 'the deck count did not rise');
+  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck count did not rise');
   await page.click('.db-grid .db-card[data-id=relief]');
   expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
   // Full: the last card that is not Base gives way.
@@ -371,7 +371,7 @@ await step('held still, the pack opens with a button and the haul fades in', asy
   await page.click('.pk-name >> nth=0');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
-  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck does not hold both packs');
+  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the deck does not hold both packs');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 });
 
@@ -401,7 +401,7 @@ await step('finishes unlocked by the old support links carry over as opened pack
   expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
   const after = await state();
   expect(after.hand.length === 7 && after.hand.includes('shallows') && !('drawn' in after), `the drawn card did not move into the hand: ${after.hand}`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the carried-over packs are not in the deck');
+  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the carried-over packs are not in the deck');
 });
 
 await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {

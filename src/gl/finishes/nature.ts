@@ -1,4 +1,4 @@
-// Nature pack: Sakura, Frost and Magma (the showpiece). See docs/packs.md.
+// Nature pack: Sakura, Frost, Stardust, Snow Globe and Magma (the showpiece). See docs/packs.md.
 import { STARDUST_GLSL } from '../stardust';
 import { SnowGlobe, SNOWGLOBE_GLSL, SNOWGLOBE_SHADER } from '../snowglobe';
 import type { FinishModule } from './types';

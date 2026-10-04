@@ -1,4 +1,4 @@
-// Studio pack: Halftone, Warmth and Shadowbox (the showpiece). See docs/packs.md.
+// Studio pack: Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular and Shadowbox (the showpiece). See docs/packs.md.
 // Shadowbox's sheets are textures of the card renderer itself (the depth code sets them).
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { HeatLayer } from '../../touch/layer';

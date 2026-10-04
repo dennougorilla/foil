@@ -1,4 +1,4 @@
-// Light pack: Galaxy, Aurora and Shallows (the showpiece). See docs/packs.md.
+// Light pack: Galaxy, Aurora, Glow, Blacklight and Shallows (the showpiece). See docs/packs.md.
 import { SHALLOWS_GLSL } from '../shallows';
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { GLOW_GLSL } from '../../touch/glow';

@@ -1,4 +1,4 @@
-// Flip Lenticular (beta): a two-picture flip card under a sheet of fine vertical lenses. Spliced into
+// Flip Lenticular: a two-picture flip card under a sheet of fine vertical lenses. Spliced into
 // CARD_FS after COMMON and TUNE_GLSL, so face/luma/tuneUnpattern/uLight are in scope.
 //
 // Under each lens lie thin strips of both pictures. The lens magnifies the strip that sits in
