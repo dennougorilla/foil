@@ -602,6 +602,86 @@ await step('phone: ?quality pins the drawing level and lowers the card resolutio
   expect(low < full * 0.6, `the lowest level drew ${low}px wide, full drew ${full}px`);
 });
 
+await step('Raden and Opal change the picture clearly, keep it, and answer the tilt', async () => {
+  // Held still (reduced motion), so two shots differ only by the finish and the pointer.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    localStorage.clear();
+    // The Supporter pack opened, with Raden and Opal in the hand.
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['supporter'], supporter: true }));
+    localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'raden', 'opal'] }));
+    sessionStorage.setItem('seeded', '1');
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(2000);
+  const card = p.locator('#cardSlot');
+  // Luminance and colour of the middle of the art window, read back from a screenshot.
+  const art = async (id, fx, fy) => {
+    await p.$eval(`.hand-slot[data-id=${id}]`, (el) => el.click());
+    const b = await card.boundingBox();
+    await p.mouse.move(b.x + b.width * fx, b.y + b.height * fy, { steps: 4 });
+    await p.waitForTimeout(900);
+    const png = (await p.screenshot({ clip: { x: b.x + b.width * 0.15, y: b.y + b.height * 0.12, width: b.width * 0.7, height: b.height * 0.66 } })).toString('base64');
+    return p.evaluate(async (src) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${src}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+      c.drawImage(img, 0, 0);
+      return Array.from(c.getImageData(0, 0, img.width, img.height).data);
+    }, png);
+  };
+  const diff = (a, b) => {
+    let s = 0;
+    for (let i = 0; i < a.length; i += 4) s += (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 765;
+    return s / (a.length / 4);
+  };
+  // How coloured the change is: a grey haze scores 0, a shift into a strong hue scores high.
+  const tint = (a, b) => {
+    let s = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      const d = [a[i] - b[i], a[i + 1] - b[i + 1], a[i + 2] - b[i + 2]];
+      s += (Math.max(...d) - Math.min(...d)) / 255;
+    }
+    return s / (a.length / 4);
+  };
+  const corr = (a, b) => {
+    const la = [], lb = [];
+    for (let i = 0; i < a.length; i += 4) {
+      la.push(a[i] * 0.299 + a[i + 1] * 0.587 + a[i + 2] * 0.114);
+      lb.push(b[i] * 0.299 + b[i + 1] * 0.587 + b[i + 2] * 0.114);
+    }
+    const n = la.length, ma = la.reduce((x, y) => x + y) / n, mb = lb.reduce((x, y) => x + y) / n;
+    let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < n; i++) {
+      sab += (la[i] - ma) * (lb[i] - mb);
+      saa += (la[i] - ma) ** 2;
+      sbb += (lb[i] - mb) ** 2;
+    }
+    return sab / Math.sqrt(saa * sbb);
+  };
+  for (const id of ['raden', 'opal']) {
+    const base = await art('base', 0.5, 0.5);
+    const front = await art(id, 0.5, 0.5);
+    const baseA = await art('base', 0.1, 0.12);
+    const tiltA = await art(id, 0.1, 0.12);
+    const baseB = await art('base', 0.92, 0.9);
+    const tiltB = await art(id, 0.92, 0.9);
+    // How much colour the finish brings to the picture, and how much of it changes between two tilts.
+    const strength = tint(front, base);
+    const keep = corr(front, base);
+    const layerA = tiltA.map((v, i) => v - baseA[i]);
+    const layerB = tiltB.map((v, i) => v - baseB[i]);
+    const swing = diff(layerA.map((v) => v + 128), layerB.map((v) => v + 128));
+    console.log(`  ${id} strength ${strength.toFixed(3)} keep ${keep.toFixed(2)} swing ${swing.toFixed(3)}`);
+    // The faint v0.9.1 versions scored about 0.1 strength and 0.03–0.05 swing here.
+    expect(strength > 0.2, `${id} barely changes the picture (${strength.toFixed(3)})`);
+    expect(keep > 0.6, `${id} loses the picture (${keep.toFixed(2)})`);
+    expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
+  }
+  await still.close();
+});
+
 await browser.close();
 console.log(results.join('\n'));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
