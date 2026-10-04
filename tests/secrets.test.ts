@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BETA_EDITIONS, mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret, secretEditions } from '../src/secrets.ts';
-import { EDITIONS } from '../src/editions.ts';
+import { EDITIONS, editionById } from '../src/editions.ts';
 
 const SECRETS = ['gold', 'relief', 'kintsugi'] as const;
 // The same list the app builds in src/sponsor.ts.
@@ -54,7 +54,7 @@ test('a retired secret (Eclipse) saved by an earlier version is ignored and neve
 });
 
 test('a beta finish (Cosmo Holo) is neither open nor a secret, so no unlock can draw it', () => {
-  assert.deepEqual(BETA_EDITIONS, ['cosmoholo']);
+  assert.ok(BETA_EDITIONS.includes('cosmoholo'));
   assert.ok(EDITIONS.some((e) => e.id === 'cosmoholo'));
   assert.ok(!OPEN_EDITIONS.includes('cosmoholo'));
   assert.ok(!SECRET_EDITIONS.includes('cosmoholo'));
@@ -70,4 +70,18 @@ test('Stained Glass joins as a beta finish: a secret, out of the hand until it i
   const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
   assert.ok((secrets as string[]).includes('stainedglass'));
   assert.deepEqual(parseUnlocked('["stainedglass"]', secrets), ['stainedglass']);
+});
+
+test('a beta finish (3D Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
+  assert.ok(BETA_EDITIONS.includes('lenticular3d'));
+  assert.ok(EDITIONS.some((e) => e.id === 'lenticular3d'));
+  assert.ok(!OPEN_EDITIONS.includes('lenticular3d'));
+  assert.ok(!SECRET_EDITIONS.includes('lenticular3d'));
+  assert.deepEqual(parseUnlocked('["lenticular3d","opal"]', SECRET_EDITIONS), ['opal']);
+  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticular3d');
+});
+
+test('Shadowbox and 3D Lenticular read the picture depth; no other finish starts the depth model', () => {
+  assert.deepEqual(EDITIONS.filter((e) => e.depth).map((e) => e.id), ['shadowbox', 'lenticular3d']);
+  assert.equal(editionById('lenticular3d').shader, 74);
 });

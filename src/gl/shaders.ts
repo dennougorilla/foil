@@ -12,6 +12,7 @@ import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { GLOW_GLSL } from '../touch/glow';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
+import { LENTICULAR3D_GLSL } from './lenticular3d';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -411,6 +412,7 @@ ${SPONSOR_GLSL}
 ${TOUCH_GLSL}
 ${GLOW_GLSL}
 ${SHADOWBOX_GLSL}
+${LENTICULAR3D_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -469,6 +471,7 @@ void main() {
   else if (e == 26) col = stainedGlass(c, uv, uTilt, L, m.r);
   else if (e == 70) col = glow(c, uv, L, m.r);
   else if (e == 72) col = blacklight(c, uv, L, lod, m);
+  else if (e == 74) col = lenticular3d(c, uv, uTilt, lod);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
