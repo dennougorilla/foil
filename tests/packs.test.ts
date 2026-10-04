@@ -40,7 +40,7 @@ test('the four theme packs and the supporter pack, showpiece last', () => {
     metal: ['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
     light: ['galaxy', 'aurora', 'shallows'],
     nature: ['sakura', 'frost', 'magma'],
-    studio: ['halftone', 'warmth', 'shadowbox'],
+    studio: ['halftone', 'warmth', 'stainedglass', 'shadowbox'],
     supporter: ['opal', 'raden', 'kintsugi'],
   });
   assert.deepEqual(PACKS.filter((p) => p.supporter).map((p) => p.id), ['supporter']);
