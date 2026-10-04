@@ -244,6 +244,18 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   expect((await page.textContent('.pk-label b')) === '？？？', 'the showpiece showed its name before it was turned over');
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Crystal', null, { timeout: 15000 });
+  // Under the card, top to bottom and never overlapping, even on a low screen: progress and tag,
+  // name, line, next-step button.
+  for (const [w, h] of [[1367, 664], [1440, 900]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(500);
+    const box = await page.evaluate(() => {
+      const r = (q) => document.querySelector(q).getBoundingClientRect();
+      return { tags: r('.pk-tags'), name: r('.pk-label b'), desc: r('.pk-label small'), hint: r('.pk-hint'), vh: innerHeight };
+    });
+    const ok = box.tags.bottom <= box.name.top && box.name.bottom <= box.desc.top && box.desc.bottom <= box.hint.top && box.hint.bottom <= box.vh;
+    expect(ok, `the words under the card overlap at ${w}x${h}: ${JSON.stringify(box)}`);
+  }
   await page.keyboard.press('ArrowRight');
   await phase('haul');
   expect((await page.locator('.pk-name').count()) === 3, 'the haul does not show all three');

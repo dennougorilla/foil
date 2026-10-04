@@ -1268,3 +1268,27 @@
 .pk[data-phase='pack'] .pk-title small {
   display: none;
 }
+
+/* The words under a card: one line each, never wrapping into the button below. */
+.pk-label {
+  gap: 4px;
+}
+
+.pk-label b {
+  line-height: 1.15;
+}
+
+.pk-label small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* Below the words, a quiet button-like line for the next step. */
+.pk[data-phase='deck'] .pk-hint {
+  max-width: min(92vw, 520px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

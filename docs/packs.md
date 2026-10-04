@@ -175,6 +175,11 @@ follows the sound toggle.
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
 | 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Use Magma" (the showpiece by name) — closes, sends the other cards into the deck and swaps this one into the hand for its last card that is not Base, and onto the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "To the deck". Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
 
+**Under a card** (beats 5–6) the words stand in one column, never overlapping: progress and tag,
+the finish's name, its line (one line, cut with … when long), then the next-step button. The card
+is sized to leave room for that column; on a low screen (664 px, a phone on its side) the card gets
+smaller instead of the words moving onto each other.
+
 **Skip** (「結果へ」, small in the top corner, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
 A replay starts at beat 0 too. Escape closes from the haul and skips the reveal from anywhere else; the
 pack counts as opened from the rip (or Skip) on, so closing before the rip leaves it sealed.

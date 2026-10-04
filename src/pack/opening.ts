@@ -249,15 +249,28 @@ export function openPack(o: OpeningOptions) {
   let packH = 0;
   let cx = 0;
   let cy = 0;
+  /**
+   * Room kept under the card for its words and the next-step button, stacked without overlap:
+   * progress and tag, the finish's name, its line, the button. Measured once shown (see overlays).
+   */
+  let below = 0;
+  const HEADER = 60;
   const layout = () => {
     vw = innerWidth;
     vh = innerHeight;
-    cardH = Math.min(vh * 0.54, (vw - 32) * 0.62 * 1.4, 540);
+    const reserve = below || (vw < 640 ? 160 : 140);
+    // The card (with room to grow 10 % as it is revealed, and the stack's steps) and the column under
+    // it fit between the header and the bottom; the pack (1.25 card heights) and its one line fit too.
+    const forDeck = (vh - 12 - HEADER - 28 - reserve) / 1.18;
+    const forPack = (vh - HEADER - 64) / 1.26;
+    cardH = Math.max(80, Math.min(vh * 0.54, (vw - 32) * 0.62 * 1.4, 540, forDeck, forPack));
     cardW = (cardH * 5) / 7;
     packW = cardW * 1.08;
     packH = (packW * PACK_H) / PACK_W;
     cx = vw / 2;
-    cy = vh * 0.45;
+    // Centre what is left over, never pushing the stack under the header.
+    const slack = Math.max(0, Math.min(forDeck - cardH, forPack - cardH)) * 1.18;
+    cy = HEADER + 0.63 * cardH + slack / 2;
     // The tray: one row on a wide screen, rows of three on a phone; packs at 2 : 3.
     const count = o.shop?.length ?? 0;
     if (count) {
@@ -1332,8 +1345,18 @@ export function openPack(o: OpeningOptions) {
     if (showGuide) guideEl.style.transform = `translate(${(pk.x.x - (packW * s) / 2 + 14).toFixed(1)}px, ${ty.toFixed(1)}px) rotate(${pk.rz.x.toFixed(4)}rad)`;
     guideEl.style.width = `${(packW * s - 28).toFixed(1)}px`;
     guideEl.style.setProperty('--run', `${(packW * s - 54).toFixed(0)}px`);
-    const hy = phase === 'pack' || phase === 'load' ? pk.y.x + (packH * s) / 2 + 36 : cy + cardH / 2 + 38 + labelEl.offsetHeight;
-    root.style.setProperty('--hint-y', `${Math.min(hy, vh - 120).toFixed(0)}px`);
+    // Under the card: the words, then 12 px, then the button. Laid out, never clamped onto each other;
+    // if the column outgrows the room kept for it, the card is made smaller instead.
+    const labelTop = cy + cardH * 0.55 + 14;
+    const hy = phase === 'pack' || phase === 'load' ? pk.y.x + (packH * s) / 2 + 36 : labelTop + labelEl.offsetHeight + 12;
+    root.style.setProperty('--hint-y', `${hy.toFixed(0)}px`);
+    if (phase === 'deck') {
+      const need = labelEl.offsetHeight + 12 + Math.max(hintEl.offsetHeight, 40) + 4;
+      if (need > (below || 0) + 1) {
+        below = need;
+        layout();
+      }
+    }
     const showCut = (cut.active || cut.draining || phase === 'rip') && cut.max > cut.min;
     cutEl.classList.toggle('is-on', showCut);
     if (showCut) {
@@ -1357,7 +1380,7 @@ export function openPack(o: OpeningOptions) {
       sweepEl.style.setProperty('--w', `${(cardW * c.s.x).toFixed(0)}px`);
       sweepEl.style.setProperty('--h', `${(cardH * c.s.x).toFixed(0)}px`);
     }
-    labelEl.style.top = `${(cy + cardH / 2 + 26).toFixed(0)}px`;
+    labelEl.style.top = `${(cy + cardH * 0.55 + 14).toFixed(0)}px`;
     if (phase === 'haul') {
       const names = root.querySelectorAll<HTMLElement>('.pk-name');
       haulAt.forEach((a, i) => {
