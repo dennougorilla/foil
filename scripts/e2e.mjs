@@ -309,6 +309,42 @@ await step('the trading-card layout: the message fills the effect box, and each 
   await page.keyboard.press('Escape');
 });
 
+await step('free placement: drag the words on the card, a tap still opens their print, Auto puts them back', async () => {
+  await tab('text');
+  await page.fill('#messageInput', 'Happy\nBirthday');
+  const auto = await savePng();
+  await page.click('.msg-arrange [data-v=free]');
+  await page.waitForFunction(() => !!JSON.parse(localStorage.getItem('foil:v1')).placements?.message, null, { timeout: 5000 });
+  const p0 = (await state()).placements.message;
+  const b = await page.locator('#cardSlot').boundingBox();
+  const sx = b.x + b.width * p0.x;
+  const sy = b.y + b.height * p0.y;
+  // A drag moves the words and holds the card still; a flick never reaches the card.
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  await page.mouse.move(sx - 20, sy - 30, { steps: 4 });
+  await page.mouse.move(sx - b.width * 0.15, sy - b.height * 0.35, { steps: 10 });
+  expect(await page.evaluate(() => document.body.classList.contains('is-arranging')), 'the card does not hold still while words are dragged');
+  await page.mouse.up();
+  const p1 = (await state()).placements.message;
+  expect(p1.y < p0.y - 0.15 && p1.x < p0.x - 0.05, `the message did not follow the drag (${JSON.stringify(p0)} → ${JSON.stringify(p1)})`);
+  expect(p1.x > 0 && p1.x < 1 && p1.y > 0 && p1.y < 1, 'the message left the card');
+  // Exports draw it where it now is.
+  const moved = await savePng();
+  const [top] = await pngDiff(auto, moved, [[0.1, 0.1, 0.9, 0.35]]);
+  expect(top > 1, `the export does not show the moved message (${top.toFixed(1)})`);
+  // A short tap opens its print menu instead of moving it.
+  await page.mouse.click(b.x + b.width * p1.x, b.y + b.height * p1.y);
+  await page.waitForTimeout(200);
+  expect(await page.isVisible('.pp'), 'a tap on the words did not open their print menu');
+  expect(JSON.stringify((await state()).placements.message) === JSON.stringify(p1), 'a tap moved the words');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.click('.msg-free .link');
+  const s = await state();
+  expect(s.arrange === 'auto' && !s.placements.message, 'Back to Auto kept the free place');
+});
+
 await step('finish area tab and brush', async () => {
   await tab('range');
   await page.click('#pane-range .region-btn[data-v=art]');
@@ -577,7 +613,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const back = document.createElement('canvas');
     face.width = mask.width = back.width = 900;
     face.height = mask.height = back.height = 1260;
-    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '' });
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
     drawBack(back);
     // A flat card (no idle motion) so the art and the nameplate land on known pixels.
     const W = 360;

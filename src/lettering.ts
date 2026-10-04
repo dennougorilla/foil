@@ -228,6 +228,18 @@ export interface TextRun {
   y: number;
   /** The name only: a face row of bare stock just above it (foil sweeps in over it). */
   stock?: number;
+  /** A freely placed piece is turned by `rot` radians about (cx, cy); x and y are before the turn. */
+  rot?: number;
+  cx?: number;
+  cy?: number;
+}
+
+/** Turns a context about a run's pivot, if it has a turn. */
+export function turnFor(ctx: CanvasRenderingContext2D, r: Pick<TextRun, 'rot' | 'cx' | 'cy'>) {
+  if (!r.rot) return;
+  ctx.translate(r.cx!, r.cy!);
+  ctx.rotate(r.rot);
+  ctx.translate(-r.cx!, -r.cy!);
 }
 
 type Box = { x0: number; y0: number; x1: number; y1: number };
@@ -256,9 +268,24 @@ function paintMap(W: number, H: number, runs: TextRun[], radius: number) {
   const parts = new Map<TextField, Box>();
   for (const r of runs) {
     glyphCtx.font = r.font;
+    glyphCtx.save();
+    turnFor(glyphCtx, r);
     glyphCtx.fillText(r.text, r.x, r.y);
+    glyphCtx.restore();
     const w = glyphCtx.measureText(r.text).width;
-    const b = { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + w, y1: r.y + r.size * 0.75 };
+    let b = { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + w, y1: r.y + r.size * 0.75 };
+    if (r.rot) {
+      // The box that holds the turned line.
+      const c = Math.cos(r.rot);
+      const s = Math.sin(r.rot);
+      const pts = [
+        [b.x0, b.y0],
+        [b.x1, b.y0],
+        [b.x0, b.y1],
+        [b.x1, b.y1],
+      ].map(([x, y]) => [r.cx! + (x - r.cx!) * c - (y - r.cy!) * s, r.cy! + (x - r.cx!) * s + (y - r.cy!) * c]);
+      b = { x0: Math.min(...pts.map((q) => q[0])), y0: Math.min(...pts.map((q) => q[1])), x1: Math.max(...pts.map((q) => q[0])), y1: Math.max(...pts.map((q) => q[1])) };
+    }
     const p = parts.get(r.part);
     parts.set(r.part, p ? { x0: Math.min(p.x0, b.x0), y0: Math.min(p.y0, b.y0), x1: Math.max(p.x1, b.x1), y1: Math.max(p.y1, b.y1) } : b);
   }

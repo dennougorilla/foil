@@ -4,6 +4,7 @@ import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Lettering } from './lettering';
 import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
+import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
 import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
@@ -37,6 +38,10 @@ export interface State extends RangeColorState {
   cardType: string;
   /** Pieces of text printed in their own lettering (style and foil only); the rest follow `text`. */
   prints: FieldPrints;
+  /** Words at their preset places, or placed freely (docs/arrange.md). */
+  arrange: Arrange;
+  /** Where freely placed words sit (used while `arrange` is 'free'). */
+  placements: Placements;
   /** Index of the sample in use, or -1 when showing the person's own image. */
   sample: number;
   crop: Crop;
@@ -80,6 +85,8 @@ const PERSIST: (keyof State)[] = [
   'layout',
   'cardType',
   'prints',
+  'arrange',
+  'placements',
   'sample',
   'crop',
   'tune',
@@ -112,6 +119,8 @@ export function createStore() {
     layout: 'classic',
     cardType: '',
     prints: {},
+    arrange: 'auto',
+    placements: {},
     sample: 0,
     crop: { zoom: 1, x: 0.5, y: 0.5 },
     loading: false,
@@ -135,6 +144,8 @@ export function createStore() {
     if (!CARD_LAYOUTS.includes(state.layout)) state.layout = 'classic';
     state.cardType = typeof state.cardType === 'string' ? state.cardType.slice(0, CARD_TYPE_MAX) : '';
     state.prints = normalizeFieldPrints(state.prints);
+    if (!ARRANGES.includes(state.arrange)) state.arrange = 'auto';
+    state.placements = normalizePlacements(state.placements);
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';

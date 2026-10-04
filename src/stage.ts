@@ -4,7 +4,7 @@ import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
-import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
+import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardPoint, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
 import './stage-phone.css';
@@ -407,6 +407,18 @@ export class Stage {
       // A keyboard press has no point on the card.
       if (this.pose && e.detail > 0) this.o.onTapCard?.(cardUv(e.clientX - this.canvasRect.left, e.clientY - this.canvasRect.top, this.pose), e.clientX, e.clientY);
     });
+  }
+
+  /** The point of the card's face (uv) under a point of the page, from the last frame's pose. */
+  uvAt(x: number, y: number): [number, number] | null {
+    return this.pose ? cardUv(x - this.canvasRect.left, y - this.canvasRect.top, this.pose) : null;
+  }
+
+  /** The point of the page over a point of the card's face (uv). */
+  pageAt(u: number, v: number): [number, number] | null {
+    if (!this.pose) return null;
+    const [x, y] = cardPoint(u, v, this.pose);
+    return [x + this.canvasRect.left, y + this.canvasRect.top];
   }
 
   juice(strength = 1) {
