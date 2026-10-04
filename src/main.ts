@@ -89,7 +89,10 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
-    onFlick: (dir) => stepEdition(dir),
+    onFlick: (dir) => {
+      store.set({ flicked: true });
+      stepEdition(dir);
+    },
     // Tapping words on the card opens their own print.
     onTapCard: (uv, x, y) => {
       const field = fieldAt(uv);
@@ -829,6 +832,15 @@ function stepEdition(dir: 1 | -1) {
   const id = stepIn(hand(), store.get().edition, dir);
   if (id) selectEdition(id);
 }
+
+/** The phone's note that a flick changes the finish: until the first flick, and not on a finish a
+ *  finger strokes instead (see stage-phone.css). */
+function syncFlickHint() {
+  const s = store.get();
+  const ed = editionById(s.edition);
+  $('flickHint').hidden = s.flicked || !!ed.touch || !!ed.torch;
+}
+syncFlickHint();
 
 // Phones step through the hand from beside the finish's name too (see stage-phone.css).
 $('handPrev').addEventListener('click', () => stepEdition(-1));
@@ -1830,6 +1842,7 @@ store.on((s, changed) => {
     depth?.update(face, artKey());
   }
   if (changed.has('layer2')) wakePacks();
+  if (changed.has('edition') || changed.has('flicked')) syncFlickHint();
   if (changed.has('hand')) {
     wakePacks();
     stage.syncHand();

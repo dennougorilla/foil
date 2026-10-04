@@ -80,7 +80,9 @@
       <main class="stage" id="stage">
         <canvas id="cards" aria-hidden="true"></canvas>
         <div class="showcase">
-          <button class="card-slot" id="cardSlot" type="button"></button>
+          <button class="card-slot" id="cardSlot" type="button">
+            <span class="flick-hint" id="flickHint" aria-hidden="true" hidden><svg viewBox="0 0 16 16"><path d="M9 2h2v2H9zM7 4h2v2H7zM5 6h2v4H5zm2 4h2v2H7zm2 2h2v2H9z" /></svg><b data-t="flickHint"></b><svg viewBox="0 0 16 16"><path d="M5 2h2v2H5zm2 2h2v2H7zm2 2h2v4H9zm-2 4h2v2H7zm-2 2h2v2H5z" /></svg></span>
+          </button>
           <button class="btn btn-paper stage-pick" id="pickBtnStage" type="button">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2 10v3.5h12V10" /></svg>
             <span class="btn-text"><b data-t="pick"></b></span>

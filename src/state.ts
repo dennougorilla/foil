@@ -69,6 +69,8 @@ export interface State extends RangeColorState {
   exportMotion: ExportMotion;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
+  /** True once the card has been flicked to change the finish; the phone's flick hint stops then. */
+  flicked: boolean;
 }
 
 /** Longest type line, in characters. */
@@ -109,6 +111,7 @@ const PERSIST: (keyof State)[] = [
   'gifMatte',
   'exportMotion',
   'text',
+  'flicked',
   ...RANGE_COLOR_PERSIST,
 ];
 
@@ -125,6 +128,7 @@ const APP_KEYS: (keyof State)[] = [
   'gifClear',
   'gifMatte',
   'exportMotion',
+  'flicked',
   'rangeShow',
   'brushMode',
   'brushSize',
@@ -174,6 +178,7 @@ const defaults = (): State => ({
   gifMatte: 'auto',
   exportMotion: 'stage',
   text: { ...DEFAULT_LETTERING },
+  flicked: false,
   ...RANGE_COLOR_DEFAULTS,
 });
 
@@ -195,6 +200,7 @@ function sanitize(state: State) {
   if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
   state.saveOptsOpen = state.saveOptsOpen === true;
   state.gifClear = state.gifClear === true;
+  state.flicked = state.flicked === true;
   if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
   if (!EXPORT_MOTIONS.includes(state.exportMotion)) state.exportMotion = 'stage';
   Object.assign(state, sanitizeRangeColors(state));
