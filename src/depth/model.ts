@@ -1,4 +1,4 @@
-// The monocular depth model behind the Shadowbox and Lenticular finishes, run inside the depth worker.
+// The monocular depth model behind the Shadowbox and 3D Lenticular finishes, run inside the depth worker.
 // Depth Anything V2 Small (Apache-2.0), as ONNX from Hugging Face's onnx-community, pinned to one
 // revision and checked against its published SHA-256 before it is used. It is fetched once on
 // first use and kept in the browser's Cache Storage; the picture itself never leaves the device.

@@ -1,4 +1,4 @@
-// Keeps the Shadowbox sheets (and the depth Lenticular reads from them) in step with the
+// Keeps the Shadowbox sheets (and the depth 3D Lenticular reads from them) in step with the
 // picture. Work starts only once a finish that reads depth is chosen: the art window goes to the depth worker, which answers with a quick cut from colour
 // and then, when the model can run, a better one. The sheets lie down while a new cut is made
 // and stand up again when it lands.

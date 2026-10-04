@@ -69,7 +69,7 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
-// Shadowbox and Lenticular read the art's depth; it only starts work once one is chosen.
+// Shadowbox and 3D Lenticular read the art's depth; it only starts work once one is chosen.
 const depth = mountShadowDepth({
   store,
   cards: stage.cards,

@@ -7,7 +7,7 @@ import { SHALLOWS_GLSL } from './shallows';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
-import { LENTICULAR_GLSL } from './lenticular';
+import { LENTICULAR3D_GLSL } from './lenticular3d';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -402,7 +402,7 @@ ${RELIEF_GLSL}
 ${SPONSOR_GLSL}
 ${TOUCH_GLSL}
 ${SHADOWBOX_GLSL}
-${LENTICULAR_GLSL}
+${LENTICULAR3D_GLSL}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -456,7 +456,7 @@ void main() {
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
-  else if (e == 74) col = lenticular(c, uv, uTilt, lod);
+  else if (e == 74) col = lenticular3d(c, uv, uTilt, lod);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;

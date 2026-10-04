@@ -53,20 +53,20 @@ test('a retired secret (Eclipse) saved by an earlier version is ignored and neve
   for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(secrets, [], Math.random), 'eclipse');
 });
 
-test('a beta finish (Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
-  assert.deepEqual(BETA_EDITIONS, ['lenticular']);
-  assert.ok(EDITIONS.some((e) => e.id === 'lenticular'));
-  assert.ok(!OPEN_EDITIONS.includes('lenticular'));
-  assert.ok(!SECRET_EDITIONS.includes('lenticular'));
-  assert.deepEqual(parseUnlocked('["lenticular","opal"]', SECRET_EDITIONS), ['opal']);
-  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticular');
+test('a beta finish (3D Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
+  assert.deepEqual(BETA_EDITIONS, ['lenticular3d']);
+  assert.ok(EDITIONS.some((e) => e.id === 'lenticular3d'));
+  assert.ok(!OPEN_EDITIONS.includes('lenticular3d'));
+  assert.ok(!SECRET_EDITIONS.includes('lenticular3d'));
+  assert.deepEqual(parseUnlocked('["lenticular3d","opal"]', SECRET_EDITIONS), ['opal']);
+  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticular3d');
 });
 
 test('every finish past the open ones that is not beta is a secret, in hand order', () => {
-  assert.deepEqual(secretEditions(['base', 'gold', 'lenticular', 'relief']), ['gold', 'relief']);
+  assert.deepEqual(secretEditions(['base', 'gold', 'lenticular3d', 'relief']), ['gold', 'relief']);
 });
 
-test('Shadowbox and Lenticular read the picture depth; no other finish starts the depth model', () => {
-  assert.deepEqual(EDITIONS.filter((e) => e.depth).map((e) => e.id), ['shadowbox', 'lenticular']);
-  assert.equal(editionById('lenticular').shader, 74);
+test('Shadowbox and 3D Lenticular read the picture depth; no other finish starts the depth model', () => {
+  assert.deepEqual(EDITIONS.filter((e) => e.depth).map((e) => e.id), ['shadowbox', 'lenticular3d']);
+  assert.equal(editionById('lenticular3d').shader, 74);
 });
