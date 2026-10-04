@@ -1,6 +1,8 @@
-// The binder: Keep puts the card on the stage into it, and it opens as pages of nine pockets
-// holding still thumbnails (plain images, no WebGL). Picking cards lifts them; Play puts one back
-// on the stage, Discard throws the picked ones away. Loaded the first time it is used; see docs/binder.md.
+// The binder: Keep puts the card on the stage into it, and it opens like a real one, six pages of
+// nine pockets holding still thumbnails (plain images, no WebGL). Cards stay in the pocket they are
+// put in and are dragged to any other; pages turn over at the rings. Picking cards lifts them; To
+// stage puts one back on the stage, Discard (or a card's own ×) throws cards away, with Undo.
+// Loaded the first time it is used; see docs/binder.md.
 
 import './binder.css';
 import type { Card } from '../state';
@@ -8,14 +10,17 @@ import type { Dict, Lang } from '../i18n';
 import { renderStill, type ExportInput } from '../exporter';
 import { fitIn, opaqueBounds } from './fit';
 import { formatBytes } from '../anim/apngUi';
-import { discard, fillOf, kept, list, put, restore, stored, thumb, type Kept, type Meta, type Stored } from './db';
-import { MAX_BYTES, MAX_CARDS, pageCount, pocketsOn, refusal } from './limits';
+import { discard, fillOf, kept, list, place, put, restore, stored, thumb, type Kept, type Meta, type Stored } from './db';
+import { arrange, firstFree, layout, MAX_BYTES, MAX_CARDS, PAGES, PER_PAGE, pocketsOn, refusal, swap, type Layout } from './limits';
+
+type Placed = Meta & { slot: number };
 
 const TEXT = {
   ja: {
     title: 'バインダー',
-    hint: 'クリックで選ぶ・ダブルクリックですぐステージへ',
-    hintTouch: 'タップで選んで「ステージに出す」',
+    hint: 'クリックで選ぶ・ドラッグで好きなポケットへ・ダブルクリックですぐステージへ',
+    hintTouch: 'タップで選ぶ・長押しで持ち上げて好きなポケットへ',
+    moved: '並べ替えました',
     pickedOne: '{card}・{date} にしまったカード',
     pickedMany: '{n} 枚を選択中・ステージに出せるのは 1 枚です',
     empty: 'まだ空です。カードができたら「しまう」で入れましょう',
@@ -46,8 +51,9 @@ const TEXT = {
   },
   en: {
     title: 'Binder',
-    hint: 'Click to pick · double-click to put it on the stage',
-    hintTouch: 'Tap to pick, then To stage',
+    hint: 'Click to pick · drag to any pocket · double-click to put it on the stage',
+    hintTouch: 'Tap to pick · hold to lift it into any pocket',
+    moved: 'Moved',
     pickedOne: '{card}, kept {date}',
     pickedMany: '{n} picked · only one goes on the stage',
     empty: 'Empty for now. Finish a card, then press Keep.',
@@ -97,15 +103,18 @@ export interface BinderHost {
   /** The person's picture on the card (null for a sample): its still, and its own file when it moves. */
   picture: () => { still: HTMLCanvasElement; file: Blob | null } | null;
   /** Puts a kept card on the stage. */
-  play: (k: Kept) => Promise<void>;
+  play: (k: Kept, id: string) => Promise<void>;
   /** The stage rests while the binder covers it. */
   pause: (on: boolean) => void;
   toast: (msg: string, error?: boolean) => void;
   /** Said to screen readers only: the binder and the chip already show it. */
   announce: (msg: string) => void;
   onCount: (n: number) => void;
-  /** The card on the stage is now in the binder. */
-  onKept: () => void;
+  /** The card on the stage is now in the binder, as this card. */
+  onKept: (id: string) => void;
+  /** Cards were thrown away, or brought back by Undo. */
+  onGone: (ids: string[]) => void;
+  onBack: (ids: string[]) => void;
   sfx: { tick(): void; coin(): void; error(): void; flip(): void };
 }
 
@@ -192,7 +201,8 @@ export function mountBinder(host: BinderHost) {
     };
   }
 
-  async function keep(): Promise<void> {
+  /** Keeps the card on the stage, in pocket `at` when it is empty, else in the first empty one. */
+  async function keep(at?: number): Promise<void> {
     const t = text();
     // The card as it is at the press: edits made while it is being kept don't change it.
     const card = host.card();
@@ -207,11 +217,13 @@ export function mountBinder(host: BinderHost) {
       const bytes = thumb.size + (picture?.size ?? 0);
       const no = refusal(fillOf(metas), bytes);
       if (no) return open(no);
-      const meta: Meta = { id: newId(), at: Date.now(), name: input.name, edition: input.edition.id, bytes };
+      const lay = layout(arrange(metas));
+      const slot = at !== undefined && lay[at] === null ? at : firstFree(lay);
+      const meta: Meta = { id: newId(), at: Date.now(), name: input.name, edition: input.edition.id, bytes, slot };
       await put(meta, thumb, { card, picture });
       const n = metas.length + 1;
       host.onCount(n);
-      host.onKept();
+      host.onKept(meta.id);
       host.sfx.coin();
       // From the stage into the chip; kept from the open binder, it simply lands in its pocket.
       if (!view) fly(thumb);
@@ -228,13 +240,17 @@ export function mountBinder(host: BinderHost) {
     if (view) return void view.refresh(note);
     const t = text();
     const wide = matchMedia('(min-width: 900px) and (min-height: 600px)');
-    let metas: Meta[] = [];
+    /** Every card, each in its own pocket; the layout follows from them. */
+    let metas: Placed[] = [];
+    let lay: Layout = layout([]);
     let spread = 0;
     const picked = new Set<string>();
     const urls = new Map<string, string>();
-    /** Cards discarded in the last few seconds, and the timer that forgets them. */
-    let undoable: Stored[] = [];
+    /** The last change, which the bar over the foot can take back for a few seconds. */
+    let undo: { gone: Stored[] } | { moved: [string, number][] } | null = null;
     let undoTimer = 0;
+    /** A page is being turned (the leaf is in the air). */
+    let turning = false;
 
     const root = document.createElement('div');
     root.className = 'bd';
@@ -250,7 +266,10 @@ export function mountBinder(host: BinderHost) {
           <button class="bd-x" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></button>
         </header>
         <p class="bd-note"></p>
-        <div class="bd-spread"></div>
+        <div class="bd-spread">
+          <i class="bd-edge bd-edge-prev" aria-hidden="true"></i>
+          <i class="bd-edge bd-edge-next" aria-hidden="true"></i>
+        </div>
         <footer class="bd-foot">
           <nav class="bd-nav">
             <button class="bd-turn bd-prev" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2h2v2H9zM7 4h2v2H7zM5 6h2v4H5zm2 4h2v2H7zm2 2h2v2H9z"/></svg></button>
@@ -286,7 +305,8 @@ export function mountBinder(host: BinderHost) {
       return c.toDataURL('image/webp', 0.8);
     };
     const perSpread = () => (wide.matches ? 2 : 1);
-    const spreads = () => Math.ceil(pageCount(metas.length) / perSpread());
+    const spreads = () => PAGES / perSpread();
+    const spreadOf = (slot: number) => Math.floor(slot / PER_PAGE / perSpread());
 
     /** A pocket's thumbnail is read when its page is shown, and kept while the binder is open. */
     async function picture(img: HTMLImageElement, id: string): Promise<boolean> {
@@ -310,9 +330,68 @@ export function mountBinder(host: BinderHost) {
       renderNote();
     }
 
+    function pocketCard(m: Placed): HTMLElement {
+      const editions = host.dict().edition;
+      // The pocket holds the card and, on its corner, a way to throw just this one away.
+      const slot = document.createElement('div');
+      slot.className = 'bd-pocket bd-slot';
+      slot.dataset.slot = String(m.slot);
+      // Its own pocket stays dimmed while it is carried, even after a page turn.
+      slot.classList.toggle('is-lifted', drag?.m.id === m.id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bd-card';
+      b.dataset.id = m.id;
+      b.setAttribute('aria-pressed', String(picked.has(m.id)));
+      const label = fill(t.card, { name: m.name, finish: editions[m.edition] ?? m.edition });
+      b.setAttribute('aria-label', label);
+      b.setAttribute('aria-keyshortcuts', 'Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown Delete');
+      b.title = label;
+      const img = document.createElement('img');
+      img.alt = '';
+      img.decoding = 'async';
+      img.draggable = false;
+      b.append(img);
+      void picture(img, m.id).then((ok) => {
+        if (ok) return;
+        // A thumbnail that can't be read still says which card it is.
+        b.classList.add('is-lost');
+        const lost = document.createElement('span');
+        lost.className = 'bd-lost';
+        lost.innerHTML = '<b></b><small></small><em></em>';
+        lost.querySelector('b')!.textContent = m.name;
+        lost.querySelector('small')!.textContent = editions[m.edition] ?? m.edition;
+        lost.querySelector('em')!.textContent = t.lost;
+        b.append(lost);
+      });
+      b.addEventListener('click', () => {
+        // The end of a drag is not a pick.
+        if (dragged) return void (dragged = false);
+        host.sfx.tick();
+        if (picked.has(m.id)) picked.delete(m.id);
+        else picked.add(m.id);
+        b.setAttribute('aria-pressed', String(picked.has(m.id)));
+        syncButtons();
+      });
+      b.addEventListener('dblclick', () => {
+        picked.clear();
+        picked.add(m.id);
+        void play();
+      });
+      b.addEventListener('pointerdown', (e) => press(e, m, b));
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'bd-del';
+      del.innerHTML = '<i aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></i>';
+      del.setAttribute('aria-label', fill(t.discardOne, { card: label }));
+      del.title = fill(t.discardOne, { card: label });
+      del.addEventListener('click', () => void remove([m.id]));
+      slot.append(b, del);
+      return slot;
+    }
+
     function render() {
       const f = fillOf(metas);
-      const editions = host.dict().edition;
       $('.bd-count').textContent = fill(t.count, { n: f.count, max: MAX_CARDS });
       $('.bd-bytes').textContent = fill(t.bytes, { used: formatBytes(f.bytes), max: formatBytes(MAX_BYTES) });
       // The bar is the space; the count says the cards. Whichever ran out turns red.
@@ -320,95 +399,47 @@ export function mountBinder(host: BinderHost) {
       root.dataset.full = refusal(f, 0) ?? '';
       root.classList.toggle('is-empty', f.count === 0);
       spread = Math.min(spread, spreads() - 1);
-      const ids = metas.map((m) => m.id);
       const byId = new Map(metas.map((m) => [m.id, m]));
-      spreadEl.textContent = '';
+      const first = spread * perSpread();
+      // While there is room, the first empty pocket on these pages keeps the card on the stage.
+      const keepAt = refusal(f, 0) ? -1 : firstFree(lay, first * PER_PAGE);
+      spreadEl.querySelectorAll(':scope > .bd-sheet:not(.bd-copy), :scope > .bd-rings').forEach((e) => e.remove());
       spreadEl.style.setProperty('--pages', String(perSpread()));
-      for (let p = spread * perSpread(); p < (spread + 1) * perSpread(); p++) {
+      for (let p = first; p < first + perSpread(); p++) {
         const sheet = document.createElement('div');
         sheet.className = 'bd-sheet';
         sheet.setAttribute('role', 'group');
-        sheet.setAttribute('aria-label', fill(t.pagesLabel, { a: p + 1, n: pageCount(metas.length) }));
-        for (const pocket of pocketsOn(ids, p)) {
-          if (pocket === 'keep') {
+        sheet.setAttribute('aria-label', fill(t.pagesLabel, { a: p + 1, n: PAGES }));
+        pocketsOn(lay, p).forEach((id, i) => {
+          const at = p * PER_PAGE + i;
+          if (id) return sheet.append(pocketCard(byId.get(id)!));
+          if (at === keepAt) {
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'bd-pocket bd-keep';
+            b.dataset.slot = String(at);
             b.innerHTML = '<img class="bd-ghost" alt=""><i aria-hidden="true">+</i><span></span>';
             b.querySelector('img')!.src = ghost();
             b.lastElementChild!.textContent = t.keepPocket;
             b.addEventListener('click', () => {
               host.sfx.tick();
-              void keep();
+              void keep(at);
             });
-            sheet.append(b);
-          } else if (pocket) {
-            const m = byId.get(pocket)!;
-            // The pocket holds the card and, on its corner, a way to throw just this one away.
-            const slot = document.createElement('div');
-            slot.className = 'bd-pocket bd-slot';
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'bd-card';
-            b.dataset.id = m.id;
-            b.setAttribute('aria-pressed', String(picked.has(m.id)));
-            const label = fill(t.card, { name: m.name, finish: editions[m.edition] ?? m.edition });
-            b.setAttribute('aria-label', label);
-            b.title = label;
-            const del = document.createElement('button');
-            del.type = 'button';
-            del.className = 'bd-del';
-            del.innerHTML = '<i aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></i>';
-            del.setAttribute('aria-label', fill(t.discardOne, { card: label }));
-            del.title = fill(t.discardOne, { card: label });
-            del.addEventListener('click', () => void remove([m.id]));
-            const img = document.createElement('img');
-            img.alt = '';
-            img.decoding = 'async';
-            b.append(img);
-            void picture(img, m.id).then((ok) => {
-              if (ok) return;
-              // A thumbnail that can't be read still says which card it is.
-              b.classList.add('is-lost');
-              const lost = document.createElement('span');
-              lost.className = 'bd-lost';
-              lost.innerHTML = '<b></b><small></small><em></em>';
-              lost.querySelector('b')!.textContent = m.name;
-              lost.querySelector('small')!.textContent = editions[m.edition] ?? m.edition;
-              lost.querySelector('em')!.textContent = t.lost;
-              b.append(lost);
-            });
-            b.addEventListener('click', () => {
-              host.sfx.tick();
-              if (picked.has(m.id)) picked.delete(m.id);
-              else picked.add(m.id);
-              b.setAttribute('aria-pressed', String(picked.has(m.id)));
-              syncButtons();
-            });
-            b.addEventListener('dblclick', () => {
-              picked.clear();
-              picked.add(m.id);
-              void play();
-            });
-            slot.append(b, del);
-            sheet.append(slot);
-          } else {
-            const e = document.createElement('span');
-            e.className = 'bd-pocket bd-empty';
-            sheet.append(e);
+            return sheet.append(b);
           }
-        }
+          const e = document.createElement('span');
+          e.className = 'bd-pocket bd-empty';
+          e.dataset.slot = String(at);
+          sheet.append(e);
+        });
         // Two open pages meet at the binder's rings.
-        if (spreadEl.childElementCount) spreadEl.insertAdjacentHTML('beforeend', '<div class="bd-rings" aria-hidden="true"><i></i><i></i><i></i></div>');
+        if (p > first) spreadEl.insertAdjacentHTML('beforeend', '<div class="bd-rings" aria-hidden="true"><i></i><i></i><i></i></div>');
         spreadEl.append(sheet);
       }
-      const first = spread * perSpread() + 1;
-      const last = Math.min(pageCount(metas.length), first + perSpread() - 1);
-      const n = pageCount(metas.length);
-      $('.bd-page').textContent = fill(t.pages, { a: first === last ? first : `${first}–${last}`, n });
+      const last = first + perSpread();
+      $('.bd-page').textContent = fill(t.pages, { a: last - first > 1 ? `${first + 1}–${last}` : first + 1, n: PAGES });
       $<HTMLButtonElement>('.bd-prev').disabled = spread === 0;
       $<HTMLButtonElement>('.bd-next').disabled = spread >= spreads() - 1;
-      $('.bd-nav').hidden = spreads() < 2;
       syncButtons();
     }
 
@@ -438,7 +469,12 @@ export function mountBinder(host: BinderHost) {
 
     async function refresh(note?: 'count' | 'bytes') {
       noteNow = note;
-      metas = await list();
+      const stored = await list();
+      metas = arrange(stored);
+      // A card that had no pocket of its own (or shared one) keeps the one it was given.
+      const moved = metas.filter((m) => stored.find((s) => s.id === m.id)?.slot !== m.slot);
+      if (moved.length) await place(moved);
+      lay = layout(metas);
       for (const id of [...picked]) if (!metas.some((m) => m.id === id)) picked.delete(id);
       host.onCount(metas.length);
       render();
@@ -455,77 +491,291 @@ export function mountBinder(host: BinderHost) {
         return;
       }
       close();
-      await host.play(k);
+      await host.play(k, id);
     }
 
-    /**
-     * Throws cards away at once, no question asked: they are read back whole first, so the bar
-     * that says so can put them back for a few seconds. Focus stays where the card was.
-     */
-    async function remove(ids: string[]) {
-      const at = [...root.querySelectorAll('.bd-card')].findIndex((c) => ids.includes((c as HTMLElement).dataset.id!));
-      const gone = await Promise.all(metas.filter((m) => ids.includes(m.id)).map(stored));
-      await discard(ids);
-      for (const id of ids) picked.delete(id);
-      undoable = [...undoable, ...gone];
-      host.sfx.flip();
-      await refresh();
+    // ---------- Undo: the bar over the foot ----------
+
+    function offerUndo(next: NonNullable<typeof undo>, msg: string) {
+      if (undo && 'gone' in undo) forgetUrls(undo.gone);
+      undo = next;
       const bar = $('.bd-undo');
-      bar.querySelector('span')!.textContent = fill(t.gone, { n: undoable.length });
+      bar.querySelector('span')!.textContent = msg;
       bar.hidden = false;
       bar.classList.remove('is-in');
       void bar.offsetWidth;
       bar.classList.add('is-in');
       clearTimeout(undoTimer);
       undoTimer = window.setTimeout(forget, 6000);
-      const cards = root.querySelectorAll<HTMLElement>('.bd-card');
-      (cards[Math.min(Math.max(at, 0), cards.length - 1)] ?? root.querySelector<HTMLElement>('.bd-keep') ?? $('.bd-x')).focus({ preventScroll: true });
     }
 
-    /** The undo bar goes, and with it the cards it could have brought back. */
-    function forget() {
-      clearTimeout(undoTimer);
-      for (const c of undoable) {
+    function forgetUrls(cards: Stored[]) {
+      for (const c of cards) {
         const url = urls.get(c.meta.id);
         if (url) URL.revokeObjectURL(url);
         urls.delete(c.meta.id);
       }
-      undoable = [];
+    }
+
+    /** The bar goes, and with it the change it could have taken back. */
+    function forget() {
+      clearTimeout(undoTimer);
+      if (undo && 'gone' in undo) forgetUrls(undo.gone);
+      undo = null;
       $('.bd-undo').hidden = true;
     }
 
     $('.bd-undo-btn').addEventListener('click', async () => {
-      const back = undoable;
-      undoable = [];
-      clearTimeout(undoTimer);
-      $('.bd-undo').hidden = true;
-      await restore(back);
+      const was = undo;
+      undo = null;
+      forget();
+      if (!was) return;
+      let focus: string | undefined;
+      if ('gone' in was) {
+        await restore(was.gone);
+        host.onBack(was.gone.map((c) => c.meta.id));
+        host.announce(fill(t.back, { n: was.gone.length }));
+        focus = was.gone[0]?.meta.id;
+      } else {
+        await place(was.moved.map(([id, slot]) => ({ ...metas.find((m) => m.id === id)!, slot })));
+        focus = was.moved[0][0];
+      }
       host.sfx.tick();
-      host.announce(fill(t.back, { n: back.length }));
       await refresh();
-      root.querySelector<HTMLElement>(`.bd-card[data-id="${back[0]?.meta.id}"]`)?.focus({ preventScroll: true });
+      const slot = metas.find((m) => m.id === focus)?.slot;
+      if (slot !== undefined && spreadOf(slot) !== spread) await turnTo(spreadOf(slot));
+      root.querySelector<HTMLElement>(`.bd-card[data-id="${focus}"]`)?.focus({ preventScroll: true });
     });
+
+    /**
+     * Throws cards away at once, no question asked: they are read back whole first, so the bar can
+     * put them back for a few seconds (more discards meanwhile join them). Focus stays where the card was.
+     */
+    async function remove(ids: string[]) {
+      const slots = metas.filter((m) => ids.includes(m.id)).map((m) => m.slot);
+      const gone = await Promise.all(metas.filter((m) => ids.includes(m.id)).map(stored));
+      await discard(ids);
+      host.onGone(ids);
+      for (const id of ids) picked.delete(id);
+      const all = undo && 'gone' in undo ? [...undo.gone, ...gone] : gone;
+      if (undo && 'gone' in undo) undo = null;
+      host.sfx.flip();
+      await refresh();
+      offerUndo({ gone: all }, fill(t.gone, { n: all.length }));
+      const at = Math.min(...slots);
+      (root.querySelector<HTMLElement>(`[data-slot="${at}"] .bd-card, .bd-keep[data-slot="${at}"]`) ?? root.querySelector<HTMLElement>('.bd-card, .bd-keep') ?? $('.bd-x')).focus({ preventScroll: true });
+    }
+
+    /** The card in pocket `from` goes to pocket `to` (a card there takes its place), kept at once. */
+    async function move(from: number, to: number) {
+      if (from === to || to < 0 || to >= MAX_CARDS || !lay[from]) return;
+      const next = swap(lay, from, to);
+      const changed = metas.filter((m) => next[m.slot] !== m.id);
+      const before: [string, number][] = changed.map((m) => [m.id, m.slot]);
+      const after = changed.map((m) => ({ ...m, slot: next.indexOf(m.id) }));
+      metas = metas.map((m) => after.find((a) => a.id === m.id) ?? m);
+      lay = next;
+      render();
+      host.sfx.tick();
+      await place(after);
+      offerUndo({ moved: before }, t.moved);
+    }
 
     playBtn.addEventListener('click', () => void play());
     discardBtn.addEventListener('click', () => picked.size && void remove([...picked]));
-    $('.bd-prev').addEventListener('click', () => {
-      host.sfx.tick();
-      spread = Math.max(0, spread - 1);
+
+    // ---------- Turning pages ----------
+
+    /** A copy of a page, for the leaf that turns; nothing in it can be pressed. */
+    function copy(sheet: Element, rect: DOMRect, box: DOMRect): HTMLElement {
+      const c = sheet.cloneNode(true) as HTMLElement;
+      c.classList.add('bd-copy');
+      c.setAttribute('aria-hidden', 'true');
+      c.inert = true;
+      Object.assign(c.style, { position: 'absolute', margin: '0', left: `${rect.left - box.left}px`, top: `${rect.top - box.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+      return c;
+    }
+
+    /**
+     * Turns to another spread like a binder's page: the page on that side lifts at the rings and
+     * turns over, showing the next page on its back. Held still, the pages just change.
+     */
+    async function turnTo(next: number) {
+      next = Math.max(0, Math.min(spreads() - 1, next));
+      if (next === spread || turning) return;
+      const dir = next > spread ? 1 : -1;
+      host.sfx.flip();
+      if (still()) {
+        spread = next;
+        return render();
+      }
+      turning = true;
+      const box = spreadEl.getBoundingClientRect();
+      const old = [...spreadEl.querySelectorAll(':scope > .bd-sheet:not(.bd-copy)')];
+      const lifting = dir > 0 ? old[old.length - 1] : old[0];
+      const liftRect = lifting.getBoundingClientRect();
+      const front = copy(lifting, liftRect, box);
+      // One page: the old page stays under the one that comes back (turning to the previous page).
+      const under = old.length === 1 && dir < 0 ? copy(lifting, liftRect, box) : null;
+      spread = next;
       render();
-    });
-    $('.bd-next').addEventListener('click', () => {
-      host.sfx.tick();
-      spread = Math.min(spreads() - 1, spread + 1);
-      render();
-    });
+      const fresh = [...spreadEl.querySelectorAll<HTMLElement>(':scope > .bd-sheet:not(.bd-copy)')];
+      const landing = fresh.length > 1 ? (dir > 0 ? fresh[0] : fresh[fresh.length - 1]) : fresh[0];
+      const back = copy(landing, landing.getBoundingClientRect(), box);
+      const leaf = document.createElement('div');
+      leaf.className = 'bd-leaf';
+      leaf.setAttribute('aria-hidden', 'true');
+      Object.assign(leaf.style, { left: front.style.left, top: front.style.top, width: front.style.width, height: front.style.height });
+      for (const face of [front, back]) Object.assign(face.style, { left: '0', top: '0', width: '100%', height: '100%' });
+      back.classList.add('bd-leaf-back');
+      let frames: Keyframe[];
+      if (fresh.length > 1) {
+        // Two pages: the leaf turns on the rings between them and lands on the other side.
+        const [l, r] = fresh.map((s) => s.getBoundingClientRect());
+        const rings = (r.left - l.right) / 2;
+        leaf.style.transformOrigin = dir > 0 ? `${-rings}px center` : `calc(100% + ${rings}px) center`;
+        leaf.append(front, back);
+        landing.style.visibility = 'hidden';
+        frames = [{ transform: 'rotateY(0deg)' }, { transform: `rotateY(${dir > 0 ? -180 : 180}deg)` }];
+      } else if (dir > 0) {
+        // One page: it turns away over the rings, the next one under it.
+        leaf.style.transformOrigin = 'left center';
+        back.classList.add('is-blank');
+        leaf.append(front, back);
+        frames = [{ transform: 'rotateY(0deg)', opacity: 1 }, { transform: 'rotateY(-110deg)', opacity: 0 }];
+      } else {
+        // One page, going back: the previous page turns back over this one.
+        leaf.style.transformOrigin = 'left center';
+        front.replaceChildren(...back.cloneNode(true).childNodes);
+        leaf.append(front);
+        spreadEl.append(under!);
+        landing.style.visibility = 'hidden';
+        frames = [{ transform: 'rotateY(-110deg)', opacity: 0 }, { transform: 'rotateY(0deg)', opacity: 1 }];
+      }
+      spreadEl.append(leaf);
+      await leaf.animate(frames, { duration: 480, easing: 'cubic-bezier(0.45, 0.05, 0.3, 1)' }).finished.catch(() => {});
+      leaf.remove();
+      under?.remove();
+      landing.style.visibility = '';
+      turning = false;
+    }
+
+    $('.bd-prev').addEventListener('click', () => void turnTo(spread - 1));
+    $('.bd-next').addEventListener('click', () => void turnTo(spread + 1));
     const onWide = () => render();
     wide.addEventListener('change', onWide);
+
+    // ---------- Dragging a card to another pocket ----------
+
+    /** The end of a drag also fires a click on the card; it is not a pick. */
+    let dragged = false;
+    let held: { m: Placed; card: HTMLElement; x: number; y: number; id: number; timer: number; touch: boolean } | null = null;
+    let drag: { m: Placed; float: HTMLElement; dx: number; dy: number; over: number | null; edge: -1 | 0 | 1; edgeTimer: number } | null = null;
+
+    /** A press on a card: a mouse drags once it moves; a finger has to hold first, then lifts the card. */
+    function press(e: PointerEvent, m: Placed, card: HTMLElement) {
+      if (e.button !== 0 || drag || turning) return;
+      const touch = e.pointerType !== 'mouse';
+      held = { m, card, x: e.clientX, y: e.clientY, id: e.pointerId, touch, timer: touch ? window.setTimeout(() => lift(e.clientX, e.clientY), 380) : 0 };
+    }
+
+    function lift(x: number, y: number) {
+      if (!held) return;
+      const { m, card } = held;
+      const r = card.getBoundingClientRect();
+      const float = document.createElement('div');
+      float.className = 'bd-float';
+      float.setAttribute('aria-hidden', 'true');
+      float.append(card.cloneNode(true));
+      Object.assign(float.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      root.append(float);
+      drag = { m, float, dx: x - r.left, dy: y - r.top, over: null, edge: 0, edgeTimer: 0 };
+      card.closest('.bd-slot')!.classList.add('is-lifted');
+      root.classList.add('is-dragging');
+      navigator.vibrate?.(8);
+      host.sfx.tick();
+      follow(x, y);
+    }
+
+    function follow(x: number, y: number) {
+      if (!drag) return;
+      drag.float.style.translate = `${x - drag.dx - parseFloat(drag.float.style.left)}px ${y - drag.dy - parseFloat(drag.float.style.top)}px`;
+      // The pocket under the finger lights up; held at a page's outer edge, the page turns.
+      const under = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-slot]');
+      const over = under && root.contains(under) ? +under.dataset.slot! : null;
+      if (over !== drag.over) {
+        root.querySelector('.is-target')?.classList.remove('is-target');
+        if (over !== null && over !== drag.m.slot) under!.classList.add('is-target');
+        drag.over = over;
+      }
+      const box = spreadEl.getBoundingClientRect();
+      const nearPrev = x < box.left + 40 || !!document.elementFromPoint(x, y)?.closest('.bd-prev');
+      const nearNext = x > box.right - 40 || !!document.elementFromPoint(x, y)?.closest('.bd-next');
+      const edge = nearPrev && spread > 0 ? -1 : nearNext && spread < spreads() - 1 ? 1 : 0;
+      if (edge !== drag.edge) {
+        drag.edge = edge;
+        clearTimeout(drag.edgeTimer);
+        root.classList.toggle('is-edge-prev', edge < 0);
+        root.classList.toggle('is-edge-next', edge > 0);
+        if (edge) armEdge();
+      }
+    }
+
+    /** Held at an edge, the page turns, and keeps turning while it stays there. */
+    function armEdge() {
+      if (!drag) return;
+      drag.edgeTimer = window.setTimeout(async () => {
+        if (!drag?.edge) return;
+        await turnTo(spread + drag.edge);
+        armEdge();
+      }, 650);
+    }
+
+    function release(drop: boolean) {
+      if (held) clearTimeout(held.timer);
+      held = null;
+      if (!drag) return;
+      const { m, float, over, edgeTimer } = drag;
+      clearTimeout(edgeTimer);
+      drag = null;
+      dragged = true;
+      // A click comes only when the pointer ends on the card itself; don't let a later one be eaten.
+      setTimeout(() => (dragged = false), 0);
+      float.remove();
+      root.classList.remove('is-dragging', 'is-edge-prev', 'is-edge-next');
+      root.querySelector('.is-target')?.classList.remove('is-target');
+      root.querySelector('.is-lifted')?.classList.remove('is-lifted');
+      if (drop && over !== null && over !== m.slot) void move(m.slot, over);
+    }
+
+    const onMove = (e: PointerEvent) => {
+      if (held && !drag && e.pointerId === held.id) {
+        const d = Math.hypot(e.clientX - held.x, e.clientY - held.y);
+        // A mouse lifts the card as it moves; a finger that moves before the hold is up lets go.
+        if (!held.touch && d > 6) lift(e.clientX, e.clientY);
+        else if (held.touch && d > 10) release(false);
+      }
+      if (drag) {
+        e.preventDefault();
+        follow(e.clientX, e.clientY);
+      }
+    };
+    const onUp = (e: PointerEvent) => release(e.type === 'pointerup');
+    addEventListener('pointermove', onMove, { passive: false });
+    addEventListener('pointerup', onUp);
+    addEventListener('pointercancel', onUp);
+    // A held finger brings up no menu or text selection on the card.
+    root.addEventListener('contextmenu', (e) => (e.target as Element).closest('.bd-card') && e.preventDefault());
 
     const back = document.activeElement as HTMLElement | null;
     function close() {
       view = null;
+      release(false);
       root.classList.remove('is-in');
       removeEventListener('keydown', onKey, true);
+      removeEventListener('pointermove', onMove);
+      removeEventListener('pointerup', onUp);
+      removeEventListener('pointercancel', onUp);
       wide.removeEventListener('change', onWide);
       forget();
       host.pause(false);
@@ -536,18 +786,30 @@ export function mountBinder(host: BinderHost) {
       (back?.isConnected ? back : host.chip).focus({ preventScroll: true });
     }
     const onKey = (e: KeyboardEvent) => {
+      const card = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.bd-slot');
+      const at = card ? +card.dataset.slot! : -1;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
+        if (drag) return release(false);
         close();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         // The card under focus, or else the picked ones.
-        const on = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.bd-slot')?.querySelector<HTMLElement>('.bd-card')?.dataset.id;
-        if (on) void remove([on]);
+        if (at >= 0) void remove([lay[at]!]);
         else if (picked.size) void remove([...picked]);
+      } else if (e.altKey && at >= 0 && e.key.startsWith('Arrow')) {
+        // Alt+arrows move the focused card a pocket along, or a row up or down, across pages too.
+        e.preventDefault();
+        const to = at + ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 } as Record<string, number>)[e.key];
+        if (!(to >= 0 && to < MAX_CARDS)) return;
+        const id = lay[at]!;
+        void move(at, to).then(async () => {
+          if (spreadOf(to) !== spread) await turnTo(spreadOf(to));
+          root.querySelector<HTMLElement>(`.bd-card[data-id="${id}"]`)?.focus({ preventScroll: true });
+        });
       } else if (e.key === 'Tab') {
         // Keep focus inside the dialog.
-        const items = [...root.querySelectorAll<HTMLElement>('button:not([disabled])')].filter((b) => b.offsetParent);
+        const items = [...root.querySelectorAll<HTMLElement>('button:not([disabled])')].filter((b) => b.offsetParent && !b.closest('[inert]'));
         if (!items.length) return;
         const i = items.indexOf(document.activeElement as HTMLElement);
         e.preventDefault();

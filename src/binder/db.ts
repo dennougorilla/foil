@@ -16,6 +16,8 @@ export interface Meta {
   edition: EditionId;
   /** Thumbnail plus picture. */
   bytes: number;
+  /** Its pocket, 0–53; a card without one is given the first empty pocket (limits.ts arrange). */
+  slot?: number;
 }
 
 /** Read only when the card is played. */
@@ -95,6 +97,13 @@ export async function restore(cards: Stored[]): Promise<void> {
       if (c.thumb) t.objectStore('thumbs').put(c.thumb, c.meta.id);
       if (c.card) t.objectStore('cards').put(c.card, c.meta.id);
     }
+  });
+}
+
+/** Keeps cards' new pockets. */
+export async function place(metas: Meta[]): Promise<void> {
+  await tx(['meta'], 'readwrite', (t) => {
+    for (const m of metas) t.objectStore('meta').put(m);
   });
 }
 

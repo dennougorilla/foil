@@ -1266,13 +1266,15 @@ const keepBtn = $<HTMLButtonElement>('keepBtn');
 const binderBtn = $<HTMLButtonElement>('binderBtn');
 /** The binder's count, kept here so the chip shows it before the binder's code loads. */
 const BINDER_COUNT = 'foil:binder';
-/** The card on the stage is in the binder as it is now (until it changes). */
-let kept = false;
+/** The binder card the stage shows as it is now (until it changes), and one just thrown away. */
+let keptId: string | null = null;
+let droppedId: string | null = null;
+const isKept = () => keptId !== null;
 
 function renderKeep() {
-  keepBtn.dataset.kept = String(kept);
-  keepBtn.querySelector('span')!.textContent = kept ? t.kept : t.keep;
-  keepBtn.title = kept ? t.keptHint : t.keepHint;
+  keepBtn.dataset.kept = String(isKept());
+  keepBtn.querySelector('span')!.textContent = isKept() ? t.kept : t.keep;
+  keepBtn.title = isKept() ? t.keptHint : t.keepHint;
 }
 
 function renderBinderChip() {
@@ -1314,10 +1316,15 @@ function useBinder(): Promise<Binder> {
         }
         renderBinderChip();
       },
-      onKept: () => {
-        kept = true;
-        renderKeep();
+      onKept: (id) => setKept(id),
+      // Throwing the stage's card away makes it keepable again; Undo makes it kept again.
+      onGone: (ids) => {
+        if (keptId && ids.includes(keptId)) {
+          droppedId = keptId;
+          setKept(null);
+        }
       },
+      onBack: (ids) => droppedId && ids.includes(droppedId) && setKept(droppedId),
       sfx,
     }),
   );
@@ -1338,14 +1345,19 @@ binderBtn.addEventListener('click', () => {
 keepBtn.addEventListener('click', () => {
   sfx.tick();
   // Already kept: the button leads to the binder instead of keeping a second copy.
-  if (kept) return void withBinder((b) => b.open());
+  if (isKept()) return void withBinder((b) => b.open());
   if (keepBtn.hasAttribute('aria-busy')) return;
   keepBtn.setAttribute('aria-busy', 'true');
   void withBinder((b) => b.keep()).finally(() => keepBtn.removeAttribute('aria-busy'));
 });
 
 /** Puts a card from the binder on the stage: its picture and every setting of the card. */
-async function playCard(k: Kept) {
+function setKept(id: string | null) {
+  keptId = id;
+  renderKeep();
+}
+
+async function playCard(k: Kept, id: string) {
   const card = cleanCard(k.card);
   if (!available(card.edition!, packs.get())) card.edition = 'holo';
   if (card.sample! >= SAMPLE_COUNT) card.sample = 0;
@@ -1370,8 +1382,7 @@ async function playCard(k: Kept) {
     syncInputs();
     renderInfo();
     drawCropPreview();
-    kept = true;
-    renderKeep();
+    setKept(id);
   });
 }
 
@@ -1713,10 +1724,8 @@ store.on((s, changed) => {
   }
   // The card changed: it is no longer the one kept, and a file waiting to be shared is out of date.
   if (CARD_KEYS.some((k) => changed.has(k))) {
-    if (kept) {
-      kept = false;
-      renderKeep();
-    }
+    droppedId = null;
+    if (isKept()) setKept(null);
     if (shareReady) readyToShare(null);
   }
   syncAdjust();

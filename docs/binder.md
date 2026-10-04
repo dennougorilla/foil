@@ -31,7 +31,7 @@ three stores so each can be read on its own:
 
 | Store | Key | Holds | Read when |
 |---|---|---|---|
-| `meta` | id | when it was kept, its name, finish and size in bytes | the binder opens (a few hundred bytes a card) |
+| `meta` | id | when it was kept, its name, finish, size in bytes and its pocket | the binder opens (a few hundred bytes a card) |
 | `thumbs` | id | the thumbnail | its page is shown |
 | `cards` | id | the settings and the picture | the card is played |
 
@@ -49,9 +49,24 @@ what is picked.
 
 ## The binder
 
-- Pages of nine pockets, three by three, like a real binder; two pages side by side where there
-  is room (wide screens), one on phones. Newest first. While it is not full, the first pocket
-  offers to keep the card on the stage now.
+- Six pages of nine pockets, three by three, like a real binder: always six, whatever is in it.
+  Two pages lie open side by side on wide screens, joined by the rings; phones show one page.
+- Every card sits in a pocket of its own (its `slot`, 0–53, kept with it), and empty pockets stay
+  empty wherever they are: nothing closes up. A new card goes into the first empty pocket; while
+  the binder is not full, the first empty pocket on the open pages offers to keep the card on the
+  stage there (it shows the card faintly). A card with no pocket, one past the last, or one whose
+  pocket an older card holds is given the first empty pocket, newest first (`arrange` in
+  `src/binder/limits.ts`).
+- Arranging, as in a real binder: drag a card onto any pocket. An empty pocket takes it; a card
+  already there swaps places with it. With a mouse the card lifts as soon as it moves; on a touch
+  screen a press held for a moment lifts it, then it follows the finger. Held at the outer edge of
+  the pages (or over ‹ ›), the page turns, again and again while it stays there, so a card can go
+  to any page. Alt+arrow keys move the focused card a pocket along or a row up or down, across
+  pages too. Every move is kept at once, and the bar over the foot can take it back for six
+  seconds.
+- Turning a page: the page on that side lifts at the rings and turns over, the page behind it on
+  its back; on a phone the page turns away over the rings (or back over the page). It is a copy of
+  the pages that turns, so nothing is read twice; held still (reduced motion) the pages just change.
 - Tapping a card picks it (it lifts with a gold edge, like a card picked in a hand); tapping again
   puts it down. The line under the head names the picked card, its finish and the day it was kept (or how
   many are picked). Two buttons, blue and red as in the game FOIL is modelled on: **To stage**

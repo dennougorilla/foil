@@ -329,9 +329,110 @@ await step('a card is thrown away from its own corner at once, and Undo brings i
   await page.click('.bd-discard');
   await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
   expect((await binderCount()) === 0, 'Discard from the foot left the card');
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the stage card was thrown away');
   await page.click('.bd-x');
   await binderClosed();
 });
+
+await step('cards stay in the pocket they are dragged to: empty pockets kept, swaps, Undo, turning pages at the edge, a held finger', async () => {
+  const pocket = (slot) => page.locator(`[data-slot="${slot}"]`);
+  const at = (slot) => page.$eval(`[data-slot="${slot}"]`, (e) => e.querySelector('.bd-card')?.dataset.id ?? null).catch(() => null);
+  const centre = async (sel) => {
+    const b = await page.locator(sel).boundingBox();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  };
+  async function drag(from, to, hold = 0) {
+    const [x0, y0] = await centre(from);
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move(x0 + 12, y0 + 8, { steps: 3 });
+    const [x1, y1] = Array.isArray(to) ? to : await centre(to);
+    await page.mouse.move(x1, y1, { steps: 8 });
+    if (hold) await page.waitForTimeout(hold);
+    if (!Array.isArray(to) || !hold) {
+      await page.mouse.up();
+      return;
+    }
+  }
+  for (const key of ['2', '3']) {
+    await page.evaluate(() => document.activeElement.blur());
+    await page.keyboard.press(key);
+    await page.waitForTimeout(300);
+    const n = await binderCount();
+    await page.click('#keepBtn');
+    await page.waitForFunction((k) => document.querySelector('#binderBtn .binder-count')?.textContent === String(k), n + 1, { timeout: 30000 });
+  }
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await page.textContent('.bd-page')).includes('6'), 'the binder does not have six pages');
+  const first = await at(0);
+  expect(first && (await at(1)), 'the two cards are not in the first two pockets');
+  // A mouse drags the first card into an empty pocket further on; the gap it leaves stays.
+  await drag('[data-slot="0"] .bd-card', '[data-slot="5"]');
+  await page.waitForTimeout(300);
+  expect((await at(5)) === first && (await at(0)) === null, 'the card did not move into the empty pocket');
+  expect(await page.isVisible('.bd-undo'), 'no undo bar after moving a card');
+  await page.click('.bd-x');
+  await binderClosed();
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await at(5)) === first, 'the pocket was not kept');
+  // Onto another card it swaps; Undo puts both back.
+  const second = await at(1);
+  await drag('[data-slot="5"] .bd-card', '[data-slot="1"]');
+  await page.waitForTimeout(300);
+  expect((await at(1)) === first && (await at(5)) === second, 'the cards did not swap');
+  await page.click('.bd-undo-btn');
+  await page.waitForFunction((id) => document.querySelector('[data-slot="5"] .bd-card')?.dataset.id === id, first, { timeout: 5000 });
+  // Held at the right edge, the page turns; the card lands on the new page.
+  const box = await page.locator('.bd-spread').boundingBox();
+  const label = await page.textContent('.bd-page');
+  await drag('[data-slot="5"] .bd-card', [box.x + box.width - 14, box.y + box.height / 2], 1100);
+  await page.waitForFunction((l) => document.querySelector('.bd-page').textContent !== l, label, { timeout: 5000 });
+  await page.waitForTimeout(600);
+  const [tx, ty] = await centre('.bd-sheet:not(.bd-copy) .bd-pocket >> nth=4');
+  await page.mouse.move(tx, ty, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const landed = await page.evaluate((id) => +document.querySelector(`.bd-card[data-id="${id}"]`)?.closest('[data-slot]')?.dataset.slot, first);
+  expect(landed >= 18, `the card did not go to a later page (pocket ${landed})`);
+  // A finger has to hold first: a quick swipe moves nothing, a held one lifts the card.
+  await page.click('.bd-prev');
+  await page.waitForTimeout(700);
+  const touch = (type, x, y, target = null) =>
+    page.evaluate(
+      ([type, x, y, sel]) => (sel ? document.querySelector(sel) : window).dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'touch', isPrimary: true, button: 0, clientX: x, clientY: y })),
+      [type, x, y, target],
+    );
+  const [sx, sy] = await centre('[data-slot="1"] .bd-card');
+  const [ex, ey] = await centre('[data-slot="7"]');
+  await touch('pointerdown', sx, sy, '[data-slot="1"] .bd-card');
+  await touch('pointermove', sx + 40, sy + 40);
+  await touch('pointerup', sx + 40, sy + 40);
+  expect((await at(1)) === second, 'a quick swipe moved the card');
+  await touch('pointerdown', sx, sy, '[data-slot="1"] .bd-card');
+  await page.waitForTimeout(550);
+  await touch('pointermove', (sx + ex) / 2, (sy + ey) / 2);
+  await touch('pointermove', ex, ey);
+  await touch('pointerup', ex, ey);
+  await page.waitForTimeout(300);
+  expect((await at(7)) === second, 'a held finger did not carry the card');
+  await page.click('.bd-x');
+  await binderClosed();
+  // Empty it again for the steps that follow.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction(['meta', 'thumbs', 'cards'], 'readwrite');
+          for (const s of ['meta', 'thumbs', 'cards']) tx.objectStore(s).clear();
+          tx.oncomplete = () => (req.result.close(), resolve());
+        };
+      }),
+  );
+});
+
 
 await step('a full binder takes no more cards and opens to make room', async () => {
   // Fill the binder's index straight in IndexedDB: 54 small cards.
