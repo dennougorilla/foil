@@ -51,9 +51,12 @@
   .hand {
     height: var(--hand-h);
   }
-  /* Just the finish's name; the panel below says more about it. */
+  /* Just the finish's name, on one line between the steps; the panel below says more about it. */
   .hand-caption {
     margin: 0;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    font-size: clamp(15px, 5vw, 20px);
   }
   .hand-caption span {
     display: none;
