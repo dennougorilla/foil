@@ -1195,3 +1195,16 @@
   .pk-desc { font-size: 25px; }
   .pk-note { font-size: 20px; }
 }
+
+/* The finale badge rides above the name, so all names share one baseline. */
+.pk-name {
+  padding-top: 4px;
+}
+
+.pk-name i {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, -2px);
+  white-space: nowrap;
+}

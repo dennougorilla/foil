@@ -321,7 +321,7 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
 
   // The top tier's wavy word above the art.
   if (words.top) {
-    const w = textLayer(words.top, words.top.length > 7 ? '700 12px Silkscreen' : '700 16px Silkscreen', 64, 30, (x, y) => mix(rgb('#fff0b0'), rgb('#f2c14e'), ((x + y) % 7) / 7), 0, 2);
+    const w = textLayer(words.top, words.top.length > 7 ? '8px Silkscreen' : '16px Silkscreen', 64, 33, (x, y) => mix(rgb('#fff0b0'), rgb('#f2c14e'), ((x + y) % 7) / 7), 0, 2);
     w.stamp(g, 1, 2);
   }
 
@@ -329,10 +329,11 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   const bubble = new Layer();
   bubble.poly([12, 132, 22, 120, 64, 116, 106, 120, 116, 132, 112, 166, 64, 171, 16, 166], (_x, y) => (y < 128 ? md : dk));
   bubble.stamp(g, 1);
-  const size = words.big.length > 7 ? 13 : words.big.length > 5 ? 19 : 24;
-  const title = textLayer(words.big, `700 ${size}px Silkscreen`, 64, 138, (_x, y) => (y < 136 ? rgb('#ffffff') : rgb(top ? '#ffe9a8' : PAPER)), 5);
+  // Silkscreen is drawn on an 8-pixel grid: sizes in steps of 8 keep every stroke (M is not H).
+  const size = words.big.length > 5 ? 16 : 24;
+  const title = textLayer(words.big, `${size}px Silkscreen`, 64, 138, (_x, y) => (y < 136 ? rgb('#ffffff') : rgb(top ? '#ffe9a8' : PAPER)), 5);
   title.stamp(g, 2, 2);
-  const line = textLayer(words.line, /[^\x00-\x7f]/.test(words.line) ? '16px DotGothic16' : '12px Silkscreen', 64, 160, () => (top ? rgb('#ffe9a8') : lt), 0);
+  const line = textLayer(words.line, /[^\x00-\x7f]/.test(words.line) ? '16px DotGothic16' : '8px Silkscreen', 64, 160, () => rgb(top ? '#ffe9a8' : PAPER), 0);
   line.stamp(g, 1, 2);
 
   // The bag's own outline, two pixels of ink.

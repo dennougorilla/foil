@@ -204,7 +204,8 @@ export function openPack(o: OpeningOptions) {
     const face = document.createElement('canvas');
     const mask = document.createElement('canvas');
     paintPack(face, mask, p, {
-      big: PACK_EN.name[p.id].toUpperCase(),
+      // Seven letters is what fits at the crisp title size.
+      big: p.supporter ? 'SUPPORT' : PACK_EN.name[p.id].toUpperCase(),
       line: t.inside.replace('{n}', String(p.finishes.length)),
       top: p.supporter ? 'THANK YOU' : undefined,
     });
@@ -1295,7 +1296,8 @@ export function openPack(o: OpeningOptions) {
         rz: sl.tilt + sl.rz.x,
         scale: sl.s.x,
         alpha: shopFade,
-        light: [-0.45 - tilt[0] * 0.5, -0.6 - tilt[1] * 0.4],
+        // The light stays up and to the left as a pack leans, so leaning never puts it in shade.
+        light: [-0.45 - tilt[0] * 0.2, -0.6 - tilt[1] * 0.15],
         spec: c[2].map((v) => 0.55 + v * 0.45) as RGB,
         shadow: [8 + sl.lift.x * 0.4, 12 + sl.lift.x * 0.6],
       });
