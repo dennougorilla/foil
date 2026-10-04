@@ -30,7 +30,9 @@ export type EditionId =
   // Shaders in src/gl/finishes/supporter.ts
   | 'kintsugi'
   | 'opal'
-  | 'raden';
+  | 'raden'
+  | 'confetti'
+  | 'fireworks';
 
 export interface Edition {
   id: EditionId;
@@ -88,6 +90,8 @@ export const EDITIONS: Edition[] = [
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
   { id: 'raden', shader: 43, color: '#b9a6ff', swirl: ['#07060a', '#2c1a3a', '#4fc0c8'], value: 8 },
+  { id: 'confetti', shader: 80, color: '#ffcf5a', swirl: ['#1a0f24', '#a8386a', '#e8b94e'], value: 8 },
+  { id: 'fireworks', shader: 82, color: '#ffc24a', swirl: ['#04061a', '#1a2658', '#d89a3a'], value: 8, dither: true },
 ];
 
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];

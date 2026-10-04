@@ -151,6 +151,7 @@ uniform float uAlpha;
 uniform float uFlash;      // white flash on juice
 uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
+uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
 out vec4 o;
 ${COMMON}
 ${TUNE_GLSL}
@@ -288,7 +289,7 @@ void main() {
   if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
@@ -303,6 +304,7 @@ void main() {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     // Glow's room is dim, so only a faint glare reaches it.
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
+    if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.6, 4.0, 0.1);

@@ -54,7 +54,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'supporter',
-    finishes: ['opal', 'raden', 'kintsugi'],
+    finishes: ['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],
     wrap: 'opal',
     colors: ['#140f1e', '#6b5aa0', '#ffe9a8'],
     supporter: true,

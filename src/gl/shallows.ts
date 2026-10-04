@@ -17,8 +17,6 @@ const lite =
 const f = (v: number) => v.toFixed(2);
 
 export const SHALLOWS_GLSL = /* glsl */ `
-// Length of an exported loop in shader seconds; 0 on the live stage.
-uniform float uLoop;
 const bool SH_LITE = ${lite};
 const int SH_WAVES = 7;
 // The art window in face pixels (card/face.ts); its corner matches the drawn window.

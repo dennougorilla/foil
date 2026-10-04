@@ -417,6 +417,105 @@ await step('a card on a finish whose pack is sealed goes back to Holographic', a
   expect((await handCount()) === s.hand.length, 'the page hand does not match the saved hand');
 });
 
+await step('Confetti and Fireworks keep the message and the name, and their loops close', async () => {
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    // Exports draw a pack finish once its pack's module has arrived.
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('supporter');
+    const { drawBack, drawFace } = await import('/src/card/face.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    // A birthday message: dark lettering on a pale picture.
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    x.fillStyle = '#f4e6d0';
+    x.fillRect(0, 0, 600, 800);
+    x.fillStyle = '#e07a8a';
+    x.beginPath();
+    x.arc(300, 520, 150, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = '#2a1a3a';
+    x.font = 'bold 84px sans-serif';
+    x.textAlign = 'center';
+    x.fillText('HAPPY', 300, 200);
+    x.fillText('BIRTHDAY', 300, 300);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = mask.width = back.width = 900;
+    face.height = mask.height = back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako' });
+    drawBack(back);
+    // A flat card (no idle motion) so the art and the nameplate land on known pixels.
+    const W = 360;
+    const H = 450;
+    const tune = { ...TUNE_DEFAULTS, idle: 'none' };
+    const cw = (320 * 5) / 7;
+    const box = (u0, v0, u1, v1) => [Math.round(W / 2 + (u0 - 0.5) * cw), Math.round(H / 2 + (v0 - 0.5) * 320), Math.round(W / 2 + (u1 - 0.5) * cw), Math.round(H / 2 + (v1 - 0.5) * 320)];
+    const ART = box(0.1, 0.08, 0.9, 0.85);
+    const PLATE = box(0.1, 0.9, 0.55, 0.965);
+    const grab = (id, intensity, ps, loop = 2.4) => {
+      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune }, W, H, true, true, false);
+      const out = ps.map((p) => {
+        s.draw(p, 40, loop);
+        return s.ctx.getImageData(0, 0, W, H).data;
+      });
+      s.dispose();
+      return out;
+    };
+    const lumas = (d, [x0, y0, x1, y1]) => {
+      const v = [];
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = (y * W + x) * 4;
+        v.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      }
+      return v;
+    };
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sd = (v) => Math.sqrt(mean(v.map((a) => (a - mean(v)) ** 2)));
+    const corr = (a, b) => {
+      const ma = mean(a);
+      const mb = mean(b);
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += (a[i] - ma) * (b[i] - mb);
+      return n / a.length / (sd(a) * sd(b));
+    };
+    // Share of pixels that visibly differ, so a finish that leaves the art as it is and only adds sparks still counts.
+    const marked = (a, b) => a.filter((v, i) => Math.abs(v - b[i]) > 24).length / a.length;
+    const diff = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += Math.abs(a[i] - b[i]);
+      return n / a.length;
+    };
+    const out = {};
+    for (const id of ['confetti', 'fireworks']) {
+      const [plain] = grab(id, 0, [0]);
+      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 3.1)];
+      out[id] = {
+        shader: editionById(id).id,
+        change: marked(lumas(p0, ART), lumas(plain, ART)),
+        art: corr(lumas(p0, ART), lumas(plain, ART)),
+        plate: diff(lumas(p0, PLATE), lumas(plain, PLATE)),
+        plateContrast: sd(lumas(p0, PLATE)) / sd(lumas(plain, PLATE)),
+        seam: Math.max(diff(p0, p1), diff(p0b, p1b)),
+        moves: diff(p0, half),
+      };
+    }
+    return out;
+  });
+  for (const [id, r] of Object.entries(report)) {
+    const f = (v) => v.toFixed(2);
+    expect(r.shader === id, `${id} is not a finish`);
+    expect(r.change > 0.02, `${id} barely changes the picture (${f(r.change * 100)}% of it)`);
+    expect(r.art > 0.75, `${id} hides the message (correlation ${f(r.art)})`);
+    expect(r.plate < 4 && r.plateContrast > 0.9, `${id} covers the name (diff ${f(r.plate)}, contrast ${f(r.plateContrast)})`);
+    expect(r.seam < 0.6, `${id} jumps where its loop closes (${f(r.seam)})`);
+    expect(r.moves > r.seam * 4, `${id} does not move along its loop (${f(r.moves)})`);
+  }
+});
+
 await step('phones: the live preview rides in the Save stub, never over the controls', async () => {
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const p = await phone.newPage();
