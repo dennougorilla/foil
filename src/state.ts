@@ -3,7 +3,9 @@ import type { Crop } from './card/face';
 import { shapeOf, type ShapeId } from './card/shape';
 import type { Lang } from './i18n';
 import { EXPORT_MOTIONS, sanitizeTune, TUNE_DEFAULTS, type ExportMotion, type Tune } from './tune/model';
-import { DEFAULT_LETTERING, type Lettering } from './lettering';
+import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Lettering } from './lettering';
+import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
+import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 /** Tabs of the Fine-tune area in the side panel. */
@@ -26,10 +28,18 @@ export interface State extends RangeColorState {
   intensity: number;
   pixel: number;
   name: string;
-  desc: string;
-  /** True once the person typed their own name/description; stops samples overwriting it. */
+  /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
-  descEdited: boolean;
+  /** The message printed on the picture (none while its text is empty). */
+  message: Message;
+  /** Whether the nameplate shows the name and the rarity. */
+  plate: boolean;
+  /** The classic FOIL card or a trading card (type line and effect box). */
+  layout: CardLayout;
+  /** The trading card's type line. */
+  cardType: string;
+  /** Pieces of text printed in their own lettering (style and foil only); the rest follow `text`. */
+  prints: FieldPrints;
   /** Index of the sample in use, or -1 when showing the person's own image. */
   sample: number;
   crop: Crop;
@@ -52,6 +62,9 @@ export interface State extends RangeColorState {
   text: Lettering;
 }
 
+/** Longest type line, in characters. */
+export const CARD_TYPE_MAX = 24;
+
 type Listener = (s: State, changed: Set<keyof State>) => void;
 
 const KEY = 'foil:v1';
@@ -67,9 +80,12 @@ const PERSIST: (keyof State)[] = [
   'intensity',
   'pixel',
   'name',
-  'desc',
   'nameEdited',
-  'descEdited',
+  'message',
+  'plate',
+  'layout',
+  'cardType',
+  'prints',
   'sample',
   'crop',
   'tune',
@@ -124,9 +140,12 @@ const defaults = (): State => ({
   intensity: 1,
   pixel: 0,
   name: '',
-  desc: '',
   nameEdited: false,
-  descEdited: false,
+  message: { ...DEFAULT_MESSAGE },
+  plate: true,
+  layout: 'classic',
+  cardType: '',
+  prints: {},
   sample: 0,
   crop: { zoom: 1, x: 0.5, y: 0.5 },
   loading: false,
@@ -147,6 +166,11 @@ function sanitize(state: State) {
   state.tune = sanitizeTune(state.tune);
   state.shape = shapeOf(state.shape);
   state.adjustOpen = state.adjustOpen === true;
+  state.message = normalizeMessage(state.message);
+  state.plate = state.plate !== false;
+  if (!CARD_LAYOUTS.includes(state.layout)) state.layout = 'classic';
+  state.cardType = typeof state.cardType === 'string' ? state.cardType.slice(0, CARD_TYPE_MAX) : '';
+  state.prints = normalizeFieldPrints(state.prints);
   // A finish that no longer exists (a retired one) starts over on the default.
   if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
   if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';

@@ -156,7 +156,7 @@ uniform float uDim;        // how far the face falls into shade away from the ba
 uniform vec3 uStar;        // a pixel star twinkling on the face: x, y, power (0 = none)
 uniform float uFaceTexels; // face texture width in px
 uniform vec2 uCardK;       // the face in units of its short side: (1, 1.4) on the trading card
-uniform vec4 uArt;         // the art window in face uv: x0, y0, x1, y1
+uniform vec4 uArt;         // the art window in face uv: x0, y0, x1, y1 (it follows the shape and the layout)
 // uv scaled so a pattern tuned on the trading card keeps its size in px on every shape.
 vec2 asTrading(vec2 uv) { return uv * uCardK / vec2(1.0, 1.4); } // any shape
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
@@ -297,8 +297,9 @@ void main() {
   if (base.a < 0.002) discard;
   vec3 c = base.rgb / max(base.a, 1e-4);
   vec3 m = texture(uMask, uv).rgb;
-  if (uPlate < 0.5 && (uv.y - uArt.w) * uCardK.y > 0.009 && m.b < 0.5 && m.r < 0.5) {
+  if (uPlate < 0.5 && uArt.y * uCardK.y < 0.1 && (uv.y - uArt.w) * uCardK.y > 0.009 && m.b < 0.5 && m.r < 0.5) {
     // At thumbnail size the name is unreadable noise; paint plain frame instead.
+    // (A trading card, whose art starts below its name bar, keeps its bars and boxes: they are what makes it one.)
     vec4 f = face(vec2(0.04 / uCardK.x, 0.5), 0.0);
     c = f.rgb / max(f.a, 1e-4);
   }

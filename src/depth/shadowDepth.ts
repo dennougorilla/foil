@@ -2,7 +2,7 @@
 // picture. Work starts only once a finish that reads depth is chosen: the art window goes to the depth worker, which answers with a quick cut from colour
 // and then, when the model can run, a better one. The sheets lie down while a new cut is made
 // and stand up again when it lands.
-import { artWindow } from '../card/shape';
+import { artOf } from '../card/face';
 import type { CardRenderer } from '../gl/renderers';
 import { editionById } from '../editions';
 import type { Dict } from '../i18n';
@@ -12,11 +12,11 @@ import { DepthPill } from './pill';
 import type { CutReply, CutRequest } from './worker';
 
 /**
- * The art window as the worker sees it: about 392 × 518 px (the trading card's) in the window's
+ * The art window as the worker sees it: about 392 × 518 px (the classic trading card's) in the window's
  * own proportions, in multiples of 14 for the model.
  */
 function seen(face: HTMLCanvasElement) {
-  const art = artWindow(face.width, face.height);
+  const art = artOf(face);
   const a = art.w / art.h;
   const step = (v: number) => Math.max(14, Math.round(v / 14) * 14);
   return { art, w: step(Math.sqrt(392 * 518 * a)), h: step(Math.sqrt((392 * 518) / a)) };

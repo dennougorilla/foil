@@ -7,7 +7,8 @@
 // Shaking comes from the card itself (tossing, flicking the tilt, a click's wobble), a pointer
 // sweeping across the art, and on phones the motion sensor. Exports and reduced motion never
 // take input: the flakes only move while the shader clock moves.
-import { artWindow, cardK, SHORT } from '../card/shape';
+import { artOf } from '../card/face';
+import { cardK } from '../card/shape';
 import type { CardDraw } from './renderers';
 
 /** Card shader index of the finish. Kept clear of the regular and sponsor ranges. */
@@ -52,11 +53,11 @@ vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
 }
 `;
 
-/** The art window of a card drawn `w` × `h`, in card uv (x, y, width, height), and its height in widths (A). */
-function artOf(w: number, h: number) {
-  const [kx, ky] = cardK(w, h);
-  const a = artWindow(kx * SHORT, ky * SHORT);
-  return { uv: [a.x / (kx * SHORT), a.y / (ky * SHORT), a.w / (kx * SHORT), a.h / (ky * SHORT)] as const, A: a.h / a.w, k: [kx, ky] as const };
+/** The art window of a face, in card uv (x, y, width, height), its height in widths (A) and the card's proportions (k). */
+function artUv(face: HTMLCanvasElement) {
+  const a = artOf(face);
+  const [W, H] = [face.width, face.height];
+  return { uv: [a.x / W, a.y / H, a.w / W, a.h / H] as const, A: a.h / a.w, k: cardK(W, H) };
 }
 
 const COARSE = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4;
@@ -336,8 +337,8 @@ export class SnowGlobe {
   private tf: WebGLTransformFeedback;
   private cur = 0;
   private time = NaN;
-  /** The art window of the card last drawn. */
-  private art = artOf(SHORT, SHORT * 1.4);
+  /** The art window of the card's face (see setFace). */
+  private art: ReturnType<typeof artUv> = { uv: [0.062, 0.0443, 0.876, 0.8343], A: 1.3333, k: [1, 1.4] }; // any shape: the classic trading card until setFace
   // Liquid state, eased back to calm.
   private impulse: [number, number] = [0, 0];
   private spin = 0;
@@ -386,10 +387,14 @@ export class SnowGlobe {
     if (!settled) listen();
   }
 
+  /** The face the flakes are drawn over: they fill its art window, wherever the layout puts it. */
+  setFace(face: HTMLCanvasElement): void {
+    this.art = artUv(face);
+  }
+
   /** Draws the flakes over a card that was just drawn; the mask must still be bound to unit 1. */
   draw(view: GlobeView, d: CardDraw, time: number): void {
     const { gl } = this;
-    this.art = artOf(d.w, d.h);
     const main = d.plate !== false && !this.settled;
     if (main) this.feel(view, d);
     if (time !== this.time) {

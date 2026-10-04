@@ -1,10 +1,12 @@
 import './style.css';
-import { cardOf, CARD_KEYS, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
+import { cardOf, CARD_KEYS, CARD_TYPE_MAX, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { artAspect, clampCrop, cropRect, drawFace, drawFlip, type Crop } from './card/face';
+import { clampCrop, cropRect, drawFace, drawFlip, faceArt, type Crop } from './card/face';
 import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
+import { CARD_LAYOUTS } from './card/tcg';
+import { mountPrintPop } from './printPop';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
@@ -16,8 +18,10 @@ import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
+import { bindMessageField, mountMessage } from './messagePanel';
+import { loadMessageFont } from './card/messageFace';
 import { changedKeys, EXPORT_MOTIONS } from './tune/model';
-import { DEFAULT_LETTERING } from './lettering';
+import { DEFAULT_LETTERING, fieldAt, setFieldPrints, setTextRuns } from './lettering';
 import { initRangeColors } from './features';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
@@ -84,6 +88,11 @@ try {
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
     onFlick: (dir) => stepEdition(dir),
+    // Tapping words on the card opens their own print.
+    onTapCard: (uv, x, y) => {
+      const field = fieldAt(uv);
+      if (field) printPop.open(field, { x, y });
+    },
     handIds: hand,
     deckRect: () => document.getElementById('deckBtn')?.getBoundingClientRect() ?? null,
   });
@@ -124,27 +133,35 @@ function wakePacks() {
 }
 const artIds = new WeakMap<object, number>();
 let artCount = 0;
-/** Names the art in the window (picture and crop), so depth is read once per art. */
+/** Names the art in the window (picture, layout and crop), so depth is read once per art. */
 function artKey() {
   const s = store.get();
   const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
   if (!artIds.has(src)) artIds.set(src, ++artCount);
-  return `${artIds.get(src)}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
+  const a = faceArt(s);
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
 }
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType };
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
 let faceVersion = 0;
 const thumbKey = () => `${faceVersion}|${JSON.stringify(store.get().tune)}|${store.get().intensity}`;
 
+/** The message's typeface and words last asked for; the face is painted again once they can be drawn. */
+let fontAsked = '';
+
 function redrawFace() {
   faceVersion++;
   const spec = faceSpec(currentImage());
-  drawFace(face, mask, spec);
+  setTextRuns(face.width, face.height, drawFace(face, mask, spec));
+  const { font, text } = spec.message;
+  const ask = text.trim() ? `${font}|${text}` : '';
+  if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
+  fontAsked = ask;
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
   depth?.update(face, artKey());
@@ -155,12 +172,10 @@ function redrawFace() {
 /** "v0.2.0 · 1a2b3c4", shown quietly at the foot of the support menu. */
 const APP_VERSION_LABEL = __APP_COMMIT__ === 'unknown' ? `v${__APP_VERSION__}` : `v${__APP_VERSION__} · ${__APP_COMMIT__}`;
 
-/** Placeholder title and line: samples carry their own, uploads get a generic one. */
+/** Placeholder name: samples carry their own, uploads get a generic one. */
 function fallback() {
   const i = store.get().sample;
-  return i >= 0
-    ? { name: t.samplesName[i], desc: t.samplesDesc[i] }
-    : { name: t.myCard, desc: t.myDesc };
+  return { name: i >= 0 ? t.samplesName[i] : t.myCard };
 }
 
 function applyText() {
@@ -351,6 +366,25 @@ function buildSegments() {
     };
     ss.appendChild(b);
   }
+  const ls = $('layoutSeg');
+  ls.textContent = '';
+  for (const id of CARD_LAYOUTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = id;
+    b.setAttribute('role', 'radio');
+    // A tiny card drawn in each layout's parts.
+    b.innerHTML = '<i class="layout-icon" aria-hidden="true"><i></i><i></i><i></i></i><span></span>';
+    b.lastElementChild!.textContent = t.tcg.layoutName[id];
+    radio(b, s.layout === id);
+    b.onclick = () => {
+      if (store.get().layout === id) return;
+      sfx.tick();
+      stage.flipTo(() => store.set({ layout: id }));
+    };
+    ls.appendChild(b);
+  }
 }
 
 /** The card takes a new shape: its slot, its back, the crop window and every face follow. */
@@ -422,14 +456,22 @@ function setRangeFill(input: HTMLInputElement) {
 function syncInputs() {
   const s = store.get();
   const name = $<HTMLInputElement>('nameInput');
-  const desc = $<HTMLTextAreaElement>('descInput');
+  const msg = $<HTMLTextAreaElement>('messageInput');
   if (document.activeElement !== name) name.value = s.name;
-  if (document.activeElement !== desc) desc.value = s.desc;
+  syncMessageInput();
   name.placeholder = fallback().name;
-  desc.placeholder = fallback().desc;
-  desc.classList.toggle('is-hint', s.sample < 0);
+  const tcg = s.layout === 'tcg';
+  msg.placeholder = tcg ? t.msg.effectTag : t.msg.tag;
+  const type = $<HTMLInputElement>('typeInput');
+  type.hidden = !tcg;
+  if (document.activeElement !== type) type.value = s.cardType;
+  type.placeholder = t.tcg.typeTag;
+  type.setAttribute('aria-label', t.tcg.type);
   name.setAttribute('aria-label', t.name);
-  desc.setAttribute('aria-label', t.desc);
+  // Off, the name stays in the tag but is not printed: it steps back.
+  name.classList.toggle('is-off', !s.plate);
+  msg.setAttribute('aria-label', t.msg.title);
+  $('info').classList.toggle('is-tcg', tcg);
   const inten = $<HTMLInputElement>('intensity');
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
@@ -480,7 +522,7 @@ function positionCropWindow() {
   const ch = parseFloat(cropCanvas.style.height) || 1;
   const left = (box.width - cw) / 2;
   const top = (box.height - ch) / 2;
-  const r = cropRect(img.width, img.height, store.get().crop, artAspect(store.get().shape));
+  const r = cropRect(img.width, img.height, store.get().crop, artAspect());
   const k = cw / img.width;
   Object.assign(cropWin.style, {
     left: `${left + r.sx * k}px`,
@@ -492,9 +534,15 @@ function positionCropWindow() {
   });
 }
 
+/** Width / height of the art window the crop fills (the layout's). */
+function artAspect() {
+  const a = faceArt(store.get());
+  return a.w / a.h;
+}
+
 function setCrop(c: Crop) {
   const img = currentImage();
-  store.set({ crop: clampCrop(img.width, img.height, c, artAspect(store.get().shape)) });
+  store.set({ crop: clampCrop(img.width, img.height, c, artAspect()) });
 }
 
 {
@@ -630,7 +678,6 @@ function useImage(idx: number) {
   const patch: Partial<State> = { sample: idx, crop: { zoom: 1, x: 0.5, y: 0.5 } };
   if (idx >= 0) {
     if (!s.nameEdited) patch.name = '';
-    if (!s.descEdited) patch.desc = '';
   }
   stage.flipTo(() => {
     store.set(patch);
@@ -703,7 +750,7 @@ let flipChosen = false;
 
 function setFlip(img: Img | null) {
   flipImage = img;
-  if (img) drawFlip(flip, img, store.get().shape);
+  if (img) drawFlip(flip, img, store.get().shape, faceArt(store.get()));
   stage.cards.setFlip(img ? flip : null);
   renderFlip();
 }
@@ -813,10 +860,9 @@ $<HTMLInputElement>('nameInput').addEventListener('input', (e) => {
   const v = (e.target as HTMLInputElement).value;
   store.set({ name: v, nameEdited: v.length > 0 });
 });
-$<HTMLTextAreaElement>('descInput').addEventListener('input', (e) => {
-  const v = (e.target as HTMLTextAreaElement).value;
-  store.set({ desc: v, descEdited: v.length > 0 });
-});
+const syncMessageInput = bindMessageField($<HTMLTextAreaElement>('messageInput'), store);
+$<HTMLInputElement>('typeInput').maxLength = CARD_TYPE_MAX;
+$<HTMLInputElement>('typeInput').addEventListener('input', (e) => store.set({ cardType: (e.target as HTMLInputElement).value }));
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
@@ -866,9 +912,10 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic';
   if (id === 'light') return changedKeys(s.tune).length > 0;
-  if (id === 'text') return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING);
+  if (id === 'text')
+    return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
   return rangeChanged;
 }
 
@@ -951,7 +998,7 @@ function syncAdjust() {
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: 'card' });
+  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1781,21 +1828,23 @@ store.on((s, changed) => {
     deck.render();
   }
   if (changed.has('rarity') || changed.has('frame') || changed.has('shape')) buildSegments();
-  if (changed.has('shape')) {
-    applyShape();
-    // The art window has new proportions: keep the crop inside the picture, then repaint.
+  if (changed.has('prints')) setFieldPrints(s.prints);
+  if (changed.has('shape')) applyShape();
+  if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && (changed.has('cardType') || changed.has('message')))) {
+    // A new art window has its own proportions: keep the crop inside the picture, and redraw the flip picture for it.
     const img = currentImage();
-    const crop = clampCrop(img.width, img.height, s.crop, artAspect(s.shape));
+    const crop = clampCrop(img.width, img.height, s.crop, artAspect());
     if (crop.x !== s.crop.x || crop.y !== s.crop.y) store.set({ crop });
-    redrawFace();
-    positionCropWindow();
+    if (flipImage) setFlip(flipImage);
+    buildSegments();
+    drawCropPreview();
   }
-  if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
-  if (changed.has('sample')) syncInputs();
+  if (['sample', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
   if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'exportMotion', 'shape'].some((k) => changed.has(k as keyof State))) {
@@ -1818,6 +1867,16 @@ store.on((s, changed) => {
 // ---------- Boot ----------
 
 setSound(store.get().sound);
+setFieldPrints(store.get().prints);
+const printPop = mountPrintPop({ store, dict: () => t, onPick: () => stage.juice(0.35) });
+mountMessage({
+  store,
+  host: $('pane-text'),
+  dict: () => t,
+  onPick: () => stage.juice(0.35),
+  chip: (f) => printPop.chip(f),
+  namePlaceholder: () => fallback().name,
+});
 mountLettering({
   store,
   host: $('pane-text'),
@@ -1855,8 +1914,8 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font, so wait for it before painting the face.
-document.fonts.load('40px "DotGothic16"').then(boot, boot);
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before painting the face.
+Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]).then(boot, boot);
 boot();
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;

@@ -75,6 +75,8 @@ export interface StageOptions {
   handIds: () => EditionId[];
   /** Where the deck sits on the page: swapped cards fly between it and the hand. */
   deckRect?: () => DOMRect | null;
+  /** A tap (not a toss) on the card, at this point of its face (uv) and of the page. */
+  onTapCard?: (uv: [number, number], x: number, y: number) => void;
 }
 
 /** A level pinned with ?quality=0…3 in the address, if any. */
@@ -402,10 +404,12 @@ export class Stage {
     };
     cardSlot.addEventListener('pointerup', release);
     cardSlot.addEventListener('pointercancel', release);
-    cardSlot.addEventListener('click', () => {
+    cardSlot.addEventListener('click', (e) => {
       if (this.drag.moved > 6) return;
       this.juice();
       sfx.pop();
+      // A keyboard press has no point on the card.
+      if (this.pose && e.detail > 0) this.o.onTapCard?.(cardUv(e.clientX - this.canvasRect.left, e.clientY - this.canvasRect.top, this.pose), e.clientX, e.clientY);
     });
   }
 
@@ -459,6 +463,8 @@ export class Stage {
   }
 
   private canvasRect = new DOMRect();
+  /** The card's pose in the last frame, to find where a tap landed on its face. */
+  private pose: Parameters<typeof cardUv>[2] | null = null;
 
   private cardRect() {
     const s = this.o.cardSlot.getBoundingClientRect();
@@ -626,6 +632,7 @@ export class Stage {
 
       const tilt = motion.tilt(tune, pose, this.rx.x + pose.rx, this.ry.x + pose.ry);
       const cardPose = { cx: r.cx + this.ox.x + fx, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      this.pose = cardPose;
       const pointed = over && !this.drag.active && !this.hold;
       let light: [number, number];
       if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);

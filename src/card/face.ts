@@ -1,10 +1,14 @@
 import { rarityById, type FrameId, type RarityId } from '../editions';
-import { paintLettering } from '../lettering';
+import { paintLettering, type TextRun } from '../lettering';
+import { messageLines, type Message, type Rect } from '../message';
 import { customFrame } from '../palette';
+import { paintMessage } from './messageFace';
 import { artWindow, shapeById, SHORT, type ShapeId } from './shape';
+import { tcgFrame, type CardLayout } from './tcg';
+import { paintTcg } from './tcgFace';
 
 /** Pixel literals below were tuned at 600px across the short side. */
-const S = SHORT / 600;
+export const S = SHORT / 600;
 
 export interface Crop {
   zoom: number;
@@ -22,28 +26,51 @@ export interface FaceSpec {
   /** Custom frame colour ('#rrggbb'); overrides the frame preset when set. */
   frameColor?: string;
   shape: ShapeId;
+  /** Printed on the picture when it has any text. */
+  message: Message;
+  /** Whether the nameplate carries the name and the rarity; off leaves the band plain. */
+  plate: boolean;
+  /** The classic FOIL card, or a trading card with a type line and an effect box. */
+  layout: CardLayout;
+  /** The trading card's type line (any short words). */
+  cardType: string;
 }
 
-const OUTLINE = '#161c1f';
-const RADIUS = 0.075 * SHORT;
-const LINE = 0.016 * SHORT;
+export const OUTLINE = '#161c1f';
+export const RADIUS = 0.075 * SHORT;
+export const LINE = 0.016 * SHORT;
 
-/** A face of this shape, its size and its art window, in face pixels. */
+/** A face of this shape, its size in face pixels. */
 function sized(canvas: HTMLCanvasElement, shape: ShapeId) {
   const { w, h } = shapeById(shape);
   canvas.width = w;
   canvas.height = h;
-  return { W: w, H: h, art: artWindow(w, h) };
+  return { W: w, H: h };
 }
 
-/** Width / height of a shape's art window: what a crop of the picture fills. */
-export function artAspect(shape: ShapeId): number {
-  const { w, h } = shapeById(shape);
-  const a = artWindow(w, h);
+/** What a trading card holds, which decides its parts. */
+export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message'>) => ({ type: !!s.cardType.trim(), lines: messageLines(s.message.text).length });
+
+/**
+ * The art window of a card, in face pixels: the shape's classic one, or the trading card's for
+ * what it holds (its parts take room from the art).
+ */
+export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message'>): Rect {
+  const { w, h } = shapeById(s.shape);
+  return s.layout === 'tcg' ? tcgFrame(w, h, tcgContent(s)).art : artWindow(w, h);
+}
+
+/** Width / height of a card's art window: what a crop of the picture fills. */
+export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message'>): number {
+  const a = faceArt(s);
   return a.w / a.h;
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+/** The art window each painted face was drawn with; a face drawn elsewhere (a pack's wrapper) has its shape's classic one. */
+const arts = new WeakMap<HTMLCanvasElement, Rect>();
+export const artOf = (face: HTMLCanvasElement): Rect => arts.get(face) ?? artWindow(face.width, face.height);
+
+export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
 }
@@ -96,7 +123,7 @@ function frameFill(ctx: CanvasRenderingContext2D, frame: FrameId, rarity: Rarity
   }
 }
 
-function fitName(ctx: CanvasRenderingContext2D, text: string, max: number, size: number): number {
+export function fitName(ctx: CanvasRenderingContext2D, text: string, max: number, size: number): number {
   let s = size;
   ctx.font = `${s}px "DotGothic16", monospace`;
   while (ctx.measureText(text).width > max && s > 16 * S) {
@@ -106,13 +133,12 @@ function fitName(ctx: CanvasRenderingContext2D, text: string, max: number, size:
   return s;
 }
 
-const ART_R = RADIUS * 0.45;
-type Rect = { x: number; y: number; w: number; h: number };
+export const ART_R = RADIUS * 0.45;
 
 /** The picture cropped into the art window, under the frame's inner shade. */
-function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop) {
+export function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop, rad = ART_R) {
   ctx.save();
-  roundRect(ctx, art.x, art.y, art.w, art.h, ART_R);
+  roundRect(ctx, art.x, art.y, art.w, art.h, rad);
   ctx.clip();
   const { sx, sy, sw, sh } = cropRect(image.width, image.height, crop, art.w / art.h);
   ctx.imageSmoothingEnabled = true;
@@ -127,9 +153,9 @@ function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['ima
   ctx.restore();
 }
 
-/** Flip Lenticular's other picture: centred and cropped to fill the art window, the rest left clear. */
-export function drawFlip(flip: HTMLCanvasElement, image: FaceSpec['image'], shape: ShapeId): void {
-  const { W, H, art } = sized(flip, shape);
+/** Flip Lenticular's other picture: centred and cropped to fill the card's art window, the rest left clear. */
+export function drawFlip(flip: HTMLCanvasElement, image: FaceSpec['image'], shape: ShapeId, art: Rect): void {
+  const { W, H } = sized(flip, shape);
   const ctx = flip.getContext('2d')!;
   ctx.clearRect(0, 0, W, H);
   paintArt(ctx, art, image, { zoom: 1, x: 0.5, y: 0.5 });
@@ -207,8 +233,37 @@ function paintRibbon(ctx: CanvasRenderingContext2D, flat?: string) {
 
 const RARITY_PIPS: Record<RarityId, number> = { common: 1, uncommon: 2, rare: 3, legendary: 4 };
 
-export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): void {
-  const { W, H, art } = sized(face, spec.shape);
+/** The four rarity diamonds, ending at `right` and centred on `cy`: the rarity colour with a dark outline. */
+export function paintPips(ctx: CanvasRenderingContext2D, spec: FaceSpec, right: number, cy: number, pipSize = 15 * S) {
+  const gap = 7 * S;
+  const rim = 3 * S;
+  const pips = RARITY_PIPS[spec.rarity];
+  const rc = rarityById(spec.rarity).color;
+  for (let i = 0; i < 4; i++) {
+    // Four slots read left to right, filled up to the rarity, matching the tag.
+    const cx = right - pipSize / 2 - (3 - i) * (pipSize + gap);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - pipSize / 2 - rim);
+    ctx.lineTo(cx + pipSize / 2 + rim, cy);
+    ctx.lineTo(cx, cy + pipSize / 2 + rim);
+    ctx.lineTo(cx - pipSize / 2 - rim, cy);
+    ctx.closePath();
+    ctx.fillStyle = OUTLINE;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - pipSize / 2);
+    ctx.lineTo(cx + pipSize / 2, cy);
+    ctx.lineTo(cx, cy + pipSize / 2);
+    ctx.lineTo(cx - pipSize / 2, cy);
+    ctx.closePath();
+    ctx.fillStyle = i < pips ? (spec.frame === 'rarity' ? '#ffffff' : rc) : spec.frame === 'ink' ? '#3a4448' : '#e9e4d6';
+    ctx.fill();
+  }
+}
+
+/** Paints the face and its mask; returns the text it printed, for the lettering map (`setTextRuns`). */
+export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
+  const { W, H } = sized(face, spec.shape);
   sized(mask, spec.shape);
   const ctx = face.getContext('2d')!;
   ctx.clearRect(0, 0, W, H);
@@ -234,56 +289,10 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   ctx.fillRect(0, H - LINE * 1.8, W, LINE * 0.8);
   ctx.restore();
 
-  // Gold rim: a thin gold rule inside the edge, and the art window edged in gold rather than ink.
-  if (frame === 'rim') {
-    const inset = LINE + 8 * S;
-    ctx.strokeStyle = brass(ctx, W, H);
-    ctx.lineWidth = 4 * S;
-    roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, RADIUS - inset);
-    ctx.stroke();
-  }
-
-  // Art window
-  ctx.fillStyle = frame === 'rim' ? brass(ctx, W, H) : OUTLINE;
-  roundRect(ctx, art.x - 4 * S, art.y - 4 * S, art.w + 8 * S, art.h + 8 * S, ART_R + 4 * S);
-  ctx.fill();
-  paintArt(ctx, art, spec.image, spec.crop);
-  if (frame === 'ribbon') paintRibbon(ctx);
-
-  // Nameplate
-  const plateY = art.y + art.h + 4 * S;
-  const plateH = H - LINE - plateY;
-  const pipSize = 15 * S;
-  const gap = 7 * S;
-  const rim = 3 * S;
-  const pips = RARITY_PIPS[spec.rarity];
-  const pipsW = 4 * (pipSize + gap);
-  const name = spec.name.trim() || ' ';
-  fitName(ctx, name, art.w - pipsW - 24 * S, 40 * S);
-  paintLettering(ctx, name, art.x + 4 * S, plateY + plateH / 2 + S, f.ink);
-  // Rarity pips: diamonds in the rarity colour with a dark outline
-  const rc = rarityById(spec.rarity).color;
-  for (let i = 0; i < 4; i++) {
-    // Four slots read left to right, filled up to the rarity, matching the tag.
-    const cx = art.x + art.w - 6 * S - pipSize / 2 - (3 - i) * (pipSize + gap);
-    const cy = plateY + plateH / 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - pipSize / 2 - rim);
-    ctx.lineTo(cx + pipSize / 2 + rim, cy);
-    ctx.lineTo(cx, cy + pipSize / 2 + rim);
-    ctx.lineTo(cx - pipSize / 2 - rim, cy);
-    ctx.closePath();
-    ctx.fillStyle = OUTLINE;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - pipSize / 2);
-    ctx.lineTo(cx + pipSize / 2, cy);
-    ctx.lineTo(cx, cy + pipSize / 2);
-    ctx.lineTo(cx - pipSize / 2, cy);
-    ctx.closePath();
-    ctx.fillStyle = i < pips ? (spec.frame === 'rarity' ? '#ffffff' : rc) : spec.frame === 'ink' ? '#3a4448' : '#e9e4d6';
-    ctx.fill();
-  }
+  const art = faceArt(spec);
+  arts.set(face, art);
+  const classic = spec.layout !== 'tcg';
+  const runs = classic ? paintClassic(ctx, spec, f, frame, art, H) : paintTcg(ctx, spec, f);
 
   // Mask: red = art window, green = frame, blue = ink outline
   const m = mask.getContext('2d')!;
@@ -297,5 +306,42 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   m.fillStyle = '#ff0000';
   roundRect(m, art.x, art.y, art.w, art.h, ART_R);
   m.fill();
-  if (frame === 'ribbon') paintRibbon(m, '#00ff00');
+  if (classic && frame === 'ribbon') paintRibbon(m, '#00ff00');
+  return runs;
+}
+
+/**
+ * The classic card: the art window framed in ink (in gold under the Gold rim, whose gold rule runs
+ * inside the edge), the message on the picture, the Ribbon over its corner, and the nameplate under it.
+ * The trading card draws its own frame stock and plates, so the rim's rule and the ribbon are the
+ * classic card's alone.
+ */
+function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: string }, frame: FrameId | null, art: Rect, H: number): TextRun[] {
+  const W = ctx.canvas.width;
+  if (frame === 'rim') {
+    const inset = LINE + 8 * S;
+    ctx.strokeStyle = brass(ctx, W, H);
+    ctx.lineWidth = 4 * S;
+    roundRect(ctx, inset, inset, W - inset * 2, H - inset * 2, RADIUS - inset);
+    ctx.stroke();
+  }
+  ctx.fillStyle = frame === 'rim' ? brass(ctx, W, H) : OUTLINE;
+  roundRect(ctx, art.x - 4 * S, art.y - 4 * S, art.w + 8 * S, art.h + 8 * S, ART_R + 4 * S);
+  ctx.fill();
+  paintArt(ctx, art, spec.image, spec.crop);
+  const runs = paintMessage(ctx, spec.message, art);
+  if (frame === 'ribbon') paintRibbon(ctx);
+
+  // Nameplate (left plain when it is turned off)
+  const plateY = art.y + art.h + 4 * S;
+  const plateH = H - LINE - plateY;
+  const pipsW = 4 * (15 * S + 7 * S);
+  const name = spec.name.trim() || ' ';
+  const size = fitName(ctx, name, art.w - pipsW - 24 * S, 40 * S);
+  if (spec.plate) {
+    runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y: plateY + plateH / 2 + S, stock: plateY + plateH / 2 + S - 0.0588 * SHORT });
+    paintLettering(ctx, name, art.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+    paintPips(ctx, spec, art.x + art.w - 6 * S, plateY + plateH / 2);
+  }
+  return runs;
 }

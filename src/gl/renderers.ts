@@ -2,13 +2,14 @@ import { BG_FS, cardFs, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './sha
 import { createProgram, createTexture, hexToRgb, quadBuffer, startProgram, uploadTexture, type PendingProgram, type Program } from './gl';
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
+import { artOf } from '../card/face';
 import { RangeLayer } from './range';
 import type { HeatSource } from '../touch/heat';
 import type { LayerMap } from '../depth/layers';
 import type { PackId } from '../packs';
 import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
-import { artWindow, cardK, SHORT } from '../card/shape';
+import { cardK } from '../card/shape';
 
 export type RGB = [number, number, number];
 
@@ -235,10 +236,9 @@ export class CardRenderer {
     uploadTexture(this.gl, f.mask, mask, false);
     f.texels = face.width;
     f.k = k;
-    const W = k[0] * SHORT;
-    const H = k[1] * SHORT;
-    const a = artWindow(W, H);
-    f.art = [a.x / W, a.y / H, (a.x + a.w) / W, (a.y + a.h) / H];
+    // The art window this face was painted with (its shape's, and the layout's), in face uv.
+    const a = artOf(face);
+    f.art = [a.x / face.width, a.y / face.height, (a.x + a.w) / face.width, (a.y + a.h) / face.height];
     if (key !== 'card') return;
     this.cardFace = face;
     for (const cp of this.programs.values()) for (const l of cp.layers) l.setFace?.(face);

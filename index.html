@@ -88,8 +88,9 @@
           <aside class="info" id="info">
             <div class="info-box">
               <input class="info-name" id="nameInput" type="text" maxlength="24" autocomplete="off" spellcheck="false" />
+              <input class="info-type" id="typeInput" type="text" autocomplete="off" spellcheck="false" hidden />
               <div class="info-desc">
-                <textarea id="descInput" maxlength="72" rows="2" spellcheck="false"></textarea>
+                <textarea class="is-hint" id="messageInput" rows="2" spellcheck="false"></textarea>
               </div>
               <div class="pills">
                 <span class="pill pill-rarity" id="pillRarity">
@@ -212,6 +213,10 @@
               <div class="field">
                 <span class="field-label" id="shapeLabel" data-t="shape"></span>
                 <div class="seg seg-shapes" id="shapeSeg" role="radiogroup" aria-labelledby="shapeLabel"></div>
+              </div>
+              <div class="field">
+                <span class="field-label" id="layoutLabel" data-t="layoutLabel"></span>
+                <div class="seg seg-layouts" id="layoutSeg" role="radiogroup" aria-labelledby="layoutLabel"></div>
               </div>
               <div class="row">
                 <label class="field-label" for="pixel" data-t="pixel"></label>

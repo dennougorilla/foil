@@ -87,9 +87,7 @@ export class RangeModel {
     void image;
     const key = JSON.stringify(rest);
     if (this.regions.text && key === this.textKey) return this.regions.text;
-    const blankSpec = { ...spec, name: ' ' } as FaceSpec & { desc?: string };
-    if ('desc' in blankSpec) blankSpec.desc = '';
-    drawFace(this.blank.face, this.blank.mask, blankSpec);
+    drawFace(this.blank.face, this.blank.mask, { ...spec, name: ' ', message: { ...spec.message, text: '' } });
     const a = sample(face, this.scratch).slice();
     const b = sample(this.blank.face, this.scratch);
     const out = new Uint8Array(N);
