@@ -1082,8 +1082,8 @@ button {
   --red-lo: #7a200f;
   --orange-ink: #2a1600;
   --mark: #59e0a5;
-  /* Side notes a step brighter than on the stage, so they read through the scanlines. */
-  --text-dim: #b3c3c6;
+  /* Side notes a step brighter than on the stage: 4.5:1 even on a slate slab. */
+  --text-dim: #c4d2d4;
   --drop: 0 2px 0 rgba(0, 0, 0, 0.5);
   --pad: 14px;
   --gap: 10px;
@@ -1294,6 +1294,12 @@ button {
   --c: var(--panel-hi);
   --lo: var(--edge);
   color: var(--text);
+}
+
+/* On the board a slab answers the pointer by moving, not by lightening, so its white text keeps
+   its contrast. */
+.panel .btn:hover {
+  filter: none;
 }
 
 /* The colour buttons wobble once as the pointer arrives, like a game's. */
@@ -2039,7 +2045,7 @@ button {
    controls above it. */
 .sec-export::after,
 .tune-dock::after {
-  content: var(--more-text);
+  content: none;
   position: absolute;
   top: -11px;
   left: 50%;
@@ -2057,13 +2063,20 @@ button {
   pointer-events: none;
 }
 
+/* Only then is there a note at all, so screen readers never hear a hidden one. */
 .panel.has-more :is(.sec-export, .tune-dock)::after {
+  content: var(--more-text);
   opacity: 1;
 }
 
 /* With the Shine tab's dock pinned above the Save box, the dock carries the tag instead. */
 .panel:has(.tune-dock:not([hidden])) .sec-export::after {
   display: none;
+}
+
+/* The Shine tab's dock sticks just above the Save box and the margin of board round it. */
+.panel .tune-dock {
+  bottom: calc(var(--export-h, 0px) + 2 * var(--gap));
 }
 
 /* With the Shine tab's dock pinned above the Save box, the dock carries the fade instead. */
@@ -3194,6 +3207,10 @@ input[type='range']:disabled {
   }
   .sec-export:has(.tune-peek:not([hidden])) .seg-format .seg-btn {
     min-height: 38px;
+  }
+  /* The Save box is fixed to the screen's bottom edge here, with no margin round it. */
+  .panel .tune-dock {
+    bottom: var(--export-h, 0px);
   }
   .sec-export .tune-peek {
     grid-area: peek;

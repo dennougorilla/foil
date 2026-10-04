@@ -1369,14 +1369,12 @@ function trackExportBar() {
 $('panel').addEventListener('scroll', trackExportBar, { passive: true });
 addEventListener('scroll', trackExportBar, { passive: true });
 
-// A value that changes pops in its pocket, the way a game's score counter does.
+// A value that changes pops in its pocket, the way a game's score counter does. A drag keeps
+// one pop going rather than restarting it, so no input event forces a layout.
 $('panel').addEventListener('input', (e) => {
-  const out = (e.target as HTMLElement).closest('.row, .tune-row')?.querySelector('output');
-  if (!out) return;
-  out.classList.remove('is-bump');
-  void out.offsetWidth;
-  out.classList.add('is-bump');
+  (e.target as HTMLElement).closest('.row, .tune-row')?.querySelector('output')?.classList.add('is-bump');
 });
+$('panel').addEventListener('animationend', (e) => (e.target as HTMLElement).classList.remove('is-bump'));
 addEventListener('resize', trackExportBar);
 
 function dismissToast(el: HTMLElement) {
