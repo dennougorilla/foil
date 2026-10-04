@@ -7,8 +7,16 @@ import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
-import { TORCH_STILL, torchAt } from './gl/blacklight';
+import { TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
+import { packOf } from './packs';
+import { loadPack } from './gl/finishes/registry';
+
+/** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
+export async function packLoaded(edition: Edition): Promise<void> {
+  const pack = packOf(edition.id);
+  if (pack) await loadPack(pack.id);
+}
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -52,6 +60,7 @@ export function download(blob: Blob, name: string): string {
 
 /** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
 export async function exportPng(input: ExportInput): Promise<string> {
+  await packLoaded(input.edition);
   const pad = 24;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
@@ -232,6 +241,7 @@ export async function exportGif(
   onProgress?: (p: number, encoding: boolean) => void,
   opts: GifOptions = { clear: false, matte: 'auto' },
 ): Promise<string> {
+  await packLoaded(input.edition);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   const result = new Promise<ArrayBuffer>((resolve, reject) => {

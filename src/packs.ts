@@ -150,9 +150,14 @@ export function addToHand(hand: readonly EditionId[], id: EditionId, at?: number
   return hand.map((x, i) => (i === last ? id : x));
 }
 
-/** Puts a card exactly in slot `at`, swapping out what is there (never Base); past the end it is added. */
+/**
+ * Puts a card exactly in slot `at`, swapping out what is there (never Base); past the end it is
+ * added. A card already in the hand trades places with the one in that slot.
+ */
 export function placeAt(hand: readonly EditionId[], id: EditionId, at: number): EditionId[] {
   if (hand[at] === 'base') return [...hand];
+  const from = hand.indexOf(id);
+  if (from >= 0 && at < hand.length) return hand.map((x, i) => (i === at ? id : i === from ? hand[at] : x));
   const rest = hand.filter((x) => x !== id);
   if (at >= rest.length) return addToHand(rest, id);
   return rest.map((x, i) => (i === at ? id : x));

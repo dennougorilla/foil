@@ -102,7 +102,10 @@ function wakeDepth() {
       animated: () => !!userAnim && store.get().sample < 0,
     });
     depth.update(face, artKey());
-  });
+  })
+    .catch((err) => console.error(err))
+    // A failed fetch (offline) is tried again the next time a depth finish is chosen.
+    .finally(() => (depthLoading = false));
 }
 
 /** Fetches the packs of the finish on the card and of the hand's cards; they deal in once ready. */
@@ -646,6 +649,8 @@ fileInput.addEventListener('change', () => {
 const flip = document.createElement('canvas');
 /** The picture Flip Lenticular flips to; null draws the front picture in pencil instead. */
 let flipImage: Img | null = null;
+/** Someone chose or removed the picture during this visit. */
+let flipChosen = false;
 
 function setFlip(img: Img | null) {
   flipImage = img;
@@ -681,6 +686,7 @@ flipInput.addEventListener('change', async () => {
   try {
     // An animated picture flips to its first frame.
     const { still } = await decodeImage(f);
+    flipChosen = true;
     setFlip(still);
     void saveUserImage(still, 'flip');
     sfx.tick();
@@ -691,6 +697,7 @@ flipInput.addEventListener('change', async () => {
   }
 });
 $('flipClear').addEventListener('click', () => {
+  flipChosen = true;
   setFlip(null);
   void forgetUserImage('flip');
   sfx.tick();
@@ -1278,7 +1285,7 @@ function viewDeck() {
     void logo.offsetWidth;
     logo.classList.add('is-flip');
     const others = hand().filter((id) => id !== store.get().edition);
-    selectEdition(others[Math.floor(Math.random() * others.length)]);
+    if (others.length) selectEdition(others[Math.floor(Math.random() * others.length)]);
   });
   logo.addEventListener('animationend', (e) => {
     if ((e.target as HTMLElement).matches('.tile:last-of-type')) logo.classList.remove('is-flip');
@@ -1515,7 +1522,8 @@ document.fonts.load('40px "DotGothic16"').then(boot, boot);
 boot();
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
-  if (img) setFlip(img.still);
+  // A picture chosen (or removed) meanwhile wins over last visit's.
+  if (img && !flipChosen) setFlip(img.still);
 });
 if (store.get().sample < 0) {
   // Bring back the image from last visit; if it's gone, fall back to the first sample.

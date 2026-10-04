@@ -8,7 +8,7 @@ import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, typ
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
 import './stage-phone.css';
-import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/blacklight';
+import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
 
 export class Spring {
   v = 0;

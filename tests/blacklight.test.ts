@@ -1,7 +1,7 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TORCH_STILL, torchAt } from '../src/gl/blacklight.ts';
+import { TORCH_STILL, torchAt } from '../src/gl/torch.ts';
 import { EDITIONS } from '../src/editions.ts';
 import { OPEN_EDITIONS } from '../src/packs.ts';
 

@@ -124,6 +124,9 @@ test('placing onto a slot swaps exactly that card, never Base; taking out leaves
   assert.deepEqual(placeAt([...OPEN_EDITIONS], 'gold', 2), ['base', 'foil', 'gold', 'poly', 'negative', 'prism', 'glitch']);
   assert.deepEqual(placeAt([...OPEN_EDITIONS], 'gold', 0), [...OPEN_EDITIONS]);
   assert.deepEqual(placeAt(['base', 'foil'], 'gold', 5), ['base', 'foil', 'gold']);
+  // A card already in the hand trades places with the one in that slot; nothing is lost.
+  assert.deepEqual(placeAt(['base', 'foil', 'holo', 'poly'], 'foil', 2), ['base', 'holo', 'foil', 'poly']);
+  assert.deepEqual(placeAt(['base', 'foil', 'holo', 'poly'], 'foil', 0), ['base', 'foil', 'holo', 'poly']);
   assert.deepEqual(removeFromHand([...OPEN_EDITIONS], 'holo'), ['base', 'foil', 'poly', 'negative', 'prism', 'glitch']);
   assert.deepEqual(removeFromHand(['base'], 'base'), ['base']);
 });
