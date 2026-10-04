@@ -100,34 +100,40 @@ class LiveMotion {
   /**
    * Starts following the device's tilt. Where the sensor takes a permission (iOS), it is asked
    * for only from a tap on the card or the hand (a card or a step), once per visit. Under reduced
-   * motion the sensor is left alone (no prompt, no listener) until that is turned off.
+   * motion the sensor is left alone: no prompt, and no listener while it is on.
    */
   armGyro(stage: HTMLElement, reduced: MediaQueryList) {
     if (!gyroAvailable()) return;
-    if (reduced.matches) {
-      reduced.addEventListener('change', () => this.armGyro(stage, reduced), { once: true });
-      return;
-    }
+    let allowed = false;
+    const sync = () => {
+      if (allowed && !reduced.matches) window.addEventListener('deviceorientation', this.orient);
+      else window.removeEventListener('deviceorientation', this.orient);
+    };
+    reduced.addEventListener('change', sync);
     const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
-    if (typeof DOE.requestPermission !== 'function') return this.listen();
+    if (typeof DOE.requestPermission !== 'function') {
+      allowed = true;
+      return sync();
+    }
     const ask = (e: Event) => {
       if (!(e.target as Element).closest('#cardSlot, .hand-slot, .hand-step') || this.gyro.asked || reduced.matches) return;
       this.gyro.asked = true;
       stage.removeEventListener('click', ask);
       // Called straight from the tap, which iOS needs to show its prompt.
-      void DOE.requestPermission!().then((r) => r === 'granted' && this.listen(), () => {});
+      void DOE.requestPermission!().then((r) => {
+        allowed = r === 'granted';
+        sync();
+      }, () => {});
     };
     stage.addEventListener('click', ask);
   }
 
-  private listen() {
-    window.addEventListener('deviceorientation', (e) => {
-      if (e.beta == null || e.gamma == null) return;
-      const now = performance.now();
-      this.gyro.tilt.feed(e.beta, e.gamma, screen.orientation?.angle ?? 0, now);
-      this.gyro.last = now;
-    });
-  }
+  private orient = (e: DeviceOrientationEvent) => {
+    if (e.beta == null || e.gamma == null) return;
+    const now = performance.now();
+    this.gyro.tilt.feed(e.beta, e.gamma, screen.orientation?.angle ?? 0, now);
+    this.gyro.last = now;
+  };
 }
 
 export const motion = new LiveMotion();

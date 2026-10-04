@@ -1161,8 +1161,10 @@ addEventListener('resize', trackExportBar);
 function dismissToast(el: HTMLElement) {
   if (el.classList.contains('is-out')) return;
   // Don't strand keyboard focus on a toast that's about to vanish.
-  // The pick button is folded away while Fine-tune is open; its toggle is always there.
-  if (el.contains(document.activeElement)) $(store.get().adjustOpen ? 'adjustToggle' : 'pickBtn').focus({ preventScroll: true });
+  // Focus goes to a pick button that is on screen: the stage's on phones, the panel's otherwise
+  // (folded away while Fine-tune is open, whose toggle stands in), brought into view if need be.
+  if (el.contains(document.activeElement))
+    ['pickBtnStage', store.get().adjustOpen ? 'adjustToggle' : 'pickBtn'].map((id) => $(id)).find((b) => b.offsetParent)?.focus();
   el.classList.add('is-out');
   el.addEventListener('animationend', () => el.remove());
   setTimeout(() => el.remove(), 400);
