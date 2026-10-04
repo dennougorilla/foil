@@ -83,6 +83,17 @@ await step('nothing of a pack loads before one is opened', async () => {
   expect((await page.textContent('#deckBtn .deck-count')) === '0', 'the deck is not empty on a first visit');
 });
 
+await step('the binder loads nothing before it is used, and Share shows only where files can be shared', async () => {
+  const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+  const binder = names.filter((n) => /binder/i.test(n));
+  expect(binder.length === 0, `loaded early: ${binder.join(', ')}`);
+  expect(await page.isVisible('#keepBtn'), 'no Keep button in the Save box');
+  expect(await page.evaluate(() => !!document.getElementById('keepBtn').closest('.sec-export')), 'Keep is not in the Save box');
+  const files = await page.evaluate(() => !!navigator.canShare?.({ files: [new File([''], 'card.png', { type: 'image/png' })] }));
+  expect((await page.isVisible('#shareBtn')) === files, `Share is ${files ? 'hidden although' : 'shown although no'} share sheet takes files`);
+  expect((await page.textContent('#binderBtn .binder-count')) === '0', 'the binder chip does not count an empty binder');
+});
+
 await step('fine-tune opens with four tabs and is remembered', async () => {
   await page.click('#adjustToggle');
   expect((await page.locator('#panelTabs [role=tab]').count()) === 4, 'expected four tabs');
@@ -187,6 +198,54 @@ await step('shine tab', async () => {
   expect((await state()).tune.scale === 1, 'reset all failed');
 });
 
+await step('the motion button above the deck switches the idle motion in one tap, in step with the Shine tab', async () => {
+  const btn = '#deckDock .qm-btn';
+  expect(await page.isVisible(btn), 'no motion button by the deck');
+  const deck = await page.locator('#deckBtn').boundingBox();
+  const b = await page.locator(btn).boundingBox();
+  expect(b.y + b.height <= deck.y && Math.abs(b.x + b.width / 2 - (deck.x + deck.width / 2)) < 30, 'the motion button is not just above the deck');
+  await page.click(btn);
+  expect((await page.getAttribute(btn, 'aria-expanded')) === 'true' && (await page.isVisible('.qm-tray')), 'the tray did not open');
+  const names = await page.locator('.qm-opt span').allTextContents();
+  expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
+  expect((await page.getAttribute('.qm-opt[aria-checked=true]', 'data-value')) === (await state()).tune.idle, 'the tray does not mark the current motion');
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('qm-opt')), 'focus did not move into the tray');
+  // Keyboard: Sway → Float, picked with Enter; the tray stays open to tune it, Escape closes it.
+  await page.keyboard.press('ArrowRight');
+  expect((await page.textContent('.qm-help')).length > 10, 'the focused motion is not described');
+  await page.keyboard.press('Enter');
+  expect((await state()).tune.idle === 'float', `Enter picked ${(await state()).tune.idle}`);
+  expect((await page.getAttribute(btn, 'data-value')) === 'float', 'the button does not show the new motion');
+  expect(await page.isVisible('.qm-tray'), 'a pick closed the tray');
+  // Speed and size: the sliders set the Shine tab's own values, and reset puts both back.
+  await page.locator('.qm-range[data-k=speed]').fill('1.5');
+  await page.locator('.qm-range[data-k=idleAmp]').fill('1.6');
+  const tuned = (await state()).tune;
+  expect(tuned.speed === 1.5 && tuned.idleAmp === 1.6, `the sliders set speed ${tuned.speed}, size ${tuned.idleAmp}`);
+  expect((await page.textContent('.qm-knob:has([data-k=idleAmp]) .qm-val')) === '×1.6' && (await page.textContent('.qm-knob:has([data-k=speed]) .qm-val')) === '×1.5', 'the values do not read ×1.5 and ×1.6');
+  await page.click('.qm-reset');
+  const back = (await state()).tune;
+  expect(back.speed === 1 && back.idleAmp === 1 && back.idle === 'float' && (await page.isDisabled('.qm-reset')), 'reset did not put speed and size back (and only them)');
+  await page.locator('.qm-range[data-k=speed]').fill('1.5');
+  await page.focus('.qm-opt[data-value=float]');
+  await page.keyboard.press('Escape');
+  expect(!(await page.isVisible('.qm-tray')) && (await page.evaluate(() => document.activeElement?.classList.contains('qm-btn'))), 'Escape left the tray open or lost focus');
+  // The Shine tab shows the same choice, and a pick there shows on the button.
+  await tab('light');
+  expect((await page.getAttribute('#pane-light [data-key=idle] [aria-checked=true]', 'data-value')) === 'float', 'the Shine tab disagrees');
+  expect((await page.inputValue('#tune-speed')) === '1.5', 'the Shine tab does not show the speed set in the tray');
+  await page.click('#pane-light [data-key=idle] [role=radio][data-value=bounce]');
+  expect((await page.getAttribute(btn, 'data-value')) === 'bounce', 'a pick in the Shine tab did not reach the button');
+  // Escape and a press elsewhere close it without changing anything.
+  await page.click(btn);
+  await page.keyboard.press('Escape');
+  expect(!(await page.isVisible('.qm-tray')), 'Escape did not close the tray');
+  await page.click(btn);
+  await page.mouse.click(20, 450);
+  expect(!(await page.isVisible('.qm-tray')) && (await state()).tune.idle === 'bounce', 'a press elsewhere did not close the tray, or changed the motion');
+  await page.click('#pane-light .tune-reset-all');
+});
+
 await step('lettering from the name tag', async () => {
   await tab('card');
   // The name tag sways gently, so Playwright's "stable" wait can time out; the chip is still clickable.
@@ -194,6 +253,155 @@ await step('lettering from the name tag', async () => {
   expect(await page.isVisible('#pane-text'), 'name tag did not open the Lettering tab');
   await page.click('.lt-style[data-style=foil]');
   expect((await state()).text.style === 'foil', 'lettering style not applied');
+});
+
+/** Saves a PNG and returns its bytes (base64). */
+const savePng = async () => {
+  await page.click('#formatSeg [role=radio][data-format=png]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#saveBtn')]);
+  const png = readFileSync(await dl.path()).toString('base64');
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return png;
+};
+/** Mean colour difference (0–255) of two PNGs inside each rect, given as fractions of the image [x0, y0, x1, y1]. */
+const pngDiff = (a, b, rects) =>
+  page.evaluate(async ([a, b, rects]) => {
+    const load = async (s) => {
+      const bm = await createImageBitmap(await (await fetch(`data:image/png;base64,${s}`)).blob());
+      const x = new OffscreenCanvas(bm.width, bm.height).getContext('2d');
+      x.drawImage(bm, 0, 0);
+      return x;
+    };
+    const [A, B] = await Promise.all([load(a), load(b)]);
+    const { width: W, height: H } = A.canvas;
+    return rects.map(([x0, y0, x1, y1]) => {
+      const r = [Math.round(x0 * W), Math.round(y0 * H), Math.round((x1 - x0) * W), Math.round((y1 - y0) * H)];
+      const p = A.getImageData(...r).data;
+      const q = B.getImageData(...r).data;
+      let d = 0;
+      for (let i = 0; i < p.length; i += 4) d += Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]);
+      return d / (p.length / 4) / 3;
+    });
+  }, [a, b, rects]);
+// Card regions (fractions of the saved PNG): a message at the bottom of the art, the top of the art, the nameplate.
+const MSG = [0.25, 0.68, 0.75, 0.8];
+const TOP = [0.25, 0.12, 0.75, 0.3];
+const PLATE = [0.15, 0.9, 0.6, 0.95];
+
+await step('a ready phrase puts a message on the card and in every export; the nameplate can go', async () => {
+  // Base and plain ink, so only the words differ between the saves.
+  await page.locator('#cardSlot').focus();
+  await page.keyboard.press('1');
+  await tab('text');
+  await page.click('.lt-style[data-style=ink]');
+  expect(!(await page.isVisible('.msg-detail')), 'place and typeface show before there are any words');
+  const bare = await savePng();
+  await page.click('.msg-phrase >> nth=0');
+  await page.click('.msg-places [data-v=bottom]');
+  await page.click('.msg-fonts [data-v=serif]');
+  const s = await state();
+  expect(s.message.text === 'Happy\nBirthday' && s.message.place === 'bottom' && s.message.font === 'serif', `message saved as ${JSON.stringify(s.message)}`);
+  expect((await page.inputValue('#messageInput')) === 'Happy\nBirthday', 'the tag beside the card does not show the message');
+  await page.waitForFunction(() => document.fonts.check('800 40px "Shippori Mincho"', 'Happy'), null, { timeout: 15000 });
+  const said = await savePng();
+  const [msg, top] = await pngDiff(bare, said, [MSG, TOP]);
+  expect(msg > 12 && top < 1, `the message did not land at the bottom of the art (bottom ${msg.toFixed(1)}, top ${top.toFixed(1)})`);
+
+  // Typing in the tag edits the same message, four lines at most.
+  await page.fill('#messageInput', 'a\nb\nc\nd\ne');
+  expect((await state()).message.text === 'a\nb\nc\nd e', 'a fifth line was kept');
+  await page.click('.msg-phrase >> nth=0');
+
+  // Message only: the nameplate leaves the band plain.
+  await page.click('.msg-plate [data-v=off]');
+  expect((await state()).plate === false, 'nameplate still on');
+  const only = await savePng();
+  const [plate, kept] = await pngDiff(said, only, [PLATE, MSG]);
+  expect(plate > 4 && kept < 1, `turning the nameplate off (plate ${plate.toFixed(1)}, message ${kept.toFixed(1)})`);
+
+  // Hot foil prints the message too: metal, not the flat ink.
+  await page.click('.lt-style[data-style=foil]');
+  const foil = await savePng();
+  const [metal] = await pngDiff(only, foil, [MSG]);
+  expect(metal > 6, `the foil did not reach the message (${metal.toFixed(1)})`);
+  await page.click('.msg-plate [data-v=on]');
+});
+
+await step('the trading-card layout: the message fills the effect box, and each piece of text can take its own print', async () => {
+  await tab('card');
+  await page.click('#layoutSeg [data-v=tcg]');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).layout === 'tcg', null, { timeout: 5000 });
+  await page.waitForTimeout(800);
+  expect(await page.isVisible('#typeInput'), 'no type line field in the tag');
+  await page.fill('#typeInput', 'Birthday card');
+  expect((await state()).cardType === 'Birthday card', 'type line not saved');
+  // The effect box holds the message; without one the box goes and the picture runs down to the footer.
+  const EFFECT = [0.25, 0.74, 0.75, 0.9];
+  const said = await savePng();
+  const keep = (await state()).message.text;
+  await page.fill('#messageInput', '');
+  const blank = await savePng();
+  const [box] = await pngDiff(said, blank, [EFFECT]);
+  expect(box > 1, `the effect box did not change with the message (${box.toFixed(1)})`);
+  await page.fill('#messageInput', keep);
+
+  // The name's chip in the Lettering tab opens its own print; the card's lettering stays as it is.
+  const before = (await state()).text.style;
+  await tab('text');
+  await page.click('#pane-text .pp-chip[data-field=name]');
+  expect(await page.isVisible('.pp'), 'the print popover did not open');
+  await page.click('.pp-style[data-style=emboss]');
+  let s = await state();
+  expect(s.prints.name?.style === 'emboss' && s.text.style === before, `prints ${JSON.stringify(s.prints)}, card ${s.text.style}`);
+  expect(await page.locator('#pane-text .pp-chip[data-field=name].is-own').count(), 'the name chip has no mark for its own print');
+  await page.click('.pp-follow');
+  s = await state();
+  expect(!s.prints.name, "Following the card's lettering left the name with its own print");
+  await page.keyboard.press('Escape');
+
+  // Tapping the words on the card opens the same popover for them.
+  const b = await page.locator('#cardSlot').boundingBox();
+  await page.mouse.click(b.x + b.width * 0.3, b.y + b.height * 0.07);
+  await page.waitForTimeout(200);
+  const title = await page.textContent('.pp-title');
+  expect(await page.isVisible('.pp') && /Name/.test(title), `a tap on the name opened ${title}`);
+  await page.keyboard.press('Escape');
+});
+
+await step('free placement: drag the words on the card, a tap still opens their print, Auto puts them back', async () => {
+  await tab('text');
+  await page.fill('#messageInput', 'Happy\nBirthday');
+  const auto = await savePng();
+  await page.click('.msg-arrange [data-v=free]');
+  await page.waitForFunction(() => !!JSON.parse(localStorage.getItem('foil:v1')).placements?.message, null, { timeout: 5000 });
+  const p0 = (await state()).placements.message;
+  const b = await page.locator('#cardSlot').boundingBox();
+  const sx = b.x + b.width * p0.x;
+  const sy = b.y + b.height * p0.y;
+  // A drag moves the words and holds the card still; a flick never reaches the card.
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  await page.mouse.move(sx - 20, sy - 30, { steps: 4 });
+  await page.mouse.move(sx - b.width * 0.15, sy - b.height * 0.35, { steps: 10 });
+  expect(await page.evaluate(() => document.body.classList.contains('is-arranging')), 'the card does not hold still while words are dragged');
+  await page.mouse.up();
+  const p1 = (await state()).placements.message;
+  expect(p1.y < p0.y - 0.15 && p1.x < p0.x - 0.05, `the message did not follow the drag (${JSON.stringify(p0)} → ${JSON.stringify(p1)})`);
+  expect(p1.x > 0 && p1.x < 1 && p1.y > 0 && p1.y < 1, 'the message left the card');
+  // Exports draw it where it now is.
+  const moved = await savePng();
+  const [top] = await pngDiff(auto, moved, [[0.1, 0.1, 0.9, 0.35]]);
+  expect(top > 1, `the export does not show the moved message (${top.toFixed(1)})`);
+  // A short tap opens its print menu instead of moving it.
+  await page.mouse.click(b.x + b.width * p1.x, b.y + b.height * p1.y);
+  await page.waitForTimeout(200);
+  expect(await page.isVisible('.pp'), 'a tap on the words did not open their print menu');
+  expect(JSON.stringify((await state()).placements.message) === JSON.stringify(p1), 'a tap moved the words');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.click('.msg-free .link');
+  const s = await state();
+  expect(s.arrange === 'auto' && !s.placements.message, 'Back to Auto kept the free place');
 });
 
 await step('finish area tab and brush', async () => {
@@ -211,6 +419,65 @@ await step('finish area tab and brush', async () => {
   await page.click('.brush-done');
   await page.waitForTimeout(300);
   expect(!(await page.isVisible('.brush')), 'brush bar did not close');
+});
+
+/** Pixels of a saved PNG at the given points, read back through the page. */
+const pngAt = (path, points) =>
+  page.evaluate(
+    async ({ b64, points }) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height);
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      return points.map(([px, py]) => [...x.getImageData(Math.round(px * img.width), Math.round(py * img.height), 1, 1).data]);
+    },
+    { b64: readFileSync(path).toString('base64'), points },
+  );
+const savePngPath = async () => {
+  await page.click('#formatSeg [role=radio][data-format=png]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return dl.path();
+};
+
+await step('layers: layer 2 from owned finishes, each layer its own area, the overlap blend, and the PNG shows both', async () => {
+  await tab('range');
+  if (await page.isVisible('#pane-range .range-reset')) await page.click('#pane-range .range-reset');
+  expect((await page.locator('.layer-row').count()) === 1 && (await page.isVisible('.layer-add')), 'one layer and a + slot to start with');
+  await page.click('.layer-add');
+  const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
+  const edition = (await state()).edition;
+  expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
+  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  const pick = chips.includes('negative') ? 'negative' : 'poly';
+  await page.click(`.layer-chip[data-v=${pick}]`);
+  let s = await state();
+  expect(s.layer2?.edition === pick && s.layer2.region === 'all' && s.layer2.blend === 'light', `layer 2 is ${JSON.stringify(s.layer2)}`);
+  expect((await page.locator('.layer-row').count()) === 2 && (await page.getAttribute('.layer-row[data-n="2"]', 'aria-checked')) === 'true', 'layer 2 is not listed and chosen');
+  expect(await page.isVisible('#tab-range .tab-dot'), 'the tab does not show it was changed');
+  // Each row hands the area controls to its layer: layer 1 on the art, layer 2 on the frame.
+  await page.click('.layer-row[data-n="1"] .layer-place');
+  await page.click('#pane-range .region-btn[data-v=art]');
+  await page.click('.layer-row[data-n="2"] .layer-place');
+  await page.click('#pane-range .region-btn[data-v=frame]');
+  s = await state();
+  expect(s.rangeRegion === 'art' && s.layer2.region === 'frame', `areas: layer 1 ${s.rangeRegion}, layer 2 ${s.layer2.region}`);
+  expect((await page.textContent('.layer-row[data-n="2"] .layer-place')).trim().length > 0, 'layer 2 does not say where it goes');
+  await page.click('.seg-blend [data-b=over]');
+  expect((await state()).layer2.blend === 'over', 'the blend did not change');
+  await page.click('.seg-blend [data-b=light]');
+  // The PNG (948 × 1308, 24 px of padding): a point in the art and one on the side of the frame.
+  const points = [[0.5, 0.42], [0.042, 0.42]];
+  const layered = await pngAt(await savePngPath(), points);
+  await page.click('.layer-row[data-n="2"] .layer-x');
+  expect((await state()).layer2 === null && (await page.locator('.layer-row').count()) === 1, '× did not remove layer 2');
+  const single = await pngAt(await savePngPath(), points);
+  const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+  expect(d(layered[0], single[0]) === 0, `the art changed: ${layered[0]} vs ${single[0]}`);
+  expect(d(layered[1], single[1]) > 24, `the frame did not take layer 2: ${layered[1]} vs ${single[1]}`);
+  // Left on (whole card, adding its light) for the exports below, so GIF and APNG are made with two layers.
+  await page.click('.layer-add');
+  await page.click(`.layer-chip[data-v=${pick}]`);
 });
 
 for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.png']]) {
@@ -241,6 +508,460 @@ await step('GIF with a clear background is really clear', async () => {
     expect(at(width >> 1, height >> 1) === 255, 'the card is not opaque');
   }
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+});
+
+await step('a GIF moves exactly as the card does on the stage, for every idle motion', async () => {
+  // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
+  // exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
+  await page.evaluate(async () => {
+    const { CardRenderer } = await import('/src/gl/renderers.ts');
+    const { motion, LiveMotion } = await import('/src/tune/motion.ts');
+    const live = document.getElementById('cards');
+    const slot = document.getElementById('cardSlot');
+    const rec = (window.__draws = { live: null, frames: [] });
+    const draw = (window.__drawCard = CardRenderer.prototype.drawCard);
+    CardRenderer.prototype.drawCard = function (d, time) {
+      const pick = ({ cx, cy, w, h, rx, ry, rz, scale, tilt, light, flash, glint }) => ({ cx, cy, w, h, rx, ry, rz, scale, tilt: [...tilt], light: [...light], flash, glint: glint ?? -2 });
+      if (this.gl.canvas === live) {
+        if (d.plate !== false) {
+          const c = live.getBoundingClientRect();
+          const s = slot.getBoundingClientRect();
+          rec.live = { ...pick(d), s: motion.idleTime, ox: s.left - c.left + s.width / 2, oy: s.top - c.top + s.height / 2 };
+        }
+      } else rec.frames.push({ ...pick(d), time, W: this.gl.canvas.width, H: this.gl.canvas.height });
+      return draw.call(this, d, time);
+    };
+    // The stage's idle clock is frozen (time stands still for it), so it can be set to any moment.
+    motion.step = function (dt, ...rest) {
+      return LiveMotion.prototype.step.call(this, 0, ...rest);
+    };
+  });
+  await tab('light');
+  try {
+  const cases = [
+    ['pendulum', 'orbit', 1.5],
+    ['sway', 'pointer', 1],
+    ['float', 'pointer', 0.75],
+    ['wobble', 'fixed', 1],
+    ['bounce', 'pointer', 2],
+    ['glint', 'pointer', 1],
+    ['spin', 'orbit', 1],
+    ['turn', 'pointer', 1],
+    ['breathe', 'pointer', 1],
+  ];
+  const norm = (d, ox, oy) => ({ dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale, t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint });
+  for (const [n, [idle, light, speed]] of cases.entries()) {
+    await page.click(`#pane-light [data-key=light] [role=radio][data-value=${light}]`);
+    await page.click(`#pane-light [data-key=idle] [role=radio][data-value=${idle}]`);
+    await page.locator('#tune-speed').fill(String(speed));
+    await page.waitForTimeout(300);
+    const s = (await state()).tune;
+    expect(s.idle === idle && s.light === light && s.speed === speed, `the tune did not take ${idle}/${light}/${speed}`);
+    // The first case goes through Save, so the file's own timing is checked; the rest draw the export's frames directly.
+    let frames;
+    if (n === 0) {
+      await page.click('#formatSeg [role=radio][data-format=gif]');
+      await page.evaluate(() => (window.__draws.frames = []));
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.click('#saveBtn')]);
+      const gif = decompressFrames(parseGIF(readFileSync(await dl.path())), true);
+      const total = gif.reduce((a, f) => a + f.delay, 0);
+      expect(Math.abs(total - 6000 / speed) <= 10, `the GIF lasts ${total} ms, not one ${6000 / speed} ms idle cycle`);
+      await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+      frames = await page.evaluate(() => window.__draws.frames);
+      expect(frames.length === gif.length, `drew ${frames.length} frames for a ${gif.length}-frame GIF`);
+    } else {
+      frames = await page.evaluate(async () => {
+        const { createScene } = await import('/src/exporter.ts');
+        const { editionById } = await import('/src/editions.ts');
+        const { drawBack } = await import('/src/card/back.ts');
+        const store = JSON.parse(localStorage.getItem('foil:v1'));
+        const face = document.createElement('canvas');
+        const back = document.createElement('canvas');
+        face.width = back.width = 900;
+        face.height = back.height = 1260;
+        drawBack(back, 'card');
+        window.__draws.frames = [];
+        const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
+        const loop = 6 / store.tune.speed;
+        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40, loop);
+        scene.dispose();
+        return window.__draws.frames;
+      });
+    }
+    // The pointer leaves the stage (the card leans a little toward a pointer anywhere on it) and the card settles.
+    await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
+    await page.waitForTimeout(1500);
+    // Each exported frame against the stage held at the same moment of its idle cycle.
+    let worst = { d: 0, at: '' };
+    for (const f of frames.filter((_, i, a) => i % Math.ceil(a.length / 12) === 0)) {
+      // An exported frame's loop time is its moment in idle seconds.
+      const sAt = f.time;
+      const got = await page.evaluate(async (sAt) => {
+        const { motion } = await import('/src/tune/motion.ts');
+        motion.idleTime = sAt;
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        return window.__draws.live;
+      }, sAt);
+      expect(Math.abs(got.s - sAt) < 1e-9, 'the stage clock moved while frozen');
+      const a = norm(got, got.ox, got.oy);
+      const b = norm(f, f.W / 2, f.H / 2);
+      for (const k of Object.keys(a)) {
+        const d = Math.abs(a[k] - b[k]);
+        if (d > worst.d) worst = { d, at: `${k} at ${sAt.toFixed(2)}s: stage ${a[k].toFixed(4)}, export ${b[k].toFixed(4)}` };
+      }
+    }
+    expect(worst.d < 2e-3, `${idle}/${light}/${speed}: the export drifts from the stage (${worst.at})`);
+  }
+  } finally {
+    await page.evaluate(async () => {
+      const { motion } = await import('/src/tune/motion.ts');
+      const { CardRenderer } = await import('/src/gl/renderers.ts');
+      delete motion.step;
+      CardRenderer.prototype.drawCard = window.__drawCard;
+    });
+    await page.click('#pane-light .tune-reset-all');
+  }
+});
+
+/** Width and height of a downloaded PNG (or APNG), from its header. */
+const pngSize = async (dl) => {
+  const b = readFileSync(await dl.path());
+  return [b.readUInt32BE(16), b.readUInt32BE(20)];
+};
+const save = async (format) => {
+  await page.click(`#formatSeg [role=radio][data-format=${format}]`);
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return dl;
+};
+
+await step('shape: a wide card turns the slot, the hand and every export on their side; reset brings the trading card back', async () => {
+  await tab('card');
+  expect((await page.getAttribute('#shapeSeg [data-shape=card]', 'aria-checked')) === 'true', 'the trading card is not the starting shape');
+  await page.click('#shapeSeg [data-shape=wide]');
+  await page.waitForTimeout(400);
+  expect((await state()).shape === 'wide', 'the shape was not kept');
+  const slot = await page.locator('#cardSlot').boundingBox();
+  expect(Math.abs(slot.width / slot.height - 1.4) < 0.03, `the slot is ${slot.width}x${slot.height}, not 7:5`);
+  const card = await page.locator('.hand-slot').first().boundingBox();
+  expect(card.width > card.height, 'the hand still holds upright cards');
+  const [pw, ph] = await pngSize(await save('png'));
+  expect(pw === 1260 + 48 && ph === 900 + 48, `the PNG is ${pw}x${ph}`);
+  const gif = parseGIF(readFileSync(await (await save('gif')).path()));
+  expect(gif.lsd.width > gif.lsd.height, `the GIF is ${gif.lsd.width}x${gif.lsd.height}`);
+  const [aw, ah] = await pngSize(await save('apng'));
+  expect(aw > ah, `the APNG is ${aw}x${ah}`);
+  await page.click('#shapeSeg [data-shape=square]');
+  const [sw, sh] = await pngSize(await save('png'));
+  expect(sw === 948 && sh === 948, `the square PNG is ${sw}x${sh}`);
+  // The celebration frames, on a card of another shape.
+  for (const f of ['rim', 'ribbon']) {
+    await page.click(`#frameSeg [role=radio]:nth-child(${['paper', 'ink', 'gilt', 'rarity', 'rim', 'ribbon'].indexOf(f) + 1})`);
+    expect((await state()).frame === f, `the ${f} frame was not chosen`);
+  }
+  await page.click('#cardReset');
+  await page.waitForTimeout(400);
+  const r = await state();
+  expect(r.shape === 'card' && r.frame === 'paper', `reset left ${r.shape}/${r.frame}`);
+  const back = await page.locator('#cardSlot').boundingBox();
+  expect(Math.abs(back.width / back.height - 5 / 7) < 0.02, 'the slot did not go back to 5:7');
+  await page.click('#formatSeg [role=radio][data-format=png]');
+});
+
+// ---------- Binder ----------
+
+const binderCount = async () => +(await page.textContent('#binderBtn .binder-count'));
+const binderOpen = () => page.waitForSelector('.bd.is-in', { timeout: 15000 });
+const binderClosed = () => page.waitForSelector('.bd', { state: 'detached', timeout: 15000 });
+let kept = null;
+
+await step('keep a card: it goes into the binder as a still picture, and Keep rests until the card changes', async () => {
+  await page.fill('#nameInput', 'Kept meadow');
+  await page.keyboard.press('Escape');
+  await page.click('#keepBtn');
+  await page.waitForFunction(() => document.querySelector('#binderBtn .binder-count')?.textContent === '1', null, { timeout: 30000 });
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) === 'true', 'Keep does not say the card is kept');
+  kept = await state();
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await page.locator('.bd-card').count()) === 1, 'the binder does not show one card');
+  await page.waitForFunction(() => document.querySelector('.bd-card img')?.complete && document.querySelector('.bd-card img').naturalWidth > 0, null, { timeout: 10000 });
+  const pic = await page.evaluate(() => {
+    const img = document.querySelector('.bd-card img');
+    return { src: img.src.slice(0, 5), w: img.naturalWidth, h: img.naturalHeight, canvases: document.querySelectorAll('.bd canvas').length };
+  });
+  expect(pic.src === 'blob:' && pic.canvases === 0, `the binder draws its cards (${JSON.stringify(pic)})`);
+  expect(Math.abs(pic.w / pic.h - 5 / 7) < 0.02 && pic.w <= 260, `the thumbnail is not a small card (${pic.w}×${pic.h})`);
+  expect((await page.textContent('.bd-count')).includes('1 / 54'), 'the head does not count 1 / 54');
+  expect(await page.isVisible('.bd-keep'), 'no pocket to keep the card on the stage');
+  await page.click('.bd-x');
+  await binderClosed();
+});
+
+await step('play a card from the binder: its picture and settings come back, the app settings stay', async () => {
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press('1');
+  await page.fill('#nameInput', 'Something else');
+  await page.click('.pill-rarity .rpip >> nth=0');
+  await page.waitForTimeout(200);
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the card changed');
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect(await page.isDisabled('.bd-play'), 'Play is ready with nothing picked');
+  await page.click('.bd-card');
+  expect((await page.getAttribute('.bd-card', 'aria-pressed')) === 'true', 'the card is not picked');
+  await page.click('.bd-play');
+  await binderClosed();
+  await page.waitForFunction((n) => JSON.parse(localStorage.getItem('foil:v1')).name === n, kept.name, { timeout: 10000 });
+  const now = await state();
+  for (const k of ['edition', 'name', 'rarity', 'sample', 'crop', 'tune', 'text', 'rangeRegion', 'rangeLo', 'rangeHi'])
+    expect(JSON.stringify(now[k]) === JSON.stringify(kept[k]), `${k} did not come back (${JSON.stringify(now[k])} ≠ ${JSON.stringify(kept[k])})`);
+  expect(now.lang === kept.lang && now.exportFormat === kept.exportFormat, 'an app setting changed');
+  expect((await page.locator('#thumbs .thumb').count()) === 4, 'the kept picture is not the picture in step 1');
+});
+
+await step('a card is thrown away from its own corner at once, and Undo brings it back', async () => {
+  await page.click('#binderBtn');
+  await binderOpen();
+  await page.mouse.move(5, 5);
+  expect((await page.$eval('.bd-del', (e) => getComputedStyle(e).opacity)) === '0', 'the delete tag shows before the pointer is on the card');
+  await page.hover('.bd-card');
+  await page.waitForTimeout(250);
+  // Its layout size: the tag pops in with a scale, so a box read mid-pop is smaller.
+  const del = await page.$eval('.bd-del', (e) => [e.offsetWidth, e.offsetHeight]);
+  expect(del[0] >= 32 && del[1] >= 32, `the place to press the delete tag is too small (${del})`);
+  await page.click('.bd-del');
+  await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
+  expect((await binderCount()) === 0, 'the chip still counts the card');
+  expect(await page.isVisible('.bd-undo'), 'no undo bar after discarding');
+  await page.click('.bd-undo-btn');
+  await page.waitForFunction(() => document.querySelectorAll('.bd-card').length === 1, null, { timeout: 5000 });
+  expect((await binderCount()) === 1, 'Undo did not bring the card back');
+  await page.waitForFunction(() => document.querySelector('.bd-card img')?.naturalWidth > 0, null, { timeout: 5000 });
+  // Picked cards go from the foot at once too; this one stays gone.
+  await page.click('.bd-card');
+  await page.click('.bd-discard');
+  await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
+  expect((await binderCount()) === 0, 'Discard from the foot left the card');
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the stage card was thrown away');
+  await page.click('.bd-x');
+  await binderClosed();
+});
+
+await step('cards stay in the pocket they are dragged to: empty pockets kept, swaps, Undo, turning pages at the edge, a held finger', async () => {
+  const pocket = (slot) => page.locator(`[data-slot="${slot}"]`);
+  const at = (slot) => page.$eval(`[data-slot="${slot}"]`, (e) => e.querySelector('.bd-card')?.dataset.id ?? null).catch(() => null);
+  const centre = async (sel) => {
+    const b = await page.locator(sel).boundingBox();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  };
+  async function drag(from, to, hold = 0) {
+    const [x0, y0] = await centre(from);
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move(x0 + 12, y0 + 8, { steps: 3 });
+    const [x1, y1] = Array.isArray(to) ? to : await centre(to);
+    await page.mouse.move(x1, y1, { steps: 8 });
+    if (hold) await page.waitForTimeout(hold);
+    if (!Array.isArray(to) || !hold) {
+      await page.mouse.up();
+      return;
+    }
+  }
+  for (const key of ['2', '3']) {
+    await page.evaluate(() => document.activeElement.blur());
+    await page.keyboard.press(key);
+    await page.waitForTimeout(300);
+    const n = await binderCount();
+    await page.click('#keepBtn');
+    await page.waitForFunction((k) => document.querySelector('#binderBtn .binder-count')?.textContent === String(k), n + 1, { timeout: 30000 });
+  }
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await page.textContent('.bd-page')).includes('6'), 'the binder does not have six pages');
+  const first = await at(0);
+  expect(first && (await at(1)), 'the two cards are not in the first two pockets');
+  // A mouse drags the first card into an empty pocket further on; the gap it leaves stays.
+  await drag('[data-slot="0"] .bd-card', '[data-slot="5"]');
+  await page.waitForTimeout(300);
+  expect((await at(5)) === first && (await at(0)) === null, 'the card did not move into the empty pocket');
+  expect(await page.isVisible('.bd-undo'), 'no undo bar after moving a card');
+  await page.click('.bd-x');
+  await binderClosed();
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await at(5)) === first, 'the pocket was not kept');
+  // Onto another card it swaps; Undo puts both back.
+  const second = await at(1);
+  await drag('[data-slot="5"] .bd-card', '[data-slot="1"]');
+  await page.waitForTimeout(300);
+  expect((await at(1)) === first && (await at(5)) === second, 'the cards did not swap');
+  await page.click('.bd-undo-btn');
+  await page.waitForFunction((id) => document.querySelector('[data-slot="5"] .bd-card')?.dataset.id === id, first, { timeout: 5000 });
+  // Held at the right edge, the page turns; the card lands on the new page.
+  const box = await page.locator('.bd-spread').boundingBox();
+  const label = await page.textContent('.bd-page');
+  await drag('[data-slot="5"] .bd-card', [box.x + box.width - 14, box.y + box.height / 2], 1100);
+  await page.waitForFunction((l) => document.querySelector('.bd-page').textContent !== l, label, { timeout: 5000 });
+  await page.waitForTimeout(600);
+  const [tx, ty] = await centre('.bd-sheet:not(.bd-copy) .bd-pocket >> nth=4');
+  await page.mouse.move(tx, ty, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const landed = await page.evaluate((id) => +document.querySelector(`.bd-card[data-id="${id}"]`)?.closest('[data-slot]')?.dataset.slot, first);
+  expect(landed >= 18, `the card did not go to a later page (pocket ${landed})`);
+  // A finger has to hold first: a quick swipe moves nothing, a held one lifts the card.
+  await page.click('.bd-prev');
+  await page.waitForTimeout(700);
+  const touch = (type, x, y, target = null) =>
+    page.evaluate(
+      ([type, x, y, sel]) => (sel ? document.querySelector(sel) : window).dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'touch', isPrimary: true, button: 0, clientX: x, clientY: y })),
+      [type, x, y, target],
+    );
+  const [sx, sy] = await centre('[data-slot="1"] .bd-card');
+  const [ex, ey] = await centre('[data-slot="7"]');
+  await touch('pointerdown', sx, sy, '[data-slot="1"] .bd-card');
+  await touch('pointermove', sx + 40, sy + 40);
+  await touch('pointerup', sx + 40, sy + 40);
+  expect((await at(1)) === second, 'a quick swipe moved the card');
+  await touch('pointerdown', sx, sy, '[data-slot="1"] .bd-card');
+  await page.waitForTimeout(550);
+  await touch('pointermove', (sx + ex) / 2, (sy + ey) / 2);
+  await touch('pointermove', ex, ey);
+  await touch('pointerup', ex, ey);
+  await page.waitForTimeout(300);
+  expect((await at(7)) === second, 'a held finger did not carry the card');
+  await page.click('.bd-x');
+  await binderClosed();
+  // Empty it again for the steps that follow.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction(['meta', 'thumbs', 'cards'], 'readwrite');
+          for (const s of ['meta', 'thumbs', 'cards']) tx.objectStore(s).clear();
+          tx.oncomplete = () => (req.result.close(), resolve());
+        };
+      }),
+  );
+});
+
+
+await step('a full binder takes no more cards and opens to make room', async () => {
+  // Fill the binder's index straight in IndexedDB: 54 small cards.
+  await page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('meta', 'readwrite');
+          for (let i = 0; i < 54; i++) tx.objectStore('meta').put({ id: `fill${i}`, at: i, name: `Fill ${i}`, edition: 'holo', bytes: 1000 });
+          tx.oncomplete = () => (req.result.close(), resolve());
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+  );
+  await page.fill('#nameInput', 'One too many');
+  await page.click('#keepBtn');
+  await binderOpen();
+  expect((await page.textContent('.bd-count')).includes('54 / 54'), 'the head does not say 54 / 54');
+  expect(await page.isVisible('.bd-full'), 'no note that the binder is full');
+  expect(!(await page.isVisible('.bd-keep')), 'a full binder still offers a pocket');
+  expect((await page.locator('.bd-card').count()) === 18 || (await page.locator('.bd-card').count()) === 9, 'more than the open pages are shown');
+  await page.click('.bd-next');
+  await page.waitForTimeout(200);
+  expect((await page.textContent('.bd-page')).trim().length > 0, 'no page number');
+  // Empty it again for the steps that follow.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('meta', 'readwrite');
+          tx.objectStore('meta').clear();
+          tx.oncomplete = () => (req.result.close(), resolve());
+        };
+      }),
+  );
+  await page.click('.bd-x');
+  await binderClosed();
+});
+
+// ---------- Share ----------
+
+await step('share: a small moving GIF goes to the share sheet with the site address, the GIF alone where both do not fit, and a late one waits for a second tap', async () => {
+  const sharer = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p = await sharer.newPage();
+  p.on('pageerror', (e) => errors.push(`share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__shared = [];
+    window.__late = 0;
+    window.__noText = false;
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File) && !(window.__noText && data.text);
+    navigator.share = async (data) => {
+      if (window.__late > 0) {
+        window.__late--;
+        throw new DOMException('no activation', 'NotAllowedError');
+      }
+      for (const f of data.files) {
+        const head = new DataView(await f.slice(0, 10).arrayBuffer());
+        window.__shared.push({ name: f.name, type: f.type, size: f.size, w: head.getUint16(6, true), h: head.getUint16(8, true), text: data.text ?? null });
+      }
+    };
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(1500);
+  expect(await p.isVisible('#shareBtn'), 'Share is hidden although files can be shared');
+  // PNG is the chosen format; Share still sends the moving card.
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__shared.length === 1, null, { timeout: 240000 });
+  const gif = await p.evaluate(() => window.__shared[0]);
+  expect(gif.type === 'image/gif' && gif.name.endsWith('.gif'), `not a GIF: ${JSON.stringify(gif)}`);
+  expect(gif.w === 360 && gif.h === 450 && gif.size < 15_000_000, `the shared GIF is not the small one: ${JSON.stringify(gif)}`);
+  expect(gif.text?.includes('https://dennougorilla.github.io/foil/'), `no site address with it: ${gif.text}`);
+  // The sheet takes no text with files here, and the tap has gone stale: the GIF alone waits for one more tap.
+  await p.evaluate(() => {
+    window.__noText = true;
+    window.__late = 1;
+  });
+  await p.click('#shareBtn');
+  await p.waitForSelector('#shareBtn[data-ready=true]', { timeout: 240000 });
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__shared.length === 2, null, { timeout: 10000 });
+  const alone = await p.evaluate(() => window.__shared[1]);
+  expect(alone.type === 'image/gif' && alone.text === null, `not the GIF alone: ${JSON.stringify(alone)}`);
+  expect((await p.getAttribute('#shareBtn', 'data-ready')) !== 'true', 'Share stays ready after sending');
+  await sharer.close();
+});
+
+await step('share on a Mac: one call, one GIF, no text (its Copy would put two items on the clipboard)', async () => {
+  const mac = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+  });
+  const p = await mac.newPage();
+  p.on('pageerror', (e) => errors.push(`mac share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__calls = [];
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File);
+    // The sheet stays open a moment, as a real one does: presses meanwhile must not share again.
+    navigator.share = (data) => {
+      window.__calls.push({ files: data.files.length, type: data.files[0]?.type, text: data.text ?? null, url: data.url ?? null });
+      return new Promise((resolve) => setTimeout(resolve, 1500));
+    };
+  });
+  await p.goto(`${URL}?lang=ja`);
+  await p.waitForTimeout(1500);
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__calls.length === 1, null, { timeout: 240000 });
+  await p.click('#shareBtn');
+  await p.waitForTimeout(2000);
+  const calls = await p.evaluate(() => window.__calls);
+  expect(calls.length === 1, `share was called ${calls.length} times`);
+  expect(calls[0].files === 1 && calls[0].type === 'image/gif' && calls[0].text === null && calls[0].url === null, `not one GIF alone: ${JSON.stringify(calls[0])}`);
+  await mac.close();
 });
 
 const handCount = () => page.locator('.hand-slot').count();
@@ -377,6 +1098,28 @@ await step('a replay from the shop can be skipped straight to the haul and close
   expect((await state()).edition === 'base', 'closing a replay changed the finish');
 });
 
+await step('a wide card is dealt in its own shape in the opening', async () => {
+  await tab('card');
+  await page.click('#shapeSeg [data-shape=wide]');
+  await page.click('#adjustToggle');
+  await page.click('#packsBtn');
+  await phase('shop');
+  await page.click('.pk-slot[data-pack=metal]', { force: true });
+  await page.click('.pk-buy');
+  await phase('pack');
+  await page.click('.pk-skip');
+  await phase('haul');
+  await page.waitForTimeout(1200);
+  // The glow behind the showpiece is sized to it.
+  const [w, h] = await page.evaluate(() => ['--w', '--h'].map((v) => parseFloat(getComputedStyle(document.querySelector('.pk-aura')).getPropertyValue(v))));
+  expect(Math.abs(w / h - 1.4) < 0.05, `the showpiece is ${w}x${h} in the haul`);
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  await tab('card');
+  await page.click('#shapeSeg [data-shape=card]');
+  await page.click('#adjustToggle');
+});
+
 await step('held still, the pack opens with a button and the haul fades in', async () => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.click('#packsBtn');
@@ -440,7 +1183,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const { createScene } = await import('/src/exporter.ts');
     // Exports draw a pack finish once its pack's module has arrived.
     await (await import('/src/gl/finishes/registry.ts')).loadPack('supporter');
-    const { drawBack, drawFace } = await import('/src/card/face.ts');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
     const { editionById } = await import('/src/editions.ts');
     const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
     // A birthday message: dark lettering on a pale picture.
@@ -464,8 +1208,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const back = document.createElement('canvas');
     face.width = mask.width = back.width = 900;
     face.height = mask.height = back.height = 1260;
-    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako' });
-    drawBack(back);
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', shape: 'card', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
+    drawBack(back, 'card');
     // A flat card (no idle motion) so the art and the nameplate land on known pixels.
     const W = 360;
     const H = 450;
@@ -552,9 +1296,10 @@ await step('phones: the live preview rides in the Save box, never over the contr
   await phone.close();
 });
 
-// ---------- Phone: the hand on the first screen, flicking the card, gyro, drawing quality ----------
+// ---------- Phone: the card filling the screen, the hand under it, flicking the card, gyro, drawing quality ----------
 
-const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+// A 3x screen, as most phones have: the stage still draws at 1.5x at most.
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
 const mob = await phone.newPage();
 mob.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
 mob.on('console', (m) => m.type() === 'error' && errors.push(`phone: ${m.text()}`));
@@ -563,13 +1308,78 @@ await mob.goto(`${URL}?lang=en`);
 await mob.waitForTimeout(3000);
 const edition = () => mob.evaluate(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').edition);
 
-await step('phone: the card and the whole hand fit above the Save bar', async () => {
-  const bar = await mob.locator('.sec-export').boundingBox();
-  for (const sel of ['#cardSlot', '#hand', '#handCaption']) {
-    const b = await mob.locator(sel).boundingBox();
-    expect(b.y >= 0 && b.y + b.height <= bar.y + 1, `${sel} is not on the first screen above Save`);
+await step('phone: upright, the card runs nearly edge to edge with the hand, the deck and the packs above the slim Save bar', async () => {
+  for (const [w, h] of [[360, 780], [390, 844], [430, 932]]) {
+    await mob.setViewportSize({ width: w, height: h });
+    await mob.waitForTimeout(500);
+    const at = `${w}x${h}`;
+    const bar = await mob.locator('.sec-export').boundingBox();
+    const card = await mob.locator('#cardSlot').boundingBox();
+    expect(card.width >= w * 0.9, `${at}: the card is ${Math.round(card.width)}px wide`);
+    expect(card.height >= h * 0.58, `${at}: the card is ${Math.round(card.height)}px tall`);
+    expect(Math.abs(card.width * 7 - card.height * 5) < 8, `${at}: the card is ${Math.round(card.width)}x${Math.round(card.height)}, not 5:7`);
+    expect(bar.height <= 80, `${at}: the Save bar is ${Math.round(bar.height)}px tall`);
+    for (const sel of ['#cardSlot', '#hand', '#handCaption', '#handPrev', '#handNext', '#deckBtn .deck-cap', '#packsBtn .deck-cap']) {
+      const b = await mob.locator(sel).boundingBox();
+      expect(b && b.y >= 0 && b.y + b.height <= bar.y + 1, `${at}: ${sel} is not on the first screen above Save`);
+    }
+    const cap = await mob.locator('#deckBtn .deck-cap').boundingBox();
+    const packs = await mob.locator('#packsBtn').boundingBox();
+    expect(cap.y + cap.height <= packs.y + 1, `${at}: the pack button covers the deck's name`);
+    for (const sel of ['#pickBtnStage', '#saveBtn']) {
+      const b = await mob.locator(sel).boundingBox();
+      expect(b.y >= bar.y && b.y + b.height <= h && b.x >= 0 && b.x + b.width <= w, `${at}: ${sel} is not in the Save bar`);
+    }
+    expect((await mob.evaluate(() => document.documentElement.scrollWidth)) <= w, `${at}: the page scrolls sideways`);
   }
-  expect((await mob.evaluate(() => document.documentElement.scrollWidth)) <= 390, 'the page scrolls sideways');
+  await mob.setViewportSize({ width: 390, height: 844 });
+  await mob.waitForTimeout(300);
+});
+
+await step('phone: the drawn card lines up with its tap area at every size', async () => {
+  const still = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => localStorage.clear());
+  await p.goto(`${URL}?lang=en&quality=0`);
+  await p.waitForTimeout(2500);
+  for (const [w, h] of [[360, 780], [390, 844], [430, 932]]) {
+    await p.setViewportSize({ width: w, height: h });
+    await p.waitForTimeout(900);
+    const r = await p.locator('#cardSlot').boundingBox();
+    // Just inside each side, past the card's dark outline (about 5px), its light paper frame; just
+    // outside, the dark backdrop.
+    const points = [
+      ['left', r.x + 9, r.y + r.height / 2, r.x - 5, r.y + r.height / 2],
+      ['right', r.x + r.width - 9, r.y + r.height / 2, r.x + r.width + 5, r.y + r.height / 2],
+      ['top', r.x + r.width / 2, r.y + 9, r.x + r.width / 2, r.y - 5],
+    ];
+    const png = (await p.screenshot()).toString('base64');
+    const lum = await p.evaluate(
+      async ([src, pts]) => {
+        const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${src}`)).blob());
+        const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+        c.drawImage(img, 0, 0);
+        const at = (x, y) => {
+          const [r, g, b] = c.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+          return r * 0.299 + g * 0.587 + b * 0.114;
+        };
+        return pts.map(([side, ix, iy, ox, oy]) => [side, at(ix, iy), at(ox, oy), document.elementFromPoint(ix, iy)?.id]);
+      },
+      [png, points],
+    );
+    for (const [side, inside, outside, hit] of lum) {
+      expect(inside > 150 && outside < inside - 60, `${w}x${h}: the drawn card's ${side} edge is off its box (inside ${Math.round(inside)}, outside ${Math.round(outside)})`);
+      expect(hit === 'cardSlot', `${w}x${h}: a tap just inside the card's ${side} edge lands on ${hit}`);
+    }
+  }
+  await still.close();
+});
+
+await step('phone: until the first flick, a note on the card says a flick changes the finish', async () => {
+  expect(await mob.isVisible('#flickHint'), 'no flick note on a first visit');
+  const b = await mob.locator('#flickHint').boundingBox();
+  const card = await mob.locator('#cardSlot').boundingBox();
+  expect(b.x >= card.x && b.x + b.width <= card.x + card.width && b.y > card.y + card.height / 2, 'the flick note is not over the foot of the card');
 });
 
 await step('phone: flicking the card or tapping ‹ › steps through the hand; only a sideways flick does', async () => {
@@ -596,6 +1406,31 @@ await step('phone: flicking the card or tapping ‹ › steps through the hand; 
   expect((await edition()) === hand[(at + 1) % hand.length], 'the › step did not deal the next card');
   await mob.click('#handPrev');
   expect((await edition()) === hand[at], 'the ‹ step did not go back');
+});
+
+await step('phone: after a flick the note is gone, and stays gone', async () => {
+  expect(!(await mob.isVisible('#flickHint')), 'the flick note stays after a flick');
+  expect((await mob.evaluate(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').flicked)) === true, 'the first flick is not remembered');
+});
+
+await step('phone: the stage draws at 1.5x at most on a 3x screen', async () => {
+  const ratio = await mob.evaluate(() => {
+    const c = document.getElementById('cards');
+    return c.width / c.getBoundingClientRect().width;
+  });
+  expect(ratio <= 1.51, `the card canvas draws at ${ratio.toFixed(2)}x`);
+});
+
+await step('phones on their side keep the full Save box and no flick note', async () => {
+  const side = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const p = await side.newPage();
+  await p.addInitScript(() => localStorage.clear());
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(2000);
+  expect(await p.isVisible('.sec-export .sec-title'), 'the Save box lost its title');
+  expect(!(await p.isVisible('#flickHint')), 'the flick note shows on a phone on its side');
+  expect((await p.$eval('#pickBtnStage', (el) => getComputedStyle(el).position)) !== 'fixed', 'the pick button left the stage');
+  await side.close();
 });
 
 await step('phone: tilting the device is taken without errors', async () => {

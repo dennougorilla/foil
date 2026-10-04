@@ -1,28 +1,38 @@
 import './style.css';
-import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
+import { cardOf, CARD_KEYS, CARD_TYPE_MAX, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
+import { clampCrop, cropRect, drawFace, drawFlip, faceArt, type Crop } from './card/face';
+import { backUrl, drawBack } from './card/back';
+import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
+import { CARD_LAYOUTS } from './card/tcg';
+import { mountPrintPop } from './printPop';
+import { mountArrange } from './arrangeEdit';
+import type { TextRun } from './lettering';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
-import { exportGif, exportPng } from './exporter';
+import { download, exportGif, exportPng, GIF_SAVE, GIF_SHARE } from './exporter';
 import { forgetUserImage, loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
-import { changedKeys } from './tune/model';
-import { DEFAULT_LETTERING } from './lettering';
+import { bindMessageField, mountMessage } from './messagePanel';
+import { loadMessageFont } from './card/messageFace';
+import { changedKeys, EXPORT_MOTIONS, type ExportMotion } from './tune/model';
+import { DEFAULT_LETTERING, fieldAt, setFieldPrints, setTextRuns } from './lettering';
 import { initRangeColors } from './features';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { addToHand, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
+import { addToHand, available, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
+import { mountQuickMotion } from './tune/quick';
+import type { Kept } from './binder/db';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -48,6 +58,8 @@ const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSampl
 let userImage: Img | null = null;
 /** Set when the person's image is an animated GIF; userImage then holds its first frame. */
 let userAnim: Anim | null = null;
+/** The person's picture as it came (kept in the binder as is while it moves). */
+let userSource: Blob | null = null;
 let animFrame = 0;
 const currentImage = (): Img => {
   const s = store.get();
@@ -59,7 +71,9 @@ const currentImage = (): Img => {
 const face = document.createElement('canvas');
 const mask = document.createElement('canvas');
 const back = document.createElement('canvas');
-drawBack(back);
+drawBack(back, store.get().shape);
+// Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
+document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
 
 // ---------- Stage ----------
 
@@ -75,7 +89,15 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
-    onFlick: (dir) => stepEdition(dir),
+    onFlick: (dir) => {
+      store.set({ flicked: true });
+      stepEdition(dir);
+    },
+    // Tapping words on the card opens their own print.
+    onTapCard: (uv, x, y) => {
+      const field = fieldAt(uv);
+      if (field) printPop.open(field, { x, y });
+    },
     handIds: hand,
     deckRect: () => document.getElementById('deckBtn')?.getBoundingClientRect() ?? null,
   });
@@ -108,35 +130,48 @@ function wakeDepth() {
     .finally(() => (depthLoading = false));
 }
 
-/** Fetches the packs of the finish on the card and of the hand's cards; they deal in once ready. */
+/** Fetches the packs of the finishes on the card (both layers) and of the hand's cards; they deal in once ready. */
 function wakePacks() {
   const s = store.get();
-  for (const id of new Set([s.edition, ...s.hand].map((e) => packOf(e)?.id))) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
+  const ids = [s.edition, ...s.hand, ...(s.layer2 ? [s.layer2.edition] : [])];
+  for (const id of new Set(ids.map((e) => packOf(e)?.id))) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
   wakeDepth();
 }
 const artIds = new WeakMap<object, number>();
 let artCount = 0;
-/** Names the art in the window (picture and crop), so depth is read once per art. */
+/** Names the art in the window (picture, layout and crop), so depth is read once per art. */
 function artKey() {
   const s = store.get();
   const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
   if (!artIds.has(src)) artIds.set(src, ++artCount);
-  return `${artIds.get(src)}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
+  const a = faceArt(s);
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
 }
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements };
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
 let faceVersion = 0;
 const thumbKey = () => `${faceVersion}|${JSON.stringify(store.get().tune)}|${store.get().intensity}`;
 
+/** The message's typeface and words last asked for; the face is painted again once they can be drawn. */
+let fontAsked = '';
+
+/** The text the face last painted (Free placement starts each piece where it was). */
+let lastRuns: TextRun[] = [];
+
 function redrawFace() {
   faceVersion++;
   const spec = faceSpec(currentImage());
-  drawFace(face, mask, spec);
+  lastRuns = drawFace(face, mask, spec);
+  setTextRuns(face.width, face.height, lastRuns);
+  const { font, text } = spec.message;
+  const ask = text.trim() ? `${font}|${text}` : '';
+  if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
+  fontAsked = ask;
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
   depth?.update(face, artKey());
@@ -147,12 +182,10 @@ function redrawFace() {
 /** "v0.2.0 · 1a2b3c4", shown quietly at the foot of the support menu. */
 const APP_VERSION_LABEL = __APP_COMMIT__ === 'unknown' ? `v${__APP_VERSION__}` : `v${__APP_VERSION__} · ${__APP_COMMIT__}`;
 
-/** Placeholder title and line: samples carry their own, uploads get a generic one. */
+/** Placeholder name: samples carry their own, uploads get a generic one. */
 function fallback() {
   const i = store.get().sample;
-  return i >= 0
-    ? { name: t.samplesName[i], desc: t.samplesDesc[i] }
-    : { name: t.myCard, desc: t.myDesc };
+  return { name: i >= 0 ? t.samplesName[i] : t.myCard };
 }
 
 function applyText() {
@@ -201,6 +234,9 @@ function applyText() {
   buildFormats();
   buildSaveOpts();
   renderSave();
+  renderShare();
+  renderKeep();
+  renderBinderChip();
   syncInputs();
   renderInfo();
   renderCaption(null);
@@ -301,13 +337,15 @@ function buildSegments() {
     ink: '#252c30',
     gilt: 'linear-gradient(135deg,#f7dc8b,#d9a441 45%,#fbe7a6 60%,#b97f26)',
     rarity: rarityById(s.rarity).color,
+    rim: '#fbf7ee',
+    ribbon: '#f3eee2',
   };
   for (const f of FRAMES) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'seg-btn';
     b.setAttribute('role', 'radio');
-    b.innerHTML = `<span class="swatch" style="--sw:${swatch[f]}"></span><span></span>`;
+    b.innerHTML = `<span class="swatch" data-frame="${f}" style="--sw:${swatch[f]}"></span><span></span>`;
     b.lastElementChild!.textContent = t.frameName[f];
     radio(b, s.frame === f);
     b.onclick = () => {
@@ -317,6 +355,60 @@ function buildSegments() {
     fs.appendChild(b);
   }
   rangeColors.decorateFrames(fs);
+  const ss = $('shapeSeg');
+  ss.textContent = '';
+  for (const sh of SHAPES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.setAttribute('role', 'radio');
+    b.dataset.shape = sh.id;
+    // A small outline of the shape, at the area of the trading card's.
+    const { w, h } = fitArea(sh.h / sh.w, 18);
+    b.innerHTML = `<span class="shape-ico" style="--w:${w.toFixed(1)}px;--h:${h.toFixed(1)}px"></span><span></span>`;
+    b.lastElementChild!.textContent = t.shapeName[sh.id];
+    b.title = `${t.shapeName[sh.id]} · ${sh.size}`;
+    radio(b, s.shape === sh.id);
+    b.onclick = () => {
+      sfx.tick();
+      store.set({ shape: sh.id });
+      stage.juice(0.4);
+    };
+    ss.appendChild(b);
+  }
+  const ls = $('layoutSeg');
+  ls.textContent = '';
+  for (const id of CARD_LAYOUTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = id;
+    b.setAttribute('role', 'radio');
+    // A tiny card drawn in each layout's parts.
+    b.innerHTML = '<i class="layout-icon" aria-hidden="true"><i></i><i></i><i></i></i><span></span>';
+    b.lastElementChild!.textContent = t.tcg.layoutName[id];
+    radio(b, s.layout === id);
+    b.onclick = () => {
+      if (store.get().layout === id) return;
+      sfx.tick();
+      stage.flipTo(() => store.set({ layout: id }));
+    };
+    ls.appendChild(b);
+  }
+}
+
+/** The card takes a new shape: its slot, its back, the crop window and every face follow. */
+function applyShape() {
+  const sh = shapeById(store.get().shape);
+  // The slot holds the card at the trading card's area (shape.ts fitArea); CSS reads these.
+  const k = fitArea(sh.h / sh.w, 1);
+  const root = document.documentElement.style;
+  root.setProperty('--card-ar', `${sh.w} / ${sh.h}`);
+  root.setProperty('--card-kw', k.w.toFixed(4));
+  root.setProperty('--card-kh', k.h.toFixed(4));
+  drawBack(back, sh.id);
+  stage.cards.setBack(back);
+  if (flipImage) setFlip(flipImage);
 }
 
 function buildThumbs() {
@@ -374,14 +466,22 @@ function setRangeFill(input: HTMLInputElement) {
 function syncInputs() {
   const s = store.get();
   const name = $<HTMLInputElement>('nameInput');
-  const desc = $<HTMLTextAreaElement>('descInput');
+  const msg = $<HTMLTextAreaElement>('messageInput');
   if (document.activeElement !== name) name.value = s.name;
-  if (document.activeElement !== desc) desc.value = s.desc;
+  syncMessageInput();
   name.placeholder = fallback().name;
-  desc.placeholder = fallback().desc;
-  desc.classList.toggle('is-hint', s.sample < 0);
+  const tcg = s.layout === 'tcg';
+  msg.placeholder = tcg ? t.msg.effectTag : t.msg.tag;
+  const type = $<HTMLInputElement>('typeInput');
+  type.hidden = !tcg;
+  if (document.activeElement !== type) type.value = s.cardType;
+  type.placeholder = t.tcg.typeTag;
+  type.setAttribute('aria-label', t.tcg.type);
   name.setAttribute('aria-label', t.name);
-  desc.setAttribute('aria-label', t.desc);
+  // Off, the name stays in the tag but is not printed: it steps back.
+  name.classList.toggle('is-off', !s.plate);
+  msg.setAttribute('aria-label', t.msg.title);
+  $('info').classList.toggle('is-tcg', tcg);
   const inten = $<HTMLInputElement>('intensity');
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
@@ -432,7 +532,7 @@ function positionCropWindow() {
   const ch = parseFloat(cropCanvas.style.height) || 1;
   const left = (box.width - cw) / 2;
   const top = (box.height - ch) / 2;
-  const r = cropRect(img.width, img.height, store.get().crop);
+  const r = cropRect(img.width, img.height, store.get().crop, artAspect());
   const k = cw / img.width;
   Object.assign(cropWin.style, {
     left: `${left + r.sx * k}px`,
@@ -444,9 +544,15 @@ function positionCropWindow() {
   });
 }
 
+/** Width / height of the art window the crop fills (the layout's). */
+function artAspect() {
+  const a = faceArt(store.get());
+  return a.w / a.h;
+}
+
 function setCrop(c: Crop) {
   const img = currentImage();
-  store.set({ crop: clampCrop(img.width, img.height, c) });
+  store.set({ crop: clampCrop(img.width, img.height, c, artAspect()) });
 }
 
 {
@@ -554,6 +660,7 @@ async function loadFile(file: File) {
     const { still, anim } = await decodeImage(file);
     userImage = still;
     userAnim = anim;
+    userSource = file;
     animFrame = 0;
     void saveUserImage(anim ? file : still);
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
@@ -581,7 +688,6 @@ function useImage(idx: number) {
   const patch: Partial<State> = { sample: idx, crop: { zoom: 1, x: 0.5, y: 0.5 } };
   if (idx >= 0) {
     if (!s.nameEdited) patch.name = '';
-    if (!s.descEdited) patch.desc = '';
   }
   stage.flipTo(() => {
     store.set(patch);
@@ -654,7 +760,7 @@ let flipChosen = false;
 
 function setFlip(img: Img | null) {
   flipImage = img;
-  if (img) drawFlip(flip, img);
+  if (img) drawFlip(flip, img, store.get().shape, faceArt(store.get()));
   stage.cards.setFlip(img ? flip : null);
   renderFlip();
 }
@@ -727,6 +833,15 @@ function stepEdition(dir: 1 | -1) {
   if (id) selectEdition(id);
 }
 
+/** The phone's note that a flick changes the finish: until the first flick, and not on a finish a
+ *  finger strokes instead (see stage-phone.css). */
+function syncFlickHint() {
+  const s = store.get();
+  const ed = editionById(s.edition);
+  $('flickHint').hidden = s.flicked || !!ed.touch || !!ed.torch;
+}
+syncFlickHint();
+
 // Phones step through the hand from beside the finish's name too (see stage-phone.css).
 $('handPrev').addEventListener('click', () => stepEdition(-1));
 $('handNext').addEventListener('click', () => stepEdition(1));
@@ -764,10 +879,9 @@ $<HTMLInputElement>('nameInput').addEventListener('input', (e) => {
   const v = (e.target as HTMLInputElement).value;
   store.set({ name: v, nameEdited: v.length > 0 });
 });
-$<HTMLTextAreaElement>('descInput').addEventListener('input', (e) => {
-  const v = (e.target as HTMLTextAreaElement).value;
-  store.set({ desc: v, descEdited: v.length > 0 });
-});
+const syncMessageInput = bindMessageField($<HTMLTextAreaElement>('messageInput'), store);
+$<HTMLInputElement>('typeInput').maxLength = CARD_TYPE_MAX;
+$<HTMLInputElement>('typeInput').addEventListener('input', (e) => store.set({ cardType: (e.target as HTMLInputElement).value }));
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
@@ -790,6 +904,8 @@ $('crtBtn').addEventListener('click', () => {
 });
 rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
+rovingKeys($('shapeSeg'));
+rovingKeys($('layoutSeg'));
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
 mountTune(store, $('pane-light'));
@@ -816,9 +932,10 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor;
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic';
   if (id === 'light') return changedKeys(s.tune).length > 0;
-  if (id === 'text') return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING);
+  if (id === 'text')
+    return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
   return rangeChanged;
 }
 
@@ -901,7 +1018,7 @@ function syncAdjust() {
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '' });
+  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -928,6 +1045,7 @@ function exportInput() {
     intensity: s.intensity,
     pixel: s.pixel,
     tune: s.tune,
+    motion: s.exportMotion,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
@@ -979,9 +1097,14 @@ function renderSave() {
   if (saveBtn.hasAttribute('aria-busy')) return;
   const f = store.get().exportFormat;
   saveBtn.dataset.format = f;
+  saveBtn.querySelector<HTMLElement>('.btn-text b')!.dataset.short = t.saveShort;
   if (f === 'apng') return apngExport.refresh();
   saveBtn.querySelector('.btn-text b')!.textContent = t.save.replace('{f}', t.format[f]);
-  saveBtn.querySelector('.btn-text small')!.textContent = f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f];
+  // The card's own size for a PNG; the GIF's frame turns with the shape.
+  const sh = shapeById(store.get().shape);
+  const gif = exportFrame(sh.h / sh.w, GIF_SAVE.w, GIF_SAVE.h);
+  const size = f === 'png' ? `${sh.w}×${sh.h}` : `${gif.W}×${gif.H}`;
+  saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
   for (const el of saveBtn.querySelectorAll('.save-meta > *')) el.textContent = '';
   saveBtn.removeAttribute('title');
 }
@@ -991,11 +1114,34 @@ const MATTES = ['auto', '#ffffff', '#000000'];
 
 function buildSaveOpts() {
   const s = store.get();
-  $('saveOpts').hidden = s.exportFormat !== 'gif';
+  const gif = s.exportFormat === 'gif';
+  $('saveOpts').hidden = s.exportFormat === 'png';
   $('saveOptsToggle').setAttribute('aria-expanded', String(s.saveOptsOpen));
   $('saveOptsBody').hidden = !s.saveOptsOpen;
   $('saveOpts').classList.toggle('is-open', s.saveOptsOpen);
-  $('saveOptsSummary').textContent = `${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`;
+  const motionName = (m: ExportMotion) => (m === 'stage' ? `${t.exportMotionName.stage} (${t.tune.idleMode[s.tune.idle]})` : t.exportMotionName[m]);
+  $('saveOptsSummary').textContent = [`${t.exportMotion}: ${motionName(s.exportMotion)}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
+  // The loop's motion, for GIF and APNG alike.
+  const mo = $('exportMotionSeg');
+  mo.textContent = '';
+  for (const m of EXPORT_MOTIONS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = m;
+    b.setAttribute('role', 'radio');
+    b.textContent = motionName(m);
+    b.title = t.exportMotionHelp[m];
+    radio(b, s.exportMotion === m);
+    b.onclick = () => {
+      if (store.get().exportMotion === m) return;
+      sfx.tick();
+      store.set({ exportMotion: m });
+    };
+    mo.appendChild(b);
+  }
+  $('exportMotionHelp').textContent = t.exportMotionHelp[s.exportMotion];
+  $('gifBgField').hidden = !gif;
   const bg = $('gifBgSeg');
   bg.textContent = '';
   for (const clear of [false, true]) {
@@ -1014,8 +1160,8 @@ function buildSaveOpts() {
     };
     bg.appendChild(b);
   }
-  $('matteField').hidden = !s.gifClear;
-  $('gifClearNote').hidden = !s.gifClear;
+  $('matteField').hidden = !gif || !s.gifClear;
+  $('gifClearNote').hidden = !gif || !s.gifClear;
   const ms = $('matteSeg');
   ms.textContent = '';
   const custom = !MATTES.includes(s.gifMatte);
@@ -1067,11 +1213,15 @@ $('toApng').addEventListener('click', () => {
   store.set({ exportFormat: 'apng' });
   saveBtn.focus();
 });
+rovingKeys($('exportMotionSeg'));
 rovingKeys($('gifBgSeg'));
 rovingKeys($('matteSeg'));
 
-/** While a job runs, the sub-label names the step and the title counts up; the button fills like a bar. */
-async function busy(label: string, job: (progress: (p: number) => void) => Promise<string>, fail = t.errDecode) {
+/**
+ * While a file is made, the sub-label names the step and the title counts up; the button fills like
+ * a bar. Answers with the file, or null when it could not be made (the person is told).
+ */
+async function busy(label: string, job: (progress: (p: number) => void) => Promise<File>, fail = t.errDecode): Promise<File | null> {
   const b = saveBtn.querySelector('.btn-text b')!;
   const small = saveBtn.querySelector('.btn-text small')!;
   // One export at a time: the button, the format choice and the APNG shortcut rest while this one works.
@@ -1085,12 +1235,9 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     b.textContent = `${Math.round(p * 100)}%`;
     saveBtn.style.setProperty('--p', p.toFixed(3));
   };
-  let saved = '';
+  let made: File | null = null;
   try {
-    const file = await job(progress);
-    sfx.coin();
-    announce(`${t.saved}: ${file}`);
-    saved = file;
+    made = await job(progress);
   } catch (err) {
     console.error(err);
     sfx.error();
@@ -1105,8 +1252,22 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     saveBtn.style.removeProperty('--p');
     // From the current dictionary, in case the language changed mid-export.
     renderSave();
-    if (saved) celebrate(saved);
   }
+  return made;
+}
+
+/** The card as a file, its progress shown on the Save button under `label`; a GIF to share is smaller. */
+function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
+  if (format === 'png') return exportPng(exportInput());
+  const small = saveBtn.querySelector('.btn-text small')!;
+  return exportGif(
+    exportInput(),
+    (p, encoding) => {
+      small.textContent = encoding ? t.encoding : label;
+      progress(p);
+    },
+    { clear: store.get().gifClear, matte: store.get().gifMatte, size: format === 'share' ? GIF_SHARE : undefined },
+  );
 }
 
 /**
@@ -1136,34 +1297,235 @@ function celebrate(file: string) {
  */
 function exportBusy(on: boolean) {
   stage?.holdQuality(on);
+  shareBtn.disabled = on;
   if (!on || !saveBtn.classList.contains('is-saved')) return;
   clearTimeout(celebrateTimer);
   saveBtn.classList.remove('is-saved');
 }
 
-saveBtn.addEventListener('click', () => {
+saveBtn.addEventListener('click', async () => {
   const f = store.get().exportFormat;
-  // One export at a time, and not while a picture is loading (APNG handles its own button, incl. stop).
-  if (f !== 'apng' && (saveBtn.hasAttribute('aria-busy') || store.get().loading)) return;
-  if (f === 'png') void busy(t.saving, () => exportPng(exportInput()), t.errPng);
-  else if (f === 'gif') {
-    const small = saveBtn.querySelector('.btn-text small')!;
-    void busy(
-      t.saving,
-      (progress) =>
-        exportGif(
-          exportInput(),
-          (p, encoding) => {
-            small.textContent = encoding ? t.encoding : t.saving;
-            progress(p);
-          },
-          { clear: store.get().gifClear, matte: store.get().gifMatte },
-        ),
-      t.errGif,
-    );
-  }
-  // APNG runs from its own module, which also handles stopping it.
+  // One export at a time, and not while a picture is loading. APNG runs from its own module,
+  // which also handles stopping it.
+  if (f === 'apng' || saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
+  const file = await busy(t.saving, (progress) => makeFile(f, t.saving, progress), f === 'png' ? t.errPng : t.errGif);
+  if (!file) return;
+  download(file);
+  sfx.coin();
+  announce(`${t.saved}: ${file.name}`);
+  celebrate(file.name);
 });
+
+// ---------- Share ----------
+
+const shareBtn = $<HTMLButtonElement>('shareBtn');
+// Only where the share sheet takes an image file; elsewhere Save is the way out.
+shareBtn.hidden = !(() => {
+  try {
+    return !!navigator.canShare?.({ files: [new File([''], 'card.gif', { type: 'image/gif' })] });
+  } catch {
+    return false;
+  }
+})();
+/** A file made for sharing that waits for one more tap: the browser stopped counting the first. */
+let shareReady: File | null = null;
+
+function renderShare() {
+  shareBtn.dataset.ready = String(!!shareReady);
+  shareBtn.querySelector('span')!.textContent = shareReady ? t.shareReady : t.share;
+  shareBtn.title = shareReady ? t.shareReadyHint : t.shareHint;
+}
+
+function readyToShare(file: File | null) {
+  shareReady = file;
+  renderShare();
+  if (file) toast(t.shareReadyHint);
+}
+
+/** Only the site's address goes along with the card; the card itself leaves the device only through the sheet. */
+const SITE = 'https://dennougorilla.github.io/foil/';
+/**
+ * A Mac (not an iPad, which also says Macintosh but has touch): its share sheet's Copy puts every
+ * shared item on the clipboard, and pasting that into X attached the GIF twice, so the GIF goes alone.
+ */
+const macDesktop = /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints < 2;
+/** A share sheet is open: another press waits for it rather than opening a second one. */
+let sending = false;
+
+/**
+ * Hands the GIF to the share sheet with a line and the site's address, or the GIF alone where the
+ * sheet can't take both (and on a Mac). On the first tap, a file made too late waits for a second one.
+ */
+async function send(file: File, firstTap: boolean) {
+  const withText = { files: [file], text: `${t.shareText} ${SITE}` };
+  sending = true;
+  try {
+    await navigator.share(!macDesktop && navigator.canShare(withText) ? withText : { files: [file] });
+  } catch (err) {
+    const name = (err as DOMException).name;
+    if (firstTap && name === 'NotAllowedError') return readyToShare(file);
+    // Closing the sheet without picking an app is not an error.
+    if (name === 'AbortError') return;
+    console.error(err);
+    sfx.error();
+    toast(t.errShare, true);
+  } finally {
+    sending = false;
+  }
+}
+
+shareBtn.addEventListener('click', async () => {
+  if (sending) return;
+  if (shareReady) {
+    const file = shareReady;
+    readyToShare(null);
+    return send(file, false);
+  }
+  if (saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
+  sfx.tick();
+  // The progress shows on Share as well as on the Save button.
+  const label = shareBtn.querySelector('span')!;
+  shareBtn.dataset.busy = 'true';
+  const file = await busy(
+    t.sharing,
+    (progress) =>
+      makeFile('share', t.sharing, (p) => {
+        label.textContent = `${Math.round(p * 100)}%`;
+        progress(p);
+      }),
+    t.errGif,
+  );
+  delete shareBtn.dataset.busy;
+  renderShare();
+  if (file) await send(file, true);
+});
+
+// ---------- Binder ----------
+
+const keepBtn = $<HTMLButtonElement>('keepBtn');
+const binderBtn = $<HTMLButtonElement>('binderBtn');
+/** The binder's count, kept here so the chip shows it before the binder's code loads. */
+const BINDER_COUNT = 'foil:binder';
+/** The binder card the stage shows as it is now (until it changes), and one just thrown away. */
+let keptId: string | null = null;
+let droppedId: string | null = null;
+const isKept = () => keptId !== null;
+
+function renderKeep() {
+  keepBtn.dataset.kept = String(isKept());
+  keepBtn.querySelector('span')!.textContent = isKept() ? t.kept : t.keep;
+  keepBtn.title = isKept() ? t.keptHint : t.keepHint;
+}
+
+function renderBinderChip() {
+  let n = 0;
+  try {
+    n = Math.max(0, parseInt(localStorage.getItem(BINDER_COUNT) ?? '0', 10) || 0);
+  } catch {
+    /* storage unavailable: no count */
+  }
+  binderBtn.querySelector('.binder-count')!.textContent = String(n);
+  binderBtn.dataset.empty = String(n === 0);
+  binderBtn.setAttribute('aria-label', t.binderLabel.replace('{n}', String(n)));
+  binderBtn.title = t.binderLabel.replace('{n}', String(n));
+}
+
+type Binder = ReturnType<typeof import('./binder/binder').mountBinder>;
+let binder: Promise<Binder> | null = null;
+/** The binder's code, styles and texts load the first time it is used (or pointed at). */
+function useBinder(): Promise<Binder> {
+  if (binder) return binder;
+  binder = import('./binder/binder').then((m) =>
+    m.mountBinder({
+      lang: () => store.get().lang,
+      dict: () => t,
+      chip: binderBtn,
+      cardRect: () => $('cardSlot').getBoundingClientRect(),
+      card: () => cardOf(store.get()),
+      input: exportInput,
+      picture: () => (store.get().sample >= 0 ? null : { still: userImage ?? samples[0], file: userAnim ? userSource : null }),
+      play: playCard,
+      pause: (on) => stage.pause(on),
+      toast: (msg, error) => toast(msg, error),
+      announce,
+      onCount: (n) => {
+        try {
+          localStorage.setItem(BINDER_COUNT, String(n));
+        } catch {
+          /* the chip shows the count from the next opening */
+        }
+        renderBinderChip();
+      },
+      onKept: (id) => setKept(id),
+      // Throwing the stage's card away makes it keepable again; Undo makes it kept again.
+      onGone: (ids) => {
+        if (keptId && ids.includes(keptId)) {
+          droppedId = keptId;
+          setKept(null);
+        }
+      },
+      onBack: (ids) => droppedId && ids.includes(droppedId) && setKept(droppedId),
+      sfx,
+    }),
+  );
+  binder.catch(() => (binder = null));
+  return binder;
+}
+
+/** Runs something in the binder, saying so if its code can't be fetched. */
+function withBinder(run: (b: Binder) => Promise<void> | void): Promise<void> {
+  return useBinder().then(run, () => toast(t.binderFailed, true));
+}
+
+for (const b of [keepBtn, binderBtn]) for (const ev of ['pointerenter', 'focus']) b.addEventListener(ev, () => void useBinder().catch(() => {}), { once: true });
+binderBtn.addEventListener('click', () => {
+  sfx.tick();
+  void withBinder((b) => b.open());
+});
+keepBtn.addEventListener('click', () => {
+  sfx.tick();
+  // Already kept: the button leads to the binder instead of keeping a second copy.
+  if (isKept()) return void withBinder((b) => b.open());
+  if (keepBtn.hasAttribute('aria-busy')) return;
+  keepBtn.setAttribute('aria-busy', 'true');
+  void withBinder((b) => b.keep()).finally(() => keepBtn.removeAttribute('aria-busy'));
+});
+
+/** Puts a card from the binder on the stage: its picture and every setting of the card. */
+function setKept(id: string | null) {
+  keptId = id;
+  renderKeep();
+}
+
+async function playCard(k: Kept, id: string) {
+  const card = cleanCard(k.card);
+  if (!available(card.edition!, packs.get())) card.edition = 'holo';
+  if (card.layer2 && !available(card.layer2.edition, packs.get())) card.layer2 = null;
+  if (card.sample! >= SAMPLE_COUNT) card.sample = 0;
+  if (card.sample! < 0) {
+    const img = k.picture ? await decodeImage(k.picture).catch(() => null) : null;
+    if (img) {
+      userImage = img.still;
+      userAnim = img.anim;
+      userSource = k.picture;
+      animFrame = 0;
+      void saveUserImage(k.picture!);
+    } else {
+      card.sample = 0;
+      card.crop = { zoom: 1, x: 0.5, y: 0.5 };
+      toast(t.errDecode, true);
+    }
+  }
+  stage.flipTo(() => {
+    store.set(card);
+    redrawFace();
+    buildThumbs();
+    syncInputs();
+    renderInfo();
+    drawCropPreview();
+    setKept(id);
+  });
+}
 
 // Before the APNG export: its first refresh already reads the export input, which includes the range.
 const rangeColors = initRangeColors({
@@ -1483,24 +1845,46 @@ store.on((s, changed) => {
     wakePacks();
     depth?.update(face, artKey());
   }
+  if (changed.has('layer2')) wakePacks();
+  // Layer 1 and layer 2 never hold the same finish: putting layer 2's finish on the card removes layer 2.
+  if (changed.has('edition') && s.layer2?.edition === s.edition) store.set({ layer2: null, areaLayer: 1 });
+  if (changed.has('edition') || changed.has('flicked')) syncFlickHint();
   if (changed.has('hand')) {
     wakePacks();
     stage.syncHand();
     deck.render();
   }
-  if (changed.has('rarity') || changed.has('frame')) buildSegments();
-  if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if (changed.has('rarity') || changed.has('frame') || changed.has('shape')) buildSegments();
+  if (changed.has('prints')) setFieldPrints(s.prints);
+  if (changed.has('shape')) applyShape();
+  if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
+    // A new art window has its own proportions: keep the crop inside the picture, and redraw the flip picture for it.
+    const img = currentImage();
+    const crop = clampCrop(img.width, img.height, s.crop, artAspect());
+    if (crop.x !== s.crop.x || crop.y !== s.crop.y) store.set({ crop });
+    if (flipImage) setFlip(flipImage);
+    buildSegments();
+    drawCropPreview();
+  }
+  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
-  if (changed.has('sample')) syncInputs();
+  if (['sample', 'name', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
-  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) {
+  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'exportMotion', 'shape', 'tune'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }
+  // The card changed: it is no longer the one kept, and a file waiting to be shared is out of date
+  // (as it is when the export's motion or transparency changes).
+  if (CARD_KEYS.some((k) => changed.has(k))) {
+    droppedId = null;
+    if (isKept()) setKept(null);
+  }
+  if (shareReady && [...CARD_KEYS, 'exportMotion', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
@@ -1511,6 +1895,25 @@ store.on((s, changed) => {
 // ---------- Boot ----------
 
 setSound(store.get().sound);
+setFieldPrints(store.get().prints);
+const printPop = mountPrintPop({ store, dict: () => t, onPick: () => stage.juice(0.35) });
+mountArrange({
+  store,
+  stage,
+  slot: $('cardSlot'),
+  face,
+  dict: () => t,
+  runs: () => lastRuns,
+  openPrint: (f, at) => printPop.open(f, at),
+});
+mountMessage({
+  store,
+  host: $('pane-text'),
+  dict: () => t,
+  onPick: () => stage.juice(0.35),
+  chip: (f) => printPop.chip(f),
+  namePlaceholder: () => fallback().name,
+});
 mountLettering({
   store,
   host: $('pane-text'),
@@ -1522,6 +1925,7 @@ mountLettering({
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
+applyShape();
 initPackStore(store);
 packs.on(() => stage.syncHand());
 const deck = mountDeck({
@@ -1532,6 +1936,8 @@ const deck = mountDeck({
   onShop: () => openShop(),
   onPrefetch: () => void import('./pack/opening'),
 });
+// The idle motion in one tap, just above the deck.
+mountQuickMotion(store, $('deckDock'));
 // The saved hand made valid; the earlier drawn card and the finish on the card take places in it.
 {
   const s = store.get();
@@ -1545,8 +1951,8 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font, so wait for it before painting the face.
-document.fonts.load('40px "DotGothic16"').then(boot, boot);
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before painting the face.
+Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]).then(boot, boot);
 boot();
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
@@ -1560,6 +1966,7 @@ if (store.get().sample < 0) {
     if (img) {
       userImage = img.still;
       userAnim = img.anim;
+      userSource = blob;
       buildThumbs();
       boot();
     } else {

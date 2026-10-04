@@ -29,7 +29,7 @@ vec4 flipFace(vec2 pv, float lod) { return textureLod(uFlip, tuneFaceUv(pv), lod
 // darker it is. Each stroke wobbles a little and breaks off here and there, as drawn by hand.
 // Strokes thinner than a screen pixel fade to the tone they would average to.
 float lfHatch(vec2 pv, vec2 d, float dark) {
-  vec2 px = pv * vec2(900.0, 1260.0);
+  vec2 px = pv * uCardK * 900.0; // face pixels
   float h = dot(px, d) / 14.0 + (vnoise(px / 60.0) - 0.5) * 0.7;
   float k = fwidth(h);
   float on = 1.0 - smoothstep(dark - k, dark + k, abs(fract(h) - 0.5) * 2.0);
@@ -57,7 +57,8 @@ vec3 lfPencil(vec2 pv, vec2 hv, float lod) {
 
 vec3 lenticularFlip(vec3 c, vec2 uv, vec2 t, float lod, float art) {
   // Across the lenses, in pattern space, so Pattern size and angle reach them.
-  float lx = (uv.x - 0.5) * LF_LENSES;
+  float lenses = LF_LENSES * uCardK.x;
+  float lx = (uv.x - 0.5) * lenses;
   float f = fract(lx);
   // Lenses narrower than about three pixels (the hand, small exports) fade to a plain crossfade.
   float detail = smoothstep(0.45, 0.25, fwidth(lx));
@@ -65,7 +66,7 @@ vec3 lenticularFlip(vec3 c, vec2 uv, vec2 t, float lod, float art) {
   vec2 ruv = tuneUnpattern(uv);
 
   // Both pictures as each lens shows them: its strip stretched across the lens.
-  float sx = (floor(lx) + 0.5 + (f - 0.5) * 0.85) / LF_LENSES + 0.5;
+  float sx = (floor(lx) + 0.5 + (f - 0.5) * 0.85) / lenses + 0.5;
   vec2 pv = vec2(mix(uv.x, sx, detail * art), uv.y);
   vec4 fa = face(pv, lod);
   vec3 a = mix(c, fa.rgb / max(fa.a, 1e-4), art);

@@ -12,6 +12,7 @@ import { editionById, type EditionId } from '../editions';
 import { addToHand, HAND_SIZE, packById, packOf, placeAt, removeFromHand, type PackId } from '../packs';
 import type { Dict } from '../i18n';
 import { tuneGl, type Tune } from '../tune/model';
+import { contain } from '../card/shape';
 
 export interface DeckViewOptions {
   dict: Dict;
@@ -49,8 +50,10 @@ function miniCard(id: EditionId, o: DeckViewOptions): HTMLCanvasElement {
   r.tune = tuneGl(o.tune);
   r.resize(TW + 16, TH + 20, 2);
   r.begin();
+  // A card of another shape fits in the same place.
+  const { w, h } = contain(o.face.height / o.face.width, TW, TH);
   // The same pose and light as a resting card in the hand.
-  r.drawCard({ cx: (TW + 16) / 2, cy: (TH + 16) / 2, w: TW, h: TH, rx: 0.04, ry: -0.06, rz: 0, scale: 1, edition: editionById(id).shader, intensity: o.intensity, pixel: 0, tilt: [0.25, 0.2], light: [0.5, 0.35], alpha: 1, flash: 0, shadow: [4, 6], plate: false }, 1.7);
+  r.drawCard({ cx: (TW + 16) / 2, cy: (TH + 16) / 2, w, h, rx: 0.04, ry: -0.06, rz: 0, scale: 1, edition: editionById(id).shader, intensity: o.intensity, pixel: 0, tilt: [0.25, 0.2], light: [0.5, 0.35], alpha: 1, flash: 0, shadow: [4, 6], plate: false }, 1.7);
   return copyOf(rendererCanvas!);
 }
 

@@ -1,42 +1,49 @@
 # FOIL
 
-Turn any picture into a collectible card and give it a rare finish.
+[![FOIL — turn any picture into a collectible card with a rare finish](public/og.png)](https://dennougorilla.github.io/foil/)
 
-**Live:** https://dennougorilla.github.io/foil/
+Turn any picture into a collectible card and give it a rare foil finish.
 
-- Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). Animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
-- Pick a finish from the fanned hand at the bottom — each card in the hand is a live preview. The hand starts with seven finishes: the five editions of the game FOIL is modelled on (Base, Foil, Holographic, Polychrome and Negative), plus Prism and Glitch. Keys 1–9 and 0 pick the cards in the hand in order, ← → step through them.
-- On phones the hand sits right under the card (and its pick button), with the name tag below it, so the card and the hand fit on one screen above the Save bar without scrolling; the card shrinks on short screens. Flicking the card left or right with a finger, or tapping ‹ › beside the finish's name, steps to the next or previous card in the hand, whichever cards the hand holds at the moment, wrapping around at the ends (on Warmth a finger strokes the card instead of flicking it).
-- Every other finish comes in a theme pack: **Metal** (Relief, Gold, Platinum, Cosmo Holo, Crystal), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Snow Globe, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray. A pack is opened once and holds its whole theme — no random draws: trace the line across its top to tear it, swipe through the cards, and the rarest one waits until last for its own entrance. Skip jumps straight to the result, and the cards are shown on your own picture so you can try them at once. The hand holds up to seven cards; every other finish you own waits in the **deck**, a small stack of card backs at the end of the hand with its count. Press it to edit your hand like a card game's deck screen: one tap moves a finish between the deck and the hand (or drag it onto a slot), with undo and a reset to the starting seven; Base always stays. An opening can be watched again from the shop.
-- Opening one of the support links in the header (GitHub Sponsors or Buy Me a Coffee) once adds the **Supporter pack** (Opal, Raden, Confetti, Fireworks, Kintsugi) to the shop in this browser and its other open tabs; until then it leaves no trace. It opens like the others, with a richer wrapper and opening. It is an honor system with no payment check. Packs, their shaders and the shop itself only load when the shop is opened (an opened pack's finishes load with the hand). Opened packs are kept in this browser; a saved card on a finish whose pack is sealed again (site data cleared) goes back to Holographic. Finishes unlocked under the earlier support-link secrets (v0.9) carry over: their packs count as opened. The design is in [`docs/packs.md`](docs/packs.md).
-- Relief strikes the picture in metal like a proof coin: the subject stands up as a matte relief in a few flat levels with crisp steps, the background becomes a flat mirror field that flashes as the card tilts, and line work sinks into grooves. Dark pictures are lifted rather than crushed. The frame gets a stamped dot texture and the name a mirror foil on a matte plate. Gold by default; silver is a choice under Shine.
-- Platinum prints the art on cold white metal brushed with fine hairlines: the light is a hard streak across the lines, and tilting slides it along them, glinting on single lines as it passes. It moves only with the tilt and the light, so it holds still when motion is reduced.
-- Cosmo Holo is the cosmos foil of trading cards laid over the art: a regular print of circles, stars and fine dots, each one a tiny diffraction grating. Rainbow bands run across the rows of motifs and slide over the card as it tilts, the star facets flash one after another and the dots twinkle; off the bands the foil all but disappears and the art shows through. It moves only with the tilt, so it loops in exports and holds still under reduced motion.
-- Glow turns the card into glow-in-the-dark ink in a dim room: the picture sits darker and cooler, and the pointer (or a finger) is a small violet lamp. Wherever it shines, the ink stores the light and, once the lamp moves on, glows pale yellow-green, brightest where the picture is light. It fades the way real glow-in-the-dark ink does: quickly at first, then a faint glow that lingers for twenty seconds or so, drawing back into its crystals so an old afterglow glimmers grain by grain. Holding still charges a spot brighter. Like Warmth it arrives with one sweep of light as a hint, and a drag strokes the card instead of tossing it. Exports sweep the light through the busiest part of the picture; a PNG catches the trail still glowing, and a GIF or APNG loop shows the light pass and the afterglow it leaves.
-- Blacklight hides fluorescent ink in the print. The card looks ordinary until the pointer (a finger on a phone) shines an ultraviolet lamp on it: inside the lamp's circle the print is washed in violet, white paper glows blue, and the hidden ink lights up neon pink, yellow and cyan — the outlines of the picture over a fine engraving of it, fibres in the paper, FOIL microtext round the frame and, somewhere on the art, a seal to find. Left alone, the lamp drifts slowly over the card by itself, glowing dimmer, and turns up to full when you point at the card (it holds still with reduced motion). On this finish a drag moves the lamp instead of tossing the card. Exports sweep the lamp slowly round the art and loop.
-- Shallows sinks the art like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports.
-- Stardust scatters rainbow star dust over the art, which sits a little deeper so the grains of light lead: each fine grain is a tiny facet that catches the light at its own angle, square chips of confetti foil flash a color as they face you, and a few big starbursts blaze when the angle is right and pop on a steady beat (so its GIF and APNG loops close without a seam). A wide band of light rolls across as the card tilts, and every grain inside it fires harder.
-- Snow Globe sets the art behind a curved pane of clear liquid full of gold glitter; shake or toss the card and the glitter swirls up, then settles.
-- Warmth reacts to touch: untouched, the art is printed as a blue cyanotype in thermochromic ink. Hover with a mouse or drag a finger across it and the ink flushes rose, coral and peach, then turns clear to show the picture in its own colors, and slowly cools back. Press and hold to leave a fingerprint. The card arrives with an unseen finger swiping it once, as a hint. On this finish a drag strokes the card instead of tossing it. Exports play the whole story (cold, a swipe, a press, cooling) and aim the swipe at the busiest part of the picture.
-- Stained Glass sets the picture in leaded glass lit from behind: black lead came cuts it into panes and runs along the picture's big outlines, each pane takes its color from the picture under it, and small details stay on the glass like painted line. The frame becomes a border of pale glass strips mitred at the corners, with the name painted on. Tilting moves the light behind the window across the panes and shifts the uneven thickness of the glass, so each pane glows and mottles in its own way. It has no clock of its own, so it holds still under reduced motion and loops cleanly in every export.
-- 3D Lenticular puts the picture under a sheet of fine vertical lenses, like a 3D lenticular print: it reads the picture's depth with the same on-device model as Shadowbox (and guesses it from color until then), so the subject floats in front of the card and the background sinks behind it. Tilting sideways steps through the views, so near and far slide against each other; tilted too far, the views flip back with a faint double image, as on a real print. The ridges show as fine lines that catch the light, and bands of light and shade sweep across them with the angle. It moves only with the tilt, so it loops in exports and holds still under reduced motion.
-- Flip Lenticular is a two-picture flip card under a sheet of fine vertical lenses. Seen from the front (or tilted right) it shows your picture; tilt it left and the other picture takes over, as on a real two-picture flip card, the two mixing in thin stripes on the way that sweep across the card. Tilting up or down never flips it, and the ridges catch the light as a band of fine glints. The other picture is picked in the panel while Flip Lenticular is on the card (Choose / Remove, kept for next time); without one, it flips to a pencil drawing of the same picture. It moves only with the tilt, so it loops in exports and holds still under reduced motion; a PNG shows the front picture.
-- Shadowbox cuts the picture into paper layers along its depth and stands them up inside a lit box, so the layers slide apart and cast shadows as the card tilts. It reads the picture's depth with a small depth model that runs on your device (WebGPU when available, otherwise WebAssembly). The first time it (or 3D Lenticular) is chosen it downloads the model once (about 19–27 MB, then cached by the browser); a chip on the card shows the progress. Until then, or if the model can't run, the layers are guessed from color. With the browser's data saver on, it waits until you ask. A cached model is checked again before use, and the model is let go about half a minute after you leave Shadowbox (or 3D Lenticular). With an animated picture the layers are cut from one frame, so the back of the box keeps showing the moving picture instead of a painted-out background.
-- Raden inlays the picture in mother-of-pearl on black lacquer: its bright parts become a mosaic of cracked shell with fine growth lines, tinted from beneath by the picture's own colors, its shadows sink into the lacquer, and as the card tilts each piece turns through blue, green, pink and gold at its own moment.
-- Opal sets the picture in precious opal, dark under its shadows and milky under its lights: soft patches of color well up around the subject from two depths that slide apart as the card tilts, and each one flashes on, changes hue and goes out at its own angle.
-- Confetti and Fireworks are made for birthday and celebration cards; the picture, any message in it and the name stay readable. Confetti scatters gold, silver and rainbow foil confetti (squares, dots and thin curled ribbons) over the art: some pieces are stuck to the card and each catches the light at its own angle as the card tilts, some drift slowly down, and now and then a popper bursts from a corner. Fireworks leaves the art as it is and sets off fireworks over it that carry their own light (a thin tinted rim keeps them visible over bright pictures, and they pass faintly behind lettering and outlines in the picture so a message stays clear): rockets climb on a glowing trail and open with a flash into a willow, chrysanthemum, peony, heart, star or a string of small pops, in gold, silver, crimson or jade, never the same twice in a row; tilting makes the foil sparks (and a few stars printed on dark parts of the picture) glint, and a sparkler with a long glowing fuse runs around the frame. Held still (reduced motion, speed zero or a PNG) both stop at a festive moment: confetti in the air, fireworks in full bloom. Their GIF and APNG loops close on themselves.
-- Edit the name, line and rarity right in the tag beside the card.
-- The side panel is a game's side table, in the same grammar as the rest of FOIL (and of the game it is modelled on): a slate board with a light rim, a black outline and a deep drop, and on it three dark, sunken boxes for the main flow, each under a small coloured label with its number: **1 Choose a picture** (samples, open a file, crop and zoom), **2 Choose a finish** (a live proof of the card, its finish, and a way to the hand), **3 Export** — the format (PNG, GIF or APNG, each saying what it makes) and Save, in a box pinned to the bottom. Each step owns one colour (blue for the picture, orange for the finish and Fine-tune, red for Save), and buttons are thick slabs in those colours with a dark underside: they swell and wobble a little under the pointer and sink when pressed (still under reduced motion). The bright slab marks the one next step: while a sample is showing, opening your own picture is blue and Save rests in slate; once the picture is yours, Save is red, and when the file is saved it turns green for a moment with a gold "done" tag and the file's name. Values sit large in dark pockets and pop whenever they change (a drag, a choice or a reset). Everything finer sits behind **Fine-tune**, a slate slab that stays closed until you open it (and remembers that). Open, steps 1 and 2 fold into one line each (the picture or a proof of the card, its name, and **Change** to go back to the step) and Fine-tune holds four tabs — **Card** (finish strength, frame, pixelation), **Shine**, **Lettering** and **Finish area**; the open tab is orange and stands up off the row, and a green gem on a tab means something in it differs from the defaults. On phones, a live view of the card rides in the Save box while you tune Shine.
-- Print the name in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and opens the Lettering tab. The relief and shine follow the card's tilt and light, in exports too.
-- Choose where the finish goes: the whole card, the art, the frame, the text or nowhere, a band of brightness (highlights only, shadows only…), inverted, and painted in or out with a soft brush while the card holds still. An overlay shows what is left out, and exports follow it.
-- Add your own frame colors with the color picker; they stay as swatches for next time (hover or press Delete to remove).
-- The card tilts with your pointer, can be tossed around, and bounces when clicked. Press the logo to shuffle the finish.
-- On phones and tablets the card also tilts as you tilt the device, and its shine moves with it; the rest pose slowly follows how you hold it, so any grip feels level. Android starts right away. iOS asks for motion access, and only when you tap the card or the hand (once per visit); if it is refused, the card simply keeps to touch. Browsers only give the sensor to secure (https) pages. Reduced motion turns this off.
-- Slow devices keep moving smoothly: the stage measures how long its frames take, and when it keeps missing frames it lowers the drawing resolution step by step, then the backdrop's resolution and the number of sparks. A step that doesn't help (the device is capped, say by a battery saver, rather than busy drawing) is undone and not tried again. Fast devices never leave full quality, and exports are always made at full quality. Add `?quality=0`…`3` to the address to pin a level (0 is full).
-- **Shine** fine-tunes every finish: pattern size and angle, hue, saturation, glare and its focus, light color, glitter, a light that follows the pointer (or the phone's tilt) / orbits / stays fixed, speed, max tilt and idle motion (none, sway, spin, breathe), and the metal of Relief (gold or silver; shown while Relief is on the card). Defaults keep the original look; exports follow the same settings.
-- Save a transparent PNG (900×1260), a looping GIF or a full-color transparent APNG loop. With an animated picture, the loop follows its timing. Relief, Platinum, Glow and Blacklight GIFs are dithered so their smooth gradients don't band in 256 colors.
-- The GIF can also drop the backdrop (GIF options under the formats, closed by default). GIF transparency is one bit, so a clear GIF has no shadow and a hard edge; the edge pixels keep the card's border color (Auto) or blend into a matte you pick (white, black or any color) to suit where it will sit. For a soft shadow and edges, save an APNG.
-- English / 日本語, sound effects and a CRT filter can be toggled. Respects `prefers-reduced-motion`.
+**Try it:** https://dennougorilla.github.io/foil/
+
+English · [日本語](README.ja.md)
+
+## What it does
+
+- **Any picture.** Open a file, drop it or paste it. Animated GIF, APNG and WebP keep moving on the card.
+- **33 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, light, nature and studio finishes. Each one reacts to tilt and light.
+- **Packs.** Seven finishes come in the starting hand; the rest come in theme packs you tear open once. Each pack holds its whole theme, with no random draws.
+- **Hand and deck.** Pick finishes from a fanned hand of up to seven live previews; the others wait in the deck, which you edit like a card game's deck screen.
+- **Card shapes.** Trading card, wide, square, postcard (upright or on its side) and business card. Frames include Gold rim and Ribbon for celebration cards.
+- **Message and trading-card layout.** Up to four lines of text in four typefaces, a trading-card layout with a type line and card text, a print of its own for each piece of text (ink, deboss, emboss, hot foil, spot UV), and free placement by drag.
+- **Layers.** Put two finishes on one card, each in its own place (art, frame, name, highlights, or painted with a brush).
+- **Binder.** Keep cards in a binder of six pages that lives in this browser; drag them between pockets and bring any of them back to the stage.
+- **Share.** On phones, send the card as a moving GIF straight to the share sheet (X, LINE and the like).
+- **Export.** Save a transparent PNG, a looping GIF or a full-color transparent APNG. The loop moves as on screen, or with one of 13 motions made for exports.
+- **Phones.** The card tilts with the device's motion sensor, and a phone held upright shows the card first, nearly edge to edge.
+
+Every detail, finish by finish: [`docs/features.md`](docs/features.md).
+
+## Finishes and packs
+
+| Where | Finishes |
+| --- | --- |
+| Starting hand | Base, Foil, Holographic, Polychrome, Negative, Prism, Glitch |
+| Metal pack | Relief, Gold, Platinum, Cosmo Holo, Crystal |
+| Light pack | Galaxy, Aurora, Glow, Blacklight, Shallows |
+| Nature pack | Sakura, Frost, Stardust, Snow Globe, Magma |
+| Studio pack | Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox |
+| Supporter pack | Opal, Raden, Confetti, Fireworks, Kintsugi |
+
+33 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
+
+## Privacy
+
+- Your pictures never leave your browser. FOIL is a static site with no server of its own: no accounts, no uploads, no analytics.
+- Settings, opened packs, your current picture and the binder are kept in this browser's storage (localStorage and IndexedDB) and nowhere else.
+- Share hands the GIF straight from the page to your device's share sheet. Nothing is uploaded and the card is never put in a link.
+- The page loads its interface typefaces from Google Fonts, and the message typefaces too once a message is used.
+- Shadowbox and 3D Lenticular download a depth model (about 19–27 MB) from Hugging Face the first time one of them is chosen. The file is pinned to one revision and checked against its SHA-256; the picture itself is read on your device.
 
 ## Development
 
@@ -46,10 +53,12 @@ npm run dev      # http://localhost:5173
 npm run build    # type-check + production build
 npm test         # unit tests (Node's built-in runner)
 npm run shoot -- <outDir> [filter]   # with the dev server running: capture the screenshot matrix
-npm run e2e      # with the dev server running: check the panel, every export, the packs and the phone stage
+npm run e2e      # with the dev server running: check the panel, every export, the packs, the binder, sharing and the phone stage
+npm run og       # with the dev server running: render public/og.png and the home-screen icon
+node scripts/layering-check.mjs [--measure]   # with the dev server running: single finishes unchanged pixel for pixel (against a reference URL), and the cost of a second finish
 ```
 
-Rendering is WebGL2 (swirl backdrop, cards, particles). The card shader's core and the seven open finishes live in `src/gl/shaders.ts`, each pack's finishes in `src/gl/finishes/` (see `docs/packs.md` for adding one); the card face is composed in `src/card/face.ts`.
+Rendering is WebGL2 (swirl backdrop, cards, particles). The card shader's core and the seven open finishes live in `src/gl/shaders.ts`, each pack's finishes in `src/gl/finishes/` (see [`docs/packs.md`](docs/packs.md) for adding one); the card face is composed in `src/card/face.ts`, its shapes are listed in `src/card/shape.ts`. Shaders never assume the 5 : 7 card: `uCardK` is the face's size in units of its short side ((1, 1.4) on the trading card) and `uArt` the art window in face uv. Design notes: [`docs/tcg.md`](docs/tcg.md) (trading-card layout), [`docs/arrange.md`](docs/arrange.md) (free placement), [`docs/layering.md`](docs/layering.md) (layers), [`docs/binder.md`](docs/binder.md) (binder).
 
 Pushes to `main` and pull requests are type-checked and built by `.github/workflows/ci.yml`; they do not deploy.
 
@@ -59,9 +68,7 @@ Pushes to `main` and pull requests are type-checked and built by `.github/workfl
 npm run release -- patch            # or minor / major / an exact x.y.z; add --dry-run to only run the checks
 ```
 
-From a clean `main` that is up to date with `origin`, this builds, bumps the version (commit + tag `vX.Y.Z`) and pushes both. The tag runs `.github/workflows/release.yml`, which deploys to GitHub Pages and publishes a GitHub Release with auto-generated notes (grouped by PR label, see `.github/release.yml`) and the built site as a zip. To redeploy without a release, run the Release workflow by hand from the Actions tab.
-
-The build exposes `__APP_VERSION__` and `__APP_COMMIT__` (short SHA) as globals.
+From a clean `main` that is up to date with `origin`, this builds, bumps the version (commit + tag `vX.Y.Z`) and pushes both. The tag runs `.github/workflows/release.yml`, which deploys to GitHub Pages and publishes a GitHub Release with auto-generated notes (grouped by PR label, see `.github/release.yml`) and the built site as a zip. To redeploy without a release, run the Release workflow by hand from the Actions tab. The build exposes `__APP_VERSION__` and `__APP_COMMIT__` (short SHA) as globals.
 
 ## Inspiration
 
@@ -71,7 +78,7 @@ Balatro is a registered trademark of LocalThunk LLC.
 
 ## Third-party
 
-The Shadowbox and 3D Lenticular finishes use [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small) (Apache-2.0), fetched at run time from the [onnx-community conversion](https://huggingface.co/onnx-community/depth-anything-v2-small) pinned to one revision and checked against its SHA-256, and [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). The model is not part of this repository. Licenses of the bundled third-party code ship with the site as `THIRD_PARTY_NOTICES.txt` (from `public/`).
+The Shadowbox and 3D Lenticular finishes use [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small) (Apache-2.0), fetched at run time from the [onnx-community conversion](https://huggingface.co/onnx-community/depth-anything-v2-small) pinned to one revision and checked against its SHA-256, and [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). The model is not part of this repository. The typefaces (DotGothic16, Silkscreen, Yusei Magic, Shippori Mincho and Mochiy Pop One, all SIL Open Font License) are served by Google Fonts. Licenses of the bundled third-party code ship with the site as `THIRD_PARTY_NOTICES.txt` (from `public/`).
 
 ## Support
 
@@ -79,4 +86,4 @@ If FOIL made you smile: [GitHub Sponsors](https://github.com/sponsors/dennougori
 
 ## License
 
-MIT
+MIT. See [`LICENSE`](LICENSE).

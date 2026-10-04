@@ -3,13 +3,14 @@
 
 import { motion } from './tune/motion';
 import { STAGE_RESUMED } from './stage';
+import { contain } from './card/shape';
 
 /** How squarely the card face looks at us; copies hold their last face-on frame while a spin or a flip shows the back. */
 export const facing = () => Math.cos(motion.spinAngle + motion.flip);
 
 /**
  * Copies the card into `view`, with `pad` of its width and height around it so tilts and bobs
- * stay in frame. Returns false when there is nothing to copy yet. Call it from a frame callback
+ * stay in frame; a card of another shape than the view is fitted inside it, centred. Returns false when there is nothing to copy yet. Call it from a frame callback
  * queued after the stage's, so it always copies a finished frame.
  */
 export function copyCard(view: HTMLCanvasElement, padX: number, padY: number): boolean {
@@ -30,7 +31,10 @@ export function copyCard(view: HTMLCanvasElement, padX: number, padY: number): b
   }
   const x = view.getContext('2d')!;
   x.clearRect(0, 0, w, h);
-  x.drawImage(source, (s.left - c.left - px) * k, (s.top - c.top - py) * k, (s.width + px * 2) * k, (s.height + py * 2) * k, 0, 0, w, h);
+  const sw = s.width + px * 2;
+  const sh = s.height + py * 2;
+  const d = contain(sh / sw, w, h);
+  x.drawImage(source, (s.left - c.left - px) * k, (s.top - c.top - py) * k, sw * k, sh * k, (w - d.w) / 2, (h - d.h) / 2, d.w, d.h);
   return true;
 }
 

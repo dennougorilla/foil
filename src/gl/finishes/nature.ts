@@ -6,17 +6,19 @@ import type { FinishModule } from './types';
 const finishes: FinishModule = {
   glsl: /* glsl */ `
 vec3 frost(vec3 c, vec2 uv, vec2 t, float L) {
-  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y) * 1.4);
-  float n = fbm(uv * 9.0 + 3.0);
+  // How far in from the nearest edge, in card widths of the short side.
+  float edge = min(min(uv.x, 1.0 - uv.x) * uCardK.x, min(uv.y, 1.0 - uv.y) * uCardK.y);
+  vec2 tu = asTrading(uv);
+  float n = fbm(tu * 9.0 + 3.0);
   float reach = smoothstep(0.26, 0.02, edge + (n - 0.5) * 0.22);
   // Dendrite-like streaks: ridges of a stretched noise field.
-  float ridge = 1.0 - abs(vnoise(uv * vec2(70.0, 98.0)) * 2.0 - 1.0);
+  float ridge = 1.0 - abs(vnoise(uv * uCardK * 70.0) * 2.0 - 1.0);
   ridge = pow(ridge, 8.0);
-  float ridge2 = pow(1.0 - abs(vnoise(uv.yx * vec2(38.0, 52.0) + 7.0) * 2.0 - 1.0), 10.0);
+  float ridge2 = pow(1.0 - abs(vnoise(tu.yx * vec2(38.0, 52.0) + 7.0) * 2.0 - 1.0), 10.0);
   vec3 cold = mix(vec3(L), c, 0.55) * vec3(0.82, 0.94, 1.12) + vec3(0.02, 0.05, 0.1);
   vec3 ice = vec3(0.86, 0.95, 1.0) + (ridge + ridge2) * 0.3;
   vec3 col = mix(cold, ice, reach * (0.55 + 0.35 * max(ridge, ridge2)));
-  vec2 cell = floor(uv * vec2(70.0, 98.0));
+  vec2 cell = floor(uv * uCardK * 70.0);
   float s = hash12(cell);
   float glint = step(0.96, s) * smoothstep(0.6, 1.0, sin(s * 40.0 + (t.x - t.y) * 8.0) * 0.5 + 0.5);
   col += vec3(0.9, 0.97, 1.0) * glint * (0.3 + reach);
@@ -24,7 +26,7 @@ vec3 frost(vec3 c, vec2 uv, vec2 t, float L) {
 }
 
 vec3 magma(vec3 c, vec2 uv, vec2 t, float L) {
-  vec4 v = voronoi(uv * vec2(6.0, 8.4) + vec2(0.0, 0.3));
+  vec4 v = voronoi(uv * uCardK * 6.0 + vec2(0.0, 0.3));
   float crack = 1.0 - smoothstep(0.0, 0.09, v.y - v.x);
   float pulse = 0.65 + 0.35 * sin(uTime * 1.8 + hash12(v.zw) * 6.28 + (t.x + t.y) * 2.0);
   vec3 stone = c * vec3(0.5, 0.38, 0.34) + vec3(0.03, 0.01, 0.0);
@@ -41,7 +43,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   for (int i = 0; i < 3; i++) {
     float fi = float(i);
     float scale = 4.0 + fi * 2.5;
-    vec2 q = uv * vec2(scale, scale * 1.4);
+    vec2 q = uv * uCardK * scale;
     q += vec2(sin(uTime * 0.4 + fi * 2.0 + uv.y * 3.0) * 0.35, -uTime * (0.25 + fi * 0.08));
     q += t * (0.3 + fi * 0.25);
     vec2 cell = floor(q);
@@ -79,10 +81,21 @@ ${SNOWGLOBE_GLSL}
   // Snow Globe's flakes are GPU particles drawn over its card; one set per renderer, made on first use.
   layers: (gl, live) => {
     let globe: SnowGlobe | null = null;
+    let face: HTMLCanvasElement | null = null;
     return [
       {
+        // The flakes fill the card's art window, which moves with the layout.
+        setFace: (f) => {
+          face = f;
+          globe?.setFace(f);
+        },
         after: (view, d, time) => {
-          if (d.edition === SNOWGLOBE_SHADER) (globe ??= new SnowGlobe(gl, !live)).draw(view, d, time);
+          if (d.edition !== SNOWGLOBE_SHADER) return;
+          if (!globe) {
+            globe = new SnowGlobe(gl, !live);
+            if (face) globe.setFace(face);
+          }
+          globe.draw(view, d, time);
         },
       },
     ];

@@ -1,28 +1,33 @@
-import { FACE_H, FACE_W } from './card/face';
-import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
+import { exportFrame } from './card/shape';
+import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { fixedLight, loopCycles, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { exportLoop, exportView, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
-import { TORCH_STILL, torchAt } from './gl/torch';
+import { TORCH_DRIFT, TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
 import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 
 /** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
-export async function packLoaded(edition: Edition): Promise<void> {
+async function packLoaded(edition: Edition): Promise<void> {
   const pack = packOf(edition.id);
   if (pack) await loadPack(pack.id);
 }
+
+/** Both layers' finishes have arrived. */
+export const packsLoaded = (input: ExportInput) => Promise.all([input.edition, input.layer?.edition].map((e) => e && packLoaded(e)));
 
 export interface ExportInput {
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   back: HTMLCanvasElement;
   edition: Edition;
+  /** Layer 2 (docs/layering.md): its finish, how it is drawn, and its area. */
+  layer?: { edition: Edition; draw: LayerDraw; range: RangeSnapshot };
   intensity: number;
   pixel: number;
   name: string;
@@ -32,6 +37,8 @@ export interface ExportInput {
   loopMs?: number;
   /** Fine-tuning of light and motion; defaults when left out. */
   tune?: Tune;
+  /** The motion of a GIF or APNG loop; the stage's own when left out. */
+  motion?: ExportMotion;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
@@ -46,22 +53,26 @@ export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-'
 
 const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
 
-export function download(blob: Blob, name: string): string {
-  const url = URL.createObjectURL(blob);
+/** Saves a made file through the browser's download; answers with its name. */
+export function download(file: File): string {
+  const url = URL.createObjectURL(file);
   const a = document.createElement('a');
   a.href = url;
-  a.download = name;
+  a.download = file.name;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-  return name;
+  return file.name;
 }
 
-/** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
-export async function exportPng(input: ExportInput): Promise<string> {
-  await packLoaded(input.edition);
-  const pad = 24;
+/** Clear margin round the still card, so its tilted edge and glow are not cut. */
+const STILL_PAD = 24;
+
+/** The card drawn once at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
+export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement> {
+  await packsLoaded(input);
+  const pad = STILL_PAD;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
@@ -69,19 +80,22 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
+  if (input.layer) r.range2.set(input.layer.range);
   if (input.layers) r.setLayers(input.layers);
   r.setFlip(input.flip ?? null);
-  r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
+  const W = input.face.width;
+  const H = input.face.height;
+  r.resize(W + pad * 2, H + pad * 2, 1);
   r.begin();
   const tilt: [number, number] = [0.35, -0.25];
   // Blacklight's lamp shines on the art.
   const light: [number, number] = tune.light === 'fixed' ? fixedLight(tune.lightAngle) : input.edition.torch ? TORCH_STILL : [0.32, 0.22];
   r.drawCard(
     {
-      cx: FACE_W / 2 + pad,
-      cy: FACE_H / 2 + pad,
-      w: FACE_W,
-      h: FACE_H,
+      cx: W / 2 + pad,
+      cy: H / 2 + pad,
+      w: W,
+      h: H,
       rx: 0,
       ry: 0,
       rz: 0,
@@ -97,13 +111,25 @@ export async function exportPng(input: ExportInput): Promise<string> {
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
+      layer: input.layer?.draw,
     },
     1.7,
   );
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+  // Copied out, so the GL context can go at once.
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  out.getContext('2d')!.drawImage(canvas, 0, 0);
   r.gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return out;
+}
+
+/** A flat, transparent PNG of the still card. */
+export async function exportPng(input: ExportInput): Promise<File> {
+  const canvas = await renderStill(input);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
   if (!blob) throw new Error('png');
-  return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
+  return new File([blob], `${fileSafe(input.name)}-${input.edition.id}.png`, { type: 'image/png' });
 }
 
 function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
@@ -115,16 +141,19 @@ function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
 export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card orbits once on the swirl backdrop. */
+  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card as the stage shows it left alone, on the swirl backdrop. */
   draw(p: number, bgTime: number, loopSec: number, sourceMs?: number): void;
   dispose(): void;
 }
 
 /**
  * The shared stage for GIF and APNG: a pixel swirl upscaled nearest, with the card composited on top.
+ * `W0` × `H0` is the frame for the trading card; other shapes turn and resize it (shape.ts
+ * exportFrame), so `out` has the frame's real size.
  * `transparent` leaves the swirl out so only the card (and its shadow, unless `shadow` is off) is drawn.
  */
-export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false, shadow = true): Scene {
+export function createScene(input: ExportInput, W0: number, H0: number, readback = false, transparent = false, shadow = true): Scene {
+  const { W, H, cw, ch } = exportFrame(input.face.height / input.face.width, W0, H0);
   const out = document.createElement('canvas');
   out.width = W;
   out.height = H;
@@ -139,6 +168,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
+  if (input.layer) cards.range2.set(input.layer.range);
   if (input.layers) cards.setLayers(input.layers, !input.faceAt);
   cards.setFlip(input.flip ?? null);
   cards.resize(W, H, 1);
@@ -149,17 +179,17 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
   const kind = input.edition.touch;
   const touch = kind ? autoTouchFor(input.face, kind) : null;
-  // Everything is laid out for a 900px-tall frame and scaled from there.
-  const k = H / 900;
-  const ch = 640 * k;
-  const cw = (ch * 5) / 7;
+  // Everything is laid out for a 900px-tall trading-card frame and scaled from there.
+  const k = H0 / 900;
 
   return {
     out,
     ctx,
     draw(p, bgTime, loopSec, sourceMs) {
-      // The card's motion and light follow the tune; the defaults give the classic orbit.
-      const pose = loopPose(tune, p);
+      // The card's motion, sheen and light: by default the stage's at the same moment of its idle cycle.
+      const view = exportView(tune, input.motion ?? 'stage', p);
+      const { pose, tilt, light } = view;
+      const time = p * loopSec * tune.speed;
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
@@ -167,34 +197,49 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
       if (kind) touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL[kind] : p));
       if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
-      const { rx, ry } = pose;
+      // The shadow as the stage drops it, for a card 500 px tall.
+      const u = ch / 500;
+      const lift = (pose.scale - 1) * 120 - pose.dy * 300;
       cards.drawCard(
         {
-          cx: W / 2,
-          cy: H / 2 + pose.dy * k,
+          cx: W / 2 + pose.dx * ch,
+          cy: H / 2 + pose.dy * ch,
           w: cw,
           h: ch,
-          rx,
-          ry,
+          rx: pose.rx,
+          ry: pose.ry + pose.spin,
           rz: pose.rz,
           scale: pose.scale,
           edition: input.edition.shader,
           intensity: input.intensity,
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
-          tilt: pose.tilt,
-          // Blacklight's lamp sweeps slowly round the art instead (unless the tune fixes the light).
-          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(p * loopCycles(tune)) : pose.light,
+          tilt,
+          // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
+          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(view.torch ?? time / TORCH_DRIFT) : light,
           alpha: 1,
-          flash: 0,
-          shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
+          flash: pose.flash,
+          glint: pose.glint,
+          beam: view.beam,
+          spot: view.spot,
+          dim: view.dim,
+          star: view.star,
+          shadow: !shadow ? null : view.shadow ? [view.shadow[0] * k, view.shadow[1] * k] : [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u],
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
+          layer: input.layer?.draw,
         },
-        p * loopSec * tune.speed,
+        time,
       );
       ctx.imageSmoothingEnabled = false;
       if (transparent) ctx.clearRect(0, 0, W, H);
-      else ctx.drawImage(bgCanvas, 0, 0, W, H);
+      else {
+        ctx.drawImage(bgCanvas, 0, 0, W, H);
+        // A light motion's dim room takes the backdrop down with the card.
+        if (view.dim) {
+          ctx.fillStyle = `rgba(6, 8, 20, ${Math.min(0.88, view.dim * 1.15)})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
       ctx.drawImage(cardCanvas, 0, 0);
     },
     dispose() {
@@ -205,20 +250,23 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
 }
 
 /**
- * Loop length for animated exports. An animated source sets it so its motion and the orbit
- * repeat together: short sources play whole cycles, and long ones are sped up to fit, so the
- * export always loops seamlessly. `sourceSpan` is the source time one loop covers.
+ * A GIF's frame for the trading card (other shapes turn it, see shape.ts exportFrame), its shortest
+ * time between frames (ms, a multiple of 10), and at most how many frames it holds: a slow loop
+ * plays at a lower frame rate rather than growing without end.
  */
-export function animLoop(sourceMs: number | undefined, fallbackMs: number): { loopMs: number; sourceSpan: number } {
-  if (!sourceMs) return { loopMs: fallbackMs, sourceSpan: fallbackMs };
-  const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
-  return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
+export interface GifSize {
+  w: number;
+  h: number;
+  delay: number;
+  maxFrames: number;
 }
-
-const GIF_W = 480;
-const GIF_H = 600;
-const GIF_FRAMES = 48;
-const GIF_DELAY = 50;
+/** Saved: up to 20 fps. */
+export const GIF_SAVE: GifSize = { w: 480, h: 600, delay: 50, maxFrames: 90 };
+/**
+ * For the share sheet: smaller and at most 50 frames (a long loop gets longer frames instead), so
+ * even a noisy picture stays well under the 15 MB X takes (50 × 360 × 450 is 8.1 MB before compression).
+ */
+export const GIF_SHARE: GifSize = { w: 360, h: 450, delay: 60, maxFrames: 50 };
 /** Share of the progress bar spent drawing frames; the worker's encode fills the rest. */
 const GIF_DRAW_SHARE = 0.35;
 
@@ -230,6 +278,8 @@ export interface GifOptions {
   clear: boolean;
   /** 'auto' keeps the card's own edge colour on solid edge pixels; a '#rrggbb' blends them into it. */
   matte: string;
+  /** The saved size when left out. */
+  size?: GifSize;
 }
 
 /**
@@ -240,8 +290,8 @@ export async function exportGif(
   input: ExportInput,
   onProgress?: (p: number, encoding: boolean) => void,
   opts: GifOptions = { clear: false, matte: 'auto' },
-): Promise<string> {
-  await packLoaded(input.edition);
+): Promise<File> {
+  await packsLoaded(input);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   const result = new Promise<ArrayBuffer>((resolve, reject) => {
@@ -256,26 +306,29 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  const { loopMs, sourceSpan } = animLoop(input.loopMs, GIF_FRAMES * GIF_DELAY);
-  const frames = Math.round(loopMs / GIF_DELAY);
-  const DUR = (frames * GIF_DELAY) / 1000;
+  const size = opts.size ?? GIF_SAVE;
+  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs, input.motion);
+  const delays = framePlan(loopMs, size.delay, size.maxFrames, 10);
+  const frames = delays.length;
+  const DUR = loopMs / 1000;
   let scene: Scene | undefined;
   try {
-    scene = createScene(input, GIF_W, GIF_H, true, opts.clear, !opts.clear);
-    for (let i = 0; i < frames; i++) {
+    scene = createScene(input, size.w, size.h, true, opts.clear, !opts.clear);
+    const { width, height } = scene.out;
+    for (let i = 0, at = 0; i < frames; at += delays[i++]) {
       await nextFrame();
-      const p = i / frames;
+      const p = at / loopMs;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
       scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, DUR, p * sourceSpan);
-      const { data } = scene.ctx.getImageData(0, 0, GIF_W, GIF_H);
+      const { data } = scene.ctx.getImageData(0, 0, width, height);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
+    send({ type: 'encode', width, height, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.layer?.edition.dither) });
     const bytes = await result;
-    return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
+    return new File([bytes], `${fileSafe(input.name)}-${input.edition.id}.gif`, { type: 'image/gif' });
   } finally {
     scene?.dispose();
     worker.terminate();

@@ -1,8 +1,8 @@
 # AGENTS.md
 
-Instructions for coding agents working on FOIL. `README.md` describes the product, development and release commands.
+Instructions for coding agents working on FOIL. `README.md` describes the product, development and release commands; `docs/features.md` holds the detailed behavior.
 
-A new finish always goes into a pack (its shader in that pack's module, never the core card shader); `docs/packs.md` says how, and how the pack opening is designed.
+A new finish always goes into a pack (its shader in that pack's module, never the core card shader); `docs/packs.md` says how, and how the pack opening is designed. The card comes in several shapes, so nothing may assume the 5 : 7 card: shaders read `uCardK` and `uArt`, layouts size cards with `src/card/shape.ts`.
 
 ## Premise
 

@@ -12,13 +12,16 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   // Glazed ceramic: the art goes a touch warm, as if fired.
   vec3 glaze = mix(c, c * vec3(1.03, 0.99, 0.92), 0.5);
   // Breaks: warped cell borders, a handful of seams that branch into hairlines.
-  vec2 w = uv * vec2(1.0, 1.4);
-  w += (vec2(fbm(uv * 3.0), fbm(uv * 3.0 + 7.3)) - 0.5) * 0.24;
+  vec2 w = uv * uCardK;
+  vec2 tu = asTrading(uv);
+  w += (vec2(fbm(tu * 3.0), fbm(tu * 3.0 + 7.3)) - 0.5) * 0.24;
   vec4 v1 = voronoi(w * 2.6);
   vec4 v2 = voronoi(w * 8.0 + 3.1);
   float d1 = v1.y - v1.x;
   float d2 = v2.y - v2.x;
-  float wide = 0.014 + 0.018 * vnoise(uv * 24.0);
+  // As layer 2 on the frame (docs/layering.md) it mends it: no subject to spare there, and bolder seams.
+  float rimOnly = uLayer > 0.5 ? 1.0 - texture(uMask, uv).r : 0.0;
+  float wide = (0.014 + 0.018 * vnoise(uv * 24.0)) * (1.0 + 0.9 * rimOnly);
   float seam = (1.0 - smoothstep(wide * 0.3, wide, d1));
   float hair = (1.0 - smoothstep(0.004, 0.014, d2)) * step(0.65, hash12(v2.zw)) * (1.0 - smoothstep(0.0, 0.25, d1));
   float vein = max(seam, hair * 0.8);
@@ -28,19 +31,21 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   vec3 gold = mix(vec3(0.62, 0.38, 0.1), vec3(0.98, 0.8, 0.4), 0.5 + 0.5 * sin(d1 * 70.0 + uv.y * 9.0 + t.x * 2.0));
   float run = smoothstep(0.75, 1.0, sin((uv.x * 0.8 + uv.y) * 6.0 - (t.x + t.y) * 3.4 - uTime * 0.7));
   gold += vec3(1.0, 0.93, 0.74) * run * 0.6 * (1.0 - keep * 0.8);
+  // On a pale frame, a deeper gold so the seams still read against it.
+  gold = mix(gold, gold * vec3(0.66, 0.46, 0.18), rimOnly * smoothstep(0.55, 0.85, L));
   // The seams stop where the bright subject begins, so the gold mends around it, never across it.
   // Judge brightness on a blurred copy of the art so dithering can't let a seam slip through.
   float Lb = luma(face(uv, 5.0).rgb);
-  float around = 1.0 - smoothstep(0.3, 0.45, max(L, Lb));
-  vec3 col = mix(c, glaze * (1.0 - rim * 0.3), around);
-  return mix(col, gold, vein * 0.9 * around);
+  float around = max(1.0 - smoothstep(0.3, 0.45, max(L, Lb)), rimOnly);
+  vec3 col = mix(c, glaze * (1.0 - rim * (0.3 + 0.35 * rimOnly)), around);
+  return mix(col, gold, vein * (0.9 + 0.1 * rimOnly) * around);
 }
 
 vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
   // Precious opal: the picture lies in a milky or dark stone, and from deep inside it soft
   // patches of pure spectral colour well up. Each patch is a grating of its own: it flashes
   // on at its own angle, slides through the spectrum as the card turns, and sinks again.
-  vec2 p = uv * vec2(1.0, 1.4);
+  vec2 p = uv * uCardK;
   vec3 fire = vec3(0.0);
   for (int i = 0; i < 2; i++) {
     float fi = float(i);
@@ -83,7 +88,7 @@ vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {
   float f = min(max(fire.r, max(fire.g, fire.b)), 1.0);
   vec3 col = veil * (1.0 - 0.45 * f) + fire * 1.5;
   // A soft glow on the domed surface, sliding with the light.
-  vec2 dm = p - vec2(0.5, 0.7) + t * 0.35;
+  vec2 dm = p - uCardK * 0.5 + t * 0.35;
   return col + vec3(0.92, 0.95, 1.0) * exp(-dot(dm, dm) * 5.0) * 0.08;
 }
 
@@ -125,7 +130,7 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   // Raden: the picture is inlaid in mother-of-pearl on black lacquer. Its light parts become
   // cracked shell, its shadows sink into the lacquer, and the shell runs through blue, green,
   // pink and gold as the card turns.
-  vec2 p = uv * vec2(1.0, 1.4);
+  vec2 p = uv * uCardK;
   vec4 s = shell(p, t, 15.0);
   // Fusaishiki: the picture is painted under the thin shell, so its hues glow through the
   // nacre while the shell's own colour and luster ride on top. Seen through shell, the
@@ -135,12 +140,12 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
   float inlay = smoothstep(0.1, 0.38, L) * s.x;
   // Lacquer: deep black with a blurred hint of the picture under a wet gloss.
   vec3 lacquer = face(uv, 6.0).rgb * 0.1 + vec3(0.012, 0.008, 0.006);
-  float gloss = smoothstep(0.7, 1.0, 0.5 + 0.5 * sin((uv.y * 1.4 + uv.x * 0.5) * 3.2 + (t.x + t.y) * 2.2));
+  float gloss = smoothstep(0.7, 1.0, 0.5 + 0.5 * sin(dot(p, vec2(0.5, 1.0)) * 3.2 + (t.x + t.y) * 2.2));
   lacquer += vec3(0.9, 0.92, 1.0) * gloss * 0.07;
   // Off the art (the nameplate and the frame) only a thin coat of pearl, so the name stays readable.
   vec3 col = mix(screen(c, s.yzw * 0.14), mix(lacquer, pearl, inlay), artMask);
   // The outer frame band: a ribbon of shell set in lacquer. The nameplate stays paper.
-  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y) * 1.4);
+  float edge = min(min(uv.x, 1.0 - uv.x) * uCardK.x, min(uv.y, 1.0 - uv.y) * uCardK.y);
   vec4 r = shell(p + 4.1, t, 15.0);
   vec3 ribbon = mix(vec3(0.015, 0.012, 0.01), r.yzw * 0.9, r.x);
   float frame = (1.0 - artMask) * (1.0 - smoothstep(0.058, 0.072, edge));
@@ -200,7 +205,7 @@ float cfShape(vec2 q, float shape, float size, float h) {
 }
 
 vec3 confetti(vec3 c, vec2 uv, vec2 t, float art) {
-  vec2 q = uv * vec2(1.0, 1.4); // card widths
+  vec2 q = uv * uCardK; // card widths of the short side
   float aa = max(fwidth(q.x), 0.0005) * 1.2;
   vec3 col = c;
   // Stuck to the card: a scatter, thinner over the middle of the picture where a message or a
@@ -211,9 +216,9 @@ vec3 confetti(vec3 c, vec2 uv, vec2 t, float art) {
     for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
       vec2 cell = base + vec2(i, j);
       vec2 cen = (cell + 0.5 + (hash22(cell + 2.7) - 0.5) * 0.3) / G;
-      vec2 cuv = tuneFaceUv(cen / vec2(1.0, 1.4));
-      float mid = length((cuv - vec2(0.5, 0.42)) * vec2(1.0, 1.4));
-      float dens = mix(0.22, 0.85, smoothstep(0.2, 0.56, mid)) * step(cuv.y, 0.85);
+      vec2 cuv = tuneFaceUv(cen / uCardK);
+      float mid = length((cuv - vec2(0.5, 0.42)) * uCardK);
+      float dens = mix(0.22, 0.85, smoothstep(0.2, 0.56, mid)) * step(cuv.y, uArt.w - 0.0286);
       if (hash12(cell + 5.9) > dens) continue;
       float h = hash12(cell + 11.3);
       float shape = hash12(cell + 8.1);
@@ -233,7 +238,7 @@ vec3 confetti(vec3 c, vec2 uv, vec2 t, float art) {
   }
   vec2 ruv = tuneFaceUv(uv);
   // Falling pieces slip behind the nameplate.
-  float open = 1.0 - smoothstep(0.85, 0.875, ruv.y);
+  float open = 1.0 - smoothstep(uArt.w - 0.0286, uArt.w - 0.0036, ruv.y);
   // Drifting down: two layers of pieces that sway, spin and flip as they fall. Each column falls
   // a whole number of its own rows a cycle and repeats every that many rows, so the loop closes.
   float pf = fract(uTime / cePeriod(4.8) + 0.37);
@@ -264,7 +269,7 @@ vec3 confetti(vec3 c, vec2 uv, vec2 t, float art) {
   float xp = (uTime + 0.22) / Pp;
   float tau = fract(xp) * Pp; // seconds since the pop
   float side = mod(ceCycle(xp, Pp), 2.0);
-  vec2 corner = vec2(mix(0.1, 0.9, side), 1.2);
+  vec2 corner = vec2(mix(0.1, uCardK.x - 0.1, side), uArt.w * uCardK.y - 0.03);
   vec2 aim = normalize(vec2(side > 0.5 ? -0.65 : 0.65, -1.0));
   float fade = 1.0 - smoothstep(1.7, 2.25, tau);
   col += vec3(1.0, 0.88, 0.55) * exp(-tau * 9.0) * ceStar(q - corner, 0.14) * art;
@@ -293,8 +298,9 @@ vec3 confetti(vec3 c, vec2 uv, vec2 t, float art) {
 
 // The sparkler's path round the frame (card widths): mid-frame on the sides and the top, and
 // low on the nameplate, under the name.
-const vec2 FW_C = vec2(0.5, 0.7045);
-const vec2 FW_H = vec2(0.461, 0.6655);
+// The centre and half size of the path: 0.039 in from the sides and the top, 0.03 from the bottom.
+#define FW_C vec2(0.5 * uCardK.x, (uCardK.y + 0.009) * 0.5)
+#define FW_H vec2(0.5 * uCardK.x - 0.039, (uCardK.y + 0.009) * 0.5 - 0.039)
 const float FW_R = 0.045;
 vec2 fwPath(float s) {
   float a = FW_H.x - FW_R, b = FW_H.y - FW_R, qr = 1.5707963 * FW_R;
@@ -492,7 +498,7 @@ vec3 fwSparkler(vec2 q, float ps, float which, inout float soot) {
 
 vec3 fireworks(vec3 c, vec2 uv, vec2 t, float art) {
   vec2 ruv = tuneFaceUv(uv);
-  vec2 q = ruv * vec2(1.0, 1.4);
+  vec2 q = ruv * uCardK;
   // The picture stays as it is: the fireworks carry their own light, with a soft tinted rim and a
   // touch of shade around each burst so they read over bright art too.
   // Three bursts, unevenly staggered through a cycle, each a different kind; live, every cycle
@@ -511,7 +517,7 @@ vec3 fireworks(vec3 c, vec2 uv, vec2 t, float art) {
     float kind = mod(idx + fk * 2.0 + 4.0, 6.0);
     vec2 hh = hash22(vec2(idx * 3.1 + fk, 5.0));
     float slot = mod(fk + idx, 3.0);
-    vec2 cen = vec2(0.24 + 0.26 * slot + (hh.x - 0.5) * 0.12, 0.2 + 0.28 * hh.y);
+    vec2 cen = vec2((0.24 + 0.26 * slot + (hh.x - 0.5) * 0.12) * uCardK.x, 0.2 + 0.28 * hh.y);
     float size = 0.21 + 0.1 * hash12(vec2(idx, fk + 2.0));
     float R = kind == 0.0 ? size * 1.15 : kind == 2.0 || kind == 4.0 ? size * 0.85 : size;
     // A heart hangs below its notch.

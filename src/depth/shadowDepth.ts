@@ -2,7 +2,7 @@
 // picture. Work starts only once a finish that reads depth is chosen: the art window goes to the depth worker, which answers with a quick cut from colour
 // and then, when the model can run, a better one. The sheets lie down while a new cut is made
 // and stand up again when it lands.
-import { ART, FACE_H, FACE_W } from '../card/face';
+import { artOf } from '../card/face';
 import type { CardRenderer } from '../gl/renderers';
 import { editionById } from '../editions';
 import type { Dict } from '../i18n';
@@ -11,9 +11,16 @@ import { colorLayers, type LayerMap } from './layers';
 import { DepthPill } from './pill';
 import type { CutReply, CutRequest } from './worker';
 
-/** The art window as the worker sees it (portrait, multiples of 14 for the model). */
-const W = 392;
-const H = 518;
+/**
+ * The art window as the worker sees it: about 392 × 518 px (the classic trading card's) in the window's
+ * own proportions, in multiples of 14 for the model.
+ */
+function seen(face: HTMLCanvasElement) {
+  const art = artOf(face);
+  const a = art.w / art.h;
+  const step = (v: number) => Math.max(14, Math.round(v / 14) * 14);
+  return { art, w: step(Math.sqrt(392 * 518 * a)), h: step(Math.sqrt((392 * 518) / a)) };
+}
 /** No sheets yet: the picture lies whole on the back wall. */
 const EMPTY: LayerMap = { w: 1, h: 1, cuts: 0, data: new Uint8ClampedArray(4), plate: new Uint8ClampedArray(4) };
 /** Shown with the data-saver offer; the CPU model's download. */
@@ -60,8 +67,6 @@ export function mountShadowDepth(o: {
     if (face) update(face, latest);
   });
   const pixels = document.createElement('canvas');
-  pixels.width = W;
-  pixels.height = H;
   const px = pixels.getContext('2d', { willReadFrequently: true })!;
 
   // ---------- The sheets standing up ----------
@@ -120,7 +125,10 @@ export function mountShadowDepth(o: {
         allowModel = false;
         if (active()) pill.failed();
         // Carry on with the colour cut, here.
-        if (face) void show(colorLayers(artPixels(face), W, H), 'color', wanted);
+        if (face) {
+          const s = seen(face);
+          void show(colorLayers(artPixels(face), s.w, s.h), 'color', wanted);
+        }
       };
       return w;
     } catch {
@@ -165,9 +173,14 @@ export function mountShadowDepth(o: {
   }
 
   function artPixels(f: HTMLCanvasElement): Uint8ClampedArray {
+    const { art, w, h } = seen(f);
+    if (pixels.width !== w || pixels.height !== h) {
+      pixels.width = w;
+      pixels.height = h;
+    }
     px.imageSmoothingQuality = 'high';
-    px.drawImage(f, (ART.x / FACE_W) * f.width, (ART.y / FACE_H) * f.height, (ART.w / FACE_W) * f.width, (ART.h / FACE_H) * f.height, 0, 0, W, H);
-    return px.getImageData(0, 0, W, H).data;
+    px.drawImage(f, art.x, art.y, art.w, art.h, 0, 0, w, h);
+    return px.getImageData(0, 0, w, h).data;
   }
 
   function send() {
@@ -179,15 +192,16 @@ export function mountShadowDepth(o: {
       return;
     }
     const rgba = artPixels(face);
+    const { w, h } = seen(face);
     clearTimeout(idle);
     worker ??= startWorker();
     if (!worker) {
       // No workers: the colour cut, here and now.
-      void show(colorLayers(rgba, W, H), 'color', key);
+      void show(colorLayers(rgba, w, h), 'color', key);
       return;
     }
     sent = { id: sent.id + 1, key };
-    const req: CutRequest = { id: sent.id, rgba, w: W, h: H, model: allowModel };
+    const req: CutRequest = { id: sent.id, rgba, w, h, model: allowModel };
     worker.postMessage(req, [rgba.buffer]);
     awaiting = allowModel;
     if (saveData && !allowModel) pill.offer(MODEL_BYTES);

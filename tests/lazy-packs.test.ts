@@ -31,6 +31,14 @@ function closure(entry: string): Set<string> {
   return seen;
 }
 
+test('the binder (its view, storage and styles) is not in the first load', () => {
+  const first = closure(join(SRC, 'main.ts'));
+  const dir = join(SRC, 'binder');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+  assert.ok(files.length >= 3);
+  for (const f of files) assert.ok(!first.has(join(dir, f)), `binder/${f} is loaded up front`);
+});
+
 test('no pack shader code is in the first load', () => {
   const first = closure(join(SRC, 'main.ts'));
   const dir = join(SRC, 'gl', 'finishes');

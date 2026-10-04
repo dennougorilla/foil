@@ -2,10 +2,12 @@
 // a slim band across the top carries a small live copy of the card, so every change can be seen as it happens.
 import { CardRenderer } from './gl/renderers';
 import { tuneGl } from './tune/model';
-import { editionById } from './editions';
+import { cardLayers } from './layers';
 import type { RangeSnapshot } from './gl/range';
 import type { Dict } from './i18n';
 import type { Store } from './state';
+import type { EditionId } from './editions';
+import { contain } from './card/shape';
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 const W = 84;
@@ -19,6 +21,8 @@ export interface MiniPreviewOptions {
   card: HTMLElement;
   isPainting: () => boolean;
   reduced: MediaQueryList;
+  /** The stage's overlay, and which layer it shows: the copy shows the same. */
+  view: () => { rangeView: number; layer: 1 | 2 };
 }
 
 export class MiniPreview {
@@ -26,6 +30,7 @@ export class MiniPreview {
   private renderer: CardRenderer | null = null;
   private face: { face: HTMLCanvasElement; mask: HTMLCanvasElement } | null = null;
   private range: RangeSnapshot | null = null;
+  private range2: RangeSnapshot | null = null;
   private sectionSeen = false;
   private cardSeen = true;
   private dismissed = false;
@@ -70,7 +75,7 @@ export class MiniPreview {
     // The card counts as visible only when most of it is on screen.
     watch(o.card, (v) => (this.cardSeen = v), 0.6);
     this.narrow.addEventListener('change', () => this.update());
-    o.store.on((_s, changed) => changed.has('edition') && this.label());
+    o.store.on((s, changed) => changed.has('edition') && this.label(s.edition));
   }
 
   applyText(t: Dict) {
@@ -84,8 +89,12 @@ export class MiniPreview {
     this.label();
   }
 
-  private label() {
-    if (this.dict) this.el.querySelector('.mini-finish')!.textContent = this.dict.edition[this.o.store.get().edition];
+  /** The finish the preview shows (layer 2's while it proves layer 2), named under it. */
+  private named: EditionId | null = null;
+
+  private label(id: EditionId = this.named ?? this.o.store.get().edition) {
+    this.named = id;
+    if (this.dict) this.el.querySelector('.mini-finish')!.textContent = this.dict.edition[id];
   }
 
   setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement) {
@@ -96,6 +105,11 @@ export class MiniPreview {
   setRange(s: RangeSnapshot) {
     this.range = s;
     this.renderer?.range.set(s);
+  }
+
+  setRange2(s: RangeSnapshot) {
+    this.range2 = s;
+    this.renderer?.range2.set(s);
   }
 
   /** Re-checks visibility, e.g. when brush mode starts or ends. */
@@ -126,31 +140,38 @@ export class MiniPreview {
     this.renderer = new CardRenderer(this.el.querySelector('canvas')!);
     if (this.face) this.renderer.setFace(this.face.face, this.face.mask);
     if (this.range) this.renderer.range.set(this.range);
+    if (this.range2) this.renderer.range2.set(this.range2);
   }
 
   private frame = (now: number) => {
     const r = this.renderer;
     if (!this.shown || !r) return;
     const s = this.o.store.get();
+    const view = this.o.view();
+    const showing = view.rangeView > 0 && view.layer === 2 && s.layer2 ? s.layer2.edition : s.edition;
+    if (showing !== this.named) this.label(showing);
     r.tune = tuneGl(s.tune);
     const motion = !this.o.reduced.matches;
-    r.range.motion = motion;
+    r.range.motion = r.range2.motion = motion;
     const t = motion ? (now - this.t0) / 1000 : 0;
     r.resize(W, H, 2);
     r.begin();
     const ry = Math.sin(t * 0.8) * 0.12;
     const rx = Math.cos(t * 0.6) * 0.08;
+    // The card in its own shape, fitted to the view.
+    const f = this.face?.face;
+    const { w, h } = contain(f ? f.height / f.width : 1.4, W - 6, H - 6 * 1.4);
     r.drawCard(
       {
         cx: W / 2,
         cy: H / 2,
-        w: W - 6,
-        h: H - 6 * 1.4,
+        w,
+        h,
         rx,
         ry,
         rz: 0,
         scale: 1,
-        edition: editionById(s.edition).shader,
+        ...cardLayers(s, view.rangeView > 0 ? view.layer : 0),
         intensity: s.intensity,
         pixel: PIXEL_STEPS[s.pixel] ? Math.max(18, PIXEL_STEPS[s.pixel] * 0.5) : 0,
         tilt: [ry / 0.32, rx / 0.28],
@@ -158,7 +179,7 @@ export class MiniPreview {
         alpha: 1,
         flash: 0,
         shadow: [0, 0],
-        rangeView: 1,
+        rangeView: view.rangeView,
       },
       t,
     );

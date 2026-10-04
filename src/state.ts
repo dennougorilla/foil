@@ -1,8 +1,12 @@
-import { EDITIONS, type EditionId, type FrameId, type RarityId } from './editions';
+import { EDITIONS, sanitizeLayer2, type EditionId, type FrameId, type Layer2, type RarityId } from './editions';
 import type { Crop } from './card/face';
+import { shapeOf, type ShapeId } from './card/shape';
 import type { Lang } from './i18n';
-import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
-import { DEFAULT_LETTERING, type Lettering } from './lettering';
+import { EXPORT_MOTIONS, sanitizeTune, TUNE_DEFAULTS, type ExportMotion, type Tune } from './tune/model';
+import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Lettering } from './lettering';
+import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
+import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
+import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 /** Tabs of the Fine-tune area in the side panel. */
@@ -16,17 +20,35 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
+  /** Layer 2: a finish laid over the card's own in an area of its own, or null (docs/layering.md). Layer 1 is `edition` with the range fields. */
+  layer2: Layer2 | null;
+  /** Which layer the Finish area tab is editing. */
+  areaLayer: 1 | 2;
   /** The seven finishes in the hand, in order (made valid against the opened packs in main.ts). */
   hand: EditionId[];
   rarity: RarityId;
   frame: FrameId;
+  /** The card's shape (card/shape.ts); the trading card unless chosen. */
+  shape: ShapeId;
   intensity: number;
   pixel: number;
   name: string;
-  desc: string;
-  /** True once the person typed their own name/description; stops samples overwriting it. */
+  /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
-  descEdited: boolean;
+  /** The message printed on the picture (none while its text is empty). */
+  message: Message;
+  /** Whether the nameplate shows the name and the rarity. */
+  plate: boolean;
+  /** The classic FOIL card or a trading card (type line and effect box). */
+  layout: CardLayout;
+  /** The trading card's type line. */
+  cardType: string;
+  /** Pieces of text printed in their own lettering (style and foil only); the rest follow `text`. */
+  prints: FieldPrints;
+  /** Words at their preset places, or placed freely (docs/arrange.md). */
+  arrange: Arrange;
+  /** Where freely placed words sit (used while `arrange` is 'free'). */
+  placements: Placements;
   /** Index of the sample in use, or -1 when showing the person's own image. */
   sample: number;
   crop: Crop;
@@ -43,9 +65,16 @@ export interface State extends RangeColorState {
   gifClear: boolean;
   /** 'auto' keeps the card's own edge colour; otherwise '#rrggbb' to blend the edge into. */
   gifMatte: string;
+  /** The motion of GIF and APNG loops: the stage's own, or one made for exports. */
+  exportMotion: ExportMotion;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
+  /** True once the card has been flicked to change the finish; the phone's flick hint stops then. */
+  flicked: boolean;
 }
+
+/** Longest type line, in characters. */
+export const CARD_TYPE_MAX = 24;
 
 type Listener = (s: State, changed: Set<keyof State>) => void;
 
@@ -55,15 +84,22 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
+  'layer2',
   'hand',
   'rarity',
   'frame',
+  'shape',
   'intensity',
   'pixel',
   'name',
-  'desc',
   'nameEdited',
-  'descEdited',
+  'message',
+  'plate',
+  'layout',
+  'cardType',
+  'prints',
+  'arrange',
+  'placements',
   'sample',
   'crop',
   'tune',
@@ -73,52 +109,119 @@ const PERSIST: (keyof State)[] = [
   'saveOptsOpen',
   'gifClear',
   'gifMatte',
+  'exportMotion',
   'text',
+  'flicked',
   ...RANGE_COLOR_PERSIST,
 ];
 
+/** Saved settings that belong to the app, not to one card: a card kept in the binder leaves them out. */
+const APP_KEYS: (keyof State)[] = [
+  'lang',
+  'sound',
+  'crt',
+  'hand',
+  'adjustOpen',
+  'panelTab',
+  'exportFormat',
+  'saveOptsOpen',
+  'gifClear',
+  'gifMatte',
+  'exportMotion',
+  'flicked',
+  'rangeShow',
+  'brushMode',
+  'brushSize',
+  'brushSoft',
+  'frameSwatches',
+];
+/** Everything else saved is the card: its finish, picture, crop, words and looks (see docs/binder.md). */
+export const CARD_KEYS = PERSIST.filter((k) => !APP_KEYS.includes(k));
+export type Card = Partial<State>;
+
+/** The card's own settings, as kept in the binder. */
+export function cardOf(s: State): Card {
+  return Object.fromEntries(CARD_KEYS.map((k) => [k, structuredClone(s[k])]));
+}
+
+const defaults = (): State => ({
+  lang: 'en',
+  sound: true,
+  crt: true,
+  edition: 'holo',
+  layer2: null,
+  areaLayer: 1,
+  hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
+  rarity: 'rare',
+  frame: 'paper',
+  shape: 'card',
+  intensity: 1,
+  pixel: 0,
+  name: '',
+  nameEdited: false,
+  message: { ...DEFAULT_MESSAGE },
+  plate: true,
+  layout: 'classic',
+  cardType: '',
+  prints: {},
+  arrange: 'auto',
+  placements: {},
+  sample: 0,
+  crop: { zoom: 1, x: 0.5, y: 0.5 },
+  loading: false,
+  tune: { ...TUNE_DEFAULTS },
+  adjustOpen: false,
+  panelTab: 'card',
+  exportFormat: 'png',
+  saveOptsOpen: false,
+  gifClear: false,
+  gifMatte: 'auto',
+  exportMotion: 'stage',
+  text: { ...DEFAULT_LETTERING },
+  flicked: false,
+  ...RANGE_COLOR_DEFAULTS,
+});
+
+/** Saved values that no longer fit fall back to their defaults. */
+function sanitize(state: State) {
+  state.tune = sanitizeTune(state.tune);
+  state.shape = shapeOf(state.shape);
+  state.adjustOpen = state.adjustOpen === true;
+  state.message = normalizeMessage(state.message);
+  state.plate = state.plate !== false;
+  if (!CARD_LAYOUTS.includes(state.layout)) state.layout = 'classic';
+  state.cardType = typeof state.cardType === 'string' ? state.cardType.slice(0, CARD_TYPE_MAX) : '';
+  state.prints = normalizeFieldPrints(state.prints);
+  if (!ARRANGES.includes(state.arrange)) state.arrange = 'auto';
+  state.placements = normalizePlacements(state.placements);
+  // A finish that no longer exists (a retired one) starts over on the default.
+  if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
+  if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
+  if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
+  state.saveOptsOpen = state.saveOptsOpen === true;
+  state.gifClear = state.gifClear === true;
+  state.flicked = state.flicked === true;
+  if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
+  if (!EXPORT_MOTIONS.includes(state.exportMotion)) state.exportMotion = 'stage';
+  Object.assign(state, sanitizeRangeColors(state));
+  state.layer2 = sanitizeLayer2(state.layer2);
+}
+
+/** A kept card made whole again: every card setting it lacks or that no longer fits is the default. */
+export function cleanCard(saved: Card): Card {
+  const s = defaults();
+  for (const k of CARD_KEYS) if (k in saved) (s as unknown as Record<string, unknown>)[k] = saved[k];
+  sanitize(s);
+  return Object.fromEntries(CARD_KEYS.map((k) => [k, s[k]]));
+}
+
 
 export function createStore() {
-  const state: State = {
-    lang: 'en',
-    sound: true,
-    crt: true,
-    edition: 'holo',
-    hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
-    rarity: 'rare',
-    frame: 'paper',
-    intensity: 1,
-    pixel: 0,
-    name: '',
-    desc: '',
-    nameEdited: false,
-    descEdited: false,
-    sample: 0,
-    crop: { zoom: 1, x: 0.5, y: 0.5 },
-    loading: false,
-    tune: { ...TUNE_DEFAULTS },
-    adjustOpen: false,
-    panelTab: 'card',
-    exportFormat: 'png',
-    saveOptsOpen: false,
-    gifClear: false,
-    gifMatte: 'auto',
-    text: { ...DEFAULT_LETTERING },
-    ...RANGE_COLOR_DEFAULTS,
-  };
+  const state = defaults();
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
-    state.tune = sanitizeTune(state.tune);
-    state.adjustOpen = state.adjustOpen === true;
-    // A finish that no longer exists (a retired one) starts over on the default.
-    if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
-    if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
-    if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
-    state.saveOptsOpen = state.saveOptsOpen === true;
-    state.gifClear = state.gifClear === true;
-    if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
-    Object.assign(state, sanitizeRangeColors(state));
+    sanitize(state);
   } catch {
     /* storage unavailable: defaults are fine */
   }

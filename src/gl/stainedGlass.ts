@@ -10,16 +10,13 @@
 // differently by each pane, and broken up by the glass's rippled, uneven thickness, which is
 // seen through a different part of each sheet as the card tilts.
 // Nothing here reads the clock, so it holds still under reduced motion and loops in exports.
-import { ART, FACE_H, FACE_W } from '../card/face';
-
-const f = (v: number) => v.toFixed(2);
-
 export const STAINED_GLASS_GLSL = /* glsl */ `
-// Panes across the card's width; the grid runs in square units (y is stretched by 1.4).
-const vec2 SG_GRID = vec2(8.5, 8.5 * 1.4);
+// Panes across the card's short side; the grid runs in square units.
+#define SG_GRID (uCardK * 8.5)
 const float SG_LEAD = 0.12; // half the lead's width, in pane units
-const vec2 SG_FACE = vec2(${f(FACE_W)}, ${f(FACE_H)});
-const vec4 SG_ART = vec4(${f(ART.x)}, ${f(ART.y)}, ${f(ART.x + ART.w)}, ${f(ART.y + ART.h)});
+// The face and its art window in face pixels (a short side of 900).
+#define SG_FACE (uCardK * 900.0)
+#define SG_ART (uArt * SG_FACE.xyxy)
 
 vec2 sgSeed(vec2 cell) { return 0.15 + 0.7 * hash22(cell * 1.37 + 11.0); }
 
@@ -62,7 +59,8 @@ float sgBorder(vec2 fp, out vec2 cell) {
               : side == 2 ? (fp.x - SG_ART.x) / (SG_ART.z - SG_ART.x) * 3.0 : 0.5;
   float span = side < 2 ? (SG_ART.w - SG_ART.y) / 5.0 : (SG_ART.z - SG_ART.x) / 3.0;
   float k = floor(clamp(along, 0.0, side < 2 ? 4.999 : 2.999));
-  float divider = side == 3 ? 1e3 : abs(fract(along + 0.5) - 0.5) * span;
+  // A trading card's name bar is on top: it stays whole too.
+  float divider = side == 3 || (side == 2 && uArt.y > 0.06) ? 1e3 : abs(fract(along + 0.5) - 0.5) * span;
   if (along < 0.5 || along > (side < 2 ? 4.5 : 2.5)) divider = 1e3; // no divider at the mitre
   // The lead that runs around the window itself.
   float win = max(max(out4.x, out4.y), max(out4.z, out4.w));
@@ -141,6 +139,7 @@ vec3 stainedGlass(vec3 c, vec2 uv, vec2 t, float L, float art) {
   vec2 ripple = vec2(hx - h0, hy - h0) / 0.08;
   // The frame's pale glass is calmer, and calmest behind the name, so the lettering reads.
   float plate = smoothstep(SG_ART.w, SG_ART.w + 20.0, ruv.y * SG_FACE.y);
+  if (uArt.y > 0.06) plate = max(plate, 1.0 - smoothstep(SG_ART.y - 20.0, SG_ART.y, ruv.y * SG_FACE.y));
   float rough = art > 0.5 ? 1.0 : 0.55 - 0.3 * plate;
   ripple *= rough;
   float thick = mix(0.5, smoothstep(0.2, 0.8, h0), rough);
@@ -153,7 +152,7 @@ vec3 stainedGlass(vec3 c, vec2 uv, vec2 t, float L, float art) {
   // shallow wedge and each ripple a small lens, so they bend that glow by their own amounts.
   vec2 behind = vec2(0.5) + (uLight - 0.5) * 0.5 - t * 0.45;
   vec2 seen = uv + wedge * 0.08 + ripple * 0.045;
-  vec2 d = (seen - behind) * vec2(1.0, 1.4);
+  vec2 d = (seen - behind) * uCardK;
   float glow = exp(-dot(d, d) * 3.0);
   float light = 0.48 + glow * (0.55 + 0.9 * (1.0 - thick)) + 0.3 * (1.0 - thick);
   // Pale glass scatters more of the light, so the border glows rather than greys.
@@ -177,7 +176,7 @@ vec3 stainedGlass(vec3 c, vec2 uv, vec2 t, float L, float art) {
   float aa = fwidth(edge) * 0.75 + 1e-4;
   float lead = max(1.0 - smoothstep(SG_LEAD - aa, SG_LEAD + aa, edge), outline);
   float ridge = sqrt(max(1.0 - edge / SG_LEAD, 0.0)) * (1.0 - outline);
-  float sheen = 0.5 + 0.5 * sin(dot(ruv, vec2(7.0, 5.0)) + dot(t, vec2(4.0, -3.0)));
+  float sheen = 0.5 + 0.5 * sin(dot(ruv * uCardK, vec2(7.0, 3.57)) + dot(t, vec2(4.0, -3.0)));
   vec3 came = vec3(0.035, 0.038, 0.042) + vec3(0.13, 0.135, 0.145) * pow(ridge, 4.0) * (0.25 + 0.75 * sheen);
   col *= mix(0.6, 1.0, smoothstep(SG_LEAD, SG_LEAD + 0.08, edge)) * (1.0 - 0.4 * smoothstep(0.1, 0.32, outline));
   col = mix(col, came, lead);

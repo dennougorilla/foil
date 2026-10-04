@@ -15,7 +15,7 @@ float sdSparkle(vec2 f, float core, float len, float thin) {
 
 vec3 stardust(vec3 c, vec2 uv, vec2 t, float L) {
   // The art stays, a little deeper, so the grains of light can be the subject.
-  vec2 p = uv * vec2(1.0, 1.4);
+  vec2 p = uv * uCardK;
   vec3 col = c * 0.8 + vec3(0.02, 0.01, 0.06) * (1.0 - L);
   // A wide band of light rolls across as you tilt; every grain inside it fires harder.
   float sweep = smoothstep(0.3, 1.0, 0.5 + 0.5 * sin(dot(p, vec2(0.55, 0.83)) * 4.5 - (t.x + t.y) * 2.6));
@@ -24,7 +24,7 @@ vec3 stardust(vec3 c, vec2 uv, vec2 t, float L) {
   float T = uTime * 6.2831853 / sdPeriod();
 
   // Fine dust: one grain per cell, each a tiny facet that catches the light at its own angle.
-  vec2 g = uv * vec2(110.0, 154.0);
+  vec2 g = uv * uCardK * 110.0;
   vec2 cell = floor(g);
   float h = hash12(cell);
   vec2 n = hash22(cell + 11.1) * 2.0 - 1.0;
@@ -39,7 +39,7 @@ vec3 stardust(vec3 c, vec2 uv, vec2 t, float L) {
   col += tint * lit;
 
   // Confetti foil: square chips, each tipped its own way, flashing a colour as they face you.
-  vec2 q = uv * vec2(34.0, 47.6);
+  vec2 q = uv * uCardK * 34.0;
   vec2 qc = floor(q);
   float qh = hash12(qc + 41.0);
   if (qh > 0.55) {
@@ -55,7 +55,7 @@ vec3 stardust(vec3 c, vec2 uv, vec2 t, float L) {
   }
 
   // Starbursts: a few big crosses that blaze when the angle is right, and pop on the beat.
-  vec2 b = uv * vec2(5.0, 7.0);
+  vec2 b = uv * uCardK * 5.0;
   vec2 bc = floor(b);
   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
     vec2 id = bc + vec2(x, y);

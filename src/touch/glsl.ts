@@ -1,14 +1,12 @@
 // The Warmth finish: thermochromic ink over the art. Spliced into CARD_FS after the shared helpers
 // and the tune, so hash/fbm/hsv2rgb, tuneFaceUv, uTime and uLight are in scope.
-import { HEAT_H, HEAT_W } from './heat';
-
 export const TOUCH_GLSL = /* glsl */ `
-uniform sampler2D uHeat;   // heat over the card, ${HEAT_W}x${HEAT_H}, rows top to bottom like uv
+uniform sampler2D uHeat;   // heat over the card, square cells, rows top to bottom like uv
 uniform vec4 uPrints[3];   // fingerprints: centre uv, turn, heat
 
 // A cubic B-spline through four bilinear taps, so the isotherms come out round, not gridded.
 float heatAt(vec2 uv) {
-  vec2 res = vec2(${HEAT_W}.0, ${HEAT_H}.0);
+  vec2 res = vec2(textureSize(uHeat, 0));
   vec2 st = uv * res - 0.5;
   vec2 i = floor(st), f = st - i;
   vec2 f2 = f * f, f3 = f2 * f;
@@ -31,7 +29,7 @@ float printHeat(vec2 uv, out float gloss) {
   for (int i = 0; i < 3; i++) {
     vec4 P = uPrints[i];
     if (P.w <= 0.0) continue;
-    vec2 d = (uv - P.xy) * vec2(1.0, 1.4);
+    vec2 d = (uv - P.xy) * uCardK;
     float c = cos(P.z), s = sin(P.z);
     vec2 q = mat2(c, -s, s, c) * d / vec2(0.085, 0.115);
     // The pad presses unevenly: firm in the middle, its edge ragged.
@@ -81,7 +79,7 @@ vec3 warmth(vec3 c, vec2 uv, vec2 t, float L, float art) {
   ink = mix(ink, vec3(0.95, 0.94, 0.89), smoothstep(0.55, 1.05, l));
   ink += (c - L) * 0.06;
   // Paper and lacquer: a fine fibre grain, and one broad satin sheen that slides with the tilt.
-  float grain = hash12(floor(uv * vec2(240.0, 336.0)));
+  float grain = hash12(floor(uv * uCardK * 240.0));
   float sheen = smoothstep(0.5, 1.0, 0.5 + 0.5 * sin(dot(uv - 0.5, vec2(0.6, 0.8)) * 3.6 - (t.x + t.y) * 1.4));
   ink += vec3(0.9, 0.95, 1.0) * sheen * 0.09 + (grain - 0.5) * 0.025;
   // The tune's hue and saturation recolour the cold ink; the warmth below always stays warm.

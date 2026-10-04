@@ -13,7 +13,7 @@ summary is in `README.md`; this note is the design behind it.
   is no random draw. The excitement comes from the order: the rarest finish waits until last.
 - The **hand** holds up to seven cards (at least Base, which never leaves it); it starts as the seven
   above. Every finish owned that is not in the hand is in the **deck**, which sits at the hand's
-  right end like a draw pile: a few face-down pixel card backs (a couple of steps of thickness at
+  right end like a draw pile: a few face-down card backs (the card's own back, drawn by the page from the same pixels) (a couple of steps of thickness at
   most) and the count. Opening a pack adds its finishes to the deck; at the end of an opening the
   cards fly into it and "+5" floats up from it.
 - Pressing the deck opens the **deck builder**, laid out like a card game's deck-editing screen
@@ -79,6 +79,13 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
    and one `dispatch` line), add the edition to `src/editions.ts`, its names to `src/i18n.ts`,
    and its id to the pack's `finishes` in `src/packs.ts` (before the showpiece, or as the new
    showpiece).
+   The card can be any shape (`src/card/shape.ts`), so the finish takes the card's proportions
+   from `uCardK` (the face in units of its short side; multiply a uv by it for round dots and
+   square cells) and the art window from `uArt`, never from literals such as `vec2(1.0, 1.4)`;
+   `tests/shape.test.ts` fails on those.
+   showpiece). A finish that needs the card to itself beyond touch, a lamp or depth (a second
+   picture, particles drawn over the art) gets `solo`, so it is never offered as layer 2
+   (`docs/layering.md`).
 2. A new pack is one more entry in `PACKS` (id, finishes, wrapper, colors, `load`) plus a module
    file and its two names in `src/i18n.ts`. Nothing else lists packs.
 3. Someone who already opened a pack finds a finish added to it later straight in the hand.
@@ -97,7 +104,8 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
 
 ## Loading (weight budget)
 
-Nothing of a pack loads before the shop or View deck is opened, or a pack finish is in the hand:
+Nothing of a pack loads before the shop or View deck is opened, or a pack finish is in the hand
+(or layer 2 on the card, `docs/layering.md`):
 
 - `src/packs.ts` is plain data (ids, order, colors, a `load()` that dynamic-imports the module).
 - Each pack module (`src/gl/finishes/<pack>.ts`) carries its finishes' GLSL and their helpers
@@ -188,9 +196,14 @@ follows the sound toggle.
 | 3 | **Rip** (0–350) | The top strip flies off (up and to the side, spin, gravity, fades by 700). The body punches 1 → 1.06 → 1 (spring 320/14). Screen shake 220, 10 px, exponential decay. | White flash on the pack (0.6, gone in about 0.12 s), light pours from the opening, 40 sparks upward. | Rip (noise 700 → 5000 Hz, 320) + low thump (90 Hz) | 18, 30, 40 |
 | 4 | **Draw** (350–1250) | The stack rises out of the pack while the pack slides down (both springs), so the cards come up in full view, never past the top of the screen; at 420 the pack lets go and falls away under gravity with a little spin, and 100 later the stack settles where it was, landing at 900. | Pack flash fades; background deepens. | Slide + thock (140 Hz) | 10 |
 | 5 | **Swipe** (per card) | Face-up stack; the top card follows the finger (rubber band, leans rz = dx·0.0012). Past 28 % of its width or a flick > 800 px/s it flies off that way (260, ease-in); else it snaps back (spring 260/18). The next card pops (scale 0.94 → 1, spring 320/14). Tap / → / Enter sends it off automatically. | Name and line of the finish under the stack, swapped with a short pop; "1 / 5" above the name says how far along it is. Second-to-last card (rare): a light sweep across it and 18 sparkles when it surfaces. | Swish per card; pop on the next; rare: two-note chime | 8 (rare: 14) |
-| 6 | **Showpiece** | The last card comes face-down on a back printed in the pack's colors and emblem, edges glowing, trembling, sparks rising off it. Press (or →/Enter): "Revealing…" — it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. Then, held a little larger, a light sweeps across it once (1.6 s) while the rays hold back to a third, so its own finish is the peak; then the rays come up and it keeps rocking slowly. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
+| 6 | **Showpiece** | The last card comes face-down on the card back every card wears (src/card/back.ts), edges glowing, trembling, sparks rising off it. Press (or →/Enter): "Revealing…" — it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. Then, held a little larger, a light sweeps across it once (1.6 s) while the rays hold back to a third, so its own finish is the peak; then the rays come up and it keeps rocking slowly. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
 | 8 | **Try it** | The title says what happened ("You have all 5 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 5". Primary: "Use Magma" (the showpiece by name) — closes, sends the other cards into the deck and swaps this one into the hand for its last card that is not Base, and onto the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "To the deck". Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
+
+**The card's shape** — every card in the opening, the haul and the deck builder is drawn in the
+card's own shape (README): the stack at the trading card's area, the haul and the deck builder's
+mini cards fitted into the trading card's room, so a wide or square card never stretches; the pack
+and its wrapper stay as they are.
 
 **Under a card** (beats 5–6) the words stand in one column, never overlapping: progress and tag,
 the finish's name, its line (one line, cut with … when long), then the next-step button. The card

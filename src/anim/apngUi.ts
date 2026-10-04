@@ -3,6 +3,7 @@ import './apng.css';
 import type { Lang } from '../i18n';
 import type { ExportInput } from '../exporter';
 import { apngPlan, exportApng } from './apngExport';
+import { TUNE_DEFAULTS } from '../tune/model';
 
 const TEXT = {
   ja: {
@@ -76,7 +77,8 @@ export function mountApngExport({ btn, active, loading, lang, input, toast, onSa
   const refresh = () => {
     if (job || hold || !active()) return;
     const t = TEXT[lang()];
-    const plan = apngPlan(input().loopMs);
+    const i = input();
+    const plan = apngPlan(i.tune ?? TUNE_DEFAULTS, i.face.height / i.face.width, i.loopMs, i.motion);
     const size = fill(t.size, { n: formatBytes(plan.bytes) });
     const secs = plan.delays.reduce((a, d) => a + d, 0) / 1000;
     b.textContent = t.title;

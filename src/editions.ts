@@ -1,4 +1,5 @@
 import type { TouchKind } from './touch/heat';
+import type { RangeRegion } from './featureState';
 
 export type EditionId =
   | 'base'
@@ -56,6 +57,8 @@ export interface Edition {
   torch?: boolean;
   /** Reads the picture's depth (src/depth), so choosing it starts the depth model. */
   depth?: boolean;
+  /** Needs the card to itself (a second picture, particles over the art), like touch, torch and depth finishes. */
+  solo?: boolean;
 }
 
 /** Every finish. The hand starts with OPEN_EDITIONS; the rest come in packs (src/packs.ts). */
@@ -87,10 +90,10 @@ export const EDITIONS: Edition[] = [
   { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
   // Shader in src/gl/lenticular3d.ts.
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
-  { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6 },
+  { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6, solo: true },
   { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
   // Glitter particles on the GPU, see src/gl/snowglobe.ts.
-  { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7 },
+  { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7, solo: true },
   // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
@@ -100,6 +103,55 @@ export const EDITIONS: Edition[] = [
 ];
 
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];
+
+/**
+ * Can be layer 2, the finish laid over the card's own in an area of its own (docs/layering.md):
+ * anything but Base (that is "no layer") and the finishes that need the card to themselves.
+ */
+export function layerable(id: EditionId): boolean {
+  const e = EDITIONS.find((x) => x.id === id);
+  return !!e && e.id !== 'base' && !e.touch && !e.torch && !e.depth && !e.solo;
+}
+
+/** What layer 2 can be: the owned finishes that layer, but the card's own. */
+export const layerChoices = (owned: readonly EditionId[], main: EditionId): EditionId[] => owned.filter((id) => id !== main && layerable(id));
+
+/** Where a layer goes: a region of the card, a band of brightness, inverted (the brush is kept beside it). */
+export interface Area {
+  region: RangeRegion;
+  lo: number;
+  hi: number;
+  invert: boolean;
+}
+
+/** Where layer 2 overlaps the card's own finish: only its light is added, or it is laid over. */
+export type Blend = 'light' | 'over';
+
+/** Layer 2: a finish, its area, how it meets layer 1 where they overlap, and how strongly it shows (0..1). */
+export interface Layer2 extends Area {
+  edition: EditionId;
+  blend: Blend;
+  strength: number;
+}
+
+const REGIONS: RangeRegion[] = ['all', 'art', 'frame', 'text', 'none'];
+const unit = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
+
+/** A saved layer 2, or null when it is missing or no longer fits. */
+export function sanitizeLayer2(v: unknown): Layer2 | null {
+  const l = v as Partial<Layer2> | null;
+  if (!l || typeof l !== 'object' || typeof l.edition !== 'string' || !layerable(l.edition)) return null;
+  const band = unit(l.lo) && unit(l.hi) && l.hi - l.lo >= 0.08 - 1e-6;
+  return {
+    edition: l.edition,
+    region: REGIONS.includes(l.region as RangeRegion) ? (l.region as RangeRegion) : 'all',
+    lo: band ? l.lo! : 0,
+    hi: band ? l.hi! : 1,
+    invert: l.invert === true,
+    blend: l.blend === 'over' ? 'over' : 'light',
+    strength: unit(l.strength) ? l.strength : 1,
+  };
+}
 
 export type RarityId = 'common' | 'uncommon' | 'rare' | 'legendary';
 
@@ -118,5 +170,5 @@ export const RARITIES: Rarity[] = [
 
 export const rarityById = (id: RarityId): Rarity => RARITIES.find((r) => r.id === id) ?? RARITIES[0];
 
-export type FrameId = 'paper' | 'ink' | 'gilt' | 'rarity';
-export const FRAMES: FrameId[] = ['paper', 'ink', 'gilt', 'rarity'];
+export type FrameId = 'paper' | 'ink' | 'gilt' | 'rarity' | 'rim' | 'ribbon';
+export const FRAMES: FrameId[] = ['paper', 'ink', 'gilt', 'rarity', 'rim', 'ribbon'];

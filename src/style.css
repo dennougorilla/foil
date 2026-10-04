@@ -13,6 +13,10 @@
   --red-lo: #b8362e;
   --green: #3fc28f;
   --gold: #f2c14e;
+  /* The binder's own colour: white text reaches 6:1 on it. */
+  --binder: #6c43c9;
+  --binder-lo: #35206a;
+  --binder-hi: #b79cff;
   --accent: #ff6b8b;
   --slider-fill: #aebec1;
   --radius: 10px;
@@ -333,6 +337,39 @@ button {
   animation: heart-beat 0.6s var(--ease-back);
 }
 
+/* The binder: a purple binder and how many cards it holds; kept cards fly into it. */
+.chip-binder {
+  margin-right: 6px;
+  color: var(--text);
+}
+
+.chip-binder svg,
+.chip-binder svg path:first-child {
+  fill: var(--binder-hi);
+  stroke: none;
+}
+
+.binder-count {
+  min-width: 22px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--edge);
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: center;
+}
+
+.chip-binder[data-empty='true'] .binder-count {
+  color: var(--text-dim);
+}
+
+.chip-binder.is-bump {
+  animation: deck-bump 0.45s var(--ease-back);
+}
+
 @keyframes heart-beat {
   40% { transform: scale(1.35); }
 }
@@ -482,12 +519,19 @@ button {
   min-height: 0;
 }
 
+/* The card's shape sets the slot: the trading card's area in its own proportions (card/shape.ts fitArea). */
+:root {
+  --card-ar: 900 / 1260;
+  --card-kw: 0.7143;
+  --card-kh: 1;
+}
+
 .card-slot {
   position: relative;
   z-index: 3;
-  height: min(100%, 520px);
+  height: calc(min(100%, 520px) * var(--card-kh));
   max-height: 520px;
-  aspect-ratio: 5 / 7;
+  aspect-ratio: var(--card-ar);
   padding: 0;
   border: 0;
   border-radius: 6%;
@@ -877,12 +921,9 @@ button {
   width: 60px;
   height: 84px;
   margin-left: calc(var(--i) * -2px);
-  border-radius: 6px;
-  background:
-    radial-gradient(circle at 50% 50%, #f3eee2 0 9px, #161c1f 9px 12px, transparent 12px),
-    repeating-linear-gradient(45deg, #a82c25 0 4px, #c4382f 4px 8px);
-  box-shadow: inset 0 0 0 3px #f3eee2, inset 0 0 0 5px #161c1f, 0 0 0 2px #0b1012, 0 3px 0 2px #d8d2c4, 0 4px 0 2px #0b1012;
-  image-rendering: pixelated;
+  border-radius: 5px;
+  background: var(--card-back) center / 100% 100%;
+  box-shadow: 0 3px 0 0 #d8d2c4, 0 4px 0 1px #0b1012;
 }
 
 .deck[data-empty='true'] .deck-pile i {
@@ -1212,6 +1253,104 @@ button {
   margin-left: auto;
   font-size: 14px;
   color: var(--text-dim);
+}
+
+/* Step 3's head: its label, then Keep (into the binder) and Share as two small slate slabs. */
+.export-head {
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+}
+
+.export-more {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mini-slab {
+  --c: var(--slab);
+  --lo: var(--slab-lo);
+  --lip: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c);
+  box-shadow: 0 var(--lip) 0 var(--lo), inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 14px;
+  text-shadow: var(--drop);
+  white-space: nowrap;
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
+}
+
+.mini-slab[hidden] {
+  display: none;
+}
+
+.mini-slab svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.mini-keep svg {
+  fill: var(--binder-hi);
+}
+
+.mini-keep .i-kept,
+.mini-keep[data-kept='true'] .i-keep {
+  display: none;
+}
+
+/* Kept: a green tick, the way a saved file is marked. */
+.mini-keep[data-kept='true'] .i-kept {
+  display: inline;
+  fill: var(--mark);
+}
+
+.mini-keep[aria-busy='true'] svg {
+  animation: keep-bob 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes keep-bob {
+  to { transform: translateY(-3px); }
+}
+
+/* A file made too late for the first tap waits on a bright slab for the second. */
+.mini-share[data-ready='true'] {
+  --c: var(--blue);
+  --lo: var(--blue-lo);
+  animation: share-call 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes share-call {
+  to { box-shadow: 0 var(--lip) 0 var(--lo), inset 0 2px 0 rgba(255, 255, 255, 0.2), 0 0 0 4px rgba(11, 120, 204, 0.45); }
+}
+
+.mini-slab:hover:not(:disabled) {
+  animation: slab-wobble 0.45s var(--ease-out) forwards;
+}
+
+.mini-slab:active:not(:disabled) {
+  animation: none;
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 var(--lo), inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  transition-duration: 0.05s;
+}
+
+.mini-slab:disabled:not([data-busy]) {
+  opacity: 0.5;
+}
+
+/* Making the GIF to share: Share counts up in place. */
+.mini-share[data-busy] {
+  --c: var(--slab-lo);
+  font-family: var(--display);
 }
 
 /*
@@ -2167,6 +2306,27 @@ button {
   grid-template-columns: 1fr 1fr;
 }
 
+.seg.seg-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* The loop's motion: As on screen (two columns) beside Gyre, then the other motions made for exports, three a row. */
+.seg.seg-motions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.seg-motions .seg-btn {
+  min-height: 34px;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.seg-motions .seg-btn:first-child {
+  grid-column: span 2;
+}
+
 .matte {
   display: flex;
   gap: 10px;
@@ -2640,6 +2800,11 @@ input[type='range']:disabled {
   opacity: 0.5;
 }
 
+/* Six frames sit three to a row. */
+.seg-frames {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .seg-frames .seg-btn {
   display: grid;
   justify-items: center;
@@ -2664,6 +2829,68 @@ input[type='range']:disabled {
   inset: 4px 4px 9px;
   border-radius: 2px;
   background: linear-gradient(160deg, #4f6e86, #24384a);
+}
+
+/* Gold rim: the art window edged in gold. Ribbon: a red band across the top-left corner. */
+.swatch[data-frame='rim'] {
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px #d9a441;
+}
+
+.swatch[data-frame='rim']::after {
+  box-shadow: 0 0 0 2px #d9a441;
+}
+
+.swatch[data-frame='ribbon'] {
+  overflow: hidden;
+}
+
+.swatch[data-frame='ribbon']::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: -7px;
+  width: 22px;
+  height: 5px;
+  background: #d23a45;
+  box-shadow: 0 0 0 1px var(--edge);
+  transform: rotate(-45deg);
+}
+
+/* Shapes: a quiet row of outlines with their names, the card's own shape first. */
+.seg-shapes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.seg-shapes .seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 4px 4px 3px;
+  font-size: 14px;
+  white-space: normal;
+  word-break: keep-all;
+  text-align: left;
+}
+
+.shape-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 22px;
+}
+
+.shape-ico::before {
+  content: '';
+  width: var(--w);
+  height: var(--h);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px currentColor;
+  opacity: 0.85;
 }
 
 /* Side notes on the board stay readable, at full strength on the colour slabs. */
@@ -2709,10 +2936,12 @@ input[type='range']:disabled {
   .adjust-toggle:hover:not(:active),
   .sw-add:hover:not(:active),
   .chip.range-chip:hover:not(:active),
+  .layer-chip:hover:not(:active),
+  .layer-row:hover:not(:active),
   .recap:hover:not(:active) .recap-go {
     transform: none;
   }
-  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .adjust-chev, .matte-sw, .recap-go, .sw-add, .lt-style, .chip.range-chip, .tone-chip) {
+  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .adjust-chev, .matte-sw, .recap-go, .sw-add, .lt-style, .chip.range-chip, .tone-chip, .layer-chip, .layer-row, .layer-add) {
     transition: none;
   }
   .panel input[type='range']::-webkit-slider-thumb {
@@ -3059,6 +3288,10 @@ input[type='range']:disabled {
   .toasts {
     width: 304px;
   }
+  /* The binder keeps to its icon and count, so the chips stay clear of the panel. */
+  .chip-binder .binder-name {
+    display: none;
+  }
   .tab {
     padding: 4px 4px;
     font-size: 14px;
@@ -3102,7 +3335,8 @@ input[type='range']:disabled {
   }
   .card-slot {
     height: auto;
-    width: min(62vw, 300px);
+    /* As wide as a trading card would be, scaled to the card's shape (see :root), never past the screen. */
+    width: min(calc(min(62vw, 300px) * var(--card-kw) * 1.4), 88vw);
   }
   /* On phones the panel is far below, so the first action also sits right under the card. */
   .btn.stage-pick {
@@ -3176,7 +3410,7 @@ input[type='range']:disabled {
     background: var(--board);
     box-shadow: 0 0 0 3px var(--edge), 0 -8px 24px rgba(0, 0, 0, 0.45);
   }
-  .sec-export .sec-title {
+  .sec-export .export-head {
     grid-area: title;
   }
   .sec-export .seg-format {
@@ -3241,7 +3475,8 @@ input[type='range']:disabled {
   }
 }
 
-@media (max-width: 420px) {
+/* Small phones, and any phone held upright, keep the header to its icons. */
+@media (max-width: 420px), (max-width: 599px) and (orientation: portrait) {
   .toggles .chip span {
     display: none;
   }
@@ -3256,6 +3491,23 @@ input[type='range']:disabled {
   }
   .chip[aria-pressed='false'] {
     opacity: 0.55;
+  }
+  /* The binder keeps to its icon, its count a tag on the corner, so the row still fits. */
+  .chip-binder {
+    position: relative;
+    margin-right: 0;
+  }
+  .binder-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 20px;
+    padding: 0 4px;
+    line-height: 18px;
+    box-shadow: 0 0 0 2px var(--panel-hi);
+  }
+  .chip-binder[data-empty='true'] .binder-count {
+    display: none;
   }
   .tile {
     width: 24px;
@@ -3286,5 +3538,14 @@ input[type='range']:disabled {
   }
   .toast {
     animation-duration: 0.01s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-slab:hover:not(:disabled),
+  .mini-share[data-ready='true'],
+  .mini-keep[aria-busy='true'] svg,
+  .chip-binder.is-bump {
+    animation: none;
   }
 }

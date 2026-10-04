@@ -1,12 +1,12 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AUTO_STILL, AutoTouch, HEAT_H, HEAT_W, HeatField } from '../src/touch/heat.ts';
+import { AUTO_STILL, AutoTouch, HeatField } from '../src/touch/heat.ts';
 import { EDITIONS } from '../src/editions.ts';
 import { OPEN_EDITIONS } from '../src/packs.ts';
 
-const at = (f: { data: Float32Array }, u: number, v: number) =>
-  f.data[Math.min(HEAT_H - 1, Math.floor(v * HEAT_H)) * HEAT_W + Math.min(HEAT_W - 1, Math.floor(u * HEAT_W))];
+const at = (f: { data: Float32Array; w: number; h: number }, u: number, v: number) =>
+  f.data[Math.min(f.h - 1, Math.floor(v * f.h)) * f.w + Math.min(f.w - 1, Math.floor(u * f.w))];
 const run = (f: HeatField, seconds: number) => {
   for (let i = 0; i < seconds * 60; i++) f.step(1 / 60);
 };

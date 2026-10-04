@@ -7,7 +7,8 @@
 // Shaking comes from the card itself (tossing, flicking the tilt, a click's wobble), a pointer
 // sweeping across the art, and on phones the motion sensor. Exports and reduced motion never
 // take input: the flakes only move while the shader clock moves.
-import { ART, FACE_H, FACE_W } from '../card/face';
+import { artOf } from '../card/face';
+import { cardK } from '../card/shape';
 import type { CardDraw } from './renderers';
 
 /** Card shader index of the finish. Kept clear of the regular and sponsor ranges. */
@@ -18,16 +19,19 @@ export const SNOWGLOBE_GLSL = /* glsl */ `
 // Snow Globe: the art seen through a curved pane of clear liquid. The glitter in it is drawn as
 // GPU particles on top of the card (below). g is the card uv (not the pattern).
 vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
-  const vec4 W = vec4(0.062, 0.0443, 0.938, 0.8786); // art window: left, top, right, bottom
+  vec4 W = uArt; // art window: left, top, right, bottom
   vec2 a = (g - W.xy) / (W.zw - W.xy);
-  vec2 q = (a - 0.5) * vec2(2.0, 2.66);
+  // The window in units of its short side.
+  vec2 win = (W.zw - W.xy) * uCardK;
+  win /= min(win.x, win.y);
+  vec2 q = (a - 0.5) * 2.0 * win;
   float r2 = dot(q, q) / 2.8;
   // The liquid lens magnifies a touch toward the middle and never quite stops moving.
   vec2 wob = vec2(vnoise(g * 5.0 + vec2(uTime * 0.2, 0.0)), vnoise(g * 5.0 + vec2(5.2, -uTime * 0.17))) - 0.5;
   vec2 s = g - (g - (W.xy + W.zw) * 0.5) * 0.07 * (1.0 - min(r2, 1.0)) + wob * 0.006 + t * 0.005;
   vec3 col = mix(c, face(tunePattern(s), lod).rgb, art);
   // Clear water with a faint cool cast, deeper toward the walls.
-  float edge = min(min(a.x, 1.0 - a.x), min(a.y, 1.0 - a.y) * 1.33);
+  float edge = min(min(a.x, 1.0 - a.x) * win.x, min(a.y, 1.0 - a.y) * win.y);
   col = mix(col, col * vec3(0.9, 0.97, 1.05) + vec3(0.0, 0.012, 0.03), 0.7);
   col *= 1.0 - 0.3 * smoothstep(0.14, 0.0, edge);
   // Light through the moving water, rippling over the lower half.
@@ -35,7 +39,7 @@ vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
   col += vec3(0.75, 0.9, 1.0) * pow(caus, 6.0) * 0.12 * smoothstep(0.35, 1.0, a.y);
   // The pane bulges like a dome: a thin highlight follows its curve in one corner and a soft
   // sheet of reflected light fills in behind it, both swinging round as the card turns.
-  vec2 e = q / vec2(0.84, 1.16);
+  vec2 e = q / (win - vec2(0.16, 0.17));
   float ell = length(e);
   vec2 dir = normalize(vec2(-0.62, -0.78) + t * vec2(-0.35, -0.3));
   float side = smoothstep(0.55, 0.97, dot(e / max(ell, 1e-3), dir));
@@ -49,9 +53,12 @@ vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
 }
 `;
 
-const ART_UV = [ART.x / FACE_W, ART.y / FACE_H, ART.w / FACE_W, ART.h / FACE_H] as const;
-/** Height of the art window in widths; the sim runs in these square units. */
-const ASPECT = (ART.h / ART.w).toFixed(4);
+/** The art window of a face, in card uv (x, y, width, height), its height in widths (A) and the card's proportions (k). */
+function artUv(face: HTMLCanvasElement) {
+  const a = artOf(face);
+  const [W, H] = [face.width, face.height];
+  return { uv: [a.x / W, a.y / H, a.w / W, a.h / H] as const, A: a.h / a.w, k: cardK(W, H) };
+}
 
 const COARSE = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4;
 const COUNT = COARSE ? 3072 : 8192;
@@ -76,8 +83,9 @@ uniform float uSpin;     // swirl of the liquid
 uniform float uStir;     // turbulence, 0 calm .. ~1.5 shaken hard
 uniform vec2 uGrav;      // card-local down
 uniform vec4 uPoke;      // a pointer sweeping through: position (art uv), velocity
+uniform float uA;        // height of the art window in widths; the sim runs in these square units
 out vec4 vState;
-const float A = ${ASPECT};
+#define A uA
 ${HASH}
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -161,7 +169,9 @@ uniform float uShow;     // share of the flakes drawn
 uniform vec2 uTilt;
 uniform vec2 uLight;
 uniform sampler2D uMask;
-const vec4 ART_UV = vec4(${ART_UV.map((v) => v.toFixed(5)).join(', ')});
+uniform vec4 uArtUv;     // the art window in card uv: x, y, width, height
+uniform vec2 uCardK;     // the card in units of its short side
+#define ART_UV uArtUv
 out vec3 vCol;
 out float vGlint;
 out vec2 vAxis;          // flake orientation (cos, sin)
@@ -185,13 +195,13 @@ void main() {
   p.xz = mat2(cy, -sy, sy, cy) * p.xz;
   n.xz = mat2(cy, -sy, sy, cy) * n.xz;
   if (!shown || n.z < 0.05) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; return; }
-  float D = max(uSize.y, 120.0) * 3.2;
+  float D = max(max(uSize.x, uSize.y), 120.0) * 3.2;
   float w = (D - p.z) / D;
   vec2 s = uCenter + p.xy / w;
   gl_Position = vec4(vec2(s.x / uRes.x * 2.0 - 1.0, 1.0 - s.y / uRes.y * 2.0) * w, 0.0, w);
 
   float leaf = step(0.82, rnd(id, 2));
-  float size = mix(mix(0.0028, 0.0055, rnd(id, 7)), mix(0.008, 0.014, rnd(id, 8)), leaf) * uSize.y * uScale / w;
+  float size = mix(mix(0.0028, 0.0055, rnd(id, 7)), mix(0.008, 0.014, rnd(id, 8)), leaf) * min(uSize.x, uSize.y) * (7.0 / 5.0) * uScale / w; // sized as on the trading card's height
   // The sprite leaves room around the flake for its glint to flare.
   gl_PointSize = max(size * 3.0 * uDpr, 2.0);
 
@@ -203,7 +213,7 @@ void main() {
   vAxis = vec2(cos(a), sin(a));
   vSquash = clamp(fn.z, 0.25, 1.0);
 
-  vec3 L = normalize(vec3((uLight - cuv) * vec2(1.0, 1.4) * 1.6 - uTilt * 0.35, 1.0));
+  vec3 L = normalize(vec3((uLight - cuv) * uCardK * 1.6 - uTilt * 0.35, 1.0));
   vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
   float spec = max(dot(fn, H), 0.0);
   vGlint = pow(spec, mix(40.0, 18.0, leaf)) * mix(1.2, 2.2, leaf);
@@ -327,6 +337,8 @@ export class SnowGlobe {
   private tf: WebGLTransformFeedback;
   private cur = 0;
   private time = NaN;
+  /** The art window of the card's face (see setFace). */
+  private art: ReturnType<typeof artUv> = { uv: [0.062, 0.0443, 0.876, 0.8343], A: 1.3333, k: [1, 1.4] }; // any shape: the classic trading card until setFace
   // Liquid state, eased back to calm.
   private impulse: [number, number] = [0, 0];
   private spin = 0;
@@ -343,9 +355,9 @@ export class SnowGlobe {
   ) {
     this.sim = compile(gl, SIM_VS, SIM_FS, ['vState']);
     this.draw_ = compile(gl, DRAW_VS, DRAW_FS);
-    this.su = uniforms(gl, this.sim, ['uDt', 'uTime', 'uKick', 'uSpin', 'uStir', 'uGrav', 'uPoke']);
+    this.su = uniforms(gl, this.sim, ['uDt', 'uTime', 'uKick', 'uSpin', 'uStir', 'uGrav', 'uPoke', 'uA']);
     this.du = uniforms(gl, this.draw_, [
-      'uRes', 'uCenter', 'uSize', 'uRot', 'uScale', 'uDpr', 'uTime', 'uShow', 'uTilt', 'uLight', 'uMask', 'uAlpha',
+      'uRes', 'uCenter', 'uSize', 'uRot', 'uScale', 'uDpr', 'uTime', 'uShow', 'uTilt', 'uLight', 'uMask', 'uAlpha', 'uArtUv', 'uCardK',
     ]);
     // Start mid-drift: most flakes hang in the liquid, a bed of them lies on the floor.
     const data = new Float32Array(COUNT * 4);
@@ -375,6 +387,11 @@ export class SnowGlobe {
     if (!settled) listen();
   }
 
+  /** The face the flakes are drawn over: they fill its art window, wherever the layout puts it. */
+  setFace(face: HTMLCanvasElement): void {
+    this.art = artUv(face);
+  }
+
   /** Draws the flakes over a card that was just drawn; the mask must still be bound to unit 1. */
   draw(view: GlobeView, d: CardDraw, time: number): void {
     const { gl } = this;
@@ -402,6 +419,8 @@ export class SnowGlobe {
     gl.uniform2f(u.uLight, d.light[0], d.light[1]);
     gl.uniform1i(u.uMask, 1);
     gl.uniform1f(u.uAlpha, d.alpha);
+    gl.uniform4fv(u.uArtUv, this.art.uv);
+    gl.uniform2fv(u.uCardK, this.art.k);
     gl.drawArrays(gl.POINTS, 0, COUNT);
   }
 
@@ -431,6 +450,7 @@ export class SnowGlobe {
     gl.uniform1f(u.uStir, this.stir);
     gl.uniform2f(u.uGrav, this.grav[0], this.grav[1]);
     gl.uniform4f(u.uPoke, ...this.poke);
+    gl.uniform1f(u.uA, this.art.A);
     this.poke = [0, 0, 0, 0];
     gl.bindVertexArray(this.simVao[src]);
     // The buffer written to may not stay bound anywhere else.
@@ -494,10 +514,11 @@ export class SnowGlobe {
     const ch = d.h * d.scale;
     const u = (input.x - rect.left - (d.cx - cw / 2)) / cw;
     const v = (input.y - rect.top - (d.cy - ch / 2)) / ch;
-    const ax2 = (u - ART_UV[0]) / ART_UV[2];
-    const ay2 = (v - ART_UV[1]) / ART_UV[3];
+    const art = this.art.uv;
+    const ax2 = (u - art[0]) / art[2];
+    const ay2 = (v - art[1]) / art[3];
     if (ax2 < -0.1 || ax2 > 1.1 || ay2 < -0.1 || ay2 > 1.1) return;
-    const k = 1 / (cw * ART_UV[2]);
+    const k = 1 / (cw * art[2]);
     const pvx = clamp(input.vx * k, -4, 4);
     const pvy = clamp(input.vy * k, -4, 4);
     this.poke = [ax2, ay2, pvx, pvy];

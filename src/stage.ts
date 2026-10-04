@@ -3,12 +3,17 @@ import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } f
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
-import { tuneGl } from './tune/model';
-import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
+import { restLight, tuneGl } from './tune/model';
+import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardPoint, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
+import { cardLayers } from './layers';
 import './stage-phone.css';
 import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
+import { cardK, contain, shapeById, type ShapeId } from './card/shape';
+
+/** The card's proportions in units of its short side, for a heat grid. */
+const kOf = (shape: ShapeId) => cardK(shapeById(shape).w, shapeById(shape).h);
 
 export class Spring {
   v = 0;
@@ -71,6 +76,8 @@ export interface StageOptions {
   handIds: () => EditionId[];
   /** Where the deck sits on the page: swapped cards fly between it and the hand. */
   deckRect?: () => DOMRect | null;
+  /** A tap (not a toss) on the card, at this point of its face (uv) and of the page. */
+  onTapCard?: (uv: [number, number], x: number, y: number) => void;
 }
 
 /** A level pinned with ?quality=0…3 in the address, if any. */
@@ -117,13 +124,13 @@ export class Stage {
   /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
   private lastTouch: [number, number] | null = null;
   private lastPointer: [number, number] = [0, 0];
-  /** The finish on the main card last frame, to greet a touch finish as it arrives. */
-  private shown: EditionId | null = null;
+  /** The finish (and shape) on the main card last frame, to greet a touch finish as it arrives. */
+  private shown: string | null = null;
   /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
   private greet: Swipe | null = null;
   /** What touch left on the main card, and the strokes the hand's preview cards draw themselves. */
   private heat = new HeatField();
-  private demos = new Map<TouchKind, AutoTouch>();
+  private demos = new Map<string, AutoTouch>();
 
   private hand: HandCard[] = [];
   private leaving: Leaving[] = [];
@@ -138,6 +145,8 @@ export class Stage {
   hold = false;
   /** 0..1: overlay on the main card showing where the finish lands. */
   rangeView = 0;
+  /** Which layer's area the overlay shows (the one being edited). */
+  rangeLayer: 1 | 2 = 1;
 
   constructor(o: StageOptions) {
     this.o = o;
@@ -398,11 +407,25 @@ export class Stage {
     };
     cardSlot.addEventListener('pointerup', release);
     cardSlot.addEventListener('pointercancel', release);
-    cardSlot.addEventListener('click', () => {
+    cardSlot.addEventListener('click', (e) => {
       if (this.drag.moved > 6) return;
       this.juice();
       sfx.pop();
+      // A keyboard press has no point on the card.
+      if (this.pose && e.detail > 0) this.o.onTapCard?.(cardUv(e.clientX - this.canvasRect.left, e.clientY - this.canvasRect.top, this.pose), e.clientX, e.clientY);
     });
+  }
+
+  /** The point of the card's face (uv) under a point of the page, from the last frame's pose. */
+  uvAt(x: number, y: number): [number, number] | null {
+    return this.pose ? cardUv(x - this.canvasRect.left, y - this.canvasRect.top, this.pose) : null;
+  }
+
+  /** The point of the page over a point of the card's face (uv). */
+  pageAt(u: number, v: number): [number, number] | null {
+    if (!this.pose) return null;
+    const [x, y] = cardPoint(u, v, this.pose);
+    return [x + this.canvasRect.left, y + this.canvasRect.top];
   }
 
   juice(strength = 1) {
@@ -455,6 +478,8 @@ export class Stage {
   }
 
   private canvasRect = new DOMRect();
+  /** The card's pose in the last frame, to find where a tap landed on its face. */
+  private pose: Parameters<typeof cardUv>[2] | null = null;
 
   private cardRect() {
     const s = this.o.cardSlot.getBoundingClientRect();
@@ -470,9 +495,11 @@ export class Stage {
     const rows = hr.height > 240 && count > 8 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
-    // Each row reserves room for lift above and the fan's arc below.
-    const h = Math.max(60, Math.min(rowH - 46, 124));
-    const w = h * (5 / 7);
+    // Each row reserves room for lift above and the fan's arc below. A card of another shape fits a
+    // box a little wider than the trading card, so a fan of wide cards stays as easy to tell apart.
+    const sh = shapeById(this.o.store.get().shape);
+    const h0 = Math.max(60, Math.min(rowH - 46, 124));
+    const { w, h } = contain(sh.h / sh.w, h0 * 0.86, h0);
     // Leave room for the fan's outer rotation so edge cards never clip.
     const spacing = Math.min(w * 0.98, (hr.width - w * 1.35) / (perRow - 1));
     const midRow = (perRow - 1) / 2;
@@ -519,10 +546,10 @@ export class Stage {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });
-    if (ed.id !== this.shown) {
-      this.shown = ed.id;
+    if (`${ed.id}|${state.shape}` !== this.shown) {
+      this.shown = `${ed.id}|${state.shape}`;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
-      if (ed.touch) this.heat = new HeatField(ed.touch);
+      if (ed.touch) this.heat = new HeatField(ed.touch, kOf(state.shape));
       this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && !this.motion) {
@@ -555,8 +582,9 @@ export class Stage {
       const amp = this.motion ? 1 : 0.5;
       // The device's tilt leans the card (and so its shine) on phones; not under reduced motion.
       const gyro = this.motion ? motion.gyroInput() : null;
-      // Brush mode holds the card too, so a spin eases back to face the viewer.
-      motion.step(dt, tune, !this.motion, over || this.drag.active || this.hold);
+      // Pointing at the card turns a spinning one to face the viewer; dragging it or holding it for
+      // the brush also eases the idle motion out.
+      motion.step(dt, tune, !this.motion, over, this.drag.active || this.hold);
       if (this.hold) {
         this.rx.target = 0;
         this.ry.target = 0;
@@ -584,8 +612,6 @@ export class Stage {
         this.rx.target = 0;
         this.rz.target = 0;
       }
-      // Idle float
-      const idle = this.motion && !this.drag.active && !this.hold ? 1 : 0;
       const sub = 4;
       for (let i = 0; i < sub; i++) {
         for (const s of [this.ox, this.oy, this.rx, this.ry, this.rz, this.sc]) s.step(dt / sub);
@@ -608,43 +634,41 @@ export class Stage {
         }
       }
 
-      // Idle motion and the light come from the tune (sway and pointer-follow by default).
-      const pose = motion.idle(tune, idle > 0);
-      const fy = pose.fy;
-      const rzIdle = pose.rz;
-      const rxIdle = pose.rx;
-      const ryIdle = pose.ry;
+      // Idle motion and the light come from the tune (sway and pointer-follow by default), timed by
+      // the same clock as an exported loop (see idlePose in tune/model.ts).
+      const pose = motion.pose(tune);
+      const fx = pose.dx * r.h;
+      const fy = pose.dy * r.h;
       const tk = motion.tiltScale(tune);
-      const RX = this.rx.x * tk + rxIdle;
+      const RX = this.rx.x * tk + pose.rx;
       motion.flip = flipAngle;
-      const RY = this.ry.x * tk + ryIdle + pose.spin + flipAngle;
-      const RZ = this.rz.x * tk + rzIdle;
+      const RY = this.ry.x * tk + pose.ry + pose.spin + flipAngle;
+      const RZ = this.rz.x * tk + pose.rz;
 
-      const orbit = motion.orbitSheen(tune);
-      const tilt: [number, number] = [
-        (this.ry.x + ryIdle) / 0.32 + pose.sheen[0] + orbit[0],
-        (this.rx.x + rxIdle) / 0.28 + pose.sheen[1] + orbit[1],
-      ];
-      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      const tilt = motion.tilt(tune, pose, this.rx.x + pose.rx, this.ry.x + pose.ry);
+      const cardPose = { cx: r.cx + this.ox.x + fx, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      this.pose = cardPose;
       const pointed = over && !this.drag.active && !this.hold;
       let light: [number, number];
       if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);
       else if (pointed) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
-      else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
+      else light = restLight(tilt);
       light = motion.light(tune, light);
 
-      const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
+      // The card's shadow drops further as it lifts or rises off the table.
+      const lift = (this.sc.x * pose.scale - 1) * 120 - fy * 0.6 + (this.drag.active ? 14 : 0);
       this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
       this.cards.drawCard(
         {
           ...cardPose,
-          edition: ed.shader,
+          ...cardLayers(state, this.rangeView > 0 ? this.rangeLayer : 0),
           intensity: state.intensity,
           pixel: PIXEL_STEPS[state.pixel] ?? 0,
           tilt,
           light,
           alpha: 1,
-          flash: this.flash,
+          flash: this.flash + pose.flash,
+          glint: pose.glint,
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
@@ -655,7 +679,7 @@ export class Stage {
       // Info box sways a little with the card, like a hanging tag.
       // ...but holds still while someone is pointing at it or typing in it.
       if (this.o.info.matches(':hover, :focus-within')) this.o.info.style.transform = '';
-      else this.o.info.style.transform = `translate(${(this.ox.x * 0.12).toFixed(1)}px, ${(this.oy.x * 0.12 + fy * 0.4).toFixed(1)}px) rotate(${(RZ * 0.25).toFixed(4)}rad)`;
+      else this.o.info.style.transform = `translate(${(this.ox.x * 0.12 + fx * 0.4).toFixed(1)}px, ${(this.oy.x * 0.12 + fy * 0.4).toFixed(1)}px) rotate(${(RZ * 0.25).toFixed(4)}rad)`;
     }
 
     this.stepParticles(dt);
@@ -841,8 +865,9 @@ export class Stage {
 
   /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
   private demoAt(kind: TouchKind, time: number) {
-    let demo = this.demos.get(kind);
-    if (!demo) this.demos.set(kind, (demo = new AutoTouch(kind)));
+    const shape = this.o.store.get().shape;
+    let demo = this.demos.get(`${kind}|${shape}`);
+    if (!demo) this.demos.set(`${kind}|${shape}`, (demo = new AutoTouch(kind, SWIPES[0], kOf(shape))));
     demo.at(2 + AUTO_STILL[kind] + time / AUTO_LOOP);
     return demo;
   }

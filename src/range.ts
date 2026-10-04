@@ -1,9 +1,10 @@
 // The Foil range: which pixels of the card face take the finish.
 // Region presets come from the face mask (and a re-render without text), the brush paints on top,
 // and the brightness key is applied live in the shader so it follows animated sources.
-import { drawFace, type FaceSpec } from './card/face';
+import { artOf, drawFace, type FaceSpec } from './card/face';
 import { RANGE_H, RANGE_W, type RangeSnapshot } from './gl/range';
-import type { BrushMode, RangeColorState, RangeRegion } from './featureState';
+import type { BrushMode, RangeRegion } from './featureState';
+import type { Area } from './editions';
 
 const N = RANGE_W * RANGE_H;
 const UNDO_DEPTH = 24;
@@ -34,10 +35,8 @@ const smooth = (a: number, b: number, v: number) => {
   return t * t * (3 - 2 * t);
 };
 
+/** The card's regions and tones, read from the face; shared by both layers' areas. */
 export class RangeModel {
-  private layers: Layers = { add: new Uint8Array(N), erase: new Uint8Array(N) };
-  private undoStack: Layers[] = [];
-  private redoStack: Layers[] = [];
   private regions: Partial<Record<RangeRegion, Uint8Array>> = { all: new Uint8Array(N).fill(255), none: new Uint8Array(N) };
   /** Inside the card silhouette, outline excluded: what coverage is measured against. */
   private body = new Uint8Array(N).fill(1);
@@ -49,12 +48,17 @@ export class RangeModel {
   private scratch = canvas2d(RANGE_W, RANGE_H);
   private blank = { face: document.createElement('canvas'), mask: document.createElement('canvas') };
 
+  /** Range-texture rows per column over the same distance on the card: 1 on the trading card. */
+  cellAspect = 1;
+
   /** Called after the live face is redrawn. Region masks are refreshed from it. */
   onFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): void {
     this.face = face;
     this.spec = spec;
-    // The mask is pure geometry; only look at it again when the frame could have changed.
-    const key = `${spec.frame}|${spec.frameColor ?? ''}`;
+    this.cellAspect = (RANGE_H / RANGE_W) * (face.width / face.height);
+    // The mask is pure geometry; only look at it again when the frame or the art window (shape, layout) changed.
+    const a = artOf(face);
+    const key = `${spec.frame}|${spec.frameColor ?? ''}|${face.width}x${face.height}|${a.x},${a.y},${a.w},${a.h}`;
     if (key === this.maskKey) return;
     this.maskKey = key;
     const m = sample(mask, this.scratch);
@@ -83,9 +87,7 @@ export class RangeModel {
     void image;
     const key = JSON.stringify(rest);
     if (this.regions.text && key === this.textKey) return this.regions.text;
-    const blankSpec = { ...spec, name: ' ' } as FaceSpec & { desc?: string };
-    if ('desc' in blankSpec) blankSpec.desc = '';
-    drawFace(this.blank.face, this.blank.mask, blankSpec);
+    drawFace(this.blank.face, this.blank.mask, { ...spec, name: ' ', message: { ...spec.message, text: '' }, cardType: '' });
     const a = sample(face, this.scratch).slice();
     const b = sample(this.blank.face, this.scratch);
     const out = new Uint8Array(N);
@@ -120,9 +122,9 @@ export class RangeModel {
     return this.regions[r] ?? this.regions.all!;
   }
 
-  snapshot(s: RangeColorState): RangeSnapshot {
-    const reg = this.region(s.rangeRegion);
-    const { add, erase } = this.layers;
+  snapshot(a: Area, paint: Paint): RangeSnapshot {
+    const reg = this.region(a.region);
+    const { add, erase } = paint.layers;
     const data = new Uint8Array(N * 4);
     for (let i = 0; i < N; i++) {
       const o = i * 4;
@@ -131,33 +133,71 @@ export class RangeModel {
       data[o + 2] = erase[i];
       data[o + 3] = 255;
     }
-    return { data, lo: s.rangeLo, hi: s.rangeHi, invert: s.rangeInvert };
+    return { data, lo: a.lo, hi: a.hi, invert: a.invert };
   }
 
-  /** Share of the card (outline excluded) that takes the finish, 0..1. Mirrors the shader. */
-  coverage(s: RangeColorState): number {
-    if (this.face) {
-      const px = sample(this.face, this.scratch);
-      for (let i = 0; i < N; i++) this.luma[i] = Math.round(px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114);
-    }
-    const reg = this.region(s.rangeRegion);
-    const { add, erase } = this.layers;
-    const lo = s.rangeLo;
-    const hi = s.rangeHi;
+  /** Reads the face's tones again (it may have changed since). */
+  private readLuma() {
+    if (!this.face) return;
+    const px = sample(this.face, this.scratch);
+    for (let i = 0; i < N; i++) this.luma[i] = Math.round(px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114);
+  }
+
+  /** How much of pixel i the area takes, 0..1. Mirrors the shader. */
+  private at(i: number, a: Area, reg: Uint8Array, paint: Paint): number {
+    const L = this.luma[i] / 255;
+    const k = (a.lo <= 0.001 ? 1 : smooth(a.lo - SOFTNESS, a.lo + SOFTNESS, L)) * (a.hi >= 0.999 ? 1 : 1 - smooth(a.hi - SOFTNESS, a.hi + SOFTNESS, L));
+    let v = (reg[i] / 255) * k;
+    if (a.invert) v = 1 - v;
+    v = Math.max(v, paint.layers.add[i] / 255);
+    return Math.min(v, 1 - paint.layers.erase[i] / 255);
+  }
+
+  /** Share of the card (outline excluded) that takes the finish, 0..1. */
+  coverage(a: Area, paint: Paint): number {
+    this.readLuma();
+    const reg = this.region(a.region);
     let sum = 0;
     let n = 0;
     for (let i = 0; i < N; i++) {
       if (!this.body[i]) continue;
-      const L = this.luma[i] / 255;
-      const k = (lo <= 0.001 ? 1 : smooth(lo - SOFTNESS, lo + SOFTNESS, L)) * (hi >= 0.999 ? 1 : 1 - smooth(hi - SOFTNESS, hi + SOFTNESS, L));
-      let v = (reg[i] / 255) * k;
-      if (s.rangeInvert) v = 1 - v;
-      v = Math.max(v, add[i] / 255);
-      v = Math.min(v, 1 - erase[i] / 255);
-      sum += v;
+      sum += this.at(i, a, reg, paint);
       n++;
     }
     return n ? sum / n : 0;
+  }
+
+  /**
+   * The area as a small picture, `w` × `h` (one value per cell, 0..255; -1 outside the card), for
+   * the layer list's card diagrams.
+   */
+  map(a: Area, paint: Paint, w: number, h: number): Int16Array {
+    this.readLuma();
+    const reg = this.region(a.region);
+    const out = new Int16Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let sum = 0;
+        let peak = 0;
+        let inCard = 0;
+        // A few samples per cell, so thin parts (the name, a stroke) still show.
+        for (let sy = 0; sy < 3; sy++) {
+          for (let sx = 0; sx < 3; sx++) {
+            const px = Math.min(RANGE_W - 1, Math.floor(((x + (sx + 0.5) / 3) / w) * RANGE_W));
+            const py = Math.min(RANGE_H - 1, Math.floor(((y + (sy + 0.5) / 3) / h) * RANGE_H));
+            const i = py * RANGE_W + px;
+            if (!this.body[i]) continue;
+            inCard++;
+            const v = this.at(i, a, reg, paint);
+            sum += v;
+            peak = Math.max(peak, v);
+          }
+        }
+        // A cell the area only grazes (a thin frame) still shows, a little dimmer.
+        out[y * w + x] = inCard < 3 ? -1 : Math.round(Math.max(sum / inCard, peak * 0.75) * 255);
+      }
+    }
+    return out;
   }
 
   /** Brightness distribution of the card body, normalised to its tallest bin. Valid after coverage(). */
@@ -169,6 +209,18 @@ export class RangeModel {
     const max = Math.max(1, ...soft);
     return soft.map((v) => v / max);
   }
+
+}
+
+/** One layer's brush strokes (painted in and out), with undo; kept in IndexedDB under `key`. */
+export class Paint {
+  layers: Layers = { add: new Uint8Array(N), erase: new Uint8Array(N) };
+  private undoStack: Layers[] = [];
+  private redoStack: Layers[] = [];
+  /** Range-texture rows per column over the same distance on the card (RangeModel.cellAspect): 1 on the trading card. */
+  cellAspect = 1;
+
+  constructor(private key: string) {}
 
   get painted(): boolean {
     return this.layers.add.some((v) => v) || this.layers.erase.some((v) => v);
@@ -214,18 +266,30 @@ export class RangeModel {
     this.layers.erase.fill(0);
   }
 
-  /** One round dab at (x, y) in range-texture pixels. */
+  /** Clears the strokes and their undo history: for a layer that is removed, not a Clear that can be undone. */
+  reset(): void {
+    this.clear();
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
+  /**
+   * One dab at (x, y) in range-texture pixels, `radius` of them across. The texture spans the face
+   * whatever its shape, so its cells are square only on the trading card; the dab is stretched by
+   * `cellAspect` to stay round on the card.
+   */
   dab(x: number, y: number, radius: number, soft: number, mode: BrushMode): void {
     const into = mode === 'add' ? this.layers.add : this.layers.erase;
     const other = mode === 'add' ? this.layers.erase : this.layers.add;
     const inner = radius * (1 - soft);
+    const sy = this.cellAspect;
     const x0 = Math.max(0, Math.floor(x - radius));
     const x1 = Math.min(RANGE_W - 1, Math.ceil(x + radius));
-    const y0 = Math.max(0, Math.floor(y - radius));
-    const y1 = Math.min(RANGE_H - 1, Math.ceil(y + radius));
+    const y0 = Math.max(0, Math.floor(y - radius * sy));
+    const y1 = Math.min(RANGE_H - 1, Math.ceil(y + radius * sy));
     for (let py = y0; py <= y1; py++) {
       for (let px = x0; px <= x1; px++) {
-        const d = Math.hypot(px + 0.5 - x, py + 0.5 - y);
+        const d = Math.hypot(px + 0.5 - x, (py + 0.5 - y) / sy);
         if (d > radius) continue;
         const f = d <= inner ? 1 : 1 - smooth(inner, radius, d);
         const i = py * RANGE_W + px;
@@ -251,7 +315,7 @@ export class RangeModel {
       const db = await openDb();
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).put(this.painted ? { w: RANGE_W, h: RANGE_H, ...this.copy() } : null, KEY);
+        tx.objectStore(STORE).put(this.painted ? { w: RANGE_W, h: RANGE_H, ...this.copy() } : null, this.key);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
@@ -265,7 +329,7 @@ export class RangeModel {
     try {
       const db = await openDb();
       const v = await new Promise<unknown>((resolve, reject) => {
-        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(this.key);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
@@ -286,7 +350,6 @@ export class RangeModel {
 
 const DB = 'foil';
 const STORE = 'images';
-const KEY = 'rangeBrush';
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

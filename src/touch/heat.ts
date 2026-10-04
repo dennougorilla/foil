@@ -5,9 +5,8 @@
 //
 // No imports: the tests load this file directly with Node.
 
-/** Grid size. Cells are square on the 5:7 card, so one cell is 1/60 of the card's width. */
-export const HEAT_W = 60;
-export const HEAT_H = 84;
+/** Grid cells across the card's short side; cells are square on every shape. */
+const HEAT_CELLS = 60;
 
 /** Most heat one spot holds: a finger left still for a while. */
 const MAX = 1.5;
@@ -56,11 +55,16 @@ export interface HeatSource {
   readonly prints: readonly Print[];
   /** Where the touch is right now (card uv) and how strongly: Glow draws its lamp there. */
   readonly lamp: readonly [number, number, number];
+  /** Grid size, columns × rows. */
+  readonly w: number;
+  readonly h: number;
 }
 
 export class HeatField implements HeatSource {
-  readonly data = new Float32Array(HEAT_W * HEAT_H);
-  private next = new Float32Array(HEAT_W * HEAT_H);
+  readonly w: number;
+  readonly h: number;
+  readonly data: Float32Array;
+  private next: Float32Array;
   prints: Print[] = [];
   version = 0;
   private warm = false;
@@ -70,8 +74,13 @@ export class HeatField implements HeatSource {
   private lit = false;
   private fade: Fade;
 
-  constructor(kind: TouchKind = 'warmth') {
+  /** `k`: the card in units of its short side (shape.ts cardK); the trading card unless given. */
+  constructor(kind: TouchKind = 'warmth', k: readonly [number, number] = [1, 1.4]) {
     this.fade = FADES[kind];
+    this.w = Math.round(HEAT_CELLS * k[0]);
+    this.h = Math.round(HEAT_CELLS * k[1]);
+    this.data = new Float32Array(this.w * this.h);
+    this.next = new Float32Array(this.w * this.h);
   }
 
   get cold() {
@@ -84,20 +93,21 @@ export class HeatField implements HeatSource {
    * about the same warmth however fast the stroke goes; lingering adds more, up to MAX.
    */
   touch(u0: number, v0: number, u1: number, v1: number, dt: number, firm: boolean) {
-    const r = (firm ? 0.07 : 0.042) * HEAT_W;
-    const ax = u0 * HEAT_W - 0.5;
-    const ay = v0 * HEAT_H - 0.5;
-    const bx = u1 * HEAT_W - 0.5;
-    const by = v1 * HEAT_H - 0.5;
+    const { w, h } = this;
+    const r = (firm ? 0.07 : 0.042) * HEAT_CELLS;
+    const ax = u0 * w - 0.5;
+    const ay = v0 * h - 0.5;
+    const bx = u1 * w - 0.5;
+    const by = v1 * h - 0.5;
     const dx = bx - ax;
     const dy = by - ay;
     const len2 = dx * dx + dy * dy;
     const gain = (firm ? 2.4 : 1.1) * dt + (firm ? 0.55 : 0.34) * Math.min(Math.sqrt(len2) / r, 1);
     const reach = r * 2.6;
     const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach));
-    const x1 = Math.min(HEAT_W - 1, Math.ceil(Math.max(ax, bx) + reach));
+    const x1 = Math.min(w - 1, Math.ceil(Math.max(ax, bx) + reach));
     const y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach));
-    const y1 = Math.min(HEAT_H - 1, Math.ceil(Math.max(ay, by) + reach));
+    const y1 = Math.min(h - 1, Math.ceil(Math.max(ay, by) + reach));
     if (x0 > x1 || y0 > y1) return;
     const inv = 1 / (r * r);
     for (let y = y0; y <= y1; y++) {
@@ -107,7 +117,7 @@ export class HeatField implements HeatSource {
         const ey = y - ay - dy * t;
         const g = Math.exp(-(ex * ex + ey * ey) * inv);
         if (g < 1e-3) continue;
-        const i = y * HEAT_W + x;
+        const i = y * w + x;
         this.data[i] = Math.min(MAX, this.data[i] + gain * g * (1 - this.data[i] / MAX));
       }
     }
@@ -170,13 +180,14 @@ export class HeatField implements HeatSource {
   private spread(k: number) {
     const a = this.data;
     const b = this.next;
-    for (let y = 0; y < HEAT_H; y++) {
-      const up = (y > 0 ? y - 1 : y) * HEAT_W;
-      const row = y * HEAT_W;
-      const down = (y < HEAT_H - 1 ? y + 1 : y) * HEAT_W;
-      for (let x = 0; x < HEAT_W; x++) {
+    const { w, h } = this;
+    for (let y = 0; y < h; y++) {
+      const up = (y > 0 ? y - 1 : y) * w;
+      const row = y * w;
+      const down = (y < h - 1 ? y + 1 : y) * w;
+      for (let x = 0; x < w; x++) {
         const l = x > 0 ? x - 1 : x;
-        const r = x < HEAT_W - 1 ? x + 1 : x;
+        const r = x < w - 1 ? x + 1 : x;
         const c = a[row + x];
         b[row + x] = c + k * (a[row + l] + a[row + r] + a[up + x] + a[down + x] - 4 * c);
       }
@@ -316,11 +327,20 @@ export class AutoTouch implements HeatSource {
   private swipe: Swipe | null = null;
   private kind: TouchKind;
   private shape: SwipeShape;
+  readonly k: readonly [number, number];
 
-  constructor(kind: TouchKind = 'warmth', shape: SwipeShape = SWIPES[0]) {
+  constructor(kind: TouchKind = 'warmth', shape: SwipeShape = SWIPES[0], k: readonly [number, number] = [1, 1.4]) {
     this.kind = kind;
     this.shape = shape;
-    this.f = new HeatField(kind);
+    this.k = k;
+    this.f = new HeatField(kind, k);
+  }
+
+  get w() {
+    return this.f.w;
+  }
+  get h() {
+    return this.f.h;
   }
 
   get data() {
@@ -341,7 +361,7 @@ export class AutoTouch implements HeatSource {
     // Going back starts over; going far ahead (a preview first drawn late in a session) starts
     // three loops short, since the heat has repeated exactly long before then.
     if (target < this.tick || target - this.tick > RUN_UP * TICKS) {
-      this.f = new HeatField(this.kind);
+      this.f = new HeatField(this.kind, this.k);
       this.swipe = null;
       this.tick = Math.max(0, target - RUN_UP * TICKS);
     }
@@ -379,7 +399,7 @@ function rotate(p: CardPose, x: number, y: number): [number, number, number] {
   return [Math.cos(p.ry) * x1 + Math.sin(p.ry) * z2, y2, -Math.sin(p.ry) * x1 + Math.cos(p.ry) * z2];
 }
 
-const depth = (p: CardPose) => Math.max(p.h, 120) * 3.2;
+const depth = (p: CardPose) => Math.max(p.w, p.h, 120) * 3.2;
 
 /** Screen position of card uv (u, v), y down. */
 export function cardPoint(u: number, v: number, p: CardPose): [number, number] {

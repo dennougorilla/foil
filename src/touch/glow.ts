@@ -17,7 +17,7 @@ vec3 glow(vec3 c, vec2 uv, float L, float art) {
   float halo = 0.0;
   for (int i = 0; i < 6; i++) {
     float a = float(i) * 1.0472 + 0.4;
-    halo += heatAt(cuv + vec2(cos(a), sin(a) * 0.714) * 0.032);
+    halo += heatAt(cuv + vec2(cos(a), sin(a)) / uCardK * 0.032);
   }
   halo /= 6.0;
 
@@ -28,8 +28,8 @@ vec3 glow(vec3 c, vec2 uv, float L, float art) {
   float room = 1.0 - 0.35 * smoothstep(0.25, 0.75, length((uv - vec2(0.5, 0.45)) * vec2(1.0, 0.75)));
 
   // The pigment is a layer of fine crystals, each glowing a little brighter or dimmer.
-  float grain = hash12(floor(uv * vec2(180.0, 252.0)));
-  float clump = vnoise(uv * vec2(24.0, 33.6));
+  float grain = hash12(floor(uv * uCardK * 180.0));
+  float clump = vnoise(uv * uCardK * 24.0);
   // The ink took the print where the picture is light, so the glow draws the picture itself.
   float pigment = mix(0.12, 1.0, smoothstep(0.04, 0.8, L));
   // Freshly charged ink glows evenly up to a fairly clear edge where the light stopped. As it dies
@@ -43,7 +43,7 @@ vec3 glow(vec3 c, vec2 uv, float L, float art) {
 
   // The lamp: a small violet-white pool that shows the art as it is and charges the ink under it.
   // Once it moves on, only the green it left behind remains.
-  vec2 ld = (cuv - uLamp.xy) * vec2(1.0, 1.4);
+  vec2 ld = (cuv - uLamp.xy) * uCardK;
   float r2 = dot(ld, ld);
   float beam = uLamp.z * exp(-r2 / 0.012);
   vec3 lit = c * vec3(0.92, 0.9, 1.05) + vec3(0.12, 0.08, 0.26);

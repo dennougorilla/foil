@@ -21,6 +21,7 @@ import {
 import { motion } from './motion';
 import { mountPeek } from './peek';
 import { mountSunHandle } from './handle';
+import { svg } from './icons';
 
 type Group = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
@@ -28,37 +29,20 @@ type Key = NumKey | ChoiceKey;
 const GROUPS: { id: Group; keys: Key[] }[] = [
   { id: 'pattern', keys: ['scale', 'angle', 'hue', 'sat', 'metal'] },
   { id: 'light', keys: ['glare', 'sharp', 'temp', 'sparkle', 'sparkleSize'] },
-  { id: 'motion', keys: ['light', 'lightAngle', 'speed', 'tiltMax', 'idle'] },
+  { id: 'motion', keys: ['light', 'lightAngle', 'speed', 'tiltMax', 'idle', 'idleAmp'] },
 ];
 
-const ICONS: Record<string, string> = {
-  pattern: '<path d="M2 2h4v4H2zm8 0h4v4h-4zM6 6h4v4H6zm-4 4h4v4H2zm8 0h4v4h-4z"/>',
-  light: '<path d="M7 1h2v3H7zm0 11h2v3H7zM1 7h3v2H1zm11 0h3v2h-3zM5 5h6v6H5zM3 2h1v1h1v1H3zm9 0h1v2h-2V3h1zM3 12h2v1H4v1H3zm8 0h2v2h-1v-1h-1z"/>',
-  motion: '<path d="M2 9h2V7h2V5h2v2h2v2h2V7h2v2h-2v2h-2V9H8V7H6v2H4v2H2z"/>',
-  pointer: '<path d="M4 1h2v1h1v1h1v1h1v1h1v1h1v1h1v2H9v1h1v2H8v-2H7v1H6v1H4z"/>',
-  orbit: '<path d="M6 2h4v1h2v1h1v2h1v4h-1v2h-1v1h-2v1H6v-1H4v-1H3v-2H2V6h1V4h1V3h2zm0 2v1H5v1H4v4h1v1h1v1h4v-1h1v-1h1V6h-1V5h-1V4zm1 3h2v2H7zm4-6h3v3h-3z"/>',
-  fixed: '<path d="M3 2h10v12H3zm2 2v8h6V4zm4 1h2v2H9z"/>',
-  none: '<path d="M3 7h10v2H3z"/>',
-  sway: '<path d="M1 8h2V6h2v2h2v2h2V8h2V6h2v2h2v2h-2v2h-2v-2H9v-2H7v2H5v2H3v-2H1z"/>',
-  spin: '<path d="M6 2h5v1h1v1h1v3h-2V5h-1V4H6v1H5v2H3V4h1V3h2zm-3 7h2v2h1v1h4v-1h1V9h2v3h-1v1h-1v1H5v-1H4v-1H3z"/>',
-  breathe: '<path d="M7 7h2v2H7zM5 4h6v1h1v1h1v4h-1v1h-1v1H5v-1H4v-1H3V6h1V5h1zm1 2v1H5v2h1v1h4V9h1V7h-1V6z"/>',
-  gold: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm1 3v1H5v4h1v1h4v-1h1V6h-1V5z"/>',
-  silver: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm0 3v6h6V5zm2 2h2v2H7z"/>',
-  eye: '<path d="M5 4h6v1h2v1h1v1h1v2h-1v1h-1v1h-2v1H5v-1H3v-1H2V9H1V7h1V6h1V5h2zm1 2v1H5v2h1v1h4V9h1V7h-1V6zm1 1h2v2H7z"/>',
-  reset: '<path d="M7 2h4v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H6v-2h4v-1h1V6h-1V5H7v1H6v1h2v2H2V3h2v2h1V4h1V3h1z"/>',
-};
 
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
 const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'blacklight', 'stardust', 'snowglobe', 'kintsugi', 'opal', 'confetti', 'fireworks']);
 
-const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 
 const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 
 /** Amounts read as a multiple of the finish's own look (×1.0); the notch under the track marks it. */
 const RELATIVE = new Set<NumKey>(['scale', 'sharp', 'sparkleSize', 'sat', 'glare']);
 
-function format(k: NumKey, v: number, t: Dict['tune']): string {
+export function format(k: NumKey, v: number, t: Dict['tune']): string {
   if (RELATIVE.has(k)) return `×${(v / (TUNE_DEFAULTS[k] || 1)).toFixed(1)}`;
   switch (k) {
     case 'scale':
@@ -79,7 +63,9 @@ function format(k: NumKey, v: number, t: Dict['tune']): string {
     case 'temp':
       return `${Math.round(v)}K`;
     case 'speed':
-      return v <= 0 ? t.stopped : `${Math.round(v * 100)}%`;
+      return v <= 0 ? t.stopped : `×${+v.toFixed(2)}`;
+    case 'idleAmp':
+      return `×${+v.toFixed(2)}`;
   }
 }
 
@@ -373,7 +359,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', `tuneLabel-${k}`);
     const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? IDLE_MODES : METALS;
-    group.style.gridTemplateColumns = `repeat(${options.length}, 1fr)`;
+    // The idle motions take two rows of five, so the row stays as wide as the others.
+    group.style.gridTemplateColumns = `repeat(${Math.min(options.length, 5)}, 1fr)`;
     for (const v of options) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -383,6 +370,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
       b.setAttribute('role', 'radio');
       b.innerHTML = `${svg(v)}<span></span>`;
       b.querySelector('span')!.textContent = formatChoice(k, v, t);
+      // What each motion does, before it is picked.
+      if (k === 'idle') b.title = t.idleHelp[v as Tune['idle']];
       b.addEventListener('click', () => choose(k, v));
       group.appendChild(b);
     }
@@ -544,7 +533,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
     if (k === 'sparkleSize' && tune.sparkle <= 0) return t.why.sparkle;
     if (k === 'sharp' && tune.glare <= 0) return t.why.glare;
     if (k === 'temp' && tune.glare <= 0 && (tune.sparkle <= 0 || s.edition === 'base')) return t.why.temp;
-    if (reduced.matches && (k === 'speed' || k === 'idle' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
+    if (reduced.matches && (k === 'speed' || k === 'idle' || k === 'idleAmp' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
+    if (k === 'idleAmp' && tune.idle === 'none') return t.why.noIdle;
     // Glitter twinkles on its own clock, so Speed matters whenever it shows.
     const glitter = tune.sparkle > 0 && s.edition !== 'base' && s.intensity > 0;
     if (k === 'speed' && tune.light !== 'orbit' && tune.idle === 'none' && !ANIMATED.has(s.edition) && !glitter) return t.why.still;

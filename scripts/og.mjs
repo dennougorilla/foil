@@ -4,20 +4,29 @@
 import { chromium } from 'playwright';
 
 const URL = process.env.URL ?? 'http://localhost:5173/';
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// The real GPU when there is one (sharper, and the stage runs at full speed); SwiftShader otherwise.
+const browser = await chromium.launch({ args: process.env.SWIFTSHADER ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 
 // ---------- og.png ----------
 
 {
-  const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
-  await page.addInitScript(() => localStorage.clear());
+  const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1, ignoreHTTPSErrors: true });
+  // Every pack opened, a hand of the showiest finishes, and a message on the card.
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['metal', 'light', 'nature', 'studio', 'supporter'], supporter: true }));
+    localStorage.setItem(
+      'foil:v1',
+      JSON.stringify({ lang: 'en', edition: 'cosmoholo', hand: ['gold', 'holo', 'cosmoholo', 'negative', 'raden'], rarity: 'legendary', name: 'Meadow', message: { text: 'Happy day!', place: 'top', font: 'pop' } }),
+    );
+  });
   await page.goto(`${URL}?lang=en`);
   // Recompose the live app as a poster: logo and pitch on the left over the fanned hand,
   // the card large on the right. The WebGL stage follows the DOM boxes, so CSS is enough.
   await page.addStyleTag({
     content: `
       .app { display: block; height: 100vh; }
-      .panel, .toggles, .info, .hand-hint, .hand-caption, .stage-pick, .toasts { display: none !important; }
+      .panel, .toggles, .info, .hand-hint, .hand-caption, .stage-pick, .toasts, .qm, .deck-dock, #flickHint { display: none !important; }
       .stage { position: fixed; inset: 0; padding: 0; display: block; }
       .showcase { position: absolute; inset: 0; display: block; }
       .card-slot { position: absolute; right: 118px; top: 46px; height: 538px; max-height: none; }
@@ -26,18 +35,26 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
       .logo-word .tile { animation: none; }
       .logo-word .spark { animation: none; opacity: 1; transform: scale(1); }
       .logo-word .spark:nth-of-type(4) { display: none; }
-      .hand-wrap { position: absolute; left: 22px; bottom: 6px; width: 660px; }
+      .hand-wrap { position: absolute; left: 34px; bottom: 34px; width: 560px; z-index: 4; }
+      .hand-slot[aria-checked='true']::after { display: none; }
+      /* A calm field behind the words: the swirl falls away into shade on the left. */
+      .stage::before { content: ''; position: absolute; inset: 0 0 220px 0; z-index: 3; pointer-events: none; -webkit-mask: linear-gradient(180deg, #000 80%, transparent); mask: linear-gradient(180deg, #000 80%, transparent);
+        background: linear-gradient(90deg, rgba(8, 11, 14, .78) 0%, rgba(8, 11, 14, .55) 42%, rgba(8, 11, 14, 0) 62%); }
       .hand { width: 100%; }
-      .og-pitch { position: absolute; left: 66px; top: 190px; z-index: 4; width: 560px; margin: 0; }
-      .og-pitch h2 { margin: 0; font-weight: 400; font-size: 46px; line-height: 1.12; letter-spacing: -0.01em; text-shadow: 0 4px 0 var(--edge), 0 0 24px rgba(0,0,0,.45); }
-      .og-pitch h2 em { font-style: normal; color: var(--gold); }
+      .og-pitch { position: absolute; left: 66px; top: 182px; z-index: 4; width: 600px; margin: 0; }
+      .og-pitch h2 { margin: 0; font-weight: 400; font-size: 50px; letter-spacing: -0.03em; line-height: 1.12; letter-spacing: -0.01em; text-shadow: 0 4px 0 var(--edge), 0 0 24px rgba(0,0,0,.45); }
+      .og-pitch h2 em { font-style: normal; color: transparent; background: linear-gradient(100deg, #ffd23f 0%, #ff6fb5 30%, #45cfff 58%, #7dff5c 80%, #ffd23f 100%); -webkit-background-clip: text; background-clip: text; text-shadow: none; filter: drop-shadow(0 4px 0 var(--edge)); }
       .og-pitch p { margin: 16px 0 0; font-size: 21px; line-height: 1.45; color: #d6dfe0; text-shadow: 0 2px 0 var(--edge); }
+      .og-chips { display: flex; flex-wrap: nowrap; gap: 7px; margin-top: 16px; white-space: nowrap; }
+      .og-chips span { padding: 4px 12px 6px; border-radius: 8px; background: #3a4a52; box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge); font-size: 21px; color: #fff; }
     `,
   });
   await page.evaluate(() => {
     const pitch = document.createElement('div');
     pitch.className = 'og-pitch';
-    pitch.innerHTML = '<h2>Turn any picture into a <em>rare foil</em> card.</h2><p>Holo, polychrome, gold, prism and more.<br>Free, right in your browser.</p>';
+    pitch.innerHTML =
+      '<h2>Turn any picture into a <em>rare foil</em> card.</h2><p>Free, in your browser. Your picture never leaves it.</p>' +
+      '<div class="og-chips"><span>33 finishes</span><span>Card shapes</span><span>GIF · APNG</span></div>';
     document.querySelector('.stage').appendChild(pitch);
     window.dispatchEvent(new Event('resize'));
   });
