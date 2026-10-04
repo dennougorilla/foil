@@ -108,10 +108,11 @@ function wakeDepth() {
     .finally(() => (depthLoading = false));
 }
 
-/** Fetches the packs of the finish on the card and of the hand's cards; they deal in once ready. */
+/** Fetches the packs of the finishes on the card (its own and the outside one) and of the hand's cards; they deal in once ready. */
 function wakePacks() {
   const s = store.get();
-  for (const id of new Set([s.edition, ...s.hand].map((e) => packOf(e)?.id))) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
+  const ids = [s.edition, ...s.hand, ...(s.outside ? [s.outside] : [])];
+  for (const id of new Set(ids.map((e) => packOf(e)?.id))) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
   wakeDepth();
 }
 const artIds = new WeakMap<object, number>();
@@ -925,6 +926,7 @@ function exportInput() {
     mask,
     back,
     edition: editionById(s.edition),
+    outside: s.outside ? editionById(s.outside) : undefined,
     intensity: s.intensity,
     pixel: s.pixel,
     tune: s.tune,
@@ -1483,6 +1485,7 @@ store.on((s, changed) => {
     wakePacks();
     depth?.update(face, artKey());
   }
+  if (changed.has('outside')) wakePacks();
   if (changed.has('hand')) {
     wakePacks();
     stage.syncHand();

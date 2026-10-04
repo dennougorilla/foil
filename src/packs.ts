@@ -166,6 +166,9 @@ export function placeAt(hand: readonly EditionId[], id: EditionId, at: number): 
 /** Sends a card back to the deck; Base stays. */
 export const removeFromHand = (hand: readonly EditionId[], id: EditionId): EditionId[] => (id === 'base' ? [...hand] : hand.filter((x) => x !== id));
 
+/** Every owned finish, starters first, then each opened pack in pack order. */
+export const owned = (o: Opened): EditionId[] => ownedGroups(o).flatMap((g) => g.finishes);
+
 /** The first pack on the shelf that is still sealed: the one the shop offers first. */
 export const firstSealed = (o: Opened): Pack | undefined => shelf(o).find((p) => !o.opened.includes(p.id));
 

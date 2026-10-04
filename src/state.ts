@@ -1,4 +1,4 @@
-import { EDITIONS, type EditionId, type FrameId, type RarityId } from './editions';
+import { EDITIONS, sanitizeOutside, type EditionId, type FrameId, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
@@ -16,6 +16,8 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
+  /** A second finish where the Finish area leaves `edition` out, or null (docs/layering.md). */
+  outside: EditionId | null;
   /** The seven finishes in the hand, in order (made valid against the opened packs in main.ts). */
   hand: EditionId[];
   rarity: RarityId;
@@ -55,6 +57,7 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
+  'outside',
   'hand',
   'rarity',
   'frame',
@@ -84,6 +87,7 @@ export function createStore() {
     sound: true,
     crt: true,
     edition: 'holo',
+    outside: null,
     hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
     rarity: 'rare',
     frame: 'paper',
@@ -113,6 +117,7 @@ export function createStore() {
     state.adjustOpen = state.adjustOpen === true;
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
+    state.outside = sanitizeOutside(state.outside);
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;

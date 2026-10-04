@@ -649,6 +649,7 @@ export class Stage {
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
           lamp: this.lampPower,
+          outside: state.outside ? editionById(state.outside).shader : undefined,
         },
         motion.fx,
       );

@@ -99,6 +99,8 @@ export interface CardDraw {
   uv?: [number, number, number, number];
   /** Blacklight's lamp power, 0..1; full when absent. */
   lamp?: number;
+  /** A second finish (shader index) where the Finish area leaves `edition` out (docs/layering.md); none when absent. */
+  outside?: number;
 }
 
 export interface Particle {
@@ -273,10 +275,21 @@ export class CardRenderer {
     gl.frontFace(gl.CW);
   }
 
-  /** Draws one card; returns false, drawing nothing, while its program is not ready (see ready). */
+  /**
+   * Draws one card; returns false, drawing nothing, while its program is not ready (see ready).
+   * An outside finish is drawn over it in a second pass, once its own program is ready too.
+   */
   drawCard(d: CardDraw, time: number): boolean {
-    const { gl } = this;
     if (!this.ready(d.edition)) return false;
+    this.pass(d, time, 0);
+    const o = d.outside;
+    if (o !== undefined && o !== d.edition && this.ready(o)) this.pass({ ...d, edition: o, shadow: null }, time, 1);
+    return true;
+  }
+
+  /** `outer`: 1 draws only where the Finish area leaves the card's own finish out. */
+  private pass(d: CardDraw, time: number, outer: number): void {
+    const { gl } = this;
     const cp = this.program(packOfShader(d.edition) ?? 'open')!;
     const p = cp.pending.get();
     const f = this.faces.get(d.face ?? 'card');
@@ -311,6 +324,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     gl.uniform1f(p.u.uUvLamp, d.lamp ?? 1);
+    gl.uniform1f(p.u.uOuter, outer);
     applyTune(gl, p.u, this.tune);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
     for (const l of cp.layers) l.bind?.(p, d);
@@ -338,7 +352,6 @@ export class CardRenderer {
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     for (const l of cp.layers) l.after?.(this, d, time);
-    return true;
   }
 
   drawParticles(list: Particle[]): void {

@@ -30,7 +30,8 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   vec3 stock = vec3(0.93, 0.9, 0.82) * (0.96 + (grain - 0.5) * 0.1 - checker * 0.035);
   // Light ink, so anything left out (by area, brightness or the eraser) reads as the same cream stock.
   vec3 paper = mix(stock, stock * vec3(0.42, 0.44, 0.48), (1.0 - luma(col)) * 0.6);
-  vec3 o = mix(col, paper, (1.0 - sel) * 0.92);
+  // A finish layered outside the area (uOuter, see docs/layering.md) shows as itself, inside the die line.
+  vec3 o = mix(col, paper, (1.0 - sel) * 0.92 * (1.0 - uOuter));
   float diag = uv.x * 0.714 + uv.y;
   float sweep = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(diag * 7.0 - uRangeAnts * 1.3));
   o += hsv2rgb(vec3(fract(diag * 0.8 + uRangeAnts * 0.05), 0.55, 1.0)) * sweep * 0.22 * sel;

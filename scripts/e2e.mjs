@@ -213,6 +213,53 @@ await step('finish area tab and brush', async () => {
   expect(!(await page.isVisible('.brush')), 'brush bar did not close');
 });
 
+/** Pixels of a saved PNG at the given points, read back through the page. */
+const pngAt = (path, points) =>
+  page.evaluate(
+    async ({ b64, points }) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height);
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      return points.map(([px, py]) => [...x.getImageData(Math.round(px * img.width), Math.round(py * img.height), 1, 1).data]);
+    },
+    { b64: readFileSync(path).toString('base64'), points },
+  );
+const savePng = async () => {
+  await page.click('#formatSeg [role=radio][data-format=png]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return dl.path();
+};
+
+await step('a second finish outside the area: owned finishes only, an all-card area moves to the art, and the PNG shows it', async () => {
+  await tab('range');
+  if (await page.isVisible('#pane-range .range-reset')) await page.click('#pane-range .range-reset');
+  expect((await state()).rangeRegion === 'all' && !(await state()).outside, 'reset area did not clear the region and the outside finish');
+  await page.click('#pane-range .outside-pick');
+  const chips = await page.locator('#pane-range .outside-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
+  const edition = (await state()).edition;
+  expect(chips[0] === '' && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
+  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  const pick = chips.includes('negative') ? 'negative' : 'poly';
+  await page.click(`#pane-range .outside-chip[data-v=${pick}]`);
+  const s = await state();
+  expect(s.outside === pick && s.rangeRegion === 'art', `outside ${s.outside}, region ${s.rangeRegion}`);
+  expect(await page.isVisible('#tab-range .tab-dot'), 'the tab does not show it was changed');
+  // The PNG (948 × 1308, 24 px of padding): a point in the art and one on the side of the frame.
+  const points = [[0.5, 0.42], [0.042, 0.42]];
+  const layered = await pngAt(await savePng(), points);
+  await page.click('#pane-range .outside-off');
+  expect((await state()).outside === null, 'Remove did not take the outside finish off');
+  const single = await pngAt(await savePng(), points);
+  const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+  expect(d(layered[0], single[0]) === 0, `the art changed: ${layered[0]} vs ${single[0]}`);
+  expect(d(layered[1], single[1]) > 24, `the frame did not take the outside finish: ${layered[1]} vs ${single[1]}`);
+  // Left on for the exports below, so GIF and APNG are made with two finishes too.
+  await page.click('#pane-range .outside-pick');
+  await page.click(`#pane-range .outside-chip[data-v=${pick}]`);
+});
+
 for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.png']]) {
   await step(`export ${format}`, async () => {
     await page.click(`#formatSeg [role=radio][data-format=${format}]`);

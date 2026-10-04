@@ -18,7 +18,9 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   vec4 v2 = voronoi(w * 8.0 + 3.1);
   float d1 = v1.y - v1.x;
   float d2 = v2.y - v2.x;
-  float wide = 0.014 + 0.018 * vnoise(uv * 24.0);
+  // Laid outside the area (docs/layering.md) it mends the frame: no subject to spare there, and bolder seams.
+  float rimOnly = uOuter > 0.5 ? 1.0 - texture(uMask, uv).r : 0.0;
+  float wide = (0.014 + 0.018 * vnoise(uv * 24.0)) * (1.0 + 0.9 * rimOnly);
   float seam = (1.0 - smoothstep(wide * 0.3, wide, d1));
   float hair = (1.0 - smoothstep(0.004, 0.014, d2)) * step(0.65, hash12(v2.zw)) * (1.0 - smoothstep(0.0, 0.25, d1));
   float vein = max(seam, hair * 0.8);
@@ -28,12 +30,14 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   vec3 gold = mix(vec3(0.62, 0.38, 0.1), vec3(0.98, 0.8, 0.4), 0.5 + 0.5 * sin(d1 * 70.0 + uv.y * 9.0 + t.x * 2.0));
   float run = smoothstep(0.75, 1.0, sin((uv.x * 0.8 + uv.y) * 6.0 - (t.x + t.y) * 3.4 - uTime * 0.7));
   gold += vec3(1.0, 0.93, 0.74) * run * 0.6 * (1.0 - keep * 0.8);
+  // On a pale frame, a deeper gold so the seams still read against it.
+  gold = mix(gold, gold * vec3(0.66, 0.46, 0.18), rimOnly * smoothstep(0.55, 0.85, L));
   // The seams stop where the bright subject begins, so the gold mends around it, never across it.
   // Judge brightness on a blurred copy of the art so dithering can't let a seam slip through.
   float Lb = luma(face(uv, 5.0).rgb);
-  float around = 1.0 - smoothstep(0.3, 0.45, max(L, Lb));
-  vec3 col = mix(c, glaze * (1.0 - rim * 0.3), around);
-  return mix(col, gold, vein * 0.9 * around);
+  float around = max(1.0 - smoothstep(0.3, 0.45, max(L, Lb)), rimOnly);
+  vec3 col = mix(c, glaze * (1.0 - rim * (0.3 + 0.35 * rimOnly)), around);
+  return mix(col, gold, vein * (0.9 + 0.1 * rimOnly) * around);
 }
 
 vec3 opal(vec3 c, vec2 uv, vec2 t, float L) {

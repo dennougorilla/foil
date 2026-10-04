@@ -13,16 +13,21 @@ import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 
 /** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
-export async function packLoaded(edition: Edition): Promise<void> {
+async function packLoaded(edition: Edition): Promise<void> {
   const pack = packOf(edition.id);
   if (pack) await loadPack(pack.id);
 }
+
+/** Both finishes of an export, the card's own and the outside one, have arrived. */
+export const packsLoaded = (input: ExportInput) => Promise.all([input.edition, input.outside].map((e) => e && packLoaded(e)));
 
 export interface ExportInput {
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   back: HTMLCanvasElement;
   edition: Edition;
+  /** A second finish where the range leaves `edition` out (docs/layering.md). */
+  outside?: Edition;
   intensity: number;
   pixel: number;
   name: string;
@@ -60,7 +65,7 @@ export function download(blob: Blob, name: string): string {
 
 /** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
 export async function exportPng(input: ExportInput): Promise<string> {
-  await packLoaded(input.edition);
+  await packsLoaded(input);
   const pad = 24;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
@@ -97,6 +102,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
+      outside: input.outside?.shader,
     },
     1.7,
   );
@@ -189,6 +195,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
+          outside: input.outside?.shader,
         },
         p * loopSec * tune.speed,
       );
@@ -241,7 +248,7 @@ export async function exportGif(
   onProgress?: (p: number, encoding: boolean) => void,
   opts: GifOptions = { clear: false, matte: 'auto' },
 ): Promise<string> {
-  await packLoaded(input.edition);
+  await packsLoaded(input);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   const result = new Promise<ArrayBuffer>((resolve, reject) => {
@@ -273,7 +280,7 @@ export async function exportGif(
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
+    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.outside?.dither) });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {

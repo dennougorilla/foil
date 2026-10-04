@@ -152,6 +152,7 @@ uniform float uFlash;      // white flash on juice
 uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
+uniform float uOuter;      // 1 = the outside pass: this finish goes where the Finish area leaves the card's own out
 out vec4 o;
 ${COMMON}
 ${TUNE_GLSL}
@@ -270,6 +271,14 @@ void main() {
     c = f.rgb / max(f.a, 1e-4);
   }
   float L = luma(c);
+  // The outside pass (docs/layering.md) covers what the area leaves out, in full, and skips the rest.
+  float range = foilRange(uv, L);
+  float cover = 1.0;
+  if (uOuter > 0.5) {
+    cover = 1.0 - range;
+    if (cover < 0.002) discard; // outside pass
+  }
+  float sel = uOuter > 0.5 ? 1.0 : range;
   vec3 col = c;
   int e = uEdition;
   // Finishes draw their pattern in tuned coordinates (zoom, rotation); the real uv comes back after.
@@ -290,9 +299,9 @@ void main() {
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
+  if (uOuter > 0.5) amt = uIntensity; // laid outside the area, mostly on the frame: in full there too
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
-  float sel = foilRange(uv, L);
   amt *= sel;
   col = mix(c, col, amt);
   col = lettering(col, uv, uTilt);
@@ -315,9 +324,9 @@ void main() {
   // Tilting away darkens a touch; tilting towards brightens.
   col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
-  col = showRange(col, uv, sel);
+  col = showRange(col, uv, range);
   col = mix(col, vec3(1.0), uFlash);
-  o = vec4(clamp(col, 0.0, 1.0) * base.a, base.a) * uAlpha;
+  o = vec4(clamp(col, 0.0, 1.0) * base.a, base.a) * uAlpha * cover;
 }
 `;
 

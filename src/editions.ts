@@ -56,6 +56,8 @@ export interface Edition {
   torch?: boolean;
   /** Reads the picture's depth (src/depth), so choosing it starts the depth model. */
   depth?: boolean;
+  /** Needs the card to itself (a second picture, particles over the art), like touch, torch and depth finishes. */
+  solo?: boolean;
 }
 
 /** Every finish. The hand starts with OPEN_EDITIONS; the rest come in packs (src/packs.ts). */
@@ -87,10 +89,10 @@ export const EDITIONS: Edition[] = [
   { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
   // Shader in src/gl/lenticular3d.ts.
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
-  { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6 },
+  { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6, solo: true },
   { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
   // Glitter particles on the GPU, see src/gl/snowglobe.ts.
-  { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7 },
+  { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7, solo: true },
   // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
@@ -100,6 +102,21 @@ export const EDITIONS: Edition[] = [
 ];
 
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];
+
+/**
+ * Can be the second finish, drawn where the Finish area leaves the card's own out (docs/layering.md):
+ * anything but Base (that is "none") and the finishes that need the card to themselves.
+ */
+export function layerable(id: EditionId): boolean {
+  const e = EDITIONS.find((x) => x.id === id);
+  return !!e && e.id !== 'base' && !e.touch && !e.torch && !e.depth && !e.solo;
+}
+
+/** What can go outside the Finish area: the owned finishes that layer, but the card's own. */
+export const outsideChoices = (owned: readonly EditionId[], main: EditionId): EditionId[] => owned.filter((id) => id !== main && layerable(id));
+
+/** A saved outside finish, or null when it is missing or no longer fits. */
+export const sanitizeOutside = (v: unknown): EditionId | null => (typeof v === 'string' && layerable(v as EditionId) ? (v as EditionId) : null);
 
 export type RarityId = 'common' | 'uncommon' | 'rare' | 'legendary';
 

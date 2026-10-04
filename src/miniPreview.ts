@@ -159,6 +159,7 @@ export class MiniPreview {
         flash: 0,
         shadow: [0, 0],
         rangeView: 1,
+        outside: s.outside ? editionById(s.outside).shader : undefined,
       },
       t,
     );

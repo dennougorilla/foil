@@ -5,6 +5,7 @@ import { RANGE_H, RANGE_W } from './gl/range';
 import { sfx } from './audio';
 import { editionById } from './editions';
 import { MiniPreview } from './miniPreview';
+import { initOutside } from './outsidePanel';
 import type { FaceSpec } from './card/face';
 import type { Dict } from './i18n';
 import type { Stage } from './stage';
@@ -103,6 +104,7 @@ export function initRangePanel(host: RangeHost) {
       <div class="seg seg-region" role="radiogroup" aria-labelledby="rangeWhereLabel" aria-describedby="rangeRegionHint"></div>
       <p class="hint region-hint" id="rangeRegionHint"></p>
     </div>
+    <div class="field outside-field"></div>
     <div class="field tone-field">
       <div class="field-head">
         <span class="field-label" id="rangeToneLabel" data-r="rangeTone"></span>
@@ -141,6 +143,7 @@ export function initRangePanel(host: RangeHost) {
   const tonePresets = q('.tone-presets');
   const paintBtn = q<HTMLButtonElement>('.range-paint');
   const cover = q('.range-cover');
+  const outside = initOutside({ store, t: host.t, announce: host.announce, root: q('.outside-field'), covered: () => model.coverage(store.get()) > 0.995 });
 
   REGIONS.forEach((r) => {
     const b = el('button', 'seg-btn region-btn', `<svg class="rgn" viewBox="0 0 18 24" aria-hidden="true">${REGION_ICON[r]}</svg><span></span>`);
@@ -202,7 +205,7 @@ export function initRangePanel(host: RangeHost) {
       model.clear();
       void model.save();
     }
-    store.set({ rangeRegion: 'all', rangeLo: 0, rangeHi: 1, rangeInvert: false });
+    store.set({ rangeRegion: 'all', rangeLo: 0, rangeHi: 1, rangeInvert: false, outside: null });
     push();
   });
 
@@ -530,7 +533,9 @@ export function initRangePanel(host: RangeHost) {
       // Never round a partial area up to 100% or down to 0%.
       const n = f >= 0.9995 ? 100 : Math.min(99, Math.round(f * 100));
       const none = f <= 0.0005;
-      const few = f < 0.02;
+      // With a finish layered outside, an area that leaves much out is the point, not a problem.
+      const few = f < 0.02 && !s.outside;
+      outside.setCover(f, s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted);
       q('.cover-val').textContent = none ? '0%' : f < 0.01 ? t.rangeTiny : `${n}%`;
       cover.classList.toggle('is-none', few);
       q('.cover-empty').hidden = !few;
@@ -631,7 +636,12 @@ export function initRangePanel(host: RangeHost) {
     softOut.style.setProperty('--blur', `${(s.brushSoft * 5).toFixed(1)}px`);
     softOut.title = pct(s.brushSoft);
     soft.setAttribute('aria-valuetext', pct(s.brushSoft));
-    const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
+    const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted || s.outside !== null;
+    // Left out of the area is plain paper, or the finish layered outside it.
+    q('[data-r=legendPaper]').textContent = s.outside ? host.t().edition[s.outside] : host.t().legendPaper;
+    const paper = q('.lg-paper');
+    paper.classList.toggle('is-outside', !!s.outside);
+    if (s.outside) paper.style.setProperty('--c', editionById(s.outside).color);
     q<HTMLElement>('.pane-tools').hidden = !changed;
     host.onRangeChanged(changed);
   }
@@ -671,7 +681,7 @@ export function initRangePanel(host: RangeHost) {
   const RANGE_KEYS: (keyof State)[] = ['rangeRegion', 'rangeLo', 'rangeHi', 'rangeInvert'];
   store.on((_s, changed) => {
     if (changed.has('lang')) applyText();
-    if (changed.has('edition')) measure();
+    if (changed.has('edition') || changed.has('outside')) measure();
     if (RANGE_KEYS.some((k) => changed.has(k))) push();
     sync();
   });
