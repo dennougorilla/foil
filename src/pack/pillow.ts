@@ -18,7 +18,8 @@ uniform float uScale;
 uniform vec2 uShift;        // screen offset (the shadow)
 uniform vec2 uV;            // the rows of the pack this piece covers (0 = top, 1 = bottom)
 uniform float uBulge;       // how far the middle stands out, css px
-uniform float uFlat;        // 1: drawn flat (the shadow)
+uniform float uFlat;        // 1: drawn flat (the shadow, the back)
+uniform float uDepth;       // pushed back by this much, css px (the back of the bag)
 uniform float uSeal;        // the seals' height, as a fraction of the pack
 out vec2 vUv;
 out vec3 vN;
@@ -43,7 +44,7 @@ vec3 rot(vec3 p) {
 
 void main() {
   vec2 uv = vec2(aGrid.x, mix(uV.x, uV.y, aGrid.y));
-  float h = height(uv) * (1.0 - uFlat);
+  float h = height(uv) * (1.0 - uFlat) - uDepth / max(uBulge, 1.0);
   // Filled, the bag swells: its sides bow out a little where it is fullest.
   vec2 bow = vec2(1.0 + 0.035 * h, 1.0 + 0.01 * h);
   vec3 p = vec3((uv - 0.5) * uSize * bow * uScale, h * uBulge * uScale);
@@ -72,7 +73,7 @@ uniform vec2 uGrid;         // the wrapper's pixel grid
 uniform vec2 uLightDir;     // where the light comes from, -1..1
 uniform vec3 uSpec;         // highlight color
 uniform float uAlpha;
-uniform float uShadow;      // 1: draw as the hard drop shadow
+uniform float uShadow;      // 1: draw as the hard drop shadow; 2: the back of the bag
 uniform float uSeal;
 uniform float uMouth;       // the row the bag is torn open at (0 = still sealed)
 out vec4 o;
@@ -98,6 +99,8 @@ float crumple(vec2 g) {
 void main() {
   vec4 base = texture(uTex, vec2(vUv.x, 1.0 - vUv.y));
   if (base.a < 0.01) discard;
+  // The back of the bag: the wrapper's own colors, deep in shade, so its thickness shows at the edges.
+  if (uShadow > 1.5) { o = vec4(base.rgb * 0.32, base.a) * uAlpha; return; }
   if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
   // Torn open: a dark inside under a bright silver lip along the tear.
   if (uMouth > 0.0) {
@@ -117,7 +120,7 @@ void main() {
     float c = crumple(g);
     float cx = crumple(g + vec2(1.0, 0.0)) - c;
     float cy = crumple(g + vec2(0.0, 1.0)) - c;
-    n = normalize(n + vec3(-cx, -cy, 0.0) * 1.5);
+    n = normalize(n + vec3(-cx, -cy, 0.0) * 1.1);
   }
   vec3 L = normalize(vec3(uLightDir, 0.85));
   vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
@@ -125,7 +128,7 @@ void main() {
   // In steps, like a palette.
   diff = floor(diff * 6.0 + 0.5) / 6.0;
   float sh = max(dot(n, H), 0.0);
-  float spec = step(0.993, sh) * 0.8 + pow(sh, 36.0) * 0.45;
+  float spec = pow(sh, 30.0) * 0.6;
   spec *= 1.0 - vRim * 0.85;
   spec = floor(spec * 4.0 + 0.5) / 4.0;
   if (seal) spec *= 1.4;
@@ -257,15 +260,22 @@ export class Pillow {
     gl.uniform2f(u.uLightDir, d.light[0], d.light[1]);
     gl.uniform3f(u.uSpec, d.spec[0], d.spec[1], d.spec[2]);
     gl.uniform1f(u.uAlpha, d.alpha);
+    gl.uniform1f(u.uDepth, 0);
     if (d.shadow) {
       gl.uniform1f(u.uShadow, 1);
       gl.uniform1f(u.uFlat, 1);
       gl.uniform2f(u.uShift, d.shadow[0], d.shadow[1]);
       gl.drawArrays(gl.TRIANGLES, 0, this.count);
     }
+    // The back sheet, a little behind and flat: it shows past the bulge's edge when the bag tilts.
+    gl.uniform1f(u.uShadow, 2);
+    gl.uniform1f(u.uFlat, 1);
+    gl.uniform2f(u.uShift, 0, 0);
+    gl.uniform1f(u.uDepth, d.w * 0.07);
+    gl.drawArrays(gl.TRIANGLES, 0, this.count);
+    gl.uniform1f(u.uDepth, 0);
     gl.uniform1f(u.uShadow, 0);
     gl.uniform1f(u.uFlat, 0);
-    gl.uniform2f(u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, this.count);
   }
 }

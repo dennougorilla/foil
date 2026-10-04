@@ -206,7 +206,7 @@ export function openPack(o: OpeningOptions) {
     paintPack(face, mask, p, {
       big: PACK_EN.name[p.id].toUpperCase(),
       line: t.inside.replace('{n}', String(p.finishes.length)),
-      top: p.supporter ? 'LIMITED' : undefined,
+      top: p.supporter ? 'THANK YOU' : undefined,
     });
     r.setFace(face, mask, `pack-${p.id}`);
     painted.add(p.id);
@@ -262,7 +262,7 @@ export function openPack(o: OpeningOptions) {
       // Four packs make a square on a phone; five, three over two.
       const perRow = narrow ? (count === 4 ? 2 : Math.min(3, count)) : count;
       const gap = narrow ? 14 : 26;
-      const room = Math.min(vw - 24, 1120) - (narrow ? 28 : 56);
+      const room = Math.min(vw - 24, 1120) - (narrow ? 40 : 84);
       let sw = (room - gap * (perRow - 1)) / perRow;
       let sh = sw * 1.5;
       const maxH = narrow ? (perRow === 2 ? vh * 0.19 : vh * 0.2) : vh * 0.36;
@@ -392,7 +392,7 @@ export function openPack(o: OpeningOptions) {
     b.className = 'pk-slot';
     b.setAttribute('role', 'radio');
     b.dataset.pack = sl.p.id;
-    b.innerHTML = `<i class="pk-pick" aria-hidden="true"></i><span class="pk-price">${o.isOpened(sl.p.id) ? `✓ ${t.tagOpened}` : t.name[sl.p.id]}</span>`;
+    b.innerHTML = `<i class="pk-pick" aria-hidden="true"></i><span class="pk-price">${t.name[sl.p.id]}${o.isOpened(sl.p.id) ? ` <small>✓ ${t.tagOpened}</small>` : ''}</span>`;
     b.setAttribute('aria-label', `${t.title.replace('{name}', t.name[sl.p.id])}${o.isOpened(sl.p.id) ? ` (${t.tagOpened})` : ''}`);
     b.addEventListener('pointerenter', () => {
       sl.hot = true;
@@ -439,6 +439,7 @@ export function openPack(o: OpeningOptions) {
     pk.s.x = (rc.height / packH) * sl.s.x;
     pk.rz.x = sl.tilt + sl.rz.x;
     root.classList.add('is-leaving');
+    shopFade = 0;
     packSfx.whoosh();
     buzz(8);
     setPhase('load');
@@ -1083,7 +1084,7 @@ export function openPack(o: OpeningOptions) {
       slots.forEach((sl, i) => {
         const chosen = i === sel;
         sl.lift.target = chosen ? (vw < 640 ? 8 : 16) : 0;
-        sl.s.target = (chosen ? 1.08 : 1) * (sl.hot ? 1.06 : 1);
+        sl.s.target = (chosen ? 1.08 : 1) * (sl.hot && !chosen ? 1.025 : 1);
         const rc = sl.el.getBoundingClientRect();
         const lean = sl.hot && time - pointer.at < 2 ? [clamp((pointer.x - (rc.left + rc.width / 2)) / (rc.width / 2), -1, 1), clamp((pointer.y - (rc.top + rc.height / 2)) / (rc.height / 2), -1, 1)] : [0, 0];
         sl.ry.target = lean[0] * 0.35 * motion;
@@ -1238,9 +1239,9 @@ export function openPack(o: OpeningOptions) {
             cy: strip.y,
             w: packW,
             h: packH * TEAR_Y,
-            rx: 0,
             ry: 0,
             rz: strip.rot,
+            rx: Math.min(1.2, (1 - strip.alpha) * 2.2),
             scale: 1,
             edition: wrap,
             intensity: 0.7,
