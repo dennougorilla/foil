@@ -11,14 +11,22 @@ summary is in `README.md`; this note is the design behind it.
 - Every other finish sits in a **theme pack**. A pack holds every finish of its theme, so its size
   is the size of the theme. It is opened **once**, and opening it shows everything inside — there
   is no random draw. The excitement comes from the order: the rarest finish waits until last.
-- An opened pack becomes a **folder** under the hand. Picking a folder deals its finishes into the
-  hand after the seven, so the hand is always "the seven + one folder" and stays short on a phone.
-  Picking the active folder again puts it away (the seven only). Each opened folder can replay its
-  opening (the Replay button beside the active folder). On the shelf a sealed pack shows how many
-  finishes it holds ("All 3 inside"), an opened folder its count, and the active one "3 in hand".
+- The hand never grows past the seven, plus one **drawn card**. Everything an opened pack holds
+  goes into the **deck**, which sits at the right end of the hand like a draw pile: a stack of
+  face-down pixel card backs that gets thicker with each finish in it, and its count. At the end of
+  an opening the cards fly into it.
+- Pressing the deck opens **View deck**: every finish owned, grouped pack by pack under a small
+  mark in the pack's color, as small still thumbnails on the person's own picture (made only when
+  the list is opened). Choosing one puts it in the hand's eighth slot — the drawn card — and onto
+  the card; choosing another swaps it. The drawn card is remembered. Putting a pack finish on the
+  card any other way (a pick in the haul, a saved card) also makes it the drawn card.
+- The way to new packs is a small pixel pack beside the deck. It glows gently while a pack is still
+  sealed (with the number sealed) and opens the **pack shop**, which holds every pack; an opened one
+  offers "Watch again" there. (Earlier versions had folders and a shelf of chips under the hand;
+  both are gone, and a saved folder choice is ignored.)
 - The **Supporter pack** replaces the old hidden-finish unlocks. It does not exist in the UI until
   one of the support links (GitHub Sponsors, Buy Me a Coffee) is opened once; then it joins the
-  shelf, sealed, and opens like any pack, with a richer wrapper and opening. Honor system: no
+  shop, sealed, and opens like any pack, with a richer wrapper and opening. Honor system: no
   server, nothing checks a payment.
 
 ## Themes
@@ -48,15 +56,13 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
    showpiece).
 2. A new pack is one more entry in `PACKS` (id, finishes, wrapper, colors, `load`) plus a module
    file and its two names in `src/i18n.ts`. Nothing else lists packs.
-3. Someone who already opened a pack finds a finish added to it later straight in the folder.
+3. Someone who already opened a pack finds a finish added to it later straight in the hand.
 
 ## Storage
 
 - `localStorage['foil:packs']` = `{"opened": ["metal", …], "supporter": true}`. Anything that
   does not parse, or unknown ids, counts as nothing opened. Other tabs follow through the
   `storage` event; two tabs opening at once keep the union.
-- The active folder is part of the main store (`foil:v1` → `folder`); a folder that is not opened
-  falls back to none.
 - A saved card on a finish whose pack is sealed (site data cleared) goes back to Holographic.
 - **From the old unlocks** (`foil:secrets`, the list of finishes unlocked by support links, v0.9.0
   to v0.9.3): every pack holding an unlocked finish counts as opened, and any unlock at all means a
@@ -66,7 +72,7 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
 
 ## Loading (weight budget)
 
-Nothing of a pack loads before it is opened or its folder picked:
+Nothing of a pack loads before the shop or View deck is opened, or a pack finish is the drawn card:
 
 - `src/packs.ts` is plain data (ids, order, colors, a `load()` that dynamic-imports the module).
 - Each pack module (`src/gl/finishes/<pack>.ts`) carries its finishes' GLSL and their helpers
@@ -76,8 +82,9 @@ Nothing of a pack loads before it is opened or its folder picked:
   when available so the frame never stalls. Cards whose program is still compiling wait (hand
   cards deal in when ready; the main card arrives with its deal-in).
 - Shadowbox's depth code (worker, model, pill) loads when Shadowbox is first put on the card.
-- The shop and the opening (`src/pack/`: overlay, pack art, the pillow mesh, motion, sounds, CSS)
-  are one chunk, fetched when a sealed pack is tapped or a replay is asked for. The shop then loads
+- The shop and the opening (`src/pack/`: overlay, pack art, the pack mesh, motion, sounds, CSS)
+  are one chunk, fetched when the pack button beside the deck is pressed. View deck is its own small chunk; its
+  thumbnails are drawn once, when it opens, with the packs of the finishes in the deck. The shop then loads
   the modules of the packs on its tray for their wrappers.
 - The support links only flip a flag; the Supporter pack module loads on opening.
 
@@ -94,10 +101,10 @@ art, sprite or font from the game is used — only the grammar):
 | Balatro | FOIL before | FOIL now |
 |---|---|---|
 | Packs are pixel art: a coarse grid scaled up, hard edges, dithered shading. | Smooth vector art at full resolution. | Each wrapper is drawn on a 128 × 192 pixel grid (2 : 3) and scaled up with hard pixels; the wrapper finish is computed on the same grid, so its sheen moves in blocks. |
-| A pack is a pillow: silver crimp seals top and bottom with ridges that catch the light, a body that bulges, darker left and right edges, a slightly wavy outline. | A flat rectangle with grey stripes for seals. | Silver seals with zig-zag teeth and ridge highlights; the body is a real bulging mesh, lit per pixel (dark sides, a sharp highlight that runs along the bulge and the foil's wrinkles as it tilts), so its thickness shows in perspective. |
+| A pack holds a stack of cards: silver crimp seals top and bottom with ridges that catch the light, a face kept nearly flat by the cards inside, only the edges and the ends near the seals rounding off, darker left and right edges, a slightly wavy outline. | A flat rectangle with grey stripes for seals. | Silver seals with zig-zag teeth and ridge highlights; the body is a mesh that stays flat across the face and rounds off only at its edges and toward the seals (it holds a stack of cards; it is not inflated), lit per pixel: dark rolled edges, the seals' step, foil wrinkles and a highlight that runs along them as it tilts; a back sheet shows the pack's thickness at the edges in perspective. |
 | Each pack has its own big illustration on a theme color, and a huge white outlined title in an arc or a speech bubble. Higher tiers get a wavy word on top and a silver-white holo body. | The same fan of cards on every pack; a small title. | A big pixel illustration per theme (gem and coin, star, blossom branch, palette and brush, crowned heart) on its color, the title in an arc of outlined letters and "ALL 3 INSIDE" / 「全3種入り」 under it; the Supporter pack is the top tier: silver-white body in Opal's rainbow, a wavy THANK YOU on top and SUPPORT as its title. |
 | Thick dark outline, a hard dark drop shadow. | No outline; a faint soft shadow. | A 2-pixel ink outline in the art, a hard offset shadow under every pack, and a dark back sheet behind the bulge so tilting shows the bag's thickness; once torn, the bag shows a dark mouth under a silver lip. |
-| The shop: items sit on a dark rounded tray with a thin light rim, each bobbing and slightly tilted; hovering springs it up with a wobble and leans it to the pointer. | One pack in an empty room. | Tapping a sealed pack opens the **pack shop**: every pack on a dark rounded tray, tilted a little, bobbing; hover or focus springs one up with a wobble and leans it to the pointer; the chosen one is lifted and stands in a pool of gold light. Four packs make a 2 × 2 square on a phone, five go three over two. |
+| The shop: items sit on a dark rounded tray with a thin light rim, each bobbing and slightly tilted; hovering springs it up with a wobble and leans it to the pointer. | One pack in an empty room. | The pack button at the end of the hand opens the **pack shop** (the first sealed pack chosen): every pack on a dark rounded tray, tilted a little, bobbing; hover or focus springs one up with a wobble and leans it to the pointer; the chosen one is lifted and stands in a pool of gold light. Four packs make a 2 × 2 square on a phone, five go three over two. |
 | Descriptions in a dark rounded panel with a colored title band; keywords colored. | Small grey text in a corner. | The tray and the chosen pack's panel are one chunky rounded object: under the packs, a band in the pack's color with its name, what is inside ("全3種入り" / "Includes all 3 … finishes") and the big button. Each pack's name tag says "✓ opened" beside the name once it is. |
 | Fat rounded buttons, saturated, a thick dark lip that disappears when pressed. | A cream generic button. | "Open pack" is a fat red button with a dark lip that sinks when pressed (blue "Watch again" for an opened pack); the big pack's own button says "Tear open". |
 | A swirling psychedelic backdrop in the current colors, CRT scanlines and grain. | The swirl, low contrast; no grain. | FOIL's swirl, faster and in the chosen pack's colors (it eases over when the choice changes), a faint grain over everything; the CRT switch adds scanlines as on the page. |
@@ -150,7 +157,7 @@ follows the sound toggle.
 
 | # | Beat | Motion | Light / particles | Sound | Vibrate |
 |---|---|---|---|---|---|
-| 0 | **Summon** (0–520) | Overlay fades in (220, ease-out). The pack flies from its shelf chip to the centre: scale 0.3 → 1 on a spring 170/13 (one overshoot), a decaying wobble ±0.22 rad. Title drops in (200, delay 220). | The room becomes FOIL's swirl in the pack's colors. | Whoosh (noise 400 → 2400 Hz, 280) | 8 |
+| 0 | **Summon** (0–520) | Overlay fades in (220, ease-out). The pack flies from its place on the shop's tray to the centre: scale 0.3 → 1 on a spring 170/13 (one overshoot), a decaying wobble ±0.22 rad. Title drops in (200, delay 220). | The room becomes FOIL's swirl in the pack's colors. | Whoosh (noise 400 → 2400 Hz, 280) | 8 |
 | 1 | **Invite** (until touched) | Pack floats (±6 px, 0.5 Hz) and leans to the pointer or gyro (spring 210/17, ±0.3 rad); its foil follows the tilt. | A bead of light runs along the dotted cut guide every 1.6 s; after 2.2 s of nothing, a ghost finger traces it once. | — | — |
 | 2 | **Trace** (finger) | Press in the top band (top 24 % of the pack, generous) and slide: progress = furthest x reached, never goes back. The pack leans toward the finger (≤0.1 rad) and trembles with finger speed. Release before 82 % → the line drains back (260, ease-in). Tap, Enter/Space or the Tear open button under the hint → an automatic trace (480, ease-in-out). The perforation glows and a gold arrow nudges at its left end; the hint and button appear once the pack has landed. | A white-hot line from the left edge to the finger, with bloom; 2–3 sparks per frame from the tip (gravity). | A noise tick every 4 % with pitch rising with progress ("riiip"); a fizzle on cancel. | 6 every 12 % |
 | 3 | **Rip** (0–350) | The top strip flies off (up and to the side, spin, gravity, fades by 700). The body punches 1 → 1.06 → 1 (spring 320/14). Screen shake 220, 10 px, exponential decay. | White flash on the pack (0.6, gone in about 0.12 s), light pours from the opening, 40 sparks upward. | Rip (noise 700 → 5000 Hz, 320) + low thump (90 Hz) | 18, 30, 40 |
@@ -158,7 +165,7 @@ follows the sound toggle.
 | 5 | **Swipe** (per card) | Face-up stack; the top card follows the finger (rubber band, leans rz = dx·0.0012). Past 28 % of its width or a flick > 800 px/s it flies off that way (260, ease-in); else it snaps back (spring 260/18). The next card pops (scale 0.94 → 1, spring 320/14). Tap / → / Enter sends it off automatically. | Name and line of the finish under the stack, swapped with a short pop; "1 / 3" above the name says how far along it is. Second-to-last card (rare): a light sweep across it and 18 sparkles when it surfaces. | Swish per card; pop on the next; rare: two-note chime | 8 (rare: 14) |
 | 6 | **Showpiece** | The last card comes face-down on a back printed in the pack's colors and emblem, edges glowing, trembling, sparks rising off it. Press (or →/Enter): "Revealing…" — it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. Then, held a little larger, a light sweeps across it once (1.6 s) while the rays hold back to a third, so its own finish is the peak; then the rays come up and it keeps rocking slowly. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
-| 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Try Magma" (the showpiece by name) — closes, picks this folder and puts it on the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "Done" (カードに戻る). Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
+| 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Try Magma" (the showpiece by name) — closes, sends the other cards into the deck and puts this one in the hand as the drawn card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "Done" (カードに戻る). Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
 
 **Skip reveal** (top right, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
 A replay starts at beat 0 too. Escape closes from the haul and skips the reveal from anywhere else; the
@@ -168,7 +175,8 @@ With a keyboard at hand, each hint shows its key (Enter, →).
 **Each theme's particles** are its own: Metal throws hot sparks that fall fast, Light lets star
 motes float up, Nature's are petals that drift and sway, Studio's are print dots in cyan, magenta,
 yellow and paper, the Supporter pack's gold leaf. The haul is calmer than the reveal: the room dims
-and the rays drop to 40 %. Back on the page, a folder just made by an opening pops once.
+and the rays drop to 40 %. When it closes, the cards fly from the haul into the deck, which bumps and counts up; a toast says
+how many went in.
 
 **Supporter pack** — everything above, one step richer: the top-tier wrapper (silver-white body in
 Opal's rainbow, a wavy SUPPORTER on top), gold dust drifting in the room the whole time, a golden shower at the rip, every card

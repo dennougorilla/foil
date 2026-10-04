@@ -27,9 +27,11 @@ out float vRim;
 
 float height(vec2 uv) {
   vec2 q = uv * 2.0 - 1.0;
-  // Full in the middle, falling off steeply at the sides; flat across the crimp seals.
-  float body = smoothstep(uSeal, uSeal + 0.07, uv.y) * smoothstep(uSeal, uSeal + 0.07, 1.0 - uv.y);
-  return (1.0 - pow(abs(q.x), 3.0)) * (1.0 - pow(abs(q.y), 6.0)) * body;
+  // A stack of cards inside keeps the face flat; only the edges roll off, and the ends ease down
+  // into the crimp seals. Flat across the seals themselves.
+  float sx = smoothstep(0.0, 0.11, min(uv.x, 1.0 - uv.x));
+  float sy = smoothstep(uSeal, uSeal + 0.09, uv.y) * smoothstep(uSeal, uSeal + 0.09, 1.0 - uv.y);
+  return sx * sy * (1.0 - 0.06 * q.x * q.x);
 }
 
 vec3 rot(vec3 p) {
@@ -46,14 +48,14 @@ void main() {
   vec2 uv = vec2(aGrid.x, mix(uV.x, uV.y, aGrid.y));
   float h = height(uv) * (1.0 - uFlat) - uDepth / max(uBulge, 1.0);
   // Filled, the bag swells: its sides bow out a little where it is fullest.
-  vec2 bow = vec2(1.0 + 0.075 * h, 1.0 + 0.012 * h);
+  vec2 bow = vec2(1.0 + 0.012 * h, 1.0);
   vec3 p = vec3((uv - 0.5) * uSize * bow * uScale, h * uBulge * uScale);
   // The surface's slope, for its normal.
   float e = 0.01;
   float hx = (height(uv + vec2(e, 0.0)) - height(uv - vec2(e, 0.0))) * uBulge / (2.0 * e * uSize.x);
   float hy = (height(uv + vec2(0.0, e)) - height(uv - vec2(0.0, e))) * uBulge / (2.0 * e * uSize.y);
   vN = rot(normalize(vec3(-hx, -hy, 1.0)));
-  vRim = clamp(length(vec2(hx, hy)) * 1.6, 0.0, 1.0);
+  vRim = clamp(length(vec2(hx, hy)) * 2.2, 0.0, 1.0);
   p = rot(p);
   float D = max(uSize.y, 120.0) * 3.2;
   float w = (D - p.z) / D;
@@ -253,7 +255,7 @@ export class Pillow {
     gl.uniform1f(u.uScale, d.scale);
     const rows = d.rows ?? [0, 1];
     gl.uniform2f(u.uV, rows[0], rows[1]);
-    gl.uniform1f(u.uBulge, d.w * 0.22);
+    gl.uniform1f(u.uBulge, d.w * 0.05);
     gl.uniform1f(u.uMouth, rows[0] > 0 ? rows[0] : 0);
     gl.uniform1f(u.uSeal, 15 / GRID_H);
     gl.uniform2f(u.uGrid, GRID_W, GRID_H);
@@ -271,7 +273,7 @@ export class Pillow {
     gl.uniform1f(u.uShadow, 2);
     gl.uniform1f(u.uFlat, 1);
     gl.uniform2f(u.uShift, 0, 0);
-    gl.uniform1f(u.uDepth, d.w * 0.07);
+    gl.uniform1f(u.uDepth, d.w * 0.045);
     gl.drawArrays(gl.TRIANGLES, 0, this.count);
     gl.uniform1f(u.uDepth, 0);
     gl.uniform1f(u.uShadow, 0);

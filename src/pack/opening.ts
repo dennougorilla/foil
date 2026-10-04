@@ -29,6 +29,8 @@ export interface OpeningOptions {
   from: DOMRect;
   /** Whether a pack was opened before (it is watched again). */
   isOpened: (id: PackId) => boolean;
+  /** Where the deck sits on the page: the haul's cards fly into it at the end. */
+  deckRect?: () => DOMRect;
   dict: Dict;
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
@@ -729,9 +731,25 @@ export function openPack(o: OpeningOptions) {
     closed = true;
     // The pack opened or watched now, if any (closing in the shop, or before the tear, leaves none).
     const result = phase !== 'shop' && (opened || (replay && phase !== 'load')) ? pack : null;
+    const fromHaul = phase === 'haul';
     setPhase('closing');
     if (pick) sfx.select(Math.max(0, pack.finishes.indexOf(pick)) + 3);
-    root.classList.remove('is-in');
+    // From the haul, every card flies into the deck before the overlay goes.
+    const deck = fromHaul && !reduced ? o.deckRect?.() : undefined;
+    if (deck) {
+      root.classList.add('is-to-deck');
+      cards.forEach((c, i) => {
+        c.dealAt = 0;
+        setTimeout(() => {
+          c.x.target = deck.left + deck.width / 2;
+          c.y.target = deck.top + deck.height / 2;
+          c.s.target = (deck.height / cardH) * 0.9;
+          c.rz.target = 0.1;
+          packSfx.deal(8 - i);
+        }, i * 70);
+      });
+    }
+    setTimeout(() => root.classList.remove('is-in'), deck ? 560 : 0);
     setTimeout(() => {
       cancelAnimationFrame(raf);
       removeEventListener('deviceorientation', onTilt);
@@ -742,7 +760,7 @@ export function openPack(o: OpeningOptions) {
       root.remove();
       o.pause(false);
       o.onClose(result, pick);
-    }, reduced ? 120 : 220);
+    }, (reduced ? 120 : 220) + (deck ? 560 : 0));
   }
 
   // ---------- Input ----------

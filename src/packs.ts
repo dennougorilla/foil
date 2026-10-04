@@ -109,11 +109,17 @@ export function mergePacks(a: Opened, b: Opened): Opened {
 /** The packs on the shelf: the theme packs, and the supporter pack once a support link was opened. */
 export const shelf = (o: Opened): Pack[] => PACKS.filter((p) => !p.supporter || o.supporter);
 
-/** The hand: the open finishes, then the chosen folder's when that pack is opened. */
-export function handOf(folder: PackId | null, o: Opened): EditionId[] {
-  const pack = folder && o.opened.includes(folder) ? packById(folder) : null;
-  return [...OPEN_EDITIONS, ...(pack?.finishes ?? [])];
+/** The hand: the open finishes, plus the drawn card when it is a finish of an opened pack. */
+export function handOf(drawn: EditionId | null, o: Opened): EditionId[] {
+  const extra = drawn && !OPEN_EDITIONS.includes(drawn) && available(drawn, o) ? [drawn] : [];
+  return [...OPEN_EDITIONS, ...extra];
 }
+
+/** The deck: every opened pack, in pack order (their finishes are what can be drawn). */
+export const deckOf = (o: Opened): Pack[] => PACKS.filter((p) => o.opened.includes(p.id));
+
+/** The first pack on the shelf that is still sealed: the one the shop offers first. */
+export const firstSealed = (o: Opened): Pack | undefined => shelf(o).find((p) => !o.opened.includes(p.id));
 
 /** Open from the start, or in an opened pack. */
 export function available(id: EditionId, o: Opened): boolean {

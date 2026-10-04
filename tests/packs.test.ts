@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
   available,
   fromSecrets,
+  deckOf,
+  firstSealed,
   handOf,
   mergePacks,
   OPEN_EDITIONS,
@@ -83,11 +85,23 @@ test('the shelf shows the supporter pack only after a support link was opened', 
   assert.deepEqual(shelf({ opened: [], supporter: true }).map((p) => p.id), ['metal', 'light', 'nature', 'studio', 'supporter']);
 });
 
-test('the hand is the seven plus the chosen folder, if that pack is opened', () => {
+test('the hand is the seven, plus the drawn card when its pack is opened', () => {
   const opened = { opened: ['metal' as const], supporter: false };
   assert.deepEqual(handOf(null, opened), [...OPEN_EDITIONS]);
-  assert.deepEqual(handOf('metal', opened), [...OPEN_EDITIONS, 'relief', 'gold', 'crystal']);
-  assert.deepEqual(handOf('light', opened), [...OPEN_EDITIONS]);
+  assert.deepEqual(handOf('relief', opened), [...OPEN_EDITIONS, 'relief']);
+  assert.deepEqual(handOf('magma', opened), [...OPEN_EDITIONS]);
+  assert.deepEqual(handOf('holo', opened), [...OPEN_EDITIONS]);
+});
+
+test('the deck holds every opened pack, in pack order', () => {
+  assert.deepEqual(deckOf({ opened: ['studio', 'metal'], supporter: false }).map((p) => p.id), ['metal', 'studio']);
+  assert.equal(deckOf({ opened: [], supporter: false }).length, 0);
+});
+
+test('the first sealed pack on the shelf is the one the shop offers first', () => {
+  assert.equal(firstSealed({ opened: ['metal'], supporter: false })?.id, 'light');
+  assert.equal(firstSealed({ opened: ['metal', 'light', 'nature', 'studio'], supporter: false }), undefined);
+  assert.equal(firstSealed({ opened: ['metal', 'light', 'nature', 'studio'], supporter: true })?.id, 'supporter');
 });
 
 test('a finish can be used once it is open or its pack is opened', () => {

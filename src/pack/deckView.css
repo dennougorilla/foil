@@ -1,0 +1,209 @@
+/* View deck (src/pack/deckView.ts): a dark rounded panel over the page, finishes grouped by pack. */
+
+.dv {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 8, 10, 0.72);
+  opacity: 0;
+  transition: opacity 0.18s var(--ease-out);
+}
+
+.dv.is-in {
+  opacity: 1;
+}
+
+.dv-panel {
+  width: min(880px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 50% 0%, #26323a, #121a1e 70%);
+  box-shadow: inset 0 0 0 6px #3a4a53, 0 0 0 4px #05080a, 0 14px 0 4px #05080a, 0 26px 40px rgba(0, 0, 0, 0.55);
+  transform: translateY(14px) scale(0.97);
+  transition: transform 0.25s var(--ease-back);
+}
+
+.dv.is-in .dv-panel {
+  transform: none;
+}
+
+.dv-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 18px 22px 12px;
+  background: #1a2328;
+  box-shadow: inset 0 -4px 0 #05080a;
+}
+
+.dv-head b {
+  font-weight: 400;
+  font-size: 28px;
+  text-shadow: 0 3px 0 #05080a;
+}
+
+.dv-head small {
+  flex: 1;
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.75);
+}
+
+.dv-x {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #f3eee2;
+  color: #0b1012;
+  box-shadow: 0 0 0 3px #05080a, 0 5px 0 3px #05080a;
+}
+
+.dv-x svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.dv-body {
+  display: grid;
+  gap: 22px;
+  padding: 18px 22px 26px;
+}
+
+.dv-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--c);
+  text-shadow: 0 2px 0 #05080a;
+}
+
+/* The pack's small mark: a crimped swatch in its colors. */
+.dv-group h3 i {
+  width: 12px;
+  height: 16px;
+  background: linear-gradient(160deg, var(--c), var(--b));
+  clip-path: polygon(0 2px, 3px 0, 6px 2px, 9px 0, 12px 2px, 12px 14px, 9px 16px, 6px 14px, 3px 16px, 0 14px);
+}
+
+.dv-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.dv-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 6px 6px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-out), background 0.15s;
+}
+
+.dv-card canvas {
+  width: 120px;
+  height: 168px;
+  border-radius: 9px;
+  background: repeating-linear-gradient(45deg, #1d262b 0 6px, #232e34 6px 12px);
+  box-shadow: 0 4px 0 #05080a;
+}
+
+.dv-card canvas:not(.is-ready) {
+  animation: dv-wait 1s ease-in-out infinite;
+}
+
+@keyframes dv-wait {
+  50% { opacity: 0.55; }
+}
+
+.dv-card b {
+  font-weight: 400;
+  font-size: 15px;
+}
+
+.dv-card:hover {
+  transform: translateY(-4px) rotate(-1deg);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dv-card:focus-visible,
+.dv-x:focus-visible,
+.dv-shop:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 3px;
+}
+
+.dv-card.is-drawn {
+  background: rgba(242, 193, 78, 0.16);
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.dv-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 20px;
+  box-shadow: 0 2px 0 #05080a;
+}
+
+.dv-empty {
+  margin: 0;
+  font-size: 18px;
+  color: rgba(245, 242, 234, 0.85);
+}
+
+.dv-shop {
+  justify-self: start;
+  min-height: 52px;
+  padding: 6px 24px;
+  border: 0;
+  border-radius: 14px;
+  background: #ee4f32;
+  color: #fff;
+  font-size: 20px;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.3), 0 0 0 4px #05080a, 0 8px 0 4px #8a2414, 0 12px 0 4px #05080a;
+}
+
+@media (max-width: 600px) {
+  .dv-card canvas {
+    width: 88px;
+    height: 123px;
+  }
+  .dv-head b {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv-panel {
+    transition: none;
+  }
+  .dv-card canvas:not(.is-ready) {
+    animation: none;
+  }
+}

@@ -18,16 +18,16 @@ import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { handOf, packOf, shelf, type Pack } from './packs';
+import { firstSealed, handOf, OPEN_EDITIONS, packOf, PACKS, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
-import { mountShelf } from './shelf';
+import { mountDeck } from './deck';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const store = createStore();
 releaseSealedEdition(store);
-/** The hand: the seven open finishes, then the chosen folder's. */
-const hand = () => handOf(store.get().folder, packs.get());
+/** The hand: the seven open finishes, plus the card drawn from the deck. */
+const hand = () => handOf(store.get().drawn, packs.get());
 let t: Dict = DICTS[store.get().lang];
 
 // ---------- Images ----------
@@ -92,10 +92,10 @@ function wakeDepth() {
   });
 }
 
-/** Fetches the pack of the finish on the card and of the chosen folder; their cards deal in once ready. */
+/** Fetches the pack of the finish on the card and of the drawn card; they deal in once ready. */
 function wakePacks() {
   const s = store.get();
-  for (const id of [packOf(s.edition)?.id, s.folder]) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
+  for (const id of new Set([packOf(s.edition)?.id, s.drawn ? packOf(s.drawn)?.id : undefined])) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
   wakeDepth();
 }
 const artIds = new WeakMap<object, number>();
@@ -1057,24 +1057,23 @@ const apngExport = mountApngExport({
 
 // ---------- Packs ----------
 
-/**
- * A sealed pack opens the pack shop (every pack on a tray, that one chosen); a replay starts the
- * opening at once. The shop's and the opening's code load now, and the packs' finishes with them.
- */
+/** Opens the pack shop (every pack on a tray, the first sealed one chosen). Its code loads now. */
 let opening = false;
-function openPack(pack: Pack, from: DOMRect) {
+function openShop() {
   if (opening) return;
   opening = true;
-  const chip = document.querySelector<HTMLElement>(`.pk-chip[data-pack="${pack.id}"]`);
-  chip?.setAttribute('aria-busy', 'true');
+  const btn = $('packsBtn');
+  btn.setAttribute('aria-busy', 'true');
   const wasOpened = new Set(packs.get().opened);
+  const list = shelf(packs.get());
   void import('./pack/opening')
     .then((m) =>
       m.openPack({
-        pack,
-        shop: wasOpened.has(pack.id) ? undefined : shelf(packs.get()),
-        from,
+        pack: firstSealed(packs.get()) ?? list[0],
+        shop: list,
+        from: btn.getBoundingClientRect(),
         isOpened: (id) => packs.isOpened(id),
+        deckRect: () => deck.rect(),
         dict: t,
         face,
         mask,
@@ -1085,16 +1084,13 @@ function openPack(pack: Pack, from: DOMRect) {
         onOpened: (id) => packs.open(id),
         onClose: (done, pick) => {
           opening = false;
-          if (!done) return shelfUi.focus(pack.id);
-          // A pack just opened becomes the folder in the hand; a pick also goes on the card.
-          const fresh = !wasOpened.has(done.id);
-          if (fresh || pick) store.set({ folder: done.id });
-          if (fresh) {
-            shelfUi.greet(done.id);
-            toast(t.pack.folded.replace('{name}', t.pack.name[done.id]));
+          if (done && !wasOpened.has(done.id)) {
+            deck.bump();
+            toast(t.pack.intoDeck.replace('{name}', t.pack.name[done.id]).replace('{n}', String(done.finishes.length)));
           }
-          if (pick && pick !== store.get().edition) stage.flipTo(() => selectEdition(pick));
-          shelfUi.focus(done.id);
+          // A pick in the haul is drawn into the hand and put on the card.
+          if (pick) drawCard(pick);
+          else deck.focusShop();
         },
       }),
     )
@@ -1102,7 +1098,30 @@ function openPack(pack: Pack, from: DOMRect) {
       opening = false;
       toast(t.pack.failed, true);
     })
-    .finally(() => chip?.removeAttribute('aria-busy'));
+    .finally(() => btn.removeAttribute('aria-busy'));
+}
+
+/** Puts a finish from the deck into the hand's eighth slot and onto the card. */
+function drawCard(id: EditionId) {
+  store.set({ drawn: id });
+  if (id !== store.get().edition) stage.flipTo(() => selectEdition(id));
+}
+
+/** View deck: everything owned, grouped by pack; choosing one draws it. */
+function viewDeck() {
+  void import('./pack/deckView').then((m) =>
+    m.viewDeck({
+      dict: t,
+      packs: PACKS.filter((p) => packs.isOpened(p.id)),
+      drawn: store.get().drawn,
+      face,
+      mask,
+      tune: store.get().tune,
+      onPick: (id) => drawCard(id),
+      onShop: () => openShop(),
+      onClose: () => deck.focusDeck(),
+    }),
+  );
 }
 
 // ---------- Logo ----------
@@ -1267,12 +1286,14 @@ store.on((s, changed) => {
     return;
   }
   if (changed.has('edition')) {
+    // A pack finish on the card is always the drawn card, however it got there.
+    if (!OPEN_EDITIONS.includes(s.edition) && s.drawn !== s.edition) store.set({ drawn: s.edition });
     stage.syncHandChecked();
     renderCaption(null);
     wakePacks();
     depth?.update(face, artKey());
   }
-  if (changed.has('folder')) {
+  if (changed.has('drawn')) {
     wakePacks();
     stage.syncHand();
   }
@@ -1312,16 +1333,18 @@ mountLettering({
 applyText();
 initPackStore(store);
 packs.on(() => stage.syncHand());
+// A saved pack finish on the card comes back as the drawn card.
+{
+  const s = store.get();
+  if (!OPEN_EDITIONS.includes(s.edition) && s.drawn !== s.edition) store.set({ drawn: s.edition });
+}
 wakePacks();
-const shelfUi = mountShelf({
-  host: $('shelf'),
-  store,
+const deck = mountDeck({
+  host: $('deckDock'),
   dict: () => t,
-  onOpen: (p, from) => openPack(p, from),
-  onPrefetch: (p) => {
-    loadPack(p.id).catch(() => {});
-    void import('./pack/opening');
-  },
+  onView: () => viewDeck(),
+  onShop: () => openShop(),
+  onPrefetch: () => void import('./pack/opening'),
 });
 const boot = () => {
   redrawFace();

@@ -1,4 +1,5 @@
 import { EDITIONS, editionById, type EditionId } from './editions';
+import { OPEN_EDITIONS } from './packs';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
 import { sfx } from './audio';
 import type { Store } from './state';
@@ -159,6 +160,8 @@ export class Stage {
         h.dealAt = fresh ? this.time + 0.05 + dealt++ * 0.07 : 0.35 + n * 0.04;
       }
       h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
+      // The card drawn from the deck sits a little apart, after the seven.
+      h.el.classList.toggle('is-drawn', !OPEN_EDITIONS.includes(id));
       hand.appendChild(h.el);
       return h;
     });
@@ -648,7 +651,9 @@ export class Stage {
       const { row, d } = slot(i);
       const fan = d * 0.045;
       const arc = d * d * arcK;
-      const x = hr.width / 2 + d * spacing;
+      // A drawn card gets a small gap before it; the whole fan stays centred.
+      const drawnGap = this.hand.length > OPEN_EDITIONS.length ? spacing * 0.4 : 0;
+      const x = hr.width / 2 + d * spacing + (card.el.classList.contains('is-drawn') ? drawnGap / 2 : -drawnGap / 2);
       const y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
       const rot = fan * (1 - Math.min(card.lift.x / 40, 0.6));
       card.el.style.width = `${w}px`;

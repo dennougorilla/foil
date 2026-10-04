@@ -60,7 +60,7 @@ export const packs = {
 export function releaseSealedEdition(store: Store) {
   const s = store.get();
   if (!available(s.edition, opened)) store.set({ edition: FALLBACK });
-  if (s.folder && !opened.opened.includes(s.folder)) store.set({ folder: null });
+  if (s.drawn && !available(s.drawn, opened)) store.set({ drawn: null });
 }
 
 /** Support links put the Supporter pack on the shelf; other tabs' opens and clears show up here. */
