@@ -81,8 +81,8 @@ finish **and** its own area, as layers in a photo app:
   saved settings from before keep their look. Layer 2 is `layer2`: `{ edition, region, lo, hi,
   invert, blend: 'light' | 'over', strength }` or `null` (the default), its brush strokes under
   `rangeBrush2`. A value that no longer fits is dropped; layer 2 is also dropped when its pack is
-  sealed again (site data cleared). A second finish saved by the first version (`outside`)
-  becomes layer 2 on the same area inverted, laid over, so such a card looks the same.
+  sealed again (site data cleared), and when it would repeat layer 1's finish. A second finish
+  saved by the first version (`outside`) is not carried over (AGENTS.md: no migrations).
 - **Which finishes**: layer 1 is any owned finish (it is the card's finish; picking it here is
   the same as picking it in the hand). Layer 2 is any owned finish except Base and the ones that
   need the card to themselves (`layerable` in `src/editions.ts`: touch, a lamp, depth, Flip

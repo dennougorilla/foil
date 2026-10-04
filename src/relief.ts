@@ -11,7 +11,7 @@
 // What the shader can't see from one pixel (where the subject is, its levels, how busy each area
 // is, the picture's tonal range) comes from reliefMap.ts, run on the face whenever it changes.
 
-import { artWindow } from './card/shape';
+import { artOf } from './card/face';
 import { createTexture, type Program } from './gl/gl';
 import { reliefMap } from './reliefMap';
 
@@ -20,7 +20,7 @@ const CELL = 4;
 
 /** The map of a face: its size in cells, and the art window in cells, inset past its border and the shade along its top edge. */
 function grid(face: HTMLCanvasElement) {
-  const art = artWindow(face.width, face.height);
+  const art = artOf(face);
   return {
     w: Math.round(face.width / CELL),
     h: Math.round(face.height / CELL),

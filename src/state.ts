@@ -1,4 +1,4 @@
-import { EDITIONS, layerFromOutside, sanitizeLayer2, type EditionId, type FrameId, type Layer2, type RarityId } from './editions';
+import { EDITIONS, sanitizeLayer2, type EditionId, type FrameId, type Layer2, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import { shapeOf, type ShapeId } from './card/shape';
 import type { Lang } from './i18n';
@@ -222,9 +222,6 @@ export function createStore() {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     sanitize(state);
-    // A second finish saved by the first layering design ("outside the area") becomes layer 2.
-    const outside = (saved as { outside?: unknown }).outside;
-    state.layer2 ??= layerFromOutside(outside, { region: state.rangeRegion, lo: state.rangeLo, hi: state.rangeHi, invert: state.rangeInvert });
   } catch {
     /* storage unavailable: defaults are fine */
   }

@@ -153,13 +153,6 @@ export function sanitizeLayer2(v: unknown): Layer2 | null {
   };
 }
 
-/**
- * The second finish of the first layering design (laid wherever the card's own area left out) as
- * layer 2: the same area inverted, laid over at full strength, so the card looks as it did.
- */
-export const layerFromOutside = (outside: unknown, area: Area): Layer2 | null =>
-  sanitizeLayer2({ edition: outside, region: area.region, lo: area.lo, hi: area.hi, invert: !area.invert, blend: 'over', strength: 1 });
-
 export type RarityId = 'common' | 'uncommon' | 'rare' | 'legendary';
 
 export interface Rarity {

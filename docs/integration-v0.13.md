@@ -91,8 +91,8 @@ card carries the card keys only). The other branches' settings were sorted into 
 - Card keys: `shape`, `message`, `plate`, `layout`, `cardType`, `prints`, `arrange`, `placements`, `layer2`.
 - App keys: `exportMotion` (how you like to export, like the format), `flicked`.
 - `areaLayer` is not saved.
-- foil-layering's one-time reading of its first design's `outside` into `layer2` is kept: the
-  owner asked for it on that branch.
+- foil-layering's one-time reading of its first design's `outside` into `layer2` is removed
+  (the Codex review pointed at AGENTS.md: no migrations; that design was never released).
 
 ### The phone's Save bar
 

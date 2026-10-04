@@ -266,6 +266,13 @@ export class Paint {
     this.layers.erase.fill(0);
   }
 
+  /** Clears the strokes and their undo history: for a layer that is removed, not a Clear that can be undone. */
+  reset(): void {
+    this.clear();
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
   /**
    * One dab at (x, y) in range-texture pixels, `radius` of them across. The texture spans the face
    * whatever its shape, so its cells are square only on the trading card; the dab is stretched by

@@ -195,6 +195,23 @@ export function mountArrange(o: Options): void {
     return { ...q, x: s.x, y: s.y };
   }
 
+  /** Pulls every placed piece back inside the frame (after the card took another shape). */
+  function refit() {
+    const cur = store.get().placements;
+    const next = { ...cur };
+    let moved = false;
+    for (const f of Object.keys(cur) as FreeField[]) {
+      const p = cur[f];
+      if (!p || !freeBox(f)) continue;
+      const q = fit(f, p);
+      if (q.x !== p.x || q.y !== p.y || q.size !== p.size) {
+        next[f] = q;
+        moved = true;
+      }
+    }
+    if (moved) store.set({ placements: next });
+  }
+
   // ---------- Gestures ----------
   type Drag = { kind: 'drag'; f: FreeField; id: number; sx: number; sy: number; uv0: [number, number]; p0: Placement; moved: boolean };
   type Handle = { kind: 'size' | 'turn'; f: FreeField; id: number; c: [number, number]; v0: [number, number]; p0: Placement };
@@ -494,6 +511,7 @@ export function mountArrange(o: Options): void {
 
   store.on((s, changed) => {
     if (changed.has('arrange') && s.arrange === 'free') seed();
+    if (changed.has('shape') && s.arrange === 'free') requestAnimationFrame(refit);
     if (changed.has('arrange')) hint();
     if (changed.has('lang')) labels();
     // A piece that can no longer move is let go.

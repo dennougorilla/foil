@@ -1322,7 +1322,7 @@ const shareBtn = $<HTMLButtonElement>('shareBtn');
 // Only where the share sheet takes an image file; elsewhere Save is the way out.
 shareBtn.hidden = !(() => {
   try {
-    return !!navigator.canShare?.({ files: [new File([''], 'card.png', { type: 'image/png' })] });
+    return !!navigator.canShare?.({ files: [new File([''], 'card.gif', { type: 'image/gif' })] });
   } catch {
     return false;
   }
@@ -1500,6 +1500,7 @@ function setKept(id: string | null) {
 async function playCard(k: Kept, id: string) {
   const card = cleanCard(k.card);
   if (!available(card.edition!, packs.get())) card.edition = 'holo';
+  if (card.layer2 && !available(card.layer2.edition, packs.get())) card.layer2 = null;
   if (card.sample! >= SAMPLE_COUNT) card.sample = 0;
   if (card.sample! < 0) {
     const img = k.picture ? await decodeImage(k.picture).catch(() => null) : null;
@@ -1845,6 +1846,8 @@ store.on((s, changed) => {
     depth?.update(face, artKey());
   }
   if (changed.has('layer2')) wakePacks();
+  // Layer 1 and layer 2 never hold the same finish: putting layer 2's finish on the card removes layer 2.
+  if (changed.has('edition') && s.layer2?.edition === s.edition) store.set({ layer2: null, areaLayer: 1 });
   if (changed.has('edition') || changed.has('flicked')) syncFlickHint();
   if (changed.has('hand')) {
     wakePacks();

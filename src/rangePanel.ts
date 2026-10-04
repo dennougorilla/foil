@@ -173,7 +173,7 @@ export function initRangePanel(host: RangeHost) {
     painted: (n) => paints[n - 1].painted,
     ready: (id) => stage.cards.ready(editionById(id).shader),
     clearPaint: (n) => {
-      paints[n - 1].clear();
+      paints[n - 1].reset();
       void paints[n - 1].save();
     },
   });

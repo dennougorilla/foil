@@ -128,7 +128,7 @@
     --room: calc(100svh - 72px - env(safe-area-inset-bottom) - 44px);
     /* Edge to edge but for 8px, unless a short screen would push the hand under the Save bar:
        the name's row, the gaps and the least hand that keeps the deck whole take 200px. */
-    --card-w: min(100vw - 16px, (var(--room) - 200px) * 5 / 7);
+    --card-w: min(100vw - 16px, (var(--room) - 200px) * var(--card-kw) / var(--card-kh));
     gap: 6px;
     padding: 0 8px 8px;
   }
@@ -145,7 +145,7 @@
   }
   /* The hand takes whatever the card leaves above the Save bar. */
   .hand {
-    height: clamp(136px, calc(var(--room) - var(--card-w) * 7 / 5 - 64px), 168px);
+    height: clamp(136px, calc(var(--room) - var(--card-w) * var(--card-kh) / var(--card-kw) - 64px), 168px);
   }
   /* The name and its steps sit between the card and the hand. */
   .hand-bar {
