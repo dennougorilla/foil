@@ -1,6 +1,6 @@
 // On phones the panel sits far below the card, so tuning would happen blind. While the Light &
 // motion tab is open and the card has scrolled away, a small live window shows it inside the
-// Save stub pinned to the bottom of the screen (so it never covers a control), copied each frame
+// Save box pinned to the bottom of the screen (so it never covers a control), copied each frame
 // from the stage canvas. Tapping it scrolls back up.
 
 import { copyCard, facing } from '../proof';

@@ -308,24 +308,24 @@
   }
 }
 
-/* Presets and switches share the segmented look: paper-white when on. */
+/* Presets and switches share the segmented slabs: card-white when on. */
 .tone-chip,
 .chip.range-chip {
   min-width: 0;
   min-height: 34px;
   padding: 2px;
   border: 0;
-  border-radius: 2px;
-  background: transparent;
-  box-shadow: inset 0 0 0 2px var(--ink-dim);
+  border-radius: 8px;
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
   color: var(--text);
   font-size: 13px;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: none;
-  transition: transform 0.08s, color 0.15s, background 0.15s;
+  text-shadow: var(--drop, none);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
 }
 
 .tone-chip:hover,
@@ -335,18 +335,22 @@
 
 .tone-chip:active,
 .chip.range-chip:active {
-  transform: translate(1px, 2px);
+  transform: translateY(3px);
+  box-shadow: none;
+  transition-duration: 0.05s;
 }
 
 .chip.range-chip:hover {
-  box-shadow: inset 0 0 0 2px var(--ink);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
 .tone-chip[aria-pressed='true'],
 .chip.range-chip[aria-pressed='true'] {
   background: var(--paper);
   color: var(--paper-ink);
-  box-shadow: inset 0 0 0 2px var(--paper);
+  text-shadow: none;
+  box-shadow: 0 3px 0 #8f8a7e, 0 3px 0 2px var(--edge), 0 0 0 2px var(--edge);
 }
 
 .range-row {
@@ -408,6 +412,7 @@
   background: var(--panel-lo);
   text-shadow: none;
   box-shadow: inset 0 0 0 2px var(--paper);
+  filter: none;
 }
 
 .range-cover {
@@ -859,12 +864,14 @@
   height: 36px;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 2px;
-  background: none;
-  box-shadow: inset 0 0 0 2px var(--ink-dim);
+  margin-bottom: 3px;
+  border-radius: 8px;
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
   color: var(--text);
   font-size: 13px;
-  transition: color 0.15s, box-shadow 0.15s, transform 0.08s;
+  text-shadow: var(--drop, none);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
 }
 
 .sw-add svg {
@@ -875,12 +882,13 @@
 }
 
 .sw-add:hover {
-  color: var(--text);
-  box-shadow: inset 0 0 0 2px var(--text-dim);
+  transform: scale(1.05);
 }
 
 .sw-add:active {
-  transform: translateY(2px);
+  transform: translateY(3px);
+  box-shadow: none;
+  transition-duration: 0.05s;
 }
 
 /* The colour input, parked over the "+" that opened it so the picker appears there. */

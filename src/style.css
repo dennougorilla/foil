@@ -1047,7 +1047,7 @@ button {
 
 /* ---------- Panel ---------- */
 
-/* The pixel face draws × like a small x; on the sheet, times signs come from the system face. */
+/* The pixel face draws × like a small x; on the panel, times signs come from the system face. */
 @font-face {
   font-family: 'Times Sign';
   src: local('Segoe UI'), local('Helvetica Neue'), local('Helvetica'), local('Roboto'), local('Arial');
@@ -1055,85 +1055,88 @@ button {
 }
 
 /*
- * The panel is the card's job ticket: the paper order a print shop sends through the press
- * with it. Trim marks hold its corners and a colour bar runs along its head; three numbered
- * steps are ruled off down the sheet, values sit at the end of dotted leaders, and the last
- * step is a tear-off stub pinned to the bottom, where the format is ringed and the Save stamp
- * waits.
+ * The panel is a game's side table: one slate board with a light rim, a black outline and a deep
+ * drop, and on it three dark, sunken boxes, one per step. Each box wears a small coloured label
+ * with its number, and each step owns one colour: blue for the picture, orange for the finish
+ * (and for Fine-tune), red for Save. Buttons are thick slabs in those colours with a dark
+ * underside: they swell and wobble a little under the pointer and sink when pressed. Numbers sit
+ * large in dark pockets. A chosen option turns card-white; a white ring is keyboard focus; green
+ * marks what differs from the defaults.
  *
- * One rhythm: 24px around and between steps, 16px between fields, 8px inside a field. One
- * face: DotGothic16 at 16px (its own pixel grid) for everything you read or press, 18px in
- * bold for the step heads, 14px for side notes. The sheet is a step darker than the card face, so the card stays the
- * brightest thing on screen. Its inks each mean one thing: black ink for words and for every
- * choice that is made (a chosen option is inked solid), vermilion only for the one next step
- * (Open a file while a sample shows, the Save stamp once the picture is yours), cyan only for
- * keyboard focus, violet only for "changed from the default".
+ * One rhythm: 12px between the board's boxes, 16px inside them, 16px between fields. One face:
+ * DotGothic16 at 16px for everything you read or press, with a dark drop under labels.
  */
 .panel {
-  --sheet: #d9ceb1;
-  --sheet-lo: #ccc0a1;
-  --ink: #2a241e;
-  --ink-dim: #4b4236;
-  --rule: #a3957a;
-  --stamp: #c93a2f;
-  --stamp-lo: #8e271f;
-  --cyan: #0a6fae;
-  --mark: #6a3aa8;
-  /* A rubber stamp's print: vermilion with a paper line inside its border. */
-  --stamp-face: inset 0 0 0 3px var(--stamp), inset 0 0 0 5px rgba(255, 248, 239, 0.8);
-  --more: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4'%3E%3Cpath d='M0 0h6L3 4z' fill='%234b4236'/%3E%3C/svg%3E");
-  --pad: 24px;
+  --board: #2f4147;
+  --board-rim: #4f6970;
+  --well: #182226;
+  --pocket: #0d1417;
+  --slab: #435a61;
+  --slab-lo: #1a2427;
+  --blue: #1a9cff;
+  --blue-lo: #0b5a96;
+  --orange: #ff9a2a;
+  --orange-lo: #a35a08;
+  --red: #ee4f32;
+  --red-lo: #8a2414;
+  --mark: #59e0a5;
+  /* Side notes a step brighter than on the stage, so they read through the scanlines. */
+  --text-dim: #b3c3c6;
+  --drop: 0 2px 0 rgba(0, 0, 0, 0.5);
+  --pad: 14px;
+  --gap: 10px;
   /* The shared parts (fields, sliders, segments and the tabs' own controls) read these. */
-  --panel: var(--sheet);
-  --panel-lo: var(--sheet-lo);
-  --panel-hi: var(--rule);
-  --edge: var(--ink);
-  --text: var(--ink);
-  --text-dim: var(--ink-dim);
-  --paper: var(--ink);
-  --paper-ink: var(--sheet);
-  --slider-fill: var(--ink);
-  --gold: var(--cyan);
+  --panel: var(--board);
+  --panel-lo: var(--pocket);
+  --panel-hi: var(--slab);
+  --hue: var(--orange);
+  --hue-lo: var(--orange-lo);
   grid-area: panel;
   position: relative;
   z-index: 4;
-  /* The whole height of the window, so the Save stub never moves when the steps change. */
+  /* The whole height of the window, so the Save box never moves when the steps change. */
   height: calc(100dvh - 32px);
   margin: 16px 16px 16px 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-radius: 3px;
-  color: var(--ink);
-  /* Trim marks and the colour bar stay on the sheet's head; the fibres scroll. */
-  background:
-    var(--trim-tl) left 6px top 6px / 14px 14px no-repeat,
-    var(--trim-tr) right 6px top 6px / 14px 14px no-repeat,
-    linear-gradient(90deg, #1b9ad6 0 10px, #d6247a 10px 20px, #f4d21f 20px 30px, var(--ink) 30px 40px, #c9a227 40px 50px,
-      #ff7eb3 50px, #ffd36e 54px, #7cf7c8 58px, #6ec3ff 62px, #c18bff 66px 70px) right 28px top 9px / 70px 6px no-repeat,
-    radial-gradient(rgba(80, 60, 30, 0.07) 1px, transparent 1.3px) 0 0 / 5px 5px local,
-    var(--sheet);
+  border: 3px solid var(--board-rim);
+  border-radius: 18px;
+  color: var(--text);
+  font-family: 'Times Sign', var(--font);
+  background: var(--board);
   box-shadow:
-    0 0 0 3px #0b1012,
-    0 10px 0 3px rgba(0, 0, 0, 0.45);
+    0 0 0 3px var(--edge),
+    0 12px 0 3px rgba(0, 0, 0, 0.5);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-  font-family: 'Times Sign', var(--font);
+  scrollbar-color: var(--slab) transparent;
   /* Japanese wraps between phrases, never mid-word. */
   word-break: auto-phrase;
-  --trim-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M0 6h10M6 0v10' stroke='%232a241e' stroke-width='1.5' fill='none' opacity='.55'/%3E%3C/svg%3E");
-  --trim-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M14 6H4M8 0v10' stroke='%232a241e' stroke-width='1.5' fill='none' opacity='.55'/%3E%3C/svg%3E");
 }
 
+/* Each step is a dark box sunk into the board. */
 .sec {
   flex: none;
-  padding: 20px var(--pad);
+  margin: var(--gap) var(--gap) 0;
+  padding: var(--pad);
+  border-radius: 12px;
+  background: var(--well);
+  box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.35), 0 2px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Scrolled, what has gone up fades into the sheet's head instead of being sliced; the pinned
-   Fine-tune line covers it while it is stuck at the top. */
+.sec-image {
+  --hue: var(--blue);
+  --hue-lo: var(--blue-lo);
+}
+
+.sec-export {
+  --hue: var(--red);
+  --hue-lo: var(--red-lo);
+}
+
+/* Scrolled, what has gone up fades into the board instead of being sliced. */
 .panel::before {
   content: '';
   position: sticky;
@@ -1141,9 +1144,9 @@ button {
   z-index: 3;
   display: block;
   flex: none;
-  height: 40px;
-  margin-bottom: -40px;
-  background: linear-gradient(var(--sheet) 45%, transparent);
+  height: 28px;
+  margin-bottom: -28px;
+  background: linear-gradient(var(--board) 40%, transparent);
   opacity: 0;
   transition: opacity 0.15s;
   pointer-events: none;
@@ -1153,47 +1156,45 @@ button {
   opacity: 1;
 }
 
-/* A step's head: its circled number, what to do, and a rule run out to what it shows now. */
+/* A step's head: its coloured label, and what it shows now. */
 .sec-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 12px;
   row-gap: 2px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .sec-title {
-  flex: 1 1 auto;
-  display: flex;
+  flex: none;
+  display: inline-flex;
   align-items: center;
+  gap: 8px;
+  width: fit-content;
   margin: 0;
-  font-size: 18px;
+  padding: 3px 12px 3px 4px;
+  border-radius: 9px;
+  background: var(--hue);
+  box-shadow: 0 3px 0 var(--hue-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 16px;
   font-weight: 400;
-  line-height: 1.35;
-  /* The pixel face has one weight; a one-pixel echo sets the step heads in bold. */
-  text-shadow: 1px 0 0 currentColor;
-}
-
-.sec-title::after {
-  content: '';
-  flex: 1;
-  min-width: 16px;
-  margin-left: 12px;
-  border-top: 2px solid var(--ink);
+  line-height: 1.4;
+  text-shadow: var(--drop);
 }
 
 .step {
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  margin-right: 10px;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--sheet);
-  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--pocket);
+  color: #fff;
+  font-family: var(--display);
+  font-size: 12px;
   font-style: normal;
   line-height: 1;
   text-shadow: none;
@@ -1202,13 +1203,17 @@ button {
 .sec-note {
   margin-left: auto;
   font-size: 14px;
-  color: var(--ink-dim);
+  color: var(--text-dim);
 }
 
-/* Buttons (also used on the stage and in dialogs, so dark by default) */
+/*
+ * Buttons (also used on the stage and in dialogs): a thick slab with a dark underside. Under the
+ * pointer it swells a little with a spring; pressed, it sinks onto its underside.
+ */
 .btn {
-  --c: var(--panel-hi);
-  --lo: var(--edge);
+  --c: var(--slab, var(--panel-hi));
+  --lo: var(--slab-lo, var(--edge));
+  --lip: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1217,21 +1222,23 @@ button {
   min-height: 52px;
   padding: 8px 16px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--c);
   color: #fff;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
-  box-shadow: 0 5px 0 var(--lo);
-  transition: transform 0.07s, box-shadow 0.07s, filter 0.15s;
+  text-shadow: var(--drop, 0 2px 0 rgba(0, 0, 0, 0.3));
+  box-shadow: 0 var(--lip) 0 var(--lo), inset 0 3px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s, filter 0.15s;
 }
 
 .btn:hover {
   filter: brightness(1.08);
+  transform: scale(1.025);
 }
 
 .btn:active {
-  transform: translateY(5px);
-  box-shadow: 0 0 0 var(--lo);
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 var(--lo), inset 0 3px 0 rgba(255, 255, 255, 0.2);
+  transition-duration: 0.05s;
 }
 
 .btn[disabled] {
@@ -1266,7 +1273,7 @@ button {
   opacity: 0.85;
 }
 
-/* A paper-white button: a clear next step that doesn't compete with Save. */
+/* A card-white button: a clear next step that doesn't compete with Save. */
 .btn-paper {
   --c: var(--paper);
   --lo: #a9a497;
@@ -1274,33 +1281,20 @@ button {
   text-shadow: none;
 }
 
-/* Everything else that is a button: a raised slab in the panel's own colour. */
+/* Everything else that is a button: a raised slab in the board's own colour. */
 .btn-quiet {
   --c: var(--panel-hi);
   --lo: var(--edge);
   color: var(--text);
-  box-shadow: 0 5px 0 var(--lo), inset 0 0 0 2px rgba(255, 255, 255, 0.06);
 }
 
-/* On the sheet a button is printed, not raised: a ruled box, or a solid block of ink. */
-.panel .btn {
-  border-radius: 3px;
-  text-shadow: none;
-}
-
-.panel .btn-quiet {
-  background: transparent;
-  color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.panel .btn-quiet:hover {
-  filter: none;
-  background: var(--sheet-lo);
-}
-
-.panel .btn-quiet:active {
-  transform: translate(1px, 2px);
+/* The colour buttons wobble once as the pointer arrives, like a game's. */
+@keyframes slab-wobble {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.04) rotate(-1.4deg); }
+  55% { transform: scale(1.035) rotate(1deg); }
+  80% { transform: scale(1.03) rotate(-0.4deg); }
+  100% { transform: scale(1.03); }
 }
 
 /* 1 Choose a picture */
@@ -1308,118 +1302,104 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  padding-top: 4px;
 }
 
-/* Each picture is a small print with a white border, the chosen one pulled up and ticked. */
+/* Each picture is a little card, the chosen one lifted and ticked. */
 .thumb {
   position: relative;
   width: 46px;
   aspect-ratio: 5 / 7;
   padding: 0;
-  border: 3px solid #fbf7ec;
-  border-radius: 3px;
-  background: var(--sheet-lo) center / cover no-repeat;
-  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 2px rgba(42, 36, 30, 0.22);
-  transition: transform 0.2s var(--ease-back), box-shadow 0.15s;
+  border: 3px solid var(--paper);
+  border-radius: 6px;
+  background: var(--pocket) center / cover no-repeat;
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.15s, filter 0.15s;
   image-rendering: pixelated;
 }
 
 .thumb[data-badge]::after {
   content: attr(data-badge);
   position: absolute;
-  right: -7px;
-  bottom: -7px;
+  right: -8px;
+  bottom: -8px;
   padding: 0 4px;
-  border-radius: 2px;
-  background: var(--ink);
-  color: var(--sheet);
+  border-radius: 4px;
+  background: var(--pocket);
+  box-shadow: 0 0 0 2px var(--edge);
+  color: var(--text);
   font-family: var(--display);
   font-size: 10px;
   line-height: 14px;
 }
 
 .thumb:hover {
-  transform: translateY(-3px) rotate(-2deg);
+  transform: translateY(-3px) rotate(-3deg) scale(1.06);
 }
 
 .thumb:not([aria-checked='true']) {
-  filter: saturate(0.7) brightness(0.92);
+  filter: saturate(0.6) brightness(0.75);
+}
+
+.thumb:not([aria-checked='true']):hover {
+  filter: none;
 }
 
 .thumb[aria-checked='true'] {
-  box-shadow: 0 0 0 2px var(--ink), 3px 6px 0 2px rgba(42, 36, 30, 0.28);
-  transform: translateY(-6px) rotate(-3deg);
+  box-shadow: 0 0 0 2px var(--edge), 0 7px 0 2px var(--edge);
+  transform: translateY(-5px) rotate(-3deg);
 }
 
 .thumb[aria-checked='true']::before {
   content: '';
   position: absolute;
-  top: -9px;
-  right: -9px;
-  width: 16px;
-  height: 16px;
-  border-radius: 2px;
+  top: -10px;
+  right: -10px;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4l2 2 4-4' stroke='%23d9ceb1' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") center / 10px no-repeat,
-    var(--ink);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4l2 2 4-4' stroke='%23fff' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") center / 10px no-repeat,
+    var(--blue);
+  box-shadow: 0 0 0 2px var(--edge);
 }
 
-/* While a sample shows, opening your own picture is the vermilion step; after that, a ruled one. */
+/* While a sample shows, opening your own picture is the blue slab; after that, a slate one. */
 .pick {
   justify-content: flex-start;
-  min-height: 52px;
-  background: transparent;
-  color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.pick:hover {
-  filter: none;
-  background: var(--sheet-lo);
-}
-
-.pick:active {
-  transform: translate(1px, 2px);
 }
 
 .panel[data-picture='sample'] .pick {
-  background: var(--stamp);
-  color: #fff8ef;
-  box-shadow: var(--stamp-face), 3px 4px 0 rgba(42, 36, 30, 0.3);
+  --c: var(--blue);
+  --lo: var(--blue-lo);
 }
 
 .panel[data-picture='sample'] .pick:hover {
-  background: var(--stamp);
-  filter: brightness(1.06);
-  transform: translate(-1px, -2px);
-  box-shadow: var(--stamp-face), 5px 7px 0 rgba(42, 36, 30, 0.3);
-}
-
-.panel[data-picture='sample'] .pick:active {
-  transform: translate(3px, 4px);
-  box-shadow: var(--stamp-face), 0 0 0 rgba(42, 36, 30, 0.3);
+  animation: slab-wobble 0.45s var(--ease-out) forwards;
 }
 
 /* The crop frame beside its zoom, the same for any shape of picture: zoom, then what to do. */
 .crop {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 18px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 16px;
 }
 
 .crop-view {
   position: relative;
   display: grid;
   place-items: center;
-  width: 108px;
-  height: 120px;
-  border-radius: 2px;
+  width: 100px;
+  height: 112px;
+  border-radius: 8px;
   background:
-    repeating-linear-gradient(45deg, rgba(42, 36, 30, 0.09) 0 2px, transparent 2px 7px),
-    var(--sheet-lo);
-  box-shadow: inset 0 0 0 2px var(--ink);
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 7px),
+    var(--pocket);
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.6);
   overflow: hidden;
   touch-action: none;
   cursor: grab;
@@ -1433,15 +1413,16 @@ button {
   display: block;
   max-width: 100%;
   max-height: 100%;
-  opacity: 0.6;
+  opacity: 0.45;
 }
 
 .crop-window {
   position: absolute;
+  border-radius: 2px;
   box-shadow:
-    0 0 0 2px #fbf7ec,
-    0 0 0 4px var(--ink),
-    0 0 0 999px color-mix(in srgb, var(--sheet-lo) 35%, transparent);
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--edge),
+    0 0 0 999px rgba(13, 20, 23, 0.35);
   background-repeat: no-repeat;
   pointer-events: none;
 }
@@ -1452,9 +1433,9 @@ button {
 
 .crop-view:focus-visible .crop-window {
   box-shadow:
-    0 0 0 2px #fbf7ec,
-    0 0 0 5px var(--cyan),
-    0 0 0 999px color-mix(in srgb, var(--sheet-lo) 35%, transparent);
+    0 0 0 2px var(--paper),
+    0 0 0 5px var(--gold),
+    0 0 0 999px rgba(13, 20, 23, 0.35);
 }
 
 .crop-side {
@@ -1462,7 +1443,6 @@ button {
   grid-template-columns: minmax(0, 1fr) auto;
   align-content: start;
   gap: 10px 12px;
-  padding-top: 2px;
 }
 
 .crop-side .row {
@@ -1482,10 +1462,10 @@ button {
   display: grid;
   gap: 12px;
   margin-top: 16px;
-  padding: 14px 16px 14px 20px;
-  border-radius: 2px;
-  background: rgba(201, 58, 47, 0.08);
-  box-shadow: inset 4px 0 0 var(--stamp), inset 0 0 0 2px rgba(201, 58, 47, 0.5);
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #3a1d19;
+  box-shadow: inset 0 0 0 2px var(--red), 0 3px 0 var(--red-lo);
 }
 
 .image-error p {
@@ -1503,11 +1483,12 @@ button {
   content: '!';
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  margin-top: 2px;
-  border-radius: 2px;
-  background: var(--stamp);
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: var(--red);
+  box-shadow: 0 2px 0 var(--red-lo);
   color: #fff;
   font-size: 14px;
   line-height: 1;
@@ -1522,9 +1503,6 @@ button {
 .image-error .btn {
   width: auto;
   min-height: 40px;
-  background: transparent;
-  color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--ink);
 }
 
 .image-error .btn svg {
@@ -1537,68 +1515,55 @@ button {
   filter: saturate(0.6);
 }
 
-/* 2 Choose a finish: what is on the card, as a swatch of the foil stock, and a way to the hand. */
+/* 2 Choose a finish: a proof of the card as it is now, its finish, and a way to the hand. */
 .sec-finish .sec-title {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-/* The proof, and beside it the finish's name, its look, and the way to the hand. */
 .finish-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
-  gap: 4px 18px;
+  gap: 2px 16px;
 }
 
-.finish-row .proof-sheet {
+.finish-row .finish-proof {
   grid-row: 1 / span 3;
+  margin: 2px 0 4px 4px;
+  rotate: -4deg;
+}
+
+.finish-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--orange);
+  text-shadow: var(--drop);
 }
 
 .finish-look {
   font-size: 14px;
-  color: var(--ink-dim);
+  color: var(--text-dim);
 }
 
 .finish-row .finish-pick {
   justify-self: start;
   align-self: end;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
-/* A proof as the print shop pulls it: trim marks at its corners and a tag under it. */
-.proof-sheet {
-  --t: linear-gradient(var(--ink-dim), var(--ink-dim));
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  padding: 7px 7px 0;
-  background:
-    var(--t) left 0 top 0 / 6px 1.5px no-repeat,
-    var(--t) left 0 top 0 / 1.5px 6px no-repeat,
-    var(--t) right 0 top 0 / 6px 1.5px no-repeat,
-    var(--t) right 0 top 0 / 1.5px 6px no-repeat;
-}
-
-.proof-sheet i {
-  padding: 0 5px;
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 1.5px var(--ink-dim);
-  color: var(--ink-dim);
-  font-family: var(--display);
-  font-size: 10px;
-  font-style: normal;
-  line-height: 15px;
-  letter-spacing: 0.06em;
-}
-
-/* A proof of the card as it is now: the finish as it really looks, pinned beside its name. */
+/* The proof: the finish as it really looks, a little card on the box. */
 .finish-proof {
-  width: 52px;
-  height: 73px;
+  width: 56px;
+  height: 78px;
   overflow: hidden;
-  border-radius: 2px;
-  background: #141c1f;
-  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 2px rgba(42, 36, 30, 0.22);
+  border-radius: 5px;
+  background: var(--pocket);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
 }
 
 .finish-proof canvas {
@@ -1607,6 +1572,41 @@ button {
   height: 100%;
 }
 
+/* The way to the hand: a small orange slab. */
+.finish-pick {
+  --lip: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--orange);
+  box-shadow: 0 var(--lip) 0 var(--orange-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 14px;
+  text-shadow: var(--drop);
+  white-space: nowrap;
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
+}
+
+.finish-pick:hover {
+  animation: slab-wobble 0.45s var(--ease-out) forwards;
+}
+
+.finish-pick:active {
+  animation: none;
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 var(--orange-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  transition-duration: 0.05s;
+}
+
+.finish-pick svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
 
 /* While tuning, the formats keep to their names so the tabs get the room. */
 .panel.is-tuning .seg-format small {
@@ -1628,11 +1628,11 @@ button {
 }
 
 .panel.is-tuning :is(.sec-image, .sec-finish) {
-  padding-block: 4px;
+  padding: 6px 8px 6px 10px;
 }
 
-.panel.is-tuning .sec-image {
-  padding-top: 16px;
+.panel.is-tuning .sec-finish {
+  margin-top: 8px;
 }
 
 .panel.is-tuning .recap {
@@ -1641,35 +1641,36 @@ button {
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   padding: 2px 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: 8px;
   background: none;
-  color: var(--ink);
+  color: var(--text);
   text-align: left;
 }
 
-.recap:hover {
-  background: var(--sheet-lo);
-}
-
 .recap .step {
-  margin-right: 0;
+  background: var(--hue);
+  box-shadow: 0 2px 0 var(--hue-lo);
+  text-shadow: var(--drop);
 }
 
 .recap-thumb {
   width: 24px;
   height: 33px;
-  border: 2px solid #fbf7ec;
-  border-radius: 2px;
+  border: 2px solid var(--paper);
+  border-radius: 4px;
   background: center / cover no-repeat;
-  box-shadow: 0 0 0 2px var(--ink);
+  box-shadow: 0 0 0 2px var(--edge);
   image-rendering: pixelated;
 }
 
 .recap .finish-proof {
+  width: 24px;
+  height: 33px;
   border: 0;
+  rotate: none;
 }
 
 .recap-name {
@@ -1681,48 +1682,25 @@ button {
 }
 
 .recap-go {
-  font-size: 14px;
-  color: var(--ink-dim);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.finish-name {
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 400;
-  font-size: 16px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.finish-pick {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 12px 0 10px;
-  border: 0;
-  border-radius: 3px;
-  background: none;
-  box-shadow: inset 0 0 0 2px var(--ink);
-  color: var(--ink);
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: #5d7880;
+  box-shadow: 0 3px 0 var(--slab-lo), inset 0 2px 0 rgba(255, 255, 255, 0.15);
+  color: #fff;
   font-size: 13px;
-  white-space: nowrap;
+  text-shadow: var(--drop);
+  transition: transform 0.25s var(--ease-back);
 }
 
-.finish-pick:hover {
-  background: var(--sheet-lo);
+.recap:hover .recap-go {
+  transform: scale(1.08);
+  background: var(--hue);
+  box-shadow: 0 3px 0 var(--hue-lo);
 }
 
-.finish-pick:active {
-  transform: translate(1px, 2px);
-}
-
-.finish-pick svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
+.recap:active .recap-go {
+  transform: translateY(3px);
+  box-shadow: none;
 }
 
 /* Flip Lenticular's other picture: one quiet row under the finish, only while Flip Lenticular is on. */
@@ -1732,6 +1710,9 @@ button {
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid rgba(255, 255, 255, 0.06);
 }
 
 .flip-row[hidden] {
@@ -1741,8 +1722,8 @@ button {
 .flip-thumb {
   width: 22px;
   height: 30px;
-  border-radius: 3px;
-  background: var(--panel-lo) center / cover no-repeat;
+  border-radius: 4px;
+  background: var(--pocket) center / cover no-repeat;
   box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--paper);
 }
 
@@ -1772,16 +1753,18 @@ button {
   font-size: 13px;
 }
 
-
-/* Fine-tune: one ruled line on the sheet that opens the detailed controls. */
+/* Fine-tune: a slate slab on the board that opens the detailed controls into a box below it. */
 .sec-adjust {
-  padding-top: 8px;
-  padding-bottom: 8px;
-  /* Whatever room is left sits here, so the GIF options and the stub keep to the bottom. */
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  /* Whatever room is left sits here, so the GIF options and the Save box keep to the bottom. */
   margin-bottom: auto;
 }
 
 .adjust-toggle {
+  --lip: 5px;
   position: sticky;
   top: 0;
   z-index: 4;
@@ -1790,25 +1773,38 @@ button {
   align-items: center;
   gap: 14px;
   width: 100%;
-  min-height: 60px;
-  padding: 10px 0;
+  min-height: 56px;
+  margin-bottom: var(--lip);
+  padding: 6px 12px 6px 14px;
   border: 0;
-  border-top: 2px solid var(--rule);
-  border-bottom: 2px solid var(--rule);
-  border-radius: 0;
-  background: var(--sheet);
+  border-radius: 12px;
+  background: var(--slab);
+  box-shadow: 0 var(--lip) 0 var(--slab-lo), inset 0 3px 0 rgba(255, 255, 255, 0.12);
   text-align: left;
+  text-shadow: var(--drop);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
 }
 
 .adjust-toggle:hover {
-  background: var(--sheet-lo);
+  transform: scale(1.015);
+}
+
+.adjust-toggle:active {
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 var(--slab-lo), inset 0 3px 0 rgba(255, 255, 255, 0.12);
+  transition-duration: 0.05s;
+}
+
+/* Stuck at the top while tuning, it keeps a margin of board round it so nothing shows past it. */
+.panel.is-tuning .adjust-toggle {
+  box-shadow: 0 var(--lip) 0 var(--slab-lo), inset 0 3px 0 rgba(255, 255, 255, 0.12), 0 calc(var(--lip) + 4px) 0 4px var(--board), 0 -10px 0 4px var(--board);
 }
 
 .adjust-icon {
   width: 22px;
   height: 22px;
-  margin-left: 4px;
-  fill: var(--ink);
+  fill: var(--orange);
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
 }
 
 .adjust-text {
@@ -1823,36 +1819,38 @@ button {
 
 .adjust-text small {
   font-size: 14px;
-  color: var(--ink-dim);
+  color: var(--text-dim);
+  text-shadow: none;
 }
 
 .adjust-text small.is-changed {
   color: var(--mark);
 }
 
-/* The fold opener: a ruled box like the ticket's tick boxes, its arrow turning when open. */
+/* The fold's arrow sits in a dark pocket and turns when open. */
 .adjust-chev {
-  width: 28px;
-  height: 28px;
-  margin-right: 4px;
-  padding: 5px;
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 2px var(--ink);
-  fill: var(--ink);
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--pocket);
+  box-shadow: inset 0 2px 0 #000;
+  fill: var(--text);
+  transition: rotate 0.25s var(--ease-back);
 }
 
-/* Open, the line says it closes: a word beside the turned arrow. */
+/* Open, the slab says it closes: a word beside the turned arrow. */
 .adjust-close {
   display: none;
   font-size: 14px;
-  color: var(--ink-dim);
+  color: var(--text-dim);
 }
 
 .sec-adjust.is-open .adjust-close {
   display: block;
 }
 
-/* Open, the tabs carry their own marks, so the line's summary steps aside. */
+/* Open, the tabs carry their own marks, so the slab's summary steps aside. */
 .sec-adjust.is-open .adjust-text small {
   display: none;
 }
@@ -1862,94 +1860,105 @@ button {
 }
 
 .sec-adjust.is-open .adjust-chev {
-  box-shadow: none;
-  transform: rotate(180deg);
+  rotate: 180deg;
 }
 
+/* The controls: an orange-labelled box under the slab. */
 .adjust-body {
-  margin-top: 0;
+  margin-top: var(--gap);
+  padding: 0 var(--pad) var(--pad);
+  border-radius: 12px;
+  background: var(--well);
+  box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.35), 0 2px 0 rgba(255, 255, 255, 0.06);
 }
 
-
-
-/* Tabs, and the way to close them, stay in reach while their content scrolls under them. */
+/* Tabs stay in reach while their content scrolls under them. */
 .tabs-bar {
   position: sticky;
-  top: var(--adjust-row-h, 64px);
+  top: var(--adjust-row-h, 72px);
   z-index: 3;
   margin: 0 calc(-1 * var(--pad));
-  padding: 10px var(--pad);
-  /* Its rule keeps to the sheet's margins, like every other rule on it. */
-  background:
-    linear-gradient(var(--ink), var(--ink)) bottom center / calc(100% - 2 * var(--pad)) 2px no-repeat,
-    var(--sheet);
+  padding: 14px var(--pad) 12px;
+  border-radius: 12px 12px 0 0;
+  background: var(--well);
 }
 
-/* What scrolls up under the tabs fades into the sheet instead of being cut by their rule. */
+/* What scrolls up under the tabs fades into the box instead of being cut. */
 .tabs-bar::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
   top: 100%;
-  height: 18px;
-  background: linear-gradient(var(--sheet), transparent);
+  height: 16px;
+  background: linear-gradient(var(--well), transparent);
   pointer-events: none;
 }
 
-/* Each tab is as wide as its word, so long English names never run together. */
+/* Each tab is a slab as wide as its word; the open one is orange and stands up off the row. */
 .tabs {
   display: flex;
   justify-content: space-between;
-  gap: 4px;
+  gap: 5px;
+  padding: 8px 5px 6px;
+  border-radius: 10px;
+  background: var(--pocket);
+  box-shadow: inset 0 3px 0 #000;
 }
 
 .tab {
+  --lip: 3px;
   position: relative;
   flex: 1 1 auto;
-  min-height: 40px;
-  padding: 4px 8px;
+  min-height: 38px;
+  padding: 2px 6px;
   border: 0;
-  border-radius: 2px;
-  background: none;
-  box-shadow: inset 0 0 0 2px var(--rule);
-  color: var(--ink);
+  border-radius: 8px;
+  background: var(--slab);
+  box-shadow: 0 var(--lip) 0 var(--slab-lo);
+  color: var(--text-dim);
   font-size: 16px;
   line-height: 1.2;
   white-space: nowrap;
+  text-shadow: var(--drop);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s, background-color 0.15s;
 }
 
 .tab:hover {
-  background: var(--sheet-lo);
-  box-shadow: inset 0 0 0 2px var(--ink);
+  color: var(--text);
+  transform: translateY(-2px);
+  box-shadow: 0 calc(var(--lip) + 2px) 0 var(--slab-lo);
 }
 
 .tab[aria-selected='true'] {
-  background: var(--ink);
-  color: var(--sheet);
-  box-shadow: none;
+  background: var(--orange);
+  color: #fff;
+  transform: translateY(-4px);
+  box-shadow: 0 calc(var(--lip) + 4px) 0 var(--orange-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
 
-/* Something in the tab differs from the defaults: a violet correction mark. */
+.tab:active {
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 var(--slab-lo);
+  transition-duration: 0.05s;
+}
+
+/* Something in the tab differs from the defaults: a green gem in its corner. */
 .tab-dot {
   position: absolute;
-  top: 5px;
-  right: 6px;
-  width: 7px;
-  height: 7px;
+  top: -4px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
   background: var(--mark);
-  box-shadow: 0 0 0 2px var(--sheet);
+  box-shadow: 0 0 0 2px var(--edge);
   transform: rotate(45deg);
-}
-
-.tab[aria-selected='true'] .tab-dot {
-  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .pane {
   display: grid;
   gap: 24px;
-  padding: 24px 0 8px;
+  padding: 16px 0 4px;
 }
 
 .pane[hidden] {
@@ -1966,73 +1975,88 @@ button {
   display: none;
 }
 
-/* GIF options sit in the flow just above the stub; only the stub is pinned. */
+/* GIF options sit in the flow just above the Save box; only the Save box is pinned. */
 .sec-format {
   display: grid;
   gap: 16px;
+  padding-block: 8px;
 }
 
 .sec-format:not(:has(.save-opts:not([hidden]))) {
   display: none;
 }
 
-/* 3 Export: the tear-off stub, pinned to the bottom of the sheet. */
+/* 3 Export: the red-labelled box pinned to the bottom of the board. */
 .sec-export {
   position: sticky;
-  bottom: 0;
+  bottom: var(--gap);
   /* Above everything that scrolls under it (slider thumbs and chips carry their own z-index). */
   z-index: 10;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  padding-top: 26px;
-  background: var(--sheet);
+  margin-top: 16px;
+  margin-bottom: var(--gap);
+  /* A margin of board all round, so nothing scrolling under it shows past its corners. */
+  box-shadow: inset 0 4px 0 rgba(0, 0, 0, 0.35), 0 0 0 var(--gap) var(--board);
 }
 
-/* Steps scrolling under the stub fade into the sheet instead of being sliced mid-line. */
+/* Steps scrolling under the Save box fade into the board instead of being sliced mid-line. */
 .sec-export::before {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 36px;
-  background: linear-gradient(transparent, var(--sheet) 85%);
+  left: calc(-1 * var(--gap));
+  right: calc(-1 * var(--gap));
+  bottom: calc(100% + var(--gap));
+  height: 24px;
+  background: linear-gradient(transparent, var(--board) 90%);
+  opacity: 0;
+  transition: opacity 0.15s;
   pointer-events: none;
 }
 
-/* More of the sheet waits below: a small arrow in the fade says so. */
-.panel.has-more :is(.sec-export, .tune-dock)::before {
-  content: var(--more-text);
-  display: grid;
-  place-items: end center;
-  height: 44px;
-  padding-bottom: 6px;
-  background: linear-gradient(transparent, var(--sheet) 55%);
-  font-size: 13px;
-  color: var(--ink-dim);
+/* Only while something actually runs on under it; otherwise Fine-tune shows whole above it. */
+.panel.has-more .sec-export::before {
+  opacity: 1;
 }
 
-/* With the Shine tab's dock pinned above the stub, the dock carries the fade instead. */
+/* More of the board waits below: a small tag on the Save box's top edge says so, clear of the
+   controls above it. */
+.sec-export::after,
+.tune-dock::after {
+  content: var(--more-text);
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--slab);
+  box-shadow: 0 0 0 2px var(--edge);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.panel.has-more :is(.sec-export, .tune-dock)::after {
+  opacity: 1;
+}
+
+/* With the Shine tab's dock pinned above the Save box, the dock carries the tag instead. */
+.panel:has(.tune-dock:not([hidden])) .sec-export::after {
+  display: none;
+}
+
+/* With the Shine tab's dock pinned above the Save box, the dock carries the fade instead. */
 .panel:has(.tune-dock:not([hidden])) .sec-export::before {
   display: none;
 }
 
-/* The perforation: a dashed tear line with a punched hole every few pixels. */
-.sec-export::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 8px;
-  background:
-    radial-gradient(circle, #141c1f 2.5px, transparent 3px) center / 12px 8px repeat-x;
-  pointer-events: none;
-}
-
-/* Formats: one of four, each with a word for what it makes (a still, a loop...); the chosen
-   one is inked. */
+/* Formats: one of three, each with a word for what it makes (a still, a loop...). */
 .seg.seg-format {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -2041,7 +2065,7 @@ button {
 .panel .seg-format .seg-btn {
   display: grid;
   place-content: center;
-  min-height: 46px;
+  min-height: 48px;
   padding: 4px 2px;
   line-height: 1.15;
 }
@@ -2054,15 +2078,10 @@ button {
   font-size: 12px;
   letter-spacing: -0.04em;
   white-space: nowrap;
-  color: var(--ink-dim);
+  opacity: 0.8;
 }
 
-.seg-format .seg-btn[aria-checked='true'] small {
-  color: inherit;
-  opacity: 0.85;
-}
-
-/* Save options: one quiet line under the formats; opened only by those who want them. */
+/* Save options: one quiet line under the steps; opened only by those who want them. */
 .save-opts[hidden],
 .save-opts-body[hidden],
 .save-opts .field[hidden],
@@ -2073,7 +2092,6 @@ button {
 .save-opts {
   display: grid;
   gap: 16px;
-  margin: -8px 0 -8px;
 }
 
 .save-opts-toggle {
@@ -2085,13 +2103,13 @@ button {
   padding: 0 2px;
   border: 0;
   background: none;
-  color: var(--ink-dim);
+  color: var(--text-dim);
   font-size: 16px;
   text-align: left;
 }
 
 .save-opts-toggle:hover {
-  color: var(--ink);
+  color: var(--text);
 }
 
 .save-opts-toggle small {
@@ -2128,20 +2146,21 @@ button {
 
 .matte-sw {
   position: relative;
-  min-width: 34px;
-  height: 34px;
+  min-width: 36px;
+  height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 3px;
-  background: var(--sw, var(--sheet-lo));
-  box-shadow: 0 0 0 2px var(--ink);
-  color: var(--ink-dim);
+  border-radius: 8px;
+  background: var(--sw, var(--slab));
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
+  color: var(--text);
   font-size: 13px;
-  transition: transform 0.15s var(--ease-back), box-shadow 0.15s;
+  text-shadow: var(--drop);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.15s;
 }
 
 .matte-sw:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.06);
 }
 
 .matte-white {
@@ -2152,10 +2171,6 @@ button {
   --sw: #000000;
 }
 
-.matte-auto {
-  background: var(--sheet-lo);
-}
-
 /* Any colour: a colour wheel with a plus, or the picked colour once set. */
 .matte-custom:not(.is-set) {
   background: conic-gradient(#ff5a4f, #ffd84a, #3fc28f, #1a9cff, #b26cd8, #ff5a4f);
@@ -2164,20 +2179,19 @@ button {
 .matte-custom:not(.is-set)::after {
   content: '+';
   position: absolute;
-  inset: 7px;
+  inset: 8px;
   display: grid;
   place-items: center;
-  border-radius: 2px;
-  background: var(--sheet);
-  color: var(--ink);
+  border-radius: 4px;
+  background: var(--well);
+  color: var(--text);
   font-family: var(--display);
   font-size: 13px;
   line-height: 1;
 }
 
 .matte-sw[aria-checked='true'] {
-  color: var(--ink);
-  box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 5px var(--paper), 0 0 0 7px var(--edge);
   transform: translateY(-2px);
 }
 
@@ -2196,48 +2210,54 @@ button {
 }
 
 /*
- * The Save stamp. While a sample shows, it waits in a plain ruled box (still pressable); once
- * the picture is yours, it is the vermilion stamp. Hover lifts it off the sheet a little;
- * pressing sets it down.
+ * Save. While a sample shows, it rests as a slate slab (still pressable); once the picture is
+ * yours, it is the big red slab and wobbles as the pointer arrives.
  */
 #saveBtn {
-  --c: var(--stamp);
-  --lo: var(--stamp-lo);
+  --c: var(--red);
+  --lo: var(--red-lo);
+  --lip: 6px;
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   justify-items: start;
-  min-height: 60px;
+  min-height: 58px;
+  margin-bottom: var(--lip);
+  border-radius: 12px;
   overflow: hidden;
-  color: #fff8ef;
-  box-shadow: var(--stamp-face), 3px 4px 0 rgba(42, 36, 30, 0.3);
+}
+
+#saveBtn > svg {
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.25);
 }
 
 #saveBtn:not([aria-busy]):hover {
-  filter: brightness(1.06);
-  transform: translate(-1px, -2px);
-  box-shadow: var(--stamp-face), 5px 7px 0 rgba(42, 36, 30, 0.3);
+  animation: slab-wobble 0.45s var(--ease-out) forwards;
 }
 
 #saveBtn:not([aria-busy]):active {
-  transform: translate(3px, 4px);
-  box-shadow: var(--stamp-face), 0 0 0 rgba(42, 36, 30, 0.3);
+  animation: none;
 }
 
 .panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved) {
-  background: transparent;
-  color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--ink);
-  transform: none;
+  --c: var(--slab);
+  --lo: var(--slab-lo);
+  color: #fff;
+}
+
+/* Resting, the red stays on its icon: still a live button, just not the next step yet. */
+.panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved) > svg {
+  background: var(--red);
+  box-shadow: 0 3px 0 var(--red-lo);
 }
 
 .panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved):hover {
-  filter: none;
-  background: var(--sheet-lo);
-}
-
-.panel[data-picture='sample'] #saveBtn:not([aria-busy]):not(.is-saved):active {
-  transform: translate(1px, 2px);
+  animation: none;
 }
 
 /* A band of foil light sweeps across once on hover, the same sheen the cards wear. */
@@ -2267,33 +2287,28 @@ button {
   to { background-position: 0 0; opacity: 1; }
 }
 
-/* Saved: the stamp has done its job and goes quiet, and the dated seal says so on it. */
-#saveBtn.is-saved,
-#saveBtn.is-saved:not([aria-busy]):hover {
-  background: transparent;
-  color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--ink);
-  filter: none;
-  transform: none;
+/* Saved: the slab turns green for a moment and a gold "done" tag pops onto it. */
+#saveBtn.is-saved {
+  --c: #2f9e72;
+  --lo: #17573e;
 }
 
 #saveBtn.is-saved .btn-text small {
   opacity: 1;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #saveBtn:not([aria-busy]):hover::before {
-    animation: none;
-  }
-}
-
 #saveBtn .btn-text b {
   font-variant-numeric: tabular-nums;
 }
 
-/* The note wraps rather than being cut off where the stamp is narrow. */
+/* The note keeps to one line (a long file name ends in …), so the box never changes height. */
+#saveBtn .btn-text {
+  min-width: 0;
+}
+
 #saveBtn .btn-text small {
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .save-meta {
@@ -2319,30 +2334,22 @@ button {
   opacity: 0.85;
 }
 
-/* Saved: a dated "done" seal is pressed onto the stamp, and fades when it is ready again. */
 .seal {
   display: none;
   grid-column: 3;
   grid-row: 1;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px 3px 6px;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px var(--sheet), inset 0 0 0 5px var(--ink);
-  color: var(--ink);
-  line-height: 1.1;
-  rotate: -5deg;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge);
+  color: #3a2706;
+  font-size: 18px;
+  line-height: 1.2;
+  text-shadow: none;
+  rotate: -6deg;
   pointer-events: none;
-}
-
-.seal b {
-  font-weight: 400;
-  font-size: 22px;
-}
-
-.seal small {
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
 }
 
 #saveBtn.is-saved .save-meta {
@@ -2351,23 +2358,18 @@ button {
 
 #saveBtn.is-saved .seal {
   display: flex;
-  animation: seal-in 0.3s var(--ease-back);
+  animation: seal-in 0.4s var(--ease-back);
 }
 
 @keyframes seal-in {
   from {
     opacity: 0;
-    scale: 1.7;
+    scale: 0.3;
+    rotate: 20deg;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #saveBtn.is-saved .seal {
-    animation: none;
-  }
-}
-
-/* Busy: the stamp's face fills left to right as the export runs. */
+/* Busy: the slab's face fills left to right as the export runs. */
 #saveBtn[aria-busy] {
   filter: none;
   background: linear-gradient(90deg, var(--c) calc(var(--p, 0) * 100%), var(--lo) 0);
@@ -2381,7 +2383,7 @@ button {
     'label out'
     'input input';
   align-items: center;
-  gap: 4px 12px;
+  gap: 6px 12px;
 }
 
 .row > label,
@@ -2413,6 +2415,31 @@ output {
   font-variant-numeric: tabular-nums;
   color: var(--text);
   text-align: right;
+}
+
+/* On the board a value sits large in a dark pocket, in its step's colour. */
+.panel output {
+  min-width: 64px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--pocket);
+  box-shadow: inset 0 2px 0 #000;
+  color: var(--hue);
+  font-size: 20px;
+  line-height: 32px;
+  text-align: center;
+  text-shadow: var(--drop);
+}
+
+/* A value that changes pops in its pocket (set from main.ts). */
+.panel output.is-bump {
+  animation: value-bump 0.3s var(--ease-back);
+}
+
+@keyframes value-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.18) rotate(-3deg); color: #fff; }
+  100% { transform: scale(1); }
 }
 
 .hint {
@@ -2457,55 +2484,64 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* One slider for the whole panel: a dark groove, a pale fill up to a paper thumb. */
+/* One slider everywhere: a sunken groove filled in the step's colour, and a thick card-white grip. */
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 28px;
+  height: 30px;
   margin: 0;
   background: transparent;
 }
 
 input[type='range']::-webkit-slider-runnable-track {
-  height: 8px;
-  border-radius: 0;
+  height: 10px;
+  border-radius: 5px;
   background:
-    linear-gradient(var(--slider-fill), var(--slider-fill)) 0 0 / var(--fill, 50%) 100% no-repeat,
+    linear-gradient(var(--hue, var(--slider-fill)), var(--hue, var(--slider-fill))) 0 0 / var(--fill, 50%) 100% no-repeat,
     var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--edge);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.7), 0 0 0 2px var(--edge);
 }
 
 input[type='range']::-moz-range-track {
-  height: 8px;
-  border-radius: 0;
+  height: 10px;
+  border-radius: 5px;
   background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--edge);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.7), 0 0 0 2px var(--edge);
 }
 
 input[type='range']::-moz-range-progress {
-  height: 8px;
-  border-radius: 0;
-  background: var(--slider-fill);
+  height: 10px;
+  border-radius: 5px;
+  background: var(--hue, var(--slider-fill));
 }
 
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 18px;
-  height: 22px;
-  margin-top: -7px;
-  border-radius: 2px;
+  width: 20px;
+  height: 26px;
+  margin-top: -10px;
+  border-radius: 6px;
   background: var(--paper);
-  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge), inset 0 -4px 0 #cfc8b6;
+  transition: transform 0.2s var(--ease-back);
 }
 
 input[type='range']::-moz-range-thumb {
-  width: 18px;
-  height: 22px;
+  width: 20px;
+  height: 26px;
   border: 0;
-  border-radius: 2px;
+  border-radius: 6px;
   background: var(--paper);
-  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge), inset 0 -4px 0 #cfc8b6;
+}
+
+input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type='range']:active::-webkit-slider-thumb {
+  transform: translateY(2px) scale(1.05);
 }
 
 input[type='range']:focus-visible {
@@ -2514,17 +2550,19 @@ input[type='range']:focus-visible {
 
 input[type='range']:focus-visible::-webkit-slider-thumb {
   background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge), 0 0 0 6px rgba(242, 193, 78, 0.45);
 }
 
 input[type='range']:focus-visible::-moz-range-thumb {
   background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge), 0 0 0 6px rgba(242, 193, 78, 0.45);
 }
 
 input[type='range']:disabled {
   opacity: 0.4;
 }
 
-/* Segmented radio groups: chosen turns paper-white, like a card face. */
+/* Segmented radio groups: slate slabs; the chosen one turns card-white and stands up. */
 .seg {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2532,34 +2570,41 @@ input[type='range']:disabled {
 }
 
 .seg-btn {
+  --lip: 4px;
   position: relative;
   min-height: 40px;
+  margin-bottom: var(--lip);
   padding: 4px 6px;
   border: 0;
-  border-radius: 4px;
-  background: var(--panel-lo);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 4px 0 var(--edge);
-  color: var(--text-dim);
+  border-radius: 8px;
+  background: var(--panel-hi);
+  box-shadow: 0 var(--lip) 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text);
   font-size: 16px;
   line-height: 1.2;
   white-space: nowrap;
-  /* The chosen state switches at once; only the press moves. */
-  transition: transform 0.08s;
+  text-shadow: var(--drop, none);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
 }
 
 .seg-btn:hover {
   color: var(--text);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 calc(var(--lip) + 2px) 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
 .seg-btn[aria-checked='true'] {
   background: var(--paper);
   color: var(--paper-ink);
-  box-shadow: 0 4px 0 var(--edge);
+  text-shadow: none;
+  transform: translateY(-2px);
+  box-shadow: 0 calc(var(--lip) + 2px) 0 #8f8a7e, 0 calc(var(--lip) + 2px) 0 2px var(--edge), 0 0 0 2px var(--edge);
 }
 
 .seg-btn:active {
-  transform: translateY(4px);
+  transform: translateY(var(--lip));
   box-shadow: 0 0 0 var(--edge);
+  transition-duration: 0.05s;
 }
 
 .seg-btn:disabled {
@@ -2593,106 +2638,49 @@ input[type='range']:disabled {
   background: linear-gradient(160deg, #4f6e86, #24384a);
 }
 
-/* On the sheet, choices are ruled boxes and the chosen one is inked; sliders are a ruled
-   groove inked up to a paper grip. */
-.panel .seg-btn {
-  border-radius: 2px;
-  background: transparent;
-  box-shadow: inset 0 0 0 2px var(--ink-dim);
-  color: var(--ink);
-}
-
-.panel .seg-btn:hover {
-  background: var(--sheet-lo);
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.panel .seg-btn[aria-checked='true'] {
-  background: var(--ink);
-  color: var(--sheet);
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.panel .seg-btn:active {
-  transform: translate(1px, 2px);
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.panel input[type='range']::-webkit-slider-runnable-track {
-  height: 6px;
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.panel input[type='range']::-moz-range-track {
-  height: 6px;
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-/* Shine paints its own tracks (fills from the default, hue and saturation scales). */
-.panel input[type='range']:not(.tune-range)::-webkit-slider-runnable-track {
-  background:
-    linear-gradient(var(--ink), var(--ink)) 0 0 / var(--fill, 50%) 100% no-repeat,
-    var(--sheet-lo);
-}
-
-.panel input[type='range']:not(.tune-range)::-moz-range-track {
-  background: var(--sheet-lo);
-}
-
-.panel input[type='range']:not(.tune-range)::-moz-range-progress {
-  height: 6px;
-  background: var(--ink);
-}
-
-.panel input[type='range']::-webkit-slider-thumb {
-  width: 16px;
-  height: 22px;
-  margin-top: -8px;
-  background: #fbf7ec;
-  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 rgba(42, 36, 30, 0.3);
-}
-
-.panel input[type='range']::-moz-range-thumb {
-  width: 16px;
-  height: 22px;
-  background: #fbf7ec;
-  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 rgba(42, 36, 30, 0.3);
-}
-
-.panel input[type='range']:focus-visible::-webkit-slider-thumb {
-  background: var(--cyan);
-}
-
-.panel input[type='range']:focus-visible::-moz-range-thumb {
-  background: var(--cyan);
-}
-
-/* Side notes on the sheet stay readable over its fibres. */
+/* Side notes on the board stay readable. */
 .panel :is(.btn-text small, .hint) {
   font-size: 14px;
 }
 
-/* A dotted leader runs from a label to its value, as on a printed form. */
-.panel .row > .field-label {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.panel .field-label {
+  text-shadow: var(--drop);
 }
 
-.panel .row > .field-label::after {
-  content: '';
-  flex: 1;
-  min-width: 12px;
-  border-bottom: 2px dotted var(--rule);
+/* Keyboard focus on the board is a white ring, apart from every step colour and the white of a
+   chosen option (as a game's cursor is). */
+.panel :focus-visible {
+  outline-color: #fff;
 }
 
-.panel .link {
-  color: var(--ink);
-  text-decoration-color: var(--ink-dim);
+.panel input[type='range']:focus-visible::-webkit-slider-thumb {
+  background: var(--paper);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge), 0 0 0 5px #fff;
 }
 
-.panel .link:hover {
-  text-decoration-color: currentColor;
+.panel input[type='range']:focus-visible::-moz-range-thumb {
+  background: var(--paper);
+  box-shadow: 0 0 0 2px var(--edge), 0 4px 0 2px var(--edge), 0 0 0 5px #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel *,
+  .panel *::before,
+  .panel *::after {
+    animation: none !important;
+  }
+  .btn:hover,
+  .seg-btn:hover,
+  .tab:hover,
+  .thumb:hover,
+  .matte-sw:hover,
+  .adjust-toggle:hover,
+  .recap:hover .recap-go {
+    transform: none;
+  }
+  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .matte-sw, .recap-go) {
+    transition: none;
+  }
 }
 
 /* ---------- Overlays ---------- */
@@ -2934,26 +2922,58 @@ input[type='range']:disabled {
 
 /* ---------- Responsive ---------- */
 
-/* Short laptop screens and 125% scaling: a smaller crop window keeps Fine-tune above the stub. */
+/* Short laptop screens and 125% scaling: tighter boxes and a smaller crop window keep Fine-tune
+   above the Save box. */
 @media (min-width: 901px) and (max-height: 800px) {
   .panel {
-    --pad: 20px;
-  }
-  .sec {
-    padding-block: 14px;
+    --pad: 12px;
+    --gap: 8px;
   }
   .sec-head {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
   .sec-finish .sec-title {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+  }
+  /* The proof, the finish's name and the way to the hand share one line. */
+  .finish-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto;
+    align-items: center;
+    column-gap: 12px;
+  }
+  .finish-row .finish-proof {
+    grid-row: 1;
+    margin-block: 0 4px;
+  }
+  .finish-name {
+    font-size: 18px;
+  }
+  .finish-row .finish-pick {
+    align-self: center;
+    margin-top: 0;
+  }
+  .sec-export {
+    margin-top: 12px;
+  }
+  #saveBtn {
+    gap: 10px;
+    padding-inline: 12px;
+  }
+  #saveBtn > svg {
+    width: 28px;
+    height: 28px;
+    padding: 4px;
+  }
+  #saveBtn .btn-text small {
+    font-size: 13px;
   }
   .crop-view {
     width: 84px;
     height: 96px;
   }
   .crop {
-    margin-top: 12px;
+    margin-top: 10px;
   }
   /* The hand's caption already says how the finish looks. */
   .crop-side .hint,
@@ -2964,11 +2984,8 @@ input[type='range']:disabled {
     width: 38px;
     height: 53px;
   }
-  .sec-adjust {
-    padding-block: 4px;
-  }
   .thumbs {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
   .thumb {
     width: 34px;
@@ -2976,30 +2993,25 @@ input[type='range']:disabled {
   .pick {
     min-height: 46px;
   }
-  .finish-row {
-    row-gap: 4px;
-  }
   .finish-row .finish-pick {
-    min-height: 30px;
+    min-height: 32px;
   }
   .adjust-toggle {
-    min-height: 46px;
-    padding: 2px 0;
+    min-height: 48px;
+    padding-block: 4px;
   }
   .sec-export {
     gap: 8px;
-    padding-top: 18px;
-    padding-bottom: 16px;
   }
   .panel .seg-format .seg-btn {
-    min-height: 40px;
+    min-height: 38px;
     padding-block: 2px;
   }
   #saveBtn {
-    min-height: 48px;
+    min-height: 50px;
   }
   .tabs-bar {
-    padding-block: 8px;
+    padding-block: 10px 8px;
   }
 }
 
@@ -3102,7 +3114,7 @@ input[type='range']:disabled {
     top: 0;
     padding-block: 8px;
   }
-  /* The stub rides along the bottom of the screen from the start, so Save is always one tap away. */
+  /* The Save box rides along the bottom of the screen from the start, so Save is always one tap away. */
   .sec-export {
     position: fixed;
     left: 16px;
@@ -3117,8 +3129,12 @@ input[type='range']:disabled {
     column-gap: 12px;
     row-gap: 10px;
     padding: 20px var(--pad) calc(14px + env(safe-area-inset-bottom));
-    border-radius: 3px 3px 0 0;
-    box-shadow: 0 0 0 3px #0b1012, 0 -8px 24px rgba(0, 0, 0, 0.45);
+    margin: 0;
+    border: 3px solid var(--board-rim);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    background: var(--board);
+    box-shadow: 0 0 0 3px var(--edge), 0 -8px 24px rgba(0, 0, 0, 0.45);
   }
   .sec-export .sec-title {
     grid-area: title;
@@ -3129,12 +3145,12 @@ input[type='range']:disabled {
   #saveBtn {
     grid-area: save;
   }
-  /* Over the stage there is nothing to fade; over the sheet, its lines fade into the stub. */
+  /* Over the stage there is nothing to fade; over the panel, its lines fade into the Save box. */
   .sec-export::before {
     opacity: 0;
     transition: opacity 0.2s;
   }
-  .sec-export.is-over-sheet::before {
+  .sec-export.is-over-panel::before {
     opacity: 1;
   }
   /* The live view of the card, while Shine is tuned, rides beside the formats and Save. */

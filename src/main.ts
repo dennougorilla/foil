@@ -186,7 +186,7 @@ function applyText() {
   }
   $('hand').title = t.handHint;
   stage.setHandLabels(t.edition, t.look);
-  // Written into the fade at the foot of the sheet when more of it waits below.
+  // Written into the fade above the Save box when more of the panel waits below.
   $('panel').style.setProperty('--more-text', JSON.stringify(t.moreBelow));
   $('cropView').setAttribute('aria-label', t.cropHint);
   $('cropView').title = t.cropHint;
@@ -859,7 +859,7 @@ tabBar.addEventListener('keydown', (e) => {
   revealTabs();
 });
 
-/** Scrolls to the top of the sheet: the folded steps, the Fine-tune row and its tabs, then the tab itself. */
+/** Scrolls to the top of the panel: the folded steps, the Fine-tune row and its tabs, then the tab itself. */
 function revealTabs() {
   const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   requestAnimationFrame(() => {
@@ -894,7 +894,7 @@ function syncAdjust() {
     ? t.adjustChanged.replace('{list}', changed.map((id) => t.tabs[id]).join(s.lang === 'ja' ? '・' : ', '))
     : t.adjustSub;
   summary.classList.toggle('is-changed', changed.length > 0);
-  // While tuning, steps 1 and 2 fold into one line each, so the tabs get the sheet.
+  // While tuning, steps 1 and 2 fold into one line each, so the tabs get the panel.
   $('panel').classList.toggle('is-tuning', s.adjustOpen);
   requestAnimationFrame(trackExportBar);
 }
@@ -1110,8 +1110,8 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
 }
 
 /**
- * A saved card is a pulled card: it hops and sheds sparks in its finish's colour, and a dated
- * seal is pressed onto the Save stamp, the way a print shop signs off a job.
+ * A saved card is a pulled card: it hops and sheds sparks in its finish's colour, and Save turns
+ * green for a moment with a gold "done" tag popping onto it.
  */
 let celebrateTimer = 0;
 function celebrate(file: string) {
@@ -1120,11 +1120,9 @@ function celebrate(file: string) {
   saveBtn.classList.remove('is-saved');
   void saveBtn.offsetWidth;
   saveBtn.classList.add('is-saved');
-  // The stamp keeps its name (it can be pressed again); its note says what was written.
+  // Save keeps its name (it can be pressed again); its note says what was written.
   saveBtn.querySelector('.btn-text small')!.textContent = `${t.savedShort}: ${file}`;
-  const now = new Date();
-  $('seal').querySelector('b')!.textContent = t.sealDone;
-  $('seal').querySelector('small')!.textContent = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, '0')).join('.');
+  $('seal').textContent = t.sealDone;
   clearTimeout(celebrateTimer);
   celebrateTimer = window.setTimeout(() => {
     saveBtn.classList.remove('is-saved');
@@ -1134,7 +1132,7 @@ function celebrate(file: string) {
 
 /**
  * An export starts (on) or ends: the stage's quality governor rests meanwhile (an export's frames
- * say nothing about the stage's own speed), and a seal still showing from the last save comes off.
+ * say nothing about the stage's own speed), and the "done" tag still showing from the last save comes off.
  */
 function exportBusy(on: boolean) {
   stage?.holdQuality(on);
@@ -1349,20 +1347,20 @@ new ResizeObserver(([e]) =>
 
 /**
  * Toasts rise from just above the Export bar, wherever it is now, so they never cover Save.
- * On phones the bar floats over the whole page; it fades the sheet's lines only over the sheet.
- * Scrolled, the sheet fades what has gone up under its head, and marks when more waits below.
+ * On phones the bar floats over the whole page; it fades the panel's lines only over the panel.
+ * Scrolled, the panel fades what has gone up under its head, and marks when more waits below.
  */
 function trackExportBar() {
   const top = exportSec.getBoundingClientRect().top;
   const bottom = Math.max(12, Math.min(innerHeight - top + 12, innerHeight - 160));
   $('toasts').style.bottom = `${Math.round(bottom)}px`;
   const panel = $('panel');
-  const sheet = panel.getBoundingClientRect();
-  exportSec.classList.toggle('is-over-sheet', sheet.top < top && sheet.bottom > top);
+  const box = panel.getBoundingClientRect();
+  exportSec.classList.toggle('is-over-panel', box.top < top && box.bottom > top);
   panel.classList.toggle('is-scrolled', panel.scrollTop > 2);
   panel.classList.toggle('has-more', panel.scrollHeight - panel.scrollTop - panel.clientHeight > 8);
 }
-// The sheet keeps its height while its steps grow and shrink, so watch the steps as well.
+// The panel keeps its height while its steps grow and shrink, so watch the steps as well.
 {
   const ro = new ResizeObserver(trackExportBar);
   ro.observe($('panel'));
@@ -1370,6 +1368,15 @@ function trackExportBar() {
 }
 $('panel').addEventListener('scroll', trackExportBar, { passive: true });
 addEventListener('scroll', trackExportBar, { passive: true });
+
+// A value that changes pops in its pocket, the way a game's score counter does.
+$('panel').addEventListener('input', (e) => {
+  const out = (e.target as HTMLElement).closest('.row, .tune-row')?.querySelector('output');
+  if (!out) return;
+  out.classList.remove('is-bump');
+  void out.offsetWidth;
+  out.classList.add('is-bump');
+});
 addEventListener('resize', trackExportBar);
 
 function dismissToast(el: HTMLElement) {
