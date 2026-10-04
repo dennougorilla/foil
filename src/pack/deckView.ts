@@ -85,7 +85,7 @@ export function viewDeck(o: DeckViewOptions) {
     }
     return i;
   };
-  const history: { hand: EditionId[]; gap: number | null }[] = [];
+  const history: { hand: EditionId[]; gap: number | null; outAt: number | null }[] = [];
   let tab: PackId | 'open' | 'all' = 'all';
   /** The mini cards are being drawn (see paint). */
   let drawing = false;
@@ -226,7 +226,7 @@ export function viewDeck(o: DeckViewOptions) {
   /** Commits a new hand: remembered for undo, applied at once. */
   function commit(next: EditionId[], nextGap: number | null) {
     if (next.join() === hand.join()) return;
-    history.push({ hand, gap });
+    history.push({ hand, gap, outAt });
     hand = next;
     gap = nextGap;
     render();
@@ -387,7 +387,7 @@ export function viewDeck(o: DeckViewOptions) {
     if (!prev) return;
     hand = prev.hand;
     gap = prev.gap;
-    outAt = null;
+    outAt = prev.outAt;
     render();
     o.onChange(hand);
   });
@@ -445,6 +445,7 @@ export function viewDeck(o: DeckViewOptions) {
     drawing = true;
     const ids = o.owned.flatMap((g) => g.finishes).filter((id) => !cache.has(id));
     const packs = [...new Set(ids.map((id) => packOf(id)?.id).filter((p): p is PackId => !!p))];
+    // A pack that cannot be fetched (offline) leaves its cards blank; the next paint tries again.
     void Promise.all(packs.map((p) => loadPack(p))).then(() => {
       if (!renderer) {
         rendererCanvas = document.createElement('canvas');
@@ -464,6 +465,6 @@ export function viewDeck(o: DeckViewOptions) {
         requestAnimationFrame(step);
       };
       step();
-    });
+    }, () => (drawing = false));
   }
 }

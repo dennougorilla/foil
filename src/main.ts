@@ -1243,18 +1243,25 @@ function useCard(id: EditionId) {
   // The cards trade places first: one lands on the deck (a bump), then the big card takes the new finish.
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (full) setTimeout(() => deck.bump(), still ? 0 : 420);
-  if (id !== store.get().edition) setTimeout(() => selectEdition(id), still ? 0 : 560);
+  // A card picked on the page meanwhile wins.
+  const was = store.get().edition;
+  if (id !== was) setTimeout(() => store.get().edition === was && store.get().hand.includes(id) && selectEdition(id), still ? 0 : 560);
 }
 
 /** The deck builder changed the hand: it applies at once; a finish taken off the hand leaves the card on Base. */
 function setHand(next: EditionId[]) {
+  // Another tab may have sealed a pack while the builder was open.
+  next = normalizeHand(next, packs.get());
   store.set({ hand: next });
   if (!next.includes(store.get().edition)) selectEdition('base');
 }
 
 /** The deck builder: the hand's slots over everything owned; one tap moves a card. */
+let deckOpen = false;
 function viewDeck() {
-  void import('./pack/deckView').then((m) =>
+  if (deckOpen) return;
+  deckOpen = true;
+  import('./pack/deckView').then((m) =>
     m.viewDeck({
       dict: t,
       owned: ownedGroups(packs.get()),
@@ -1267,9 +1274,15 @@ function viewDeck() {
       intensity: store.get().intensity,
       onChange: (next) => setHand(next),
       onShop: () => openShop(),
-      onClose: () => deck.focusDeck(),
+      onClose: () => {
+        deckOpen = false;
+        deck.focusDeck();
+      },
     }),
-  );
+  ).catch(() => {
+    deckOpen = false;
+    toast(t.pack.failed, true);
+  });
 }
 
 // ---------- Logo ----------
