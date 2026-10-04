@@ -26,9 +26,9 @@ export interface ApngPlan {
   sourceSpan: number;
 }
 
-/** Frame timing and expected size: one idle cycle at the tune's speed, as for the GIF. */
-export function apngPlan(tune: Tune, loopMs?: number): ApngPlan {
-  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs);
+/** Frame timing and expected size: one loop cycle at the tune's speed, as for the GIF (`whole` as in `exportLoop`). */
+export function apngPlan(tune: Tune, loopMs?: number, whole = false): ApngPlan {
+  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs, whole);
   const delays = framePlan(ms, DELAY, MAX_FRAMES, 1);
   return { width: W, height: H, delays, bytes: delays.length * BYTES_PER_FRAME, sourceSpan };
 }
@@ -67,7 +67,7 @@ export async function exportApng(
   if (signal.aborted) throw aborted();
   await packLoaded(input.edition);
   if (signal.aborted) throw aborted();
-  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.loopMs);
+  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.loopMs, !!input.edition.torch);
   const worker = new Worker(new URL('./apngWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: ApngRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   let drawn = 0;

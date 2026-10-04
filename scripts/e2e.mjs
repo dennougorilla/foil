@@ -196,7 +196,7 @@ await step('the motion button above the deck switches the idle motion in one tap
   await page.click(btn);
   expect((await page.getAttribute(btn, 'aria-expanded')) === 'true' && (await page.isVisible('.qm-tray')), 'the tray did not open');
   const names = await page.locator('.qm-opt span').allTextContents();
-  expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
+  expect(names.length === 13 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
   expect((await page.getAttribute('.qm-opt[aria-checked=true]', 'data-value')) === (await state()).tune.idle, 'the tray does not mark the current motion');
   expect(await page.evaluate(() => document.activeElement?.classList.contains('qm-opt')), 'focus did not move into the tray');
   // Keyboard: Sway → Float, picked with Enter; the tray closes and focus returns to the button.
@@ -315,6 +315,9 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
     ['spin', 'orbit', 1],
     ['turn', 'pointer', 1],
     ['breathe', 'pointer', 1],
+    ['reveal', 'pointer', 1],
+    ['push', 'fixed', 1.5],
+    ['pulse', 'orbit', 1],
   ];
   const norm = (d, ox, oy) => ({ dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale, t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint });
   for (const [n, [idle, light, speed]] of cases.entries()) {
@@ -341,6 +344,7 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
         const { createScene } = await import('/src/exporter.ts');
         const { editionById } = await import('/src/editions.ts');
         const { drawBack } = await import('/src/card/back.ts');
+        const { loopCycle } = await import('/src/tune/model.ts');
         const store = JSON.parse(localStorage.getItem('foil:v1'));
         const face = document.createElement('canvas');
         const back = document.createElement('canvas');
@@ -349,7 +353,7 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
         drawBack(back);
         window.__draws.frames = [];
         const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
-        const loop = 6 / store.tune.speed;
+        const loop = loopCycle(store.tune) / store.tune.speed;
         for (let i = 0; i < 12; i++) scene.draw(i / 12, 40, loop);
         scene.dispose();
         return window.__draws.frames;

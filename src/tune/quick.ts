@@ -1,5 +1,5 @@
 // The motion button above the deck: the card's idle motion in one tap, without opening the panel.
-// It shows the current motion's icon; pressed, it deals the ten motions out as a small tray with
+// It shows the current motion's icon; pressed, it deals the motions out as a small tray with
 // their names, and what the pointed one does underneath. A pick applies at once and closes the
 // tray. It is the same setting as the Shine tab's "Idle motion" (both read and write the store).
 

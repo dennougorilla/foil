@@ -3,7 +3,7 @@
 // "More" drawer closed changes nothing.
 
 export type LightMode = 'pointer' | 'orbit' | 'fixed';
-export type IdleMode = 'none' | 'sway' | 'float' | 'pendulum' | 'wobble' | 'bounce' | 'glint' | 'spin' | 'turn' | 'breathe';
+export type IdleMode = 'none' | 'sway' | 'float' | 'pendulum' | 'wobble' | 'bounce' | 'glint' | 'spin' | 'turn' | 'breathe' | 'reveal' | 'push' | 'pulse';
 /** The metal the Relief finish is struck in; other finishes ignore it. */
 export type Metal = 'gold' | 'silver';
 
@@ -82,7 +82,7 @@ export const RANGES: Record<NumKey, Range> = {
 };
 
 export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed'];
-export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe'];
+export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe', 'reveal', 'push', 'pulse'];
 export const METALS: Metal[] = ['gold', 'silver'];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -208,6 +208,22 @@ export function applyTune(gl: WebGL2RenderingContext, u: Uniforms, g: TuneGl): v
 export const IDLE_CYCLE = 6;
 const W = (Math.PI * 2) / IDLE_CYCLE;
 
+/**
+ * The showpieces made for a GIF come round faster: seconds per loop, each dividing IDLE_CYCLE so
+ * the idle clock still closes on itself.
+ */
+const SHORT: Partial<Record<IdleMode, number>> = { reveal: 3, push: 3, pulse: 2 };
+const period = (idle: IdleMode) => SHORT[idle] ?? IDLE_CYCLE;
+
+/**
+ * Idle seconds an exported loop covers: the motion's own period, or the whole idle cycle when the
+ * light orbits or `whole` asks for it (Blacklight's lamp drifts once per idle cycle).
+ */
+export const loopCycle = (t: Tune, whole = false) => (whole || t.light === 'orbit' ? IDLE_CYCLE : period(t.idle));
+
+/** Motions that turn the card round, and come back to its face once per period. */
+const TURNING: IdleMode[] = ['spin', 'turn', 'reveal'];
+
 /** The card's automatic motion at one moment: offsets in card heights, angles in radians. */
 export interface IdlePose {
   dx: number;
@@ -230,6 +246,10 @@ const REST_POSE: IdlePose = { dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1, spin:
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 const frac = (v: number) => v - Math.floor(v);
+/** 0 to 1, overshooting a little before it settles: a flip that snaps round. */
+const overshoot = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
+/** One heartbeat thump `x` seconds after it starts: a sharp rise and a soft fall, 1 at its peak. */
+const thump = (x: number, rise: number) => (x > 0 ? (x / rise) * Math.exp(1 - x / rise) : 0);
 
 /** The idle motion `s` idle seconds in. Periodic in IDLE_CYCLE (spin and turn add whole turns). */
 export function idlePose(t: Tune, s: number): IdlePose {
@@ -331,15 +351,83 @@ export function idlePose(t: Tune, s: number): IdlePose {
       p.sheen = [Math.sin(a + 1) * 0.15, b * 0.4];
       break;
     }
+    case 'reveal': {
+      // Face up and quiet (the light off to one side), it turns away to its back, crouches for an
+      // instant, then flips round with a snap, the edge catching the light; as it lands the light
+      // runs right across the foil and leaves it quiet again.
+      const P = period('reveal');
+      const u = frac(s / P);
+      const AWAY = 0.3;
+      const BACK = 0.4;
+      const FLIP = 0.43;
+      const LAND = 0.58;
+      const RUN = 0.54;
+      const DONE = 0.74;
+      let turn = 0;
+      if (u >= AWAY && u < BACK) turn = Math.PI * smooth((u - AWAY) / (BACK - AWAY));
+      else if (u >= BACK && u < FLIP) {
+        turn = Math.PI;
+        p.scale = 1 - Math.sin((Math.PI * (u - BACK)) / (FLIP - BACK)) * 0.015;
+      } else if (u >= FLIP && u < LAND) {
+        const q = (u - FLIP) / (LAND - FLIP);
+        turn = Math.PI * (1 + overshoot(q));
+        p.scale = 1 + Math.sin(Math.PI * q) * 0.06;
+        p.dy = -Math.sin(Math.PI * q) * 0.03;
+      } else if (u >= LAND) turn = Math.PI * 2;
+      p.spin = turn + Math.floor(s / P) * Math.PI * 2;
+      // The light rests off one side, is led to the other while the card is turned, and runs across as it lands.
+      const run = u < AWAY ? 1 : u < RUN ? 1 - 2 * smooth((u - AWAY) / (RUN - AWAY)) : u < DONE ? -1 + 2 * smooth((u - RUN) / (DONE - RUN)) : 1;
+      const pass = u >= RUN && u < DONE ? Math.sin((Math.PI * (u - RUN)) / (DONE - RUN)) : 0;
+      p.sheen = [Math.sin(p.spin) * 1.0 + run * 1.6, -pass * 0.35];
+      p.ry = pass * 0.05;
+      p.rx = Math.sin(Math.PI * 2 * u) * 0.02;
+      break;
+    }
+    case 'push': {
+      // A slow move in from far off to one side: the card swings round to face the camera as it
+      // arrives, the light crosses it as it does, it holds still and quiet, then steps back.
+      const u = frac(s / period('push'));
+      const IN = 0.62;
+      const HOLD = 0.82;
+      const e = u < IN ? (1 - Math.cos((Math.PI * u) / IN)) / 2 : u < HOLD ? 1 : 1 - smooth((u - HOLD) / (1 - HOLD));
+      const far = 1 - e;
+      // The light crosses as it arrives and waits off the far side; it is led back while the card is far and turned.
+      const light = u < 0.44 ? -1 : u < 0.7 ? -1 + 2 * smooth((u - 0.44) / 0.26) : u < HOLD ? 1 : 1 - 2 * smooth((u - HOLD) / (1 - HOLD));
+      p.scale = 0.84 + e * 0.28;
+      p.dx = -far * 0.07;
+      p.dy = far * 0.03 - e * 0.02;
+      p.rx = far * 0.1;
+      p.ry = far * 0.36;
+      p.rz = -far * 0.04;
+      p.sheen = [light * 1.6, -Math.sin((Math.PI * (light + 1)) / 2) * 0.3];
+      break;
+    }
+    case 'pulse': {
+      // A heartbeat, twice a loop: a strong lub and a softer dub. Each lub swells the card and, a
+      // moment after, sends one sweep of light across the foil, from the right on one beat and from
+      // the left on the next; between beats the light waits off the side and the card is still.
+      const beat = s / (period('pulse') / 2);
+      const x = frac(beat);
+      const side = Math.floor(beat) % 2 ? -1 : 1;
+      const b = thump(x, 0.035) + thump(x - 0.17, 0.04) * 0.4;
+      const sweep = smooth(Math.min(1, Math.max(0, (x - 0.03) / 0.3)));
+      p.scale = 1 + b * 0.14;
+      p.dy = -b * 0.012;
+      p.rx = b * 0.06;
+      p.ry = side * b * 0.06;
+      p.sheen = [side * (1.6 - 3.2 * sweep), -Math.sin(Math.PI * sweep) * 0.4];
+      break;
+    }
   }
   return p;
 }
 
 /** Where a turning idle motion next faces the viewer, in idle seconds; `s` itself when it already does. */
 export function facingAt(t: Tune, s: number): number {
-  if (t.idle !== 'spin' && t.idle !== 'turn') return s;
+  if (!TURNING.includes(t.idle)) return s;
   const turned = idlePose(t, s).spin / (Math.PI * 2);
-  return Math.abs(turned - Math.round(turned)) < 1e-6 ? s : Math.ceil(s / IDLE_CYCLE) * IDLE_CYCLE;
+  const P = period(t.idle);
+  return Math.abs(turned - Math.round(turned)) < 1e-6 ? s : Math.ceil(s / P) * P;
 }
 
 /** Position of the orbiting light in card uv, `s` idle seconds in. */
@@ -372,27 +460,27 @@ export interface LoopView {
   light: [number, number];
 }
 
-/** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, one idle cycle long. */
-export function loopView(t: Tune, p: number): LoopView {
-  const s = p * IDLE_CYCLE;
+/** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, `cycle` idle seconds long. */
+export function loopView(t: Tune, p: number, cycle = loopCycle(t)): LoopView {
+  const s = p * cycle;
   const pose = idlePose(t, s);
   const tilt = cardTilt(t, s, pose, pose.rx, pose.ry);
   return { pose, tilt, light: tunedLight(t, s, restLight(tilt)) };
 }
 
 /**
- * Length of an exported loop and the source time it covers. It is one idle cycle at the tune's
- * speed; an animated picture plays a whole number of its own loops inside it, sped up or slowed
+ * Length of an exported loop and the source time it covers. It is one loop cycle (`loopCycle`,
+ * `whole` as there) at the tune's speed; an animated picture plays a whole number of its own loops inside it, sped up or slowed
  * a little to fit. At speed zero nothing moves on its own, so the picture alone sets the loop:
  * short ones play whole cycles, long ones are sped up to fit six seconds.
  */
-export function exportLoop(t: Tune, sourceMs?: number): { loopMs: number; sourceSpan: number } {
+export function exportLoop(t: Tune, sourceMs?: number, whole = false): { loopMs: number; sourceSpan: number } {
   if (t.speed <= 0) {
     if (!sourceMs) return { loopMs: 2400, sourceSpan: 2400 };
     const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
     return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
   }
-  const loopMs = Math.round((IDLE_CYCLE * 1000) / t.speed);
+  const loopMs = Math.round((loopCycle(t, whole) * 1000) / t.speed);
   return { loopMs, sourceSpan: sourceMs ? sourceMs * Math.max(1, Math.round(loopMs / sourceMs)) : loopMs };
 }
 
@@ -435,7 +523,7 @@ export class IdleClock {
       // Let go of a turn by easing forward to the next time the face looks straight on.
       this.idleTime += Math.min(face - this.idleTime, Math.max(dt * t.speed, (face - this.idleTime) * (1 - Math.exp(-dt * 5))));
       if (face - this.idleTime < 1e-3) this.idleTime = face;
-    } else if (!held && !(facing && face === this.idleTime && (t.idle === 'spin' || t.idle === 'turn'))) {
+    } else if (!held && !(facing && face === this.idleTime && TURNING.includes(t.idle))) {
       this.idleTime += dt * t.speed;
     }
     this.spinAngle = idlePose(t, this.idleTime).spin;
