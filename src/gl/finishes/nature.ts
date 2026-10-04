@@ -1,4 +1,5 @@
 // Nature pack: Sakura, Frost and Magma (the showpiece). See docs/packs.md.
+import { STARDUST_GLSL } from '../stardust';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -64,11 +65,13 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   }
   return col;
 }
+${STARDUST_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 10) col = frost(c, uv, uTilt, L);
   else if (e == 11) col = magma(c, uv, uTilt, L);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
+  else if (e == 22) col = stardust(c, uv, uTilt, L);
 `,
 };
 export default finishes;
