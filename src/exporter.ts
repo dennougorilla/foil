@@ -27,6 +27,8 @@ export interface ExportInput {
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture. */
   layers?: LayerMap;
+  /** Lenticular's other picture (card/face.ts drawFlip); the front one in pencil when absent. */
+  flip?: HTMLCanvasElement;
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -58,8 +60,11 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
   if (input.layers) r.setLayers(input.layers);
+  r.setFlip(input.flip ?? null);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
   r.begin();
+  const tilt: [number, number] = [0.35, -0.25];
+  const light: [number, number] = tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22];
   r.drawCard(
     {
       cx: FACE_W / 2 + pad,
@@ -75,8 +80,9 @@ export async function exportPng(input: ExportInput): Promise<string> {
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
       // A finish that reacts to touch shows a swipe made for this picture, caught while it is warm.
       heat: input.edition.touch ? autoTouch(input.face, 3 + AUTO_STILL) : undefined,
-      // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
-      ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
+      // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
+      // except on Lenticular, where a nudge could land between its two pictures.
+      ...(input.edition.id === 'lenticular' ? { tilt, light } : stillPose(tilt, light)),
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
@@ -123,6 +129,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
   if (input.layers) cards.setLayers(input.layers, !input.faceAt);
+  cards.setFlip(input.flip ?? null);
   cards.resize(W, H, 1);
   const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.

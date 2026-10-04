@@ -2,13 +2,13 @@ import './style.css';
 import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { EDITIONS, FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face';
+import { clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
 import { mountShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
 import { exportGif, exportPng } from './exporter';
-import { loadUserImage, saveUserImage } from './imageStore';
+import { forgetUserImage, loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
@@ -177,6 +177,7 @@ function renderInfo() {
   chip.style.setProperty('--c3', ed.swirl[2]);
   $('finishPick').setAttribute('aria-label', t.finishPick);
   $('finishPick').title = matchMedia('(max-width: 900px)').matches ? t.finishPickHintPhone : t.finishPickHint;
+  renderFlip();
 }
 
 $('finishPick').addEventListener('click', () => {
@@ -593,6 +594,61 @@ fileInput.addEventListener('change', () => {
   });
 }
 
+// ---------- Lenticular's other picture ----------
+
+const flip = document.createElement('canvas');
+/** The picture Lenticular flips to; null draws the front picture in pencil instead. */
+let flipImage: Img | null = null;
+
+function setFlip(img: Img | null) {
+  flipImage = img;
+  if (img) drawFlip(flip, img);
+  stage.cards.setFlip(img ? flip : null);
+  renderFlip();
+}
+
+/** One quiet row under the finish, shown only while Lenticular is on the card. */
+function renderFlip() {
+  const s = store.get();
+  $('flipRow').hidden = s.edition !== 'lenticular';
+  const front = s.sample >= 0 ? samples[s.sample] : (userImage ?? samples[0]);
+  const thumb = $('flipThumb');
+  thumb.style.backgroundImage = `url(${thumbUrl(flipImage ?? front)})`;
+  thumb.classList.toggle('is-auto', !flipImage);
+  $('flipNow').textContent = flipImage ? t.flipOwn : t.flipAuto;
+  $('flipClear').hidden = !flipImage;
+  $('flipPick').setAttribute('aria-label', t.flipPickLabel);
+  $('flipClear').setAttribute('aria-label', t.flipClearLabel);
+}
+
+const flipInput = $<HTMLInputElement>('flipInput');
+$('flipPick').addEventListener('click', () => flipInput.click());
+flipInput.addEventListener('change', async () => {
+  const f = flipInput.files?.[0];
+  flipInput.value = '';
+  if (!f) return;
+  if (!ACCEPT.test(f.type)) {
+    toast(t.errType.replace('{name}', f.name), true);
+    return;
+  }
+  try {
+    // An animated picture flips to its first frame.
+    const { still } = await decodeImage(f);
+    setFlip(still);
+    void saveUserImage(still, 'flip');
+    sfx.tick();
+    stage.juice(0.35);
+  } catch (err) {
+    console.error(err);
+    toast(t.errDecode, true);
+  }
+});
+$('flipClear').addEventListener('click', () => {
+  setFlip(null);
+  void forgetUserImage('flip');
+  sfx.tick();
+});
+
 // ---------- Edition ----------
 
 function selectEdition(id: EditionId) {
@@ -796,6 +852,7 @@ function exportInput() {
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
     layers: depth.current(),
+    flip: flipImage ? flip : undefined,
   };
 }
 
@@ -1242,6 +1299,10 @@ const boot = () => {
 // The nameplate uses the pixel font, so wait for it before painting the face.
 document.fonts.load('40px "DotGothic16"').then(boot, boot);
 boot();
+void loadUserImage('flip').then(async (blob) => {
+  const img = blob ? await decodeImage(blob).catch(() => null) : null;
+  if (img) setFlip(img.still);
+});
 if (store.get().sample < 0) {
   // Bring back the image from last visit; if it's gone, fall back to the first sample.
   void loadUserImage().then(async (blob) => {

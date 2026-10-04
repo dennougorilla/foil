@@ -150,6 +150,12 @@
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5h4v8H1zm4-2h4v1H6v9H4V4h1zm5-1h4v8h-4zM9 3h1v9H9z" /></svg>
             <span data-t="finishPick"></span>
           </button>
+          <div class="flip-row" id="flipRow" hidden>
+            <span class="flip-thumb" id="flipThumb" aria-hidden="true"></span>
+            <span class="flip-text"><b data-t="flipLabel"></b><small><span id="flipNow"></span> <button class="link" id="flipClear" type="button" data-t="flipClear"></button></small></span>
+            <button class="finish-pick" id="flipPick" type="button" data-t="flipPick"></button>
+            <input type="file" id="flipInput" accept="image/png,image/apng,.apng,image/jpeg,image/webp,image/gif,image/avif,image/bmp" hidden />
+          </div>
         </section>
 
         <section class="sec sec-adjust" id="adjust">

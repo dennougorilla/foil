@@ -97,6 +97,35 @@ function fitName(ctx: CanvasRenderingContext2D, text: string, max: number, size:
   return s;
 }
 
+const ART_R = RADIUS * 0.45;
+
+/** The picture cropped into the art window, under the frame's inner shade. */
+function paintArt(ctx: CanvasRenderingContext2D, image: FaceSpec['image'], crop: Crop) {
+  ctx.save();
+  roundRect(ctx, ART.x, ART.y, ART.w, ART.h, ART_R);
+  ctx.clip();
+  const { sx, sy, sw, sh } = cropRect(image.width, image.height, crop);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(image, sx, sy, sw, sh, ART.x, ART.y, ART.w, ART.h);
+  // Inner shade so the art sits under the frame
+  const shade = ctx.createLinearGradient(0, ART.y, 0, ART.y + 18 * S);
+  shade.addColorStop(0, 'rgba(0,0,0,.28)');
+  shade.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(ART.x, ART.y, ART.w, 18 * S);
+  ctx.restore();
+}
+
+/** Lenticular's other picture: centred and cropped to fill the art window, the rest left clear. */
+export function drawFlip(flip: HTMLCanvasElement, image: FaceSpec['image']): void {
+  flip.width = FACE_W;
+  flip.height = FACE_H;
+  const ctx = flip.getContext('2d')!;
+  ctx.clearRect(0, 0, FACE_W, FACE_H);
+  paintArt(ctx, image, { zoom: 1, x: 0.5, y: 0.5 });
+}
+
 const RARITY_PIPS: Record<RarityId, number> = { common: 1, uncommon: 2, rare: 3, legendary: 4 };
 
 export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): void {
@@ -128,24 +157,10 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   ctx.restore();
 
   // Art window
-  const artR = RADIUS * 0.45;
   ctx.fillStyle = OUTLINE;
-  roundRect(ctx, ART.x - 4 * S, ART.y - 4 * S, ART.w + 8 * S, ART.h + 8 * S, artR + 4 * S);
+  roundRect(ctx, ART.x - 4 * S, ART.y - 4 * S, ART.w + 8 * S, ART.h + 8 * S, ART_R + 4 * S);
   ctx.fill();
-  ctx.save();
-  roundRect(ctx, ART.x, ART.y, ART.w, ART.h, artR);
-  ctx.clip();
-  const { sx, sy, sw, sh } = cropRect(spec.image.width, spec.image.height, spec.crop);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(spec.image, sx, sy, sw, sh, ART.x, ART.y, ART.w, ART.h);
-  // Inner shade so the art sits under the frame
-  const shade = ctx.createLinearGradient(0, ART.y, 0, ART.y + 18 * S);
-  shade.addColorStop(0, 'rgba(0,0,0,.28)');
-  shade.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = shade;
-  ctx.fillRect(ART.x, ART.y, ART.w, 18 * S);
-  ctx.restore();
+  paintArt(ctx, spec.image, spec.crop);
 
   // Nameplate
   const plateY = ART.y + ART.h + 4 * S;
@@ -192,7 +207,7 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   roundRect(m, LINE, LINE, FACE_W - LINE * 2, FACE_H - LINE * 2, RADIUS - LINE);
   m.fill();
   m.fillStyle = '#ff0000';
-  roundRect(m, ART.x, ART.y, ART.w, ART.h, artR);
+  roundRect(m, ART.x, ART.y, ART.w, ART.h, ART_R);
   m.fill();
 }
 

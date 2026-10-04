@@ -2,9 +2,10 @@
 //
 // The hand opens with the seven open finishes (the original game's editions plus Prism and
 // Glitch, see src/secrets.ts); every other finish is a secret and leaves no trace in the UI
-// until it is unlocked. Each time either of the app's support links (GitHub Sponsors or Buy
-// Me a Coffee, in the header's Support menu) is opened, one secret still locked, picked at
-// random, quietly joins the hand in this browser; once all are out, nothing more happens.
+// until it is unlocked (beta finishes, still being tried, stay out altogether). Each time
+// either of the app's support links (GitHub Sponsors or Buy Me a Coffee, in the header's
+// Support menu) is opened, one secret still locked, picked at random, quietly joins the hand
+// in this browser; once all are out, nothing more happens.
 // This is an honour system with no server: nothing checks that a payment happened, and the
 // list lives in localStorage, so clearing site data locks them again.
 //
@@ -12,14 +13,14 @@
 // or a store schema change can never take an unlock back.
 
 import { EDITIONS, type EditionId } from './editions';
-import { mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret } from './secrets';
+import { BETA_EDITIONS, mergeUnlocked, parseUnlocked, pickSecret, secretEditions } from './secrets';
 import type { Stage } from './stage';
 import type { Store } from './state';
 
-const SECRETS = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+const SECRETS = secretEditions(EDITIONS.map((e) => e.id));
 
 const KEY = 'foil:secrets';
-/** Where a card restored from storage lands if its secret finish is locked (the store's default). */
+/** Where a card restored from storage lands if its finish is locked or beta (the store's default). */
 const FALLBACK: EditionId = 'holo';
 
 const readUnlocked = () => {
@@ -40,7 +41,8 @@ const save = (list: EditionId[]) => {
   }
 };
 
-export const isLocked = (id: EditionId) => SECRETS.includes(id) && !unlocked.includes(id);
+/** Left out of the hand: a secret still locked, or a beta finish. */
+export const isLocked = (id: EditionId) => BETA_EDITIONS.includes(id) || (SECRETS.includes(id) && !unlocked.includes(id));
 
 /** Run before anything reads the edition: a locked finish restored from a past visit falls back quietly. */
 export function releaseLockedEdition(store: Store) {

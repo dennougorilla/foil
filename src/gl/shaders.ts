@@ -4,6 +4,7 @@ import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
 import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
+import { LENTICULAR_GLSL } from './lenticular';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
@@ -395,6 +396,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${SHALLOWS_GLSL}
+${LENTICULAR_GLSL}
 ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
@@ -454,10 +456,12 @@ void main() {
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
+  else if (e == 76) col = lenticular(c, uv, uTilt, lod, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
-  if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
+  // Warmth tunes its own ink (see touch/glsl.ts); Lenticular shows two pictures, not a tint.
+  if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12) amt = uIntensity;
