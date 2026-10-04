@@ -83,6 +83,8 @@ export interface CardDraw {
   light: [number, number];
   alpha: number;
   flash: number;
+  /** A streak of light crossing the face, its place along the diagonal (about -0.2 to 1.6); none when absent. */
+  glint?: number;
   /** Offset of the hard drop shadow, or null for none. */
   shadow: [number, number] | null;
   /** Draw the nameplate text; off for thumbnail-sized cards. */
@@ -305,6 +307,7 @@ export class CardRenderer {
     gl.uniform2f(p.u.uLight, d.light[0], d.light[1]);
     gl.uniform1f(p.u.uAlpha, d.alpha);
     gl.uniform1f(p.u.uFlash, d.flash);
+    gl.uniform1f(p.u.uGlint, d.glint ?? -2);
     gl.uniform1f(p.u.uFaceTexels, f?.texels ?? 1);
     const uv = d.uv ?? [0, 0, 1, 1];
     gl.uniform4f(p.u.uUvRect, uv[0], uv[1], uv[2], uv[3]);

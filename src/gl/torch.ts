@@ -8,8 +8,11 @@ export function torchAt(turn: number): [number, number] {
   return [0.5 + Math.cos(a) * 0.13, 0.44 + Math.sin(a) * 0.085];
 }
 
-/** Seconds the live lamp takes to drift once round when nobody points at the card. */
-export const TORCH_DRIFT = 10;
+/**
+ * Seconds (at speed 1) the lamp takes to drift once round when nobody points at the card: one idle
+ * cycle (IDLE_CYCLE in src/tune/model.ts), so an exported loop holds exactly one sweep.
+ */
+export const TORCH_DRIFT = 6;
 
 /** The drifting lamp glows at this power; pointing at the card turns it up to full. */
 export const TORCH_IDLE = 0.5;

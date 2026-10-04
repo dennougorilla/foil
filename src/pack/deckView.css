@@ -220,7 +220,7 @@
   margin: 6% 6% 10%;
   height: 84%;
   border-radius: 8px;
-  background: repeating-linear-gradient(45deg, #1d262b 0 6px, #232e34 6px 12px);
+  background: var(--card-back) center / 100% 100%;
   animation: dv-wait 1s ease-in-out infinite;
 }
 

@@ -2,7 +2,8 @@ import './style.css';
 import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
+import { clampCrop, cropRect, drawFace, drawFlip, type Crop } from './card/face';
+import { backUrl, drawBack } from './card/back';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
@@ -14,7 +15,7 @@ import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
 import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
-import { changedKeys } from './tune/model';
+import { changedKeys, EXPORT_MOTIONS } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { mountProof } from './proof';
@@ -23,6 +24,7 @@ import { initPackStore, packs, releaseSealedEdition } from './packStore';
 import { addToHand, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
+import { mountQuickMotion } from './tune/quick';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -60,6 +62,8 @@ const face = document.createElement('canvas');
 const mask = document.createElement('canvas');
 const back = document.createElement('canvas');
 drawBack(back);
+// Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
+document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
 
 // ---------- Stage ----------
 
@@ -928,6 +932,7 @@ function exportInput() {
     intensity: s.intensity,
     pixel: s.pixel,
     tune: s.tune,
+    motion: s.exportMotion,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
@@ -991,11 +996,33 @@ const MATTES = ['auto', '#ffffff', '#000000'];
 
 function buildSaveOpts() {
   const s = store.get();
-  $('saveOpts').hidden = s.exportFormat !== 'gif';
+  const gif = s.exportFormat === 'gif';
+  $('saveOpts').hidden = s.exportFormat === 'png';
   $('saveOptsToggle').setAttribute('aria-expanded', String(s.saveOptsOpen));
   $('saveOptsBody').hidden = !s.saveOptsOpen;
   $('saveOpts').classList.toggle('is-open', s.saveOptsOpen);
-  $('saveOptsSummary').textContent = `${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`;
+  $('saveOptsSummary').textContent = [`${t.exportMotion}: ${t.exportMotionName[s.exportMotion]}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
+  // The loop's motion, for GIF and APNG alike.
+  const mo = $('exportMotionSeg');
+  mo.textContent = '';
+  for (const m of EXPORT_MOTIONS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = m;
+    b.setAttribute('role', 'radio');
+    b.textContent = t.exportMotionName[m];
+    b.title = t.exportMotionHelp[m];
+    radio(b, s.exportMotion === m);
+    b.onclick = () => {
+      if (store.get().exportMotion === m) return;
+      sfx.tick();
+      store.set({ exportMotion: m });
+    };
+    mo.appendChild(b);
+  }
+  $('exportMotionHelp').textContent = t.exportMotionHelp[s.exportMotion];
+  $('gifBgField').hidden = !gif;
   const bg = $('gifBgSeg');
   bg.textContent = '';
   for (const clear of [false, true]) {
@@ -1014,8 +1041,8 @@ function buildSaveOpts() {
     };
     bg.appendChild(b);
   }
-  $('matteField').hidden = !s.gifClear;
-  $('gifClearNote').hidden = !s.gifClear;
+  $('matteField').hidden = !gif || !s.gifClear;
+  $('gifClearNote').hidden = !gif || !s.gifClear;
   const ms = $('matteSeg');
   ms.textContent = '';
   const custom = !MATTES.includes(s.gifMatte);
@@ -1067,6 +1094,7 @@ $('toApng').addEventListener('click', () => {
   store.set({ exportFormat: 'apng' });
   saveBtn.focus();
 });
+rovingKeys($('exportMotionSeg'));
 rovingKeys($('gifBgSeg'));
 rovingKeys($('matteSeg'));
 
@@ -1497,7 +1525,7 @@ store.on((s, changed) => {
   if (changed.has('sample')) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
-  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) {
+  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'exportMotion'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }
@@ -1532,6 +1560,8 @@ const deck = mountDeck({
   onShop: () => openShop(),
   onPrefetch: () => void import('./pack/opening'),
 });
+// The idle motion in one tap, just above the deck.
+mountQuickMotion(store, $('deckDock'));
 // The saved hand made valid; the earlier drawn card and the finish on the card take places in it.
 {
   const s = store.get();

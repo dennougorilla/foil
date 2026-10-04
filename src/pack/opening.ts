@@ -15,7 +15,7 @@ import { tuneGl, type Tune } from '../tune/model';
 import { loadPack } from '../gl/finishes/registry';
 import { Spring } from '../stage';
 import { sfx } from '../audio';
-import { paintPack, paintShowpieceBack, PACK_H, PACK_W, TEAR_Y } from './packArt';
+import { paintPack, PACK_H, PACK_W, TEAR_Y } from './packArt';
 import { buzz, packSfx } from './sounds';
 import { Pillow, type Print } from './pillow';
 import { PACK_EN } from '../packText';
@@ -358,10 +358,8 @@ export function openPack(o: OpeningOptions) {
     // Under the title, the one thing to do now; where the folder went is said on the page afterwards.
     $('.pk-haul-title small').textContent = t.haulHint;
     $('.pk-try').textContent = t.try.replace('{finish}', dict.edition[p.finishes[n - 1]]);
-    // Only the showpiece is ever seen face down, so the overlay's card back is its back.
-    const back = document.createElement('canvas');
-    paintShowpieceBack(back, o.back, p);
-    r.setBack(back);
+    // The showpiece waits face down on the card's own back.
+    r.setBack(o.back);
     cards = p.finishes.map((id, i) => ({
       id,
       shader: editionById(id).shader,

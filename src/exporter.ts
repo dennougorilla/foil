@@ -2,12 +2,12 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { fixedLight, loopCycles, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { exportLoop, exportView, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
-import { TORCH_STILL, torchAt } from './gl/torch';
+import { TORCH_DRIFT, TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
 import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
@@ -32,6 +32,8 @@ export interface ExportInput {
   loopMs?: number;
   /** Fine-tuning of light and motion; defaults when left out. */
   tune?: Tune;
+  /** The motion of a GIF or APNG loop; the stage's own when left out. */
+  motion?: ExportMotion;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
@@ -115,7 +117,7 @@ function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
 export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card orbits once on the swirl backdrop. */
+  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card as the stage shows it left alone, on the swirl backdrop. */
   draw(p: number, bgTime: number, loopSec: number, sourceMs?: number): void;
   dispose(): void;
 }
@@ -158,8 +160,10 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
     out,
     ctx,
     draw(p, bgTime, loopSec, sourceMs) {
-      // The card's motion and light follow the tune; the defaults give the classic orbit.
-      const pose = loopPose(tune, p);
+      // The card's motion, sheen and light: by default the stage's at the same moment of its idle cycle.
+      const view = exportView(tune, input.motion ?? 'stage', p);
+      const { pose, tilt, light } = view;
+      const time = p * loopSec * tune.speed;
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
@@ -167,30 +171,33 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
       if (kind) touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL[kind] : p));
       if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
-      const { rx, ry } = pose;
+      // The shadow as the stage drops it, for a card 500 px tall.
+      const u = ch / 500;
+      const lift = (pose.scale - 1) * 120 - pose.dy * 300;
       cards.drawCard(
         {
-          cx: W / 2,
-          cy: H / 2 + pose.dy * k,
+          cx: W / 2 + pose.dx * ch,
+          cy: H / 2 + pose.dy * ch,
           w: cw,
           h: ch,
-          rx,
-          ry,
+          rx: pose.rx,
+          ry: pose.ry + pose.spin,
           rz: pose.rz,
           scale: pose.scale,
           edition: input.edition.shader,
           intensity: input.intensity,
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
-          tilt: pose.tilt,
-          // Blacklight's lamp sweeps slowly round the art instead (unless the tune fixes the light).
-          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(p * loopCycles(tune)) : pose.light,
+          tilt,
+          // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
+          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(view.torch ?? time / TORCH_DRIFT) : light,
           alpha: 1,
-          flash: 0,
-          shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
+          flash: pose.flash,
+          glint: pose.glint,
+          shadow: !shadow ? null : view.shadow ? [view.shadow[0] * k, view.shadow[1] * k] : [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u],
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
         },
-        p * loopSec * tune.speed,
+        time,
       );
       ctx.imageSmoothingEnabled = false;
       if (transparent) ctx.clearRect(0, 0, W, H);
@@ -204,21 +211,11 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   };
 }
 
-/**
- * Loop length for animated exports. An animated source sets it so its motion and the orbit
- * repeat together: short sources play whole cycles, and long ones are sped up to fit, so the
- * export always loops seamlessly. `sourceSpan` is the source time one loop covers.
- */
-export function animLoop(sourceMs: number | undefined, fallbackMs: number): { loopMs: number; sourceSpan: number } {
-  if (!sourceMs) return { loopMs: fallbackMs, sourceSpan: fallbackMs };
-  const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
-  return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
-}
-
 const GIF_W = 480;
 const GIF_H = 600;
-const GIF_FRAMES = 48;
-const GIF_DELAY = 50;
+/** Up to 20 fps, and at most this many frames: a slow loop plays at a lower frame rate rather than growing without end. */
+const GIF_MIN_DELAY = 50;
+const GIF_MAX_FRAMES = 90;
 /** Share of the progress bar spent drawing frames; the worker's encode fills the rest. */
 const GIF_DRAW_SHARE = 0.35;
 
@@ -256,15 +253,16 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  const { loopMs, sourceSpan } = animLoop(input.loopMs, GIF_FRAMES * GIF_DELAY);
-  const frames = Math.round(loopMs / GIF_DELAY);
-  const DUR = (frames * GIF_DELAY) / 1000;
+  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs, input.motion);
+  const delays = framePlan(loopMs, GIF_MIN_DELAY, GIF_MAX_FRAMES, 10);
+  const frames = delays.length;
+  const DUR = loopMs / 1000;
   let scene: Scene | undefined;
   try {
     scene = createScene(input, GIF_W, GIF_H, true, opts.clear, !opts.clear);
-    for (let i = 0; i < frames; i++) {
+    for (let i = 0, at = 0; i < frames; at += delays[i++]) {
       await nextFrame();
-      const p = i / frames;
+      const p = at / loopMs;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
       scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, DUR, p * sourceSpan);
@@ -273,7 +271,7 @@ export async function exportGif(
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
+    send({ type: 'encode', width: GIF_W, height: GIF_H, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {

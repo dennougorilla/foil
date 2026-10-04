@@ -187,6 +187,54 @@ await step('shine tab', async () => {
   expect((await state()).tune.scale === 1, 'reset all failed');
 });
 
+await step('the motion button above the deck switches the idle motion in one tap, in step with the Shine tab', async () => {
+  const btn = '#deckDock .qm-btn';
+  expect(await page.isVisible(btn), 'no motion button by the deck');
+  const deck = await page.locator('#deckBtn').boundingBox();
+  const b = await page.locator(btn).boundingBox();
+  expect(b.y + b.height <= deck.y && Math.abs(b.x + b.width / 2 - (deck.x + deck.width / 2)) < 30, 'the motion button is not just above the deck');
+  await page.click(btn);
+  expect((await page.getAttribute(btn, 'aria-expanded')) === 'true' && (await page.isVisible('.qm-tray')), 'the tray did not open');
+  const names = await page.locator('.qm-opt span').allTextContents();
+  expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
+  expect((await page.getAttribute('.qm-opt[aria-checked=true]', 'data-value')) === (await state()).tune.idle, 'the tray does not mark the current motion');
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('qm-opt')), 'focus did not move into the tray');
+  // Keyboard: Sway → Float, picked with Enter; the tray stays open to tune it, Escape closes it.
+  await page.keyboard.press('ArrowRight');
+  expect((await page.textContent('.qm-help')).length > 10, 'the focused motion is not described');
+  await page.keyboard.press('Enter');
+  expect((await state()).tune.idle === 'float', `Enter picked ${(await state()).tune.idle}`);
+  expect((await page.getAttribute(btn, 'data-value')) === 'float', 'the button does not show the new motion');
+  expect(await page.isVisible('.qm-tray'), 'a pick closed the tray');
+  // Speed and size: the sliders set the Shine tab's own values, and reset puts both back.
+  await page.locator('.qm-range[data-k=speed]').fill('1.5');
+  await page.locator('.qm-range[data-k=idleAmp]').fill('1.6');
+  const tuned = (await state()).tune;
+  expect(tuned.speed === 1.5 && tuned.idleAmp === 1.6, `the sliders set speed ${tuned.speed}, size ${tuned.idleAmp}`);
+  expect((await page.textContent('.qm-knob:has([data-k=idleAmp]) .qm-val')) === '×1.6' && (await page.textContent('.qm-knob:has([data-k=speed]) .qm-val')) === '×1.5', 'the values do not read ×1.5 and ×1.6');
+  await page.click('.qm-reset');
+  const back = (await state()).tune;
+  expect(back.speed === 1 && back.idleAmp === 1 && back.idle === 'float' && (await page.isDisabled('.qm-reset')), 'reset did not put speed and size back (and only them)');
+  await page.locator('.qm-range[data-k=speed]').fill('1.5');
+  await page.focus('.qm-opt[data-value=float]');
+  await page.keyboard.press('Escape');
+  expect(!(await page.isVisible('.qm-tray')) && (await page.evaluate(() => document.activeElement?.classList.contains('qm-btn'))), 'Escape left the tray open or lost focus');
+  // The Shine tab shows the same choice, and a pick there shows on the button.
+  await tab('light');
+  expect((await page.getAttribute('#pane-light [data-key=idle] [aria-checked=true]', 'data-value')) === 'float', 'the Shine tab disagrees');
+  expect((await page.inputValue('#tune-speed')) === '1.5', 'the Shine tab does not show the speed set in the tray');
+  await page.click('#pane-light [data-key=idle] [role=radio][data-value=bounce]');
+  expect((await page.getAttribute(btn, 'data-value')) === 'bounce', 'a pick in the Shine tab did not reach the button');
+  // Escape and a press elsewhere close it without changing anything.
+  await page.click(btn);
+  await page.keyboard.press('Escape');
+  expect(!(await page.isVisible('.qm-tray')), 'Escape did not close the tray');
+  await page.click(btn);
+  await page.mouse.click(20, 450);
+  expect(!(await page.isVisible('.qm-tray')) && (await state()).tune.idle === 'bounce', 'a press elsewhere did not close the tray, or changed the motion');
+  await page.click('#pane-light .tune-reset-all');
+});
+
 await step('lettering from the name tag', async () => {
   await tab('card');
   // The name tag sways gently, so Playwright's "stable" wait can time out; the chip is still clickable.
@@ -241,6 +289,119 @@ await step('GIF with a clear background is really clear', async () => {
     expect(at(width >> 1, height >> 1) === 255, 'the card is not opaque');
   }
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+});
+
+await step('a GIF moves exactly as the card does on the stage, for every idle motion', async () => {
+  // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
+  // exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
+  await page.evaluate(async () => {
+    const { CardRenderer } = await import('/src/gl/renderers.ts');
+    const { motion, LiveMotion } = await import('/src/tune/motion.ts');
+    const live = document.getElementById('cards');
+    const slot = document.getElementById('cardSlot');
+    const rec = (window.__draws = { live: null, frames: [] });
+    const draw = (window.__drawCard = CardRenderer.prototype.drawCard);
+    CardRenderer.prototype.drawCard = function (d, time) {
+      const pick = ({ cx, cy, w, h, rx, ry, rz, scale, tilt, light, flash, glint }) => ({ cx, cy, w, h, rx, ry, rz, scale, tilt: [...tilt], light: [...light], flash, glint: glint ?? -2 });
+      if (this.gl.canvas === live) {
+        if (d.plate !== false) {
+          const c = live.getBoundingClientRect();
+          const s = slot.getBoundingClientRect();
+          rec.live = { ...pick(d), s: motion.idleTime, ox: s.left - c.left + s.width / 2, oy: s.top - c.top + s.height / 2 };
+        }
+      } else rec.frames.push({ ...pick(d), time, W: this.gl.canvas.width, H: this.gl.canvas.height });
+      return draw.call(this, d, time);
+    };
+    // The stage's idle clock is frozen (time stands still for it), so it can be set to any moment.
+    motion.step = function (dt, ...rest) {
+      return LiveMotion.prototype.step.call(this, 0, ...rest);
+    };
+  });
+  await tab('light');
+  try {
+  const cases = [
+    ['pendulum', 'orbit', 1.5],
+    ['sway', 'pointer', 1],
+    ['float', 'pointer', 0.75],
+    ['wobble', 'fixed', 1],
+    ['bounce', 'pointer', 2],
+    ['glint', 'pointer', 1],
+    ['spin', 'orbit', 1],
+    ['turn', 'pointer', 1],
+    ['breathe', 'pointer', 1],
+  ];
+  const norm = (d, ox, oy) => ({ dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale, t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint });
+  for (const [n, [idle, light, speed]] of cases.entries()) {
+    await page.click(`#pane-light [data-key=light] [role=radio][data-value=${light}]`);
+    await page.click(`#pane-light [data-key=idle] [role=radio][data-value=${idle}]`);
+    await page.locator('#tune-speed').fill(String(speed));
+    await page.waitForTimeout(300);
+    const s = (await state()).tune;
+    expect(s.idle === idle && s.light === light && s.speed === speed, `the tune did not take ${idle}/${light}/${speed}`);
+    // The first case goes through Save, so the file's own timing is checked; the rest draw the export's frames directly.
+    let frames;
+    if (n === 0) {
+      await page.click('#formatSeg [role=radio][data-format=gif]');
+      await page.evaluate(() => (window.__draws.frames = []));
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.click('#saveBtn')]);
+      const gif = decompressFrames(parseGIF(readFileSync(await dl.path())), true);
+      const total = gif.reduce((a, f) => a + f.delay, 0);
+      expect(Math.abs(total - 6000 / speed) <= 10, `the GIF lasts ${total} ms, not one ${6000 / speed} ms idle cycle`);
+      await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+      frames = await page.evaluate(() => window.__draws.frames);
+      expect(frames.length === gif.length, `drew ${frames.length} frames for a ${gif.length}-frame GIF`);
+    } else {
+      frames = await page.evaluate(async () => {
+        const { createScene } = await import('/src/exporter.ts');
+        const { editionById } = await import('/src/editions.ts');
+        const { drawBack } = await import('/src/card/back.ts');
+        const store = JSON.parse(localStorage.getItem('foil:v1'));
+        const face = document.createElement('canvas');
+        const back = document.createElement('canvas');
+        face.width = back.width = 900;
+        face.height = back.height = 1260;
+        drawBack(back);
+        window.__draws.frames = [];
+        const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
+        const loop = 6 / store.tune.speed;
+        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40, loop);
+        scene.dispose();
+        return window.__draws.frames;
+      });
+    }
+    // The pointer leaves the stage (the card leans a little toward a pointer anywhere on it) and the card settles.
+    await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
+    await page.waitForTimeout(1500);
+    // Each exported frame against the stage held at the same moment of its idle cycle.
+    let worst = { d: 0, at: '' };
+    for (const f of frames.filter((_, i, a) => i % Math.ceil(a.length / 12) === 0)) {
+      // An exported frame's loop time is its moment in idle seconds.
+      const sAt = f.time;
+      const got = await page.evaluate(async (sAt) => {
+        const { motion } = await import('/src/tune/motion.ts');
+        motion.idleTime = sAt;
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        return window.__draws.live;
+      }, sAt);
+      expect(Math.abs(got.s - sAt) < 1e-9, 'the stage clock moved while frozen');
+      const a = norm(got, got.ox, got.oy);
+      const b = norm(f, f.W / 2, f.H / 2);
+      for (const k of Object.keys(a)) {
+        const d = Math.abs(a[k] - b[k]);
+        if (d > worst.d) worst = { d, at: `${k} at ${sAt.toFixed(2)}s: stage ${a[k].toFixed(4)}, export ${b[k].toFixed(4)}` };
+      }
+    }
+    expect(worst.d < 2e-3, `${idle}/${light}/${speed}: the export drifts from the stage (${worst.at})`);
+  }
+  } finally {
+    await page.evaluate(async () => {
+      const { motion } = await import('/src/tune/motion.ts');
+      const { CardRenderer } = await import('/src/gl/renderers.ts');
+      delete motion.step;
+      CardRenderer.prototype.drawCard = window.__drawCard;
+    });
+    await page.click('#pane-light .tune-reset-all');
+  }
 });
 
 const handCount = () => page.locator('.hand-slot').count();
@@ -440,7 +601,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const { createScene } = await import('/src/exporter.ts');
     // Exports draw a pack finish once its pack's module has arrived.
     await (await import('/src/gl/finishes/registry.ts')).loadPack('supporter');
-    const { drawBack, drawFace } = await import('/src/card/face.ts');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
     const { editionById } = await import('/src/editions.ts');
     const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
     // A birthday message: dark lettering on a pale picture.
