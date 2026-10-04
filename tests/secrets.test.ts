@@ -85,3 +85,18 @@ test('Shadowbox and 3D Lenticular read the picture depth; no other finish starts
   assert.deepEqual(EDITIONS.filter((e) => e.depth).map((e) => e.id), ['shadowbox', 'lenticular3d']);
   assert.equal(editionById('lenticular3d').shader, 74);
 });
+
+test('a beta finish (Flip Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
+  assert.ok(BETA_EDITIONS.includes('lenticularflip'));
+  assert.ok(EDITIONS.some((e) => e.id === 'lenticularflip'));
+  assert.ok(!OPEN_EDITIONS.includes('lenticularflip'));
+  assert.ok(!SECRET_EDITIONS.includes('lenticularflip'));
+  assert.deepEqual(parseUnlocked('["lenticularflip","opal"]', SECRET_EDITIONS), ['opal']);
+  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticularflip');
+});
+
+test('Flip Lenticular draws with shader 76, which no other finish uses', () => {
+  const shaders = EDITIONS.map((e) => e.shader);
+  assert.equal(EDITIONS.find((e) => e.id === 'lenticularflip')?.shader, 76);
+  assert.equal(new Set(shaders).size, shaders.length);
+});

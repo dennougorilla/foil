@@ -8,6 +8,7 @@ import { PLATINUM_GLSL } from './platinum';
 import { COSMOHOLO_GLSL } from './cosmoholo';
 import { STAINED_GLASS_GLSL } from './stainedGlass';
 import { BLACKLIGHT_GLSL } from './blacklight';
+import { LENTICULAR_FLIP_GLSL } from './lenticularFlip';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { GLOW_GLSL } from '../touch/glow';
@@ -405,6 +406,7 @@ ${PLATINUM_GLSL}
 ${COSMOHOLO_GLSL}
 ${STAINED_GLASS_GLSL}
 ${BLACKLIGHT_GLSL}
+${LENTICULAR_FLIP_GLSL}
 ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
@@ -472,10 +474,12 @@ void main() {
   else if (e == 70) col = glow(c, uv, L, m.r);
   else if (e == 72) col = blacklight(c, uv, L, lod, m);
   else if (e == 74) col = lenticular3d(c, uv, uTilt, lod);
+  else if (e == 76) col = lenticularFlip(c, uv, uTilt, lod, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
-  if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
+  // Warmth tunes its own ink (see touch/glsl.ts); Flip Lenticular shows two pictures, not a tint.
+  if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
