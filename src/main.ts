@@ -2,7 +2,8 @@ import './style.css';
 import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
+import { clampCrop, cropRect, drawFace, drawFlip, type Crop } from './card/face';
+import { backUrl, drawBack } from './card/back';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
@@ -60,6 +61,8 @@ const face = document.createElement('canvas');
 const mask = document.createElement('canvas');
 const back = document.createElement('canvas');
 drawBack(back);
+// Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
+document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
 
 // ---------- Stage ----------
 

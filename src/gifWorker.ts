@@ -8,7 +8,8 @@ export type GifRequest =
       type: 'encode';
       width: number;
       height: number;
-      delay: number;
+      /** Each frame's delay in ms, a whole number of 10 ms. */
+      delays: number[];
       /** Frames were drawn without a backdrop: keep what is clear, clear. */
       clear: boolean;
       /** Colour that solid edge pixels are blended into, or null to keep their own colour. */
@@ -78,13 +79,14 @@ function globalPalette() {
 }
 
 function encode(m: Extract<GifRequest, { type: 'encode' }>) {
-  const { width, height, delay, clear } = m;
+  const { width, height, delays, clear } = m;
   if (clear) frames.forEach((f) => cutOut(f, m.matte));
   const palette = globalPalette();
   const key = palette.length;
   const gif = GIFEncoder({ initialCapacity: 1 << 20 });
   let prev: Uint8Array | null = null;
   frames.forEach((f, i) => {
+    const delay = delays[i];
     const index = m.dither ? ditherToPalette(f, width, palette, 16) : applyPalette(f, palette);
     const first = i === 0 ? { palette: [...palette, [0, 0, 0]], repeat: 0 } : {};
     if (clear) {

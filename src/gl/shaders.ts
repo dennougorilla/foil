@@ -149,6 +149,7 @@ uniform vec2 uLight;       // highlight position in card uv
 uniform float uShadow;     // 1 = draw as drop shadow
 uniform float uAlpha;
 uniform float uFlash;      // white flash on juice
+uniform float uGlint;      // a streak of light crossing the face: its place along the diagonal, below -1 when none
 uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
@@ -246,8 +247,20 @@ void main() {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
     vec4 b = texture(uBack, buv);
     if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, b.a * 0.45 * uAlpha); return; }
-    b.rgb *= 1.0 - clamp(-vShade, 0.0, 0.4);
-    o = vec4(b.rgb * b.a, b.a) * uAlpha;
+    // The back's foil pixels (alpha 254, see src/card/back.ts) catch a band of light that steps
+    // across them, one pixel of the back at a time, as the card tilts and turns.
+    float foil = b.a > 0.99 ? clamp((1.0 - b.a) * 255.0, 0.0, 1.0) : 0.0;
+    float a = b.a > 0.99 ? 1.0 : b.a;
+    vec2 cell = floor(buv * vec2(90.0, 126.0));
+    float sweep = dot(cell, vec2(0.8, 0.6) / 90.0) - (uTilt.x * 0.45 + uTilt.y * 0.3) - vShade * 1.5;
+    float wave = 0.5 + 0.5 * sin(sweep * 7.0);
+    float glint = smoothstep(0.6, 1.0, wave) * (0.6 + 0.4 * hash12(cell));
+    vec3 c = b.rgb / max(b.a, 1e-4);
+    // The gold brightens and dims as a whole with the angle, and the band of light runs over it.
+    c = mix(c, c * (0.8 + 0.55 * wave), foil);
+    c += foil * glint * vec3(1.0, 0.93, 0.75);
+    c *= 1.0 - clamp(-vShade, 0.0, 0.4);
+    o = vec4(c * a, a) * uAlpha;
     return;
   }
   vec2 uv = vUv;
@@ -316,6 +329,13 @@ void main() {
   col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
   col = showRange(col, uv, sel);
+  if (uGlint > -1.0) {
+    // Stepped on a coarse pixel grid, like the rest of the page: a bright bar with a thin one trailing.
+    vec2 g = floor(vUv * vec2(60.0, 84.0)) / vec2(60.0, 84.0);
+    float d = g.x * 0.8 + g.y * 0.6 - uGlint;
+    float streak = step(abs(d), 0.045) + step(abs(d + 0.11), 0.012) * 0.7;
+    col = mix(col, vec3(1.0, 0.98, 0.9), streak * 0.6);
+  }
   col = mix(col, vec3(1.0), uFlash);
   o = vec4(clamp(col, 0.0, 1.0) * base.a, base.a) * uAlpha;
 }

@@ -40,7 +40,13 @@ const ICONS: Record<string, string> = {
   fixed: '<path d="M3 2h10v12H3zm2 2v8h6V4zm4 1h2v2H9z"/>',
   none: '<path d="M3 7h10v2H3z"/>',
   sway: '<path d="M1 8h2V6h2v2h2v2h2V8h2V6h2v2h2v2h-2v2h-2v-2H9v-2H7v2H5v2H3v-2H1z"/>',
+  float: '<path d="M5 1h6v7H5zM2 11h2v1h2v-1h4v1h2v-1h2v1h-2v1h-2v-1H6v1H4v-1H2zm0 3h2v1h2v-1h4v1h2v-1h2v1h-2v1h-2v-1H6v1H4v-1H2z"/>',
+  pendulum: '<path d="M7 1h2v2H7zm0 2h2v3H7zM4 6h8v8H4zm2 2v4h4V8z"/>',
+  wobble: '<path d="M6 2h5v1h1v9h-1v1H6v-1H5V3h1zM1 4h2v1H2v2H1zm0 5h1v2h1v1H1zm13-5h1v3h-1V5h-1V4zm0 5h1v3h-2v-1h1z"/>',
+  bounce: '<path d="M5 1h6v6H5zM1 14h14v1H1zM3 9h1v2H3zm9 0h1v2h-1zM6 12h4v1H6z"/>',
+  glint: '<path d="M7 1h2v5h5v2H9v5H7V8H2V6h5zM3 2h1v1H3zm9 0h1v1h-1zM3 12h1v1H3zm9 0h1v1h-1z"/>',
   spin: '<path d="M6 2h5v1h1v1h1v3h-2V5h-1V4H6v1H5v2H3V4h1V3h2zm-3 7h2v2h1v1h4v-1h1V9h2v3h-1v1h-1v1H5v-1H4v-1H3z"/>',
+  turn: '<path d="M7 3h3v10H7zM3 1h7v1H4v1H3v3H2V2h1zm9 9h1v4h-1v1H6v-1h5v-1h1z"/>',
   breathe: '<path d="M7 7h2v2H7zM5 4h6v1h1v1h1v4h-1v1h-1v1H5v-1H4v-1H3V6h1V5h1zm1 2v1H5v2h1v1h4V9h1V7h-1V6z"/>',
   gold: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm1 3v1H5v4h1v1h4v-1h1V6h-1V5z"/>',
   silver: '<path d="M5 2h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V5h1V3h2zm0 3v6h6V5zm2 2h2v2H7z"/>',
@@ -373,7 +379,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', `tuneLabel-${k}`);
     const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? IDLE_MODES : METALS;
-    group.style.gridTemplateColumns = `repeat(${options.length}, 1fr)`;
+    // The idle motions take two rows of five, so the row stays as wide as the others.
+    group.style.gridTemplateColumns = `repeat(${Math.min(options.length, 5)}, 1fr)`;
     for (const v of options) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -383,6 +390,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
       b.setAttribute('role', 'radio');
       b.innerHTML = `${svg(v)}<span></span>`;
       b.querySelector('span')!.textContent = formatChoice(k, v, t);
+      // What each motion does, before it is picked.
+      if (k === 'idle') b.title = t.idleHelp[v as Tune['idle']];
       b.addEventListener('click', () => choose(k, v));
       group.appendChild(b);
     }

@@ -877,12 +877,9 @@ button {
   width: 60px;
   height: 84px;
   margin-left: calc(var(--i) * -2px);
-  border-radius: 6px;
-  background:
-    radial-gradient(circle at 50% 50%, #f3eee2 0 9px, #161c1f 9px 12px, transparent 12px),
-    repeating-linear-gradient(45deg, #a82c25 0 4px, #c4382f 4px 8px);
-  box-shadow: inset 0 0 0 3px #f3eee2, inset 0 0 0 5px #161c1f, 0 0 0 2px #0b1012, 0 3px 0 2px #d8d2c4, 0 4px 0 2px #0b1012;
-  image-rendering: pixelated;
+  border-radius: 5px;
+  background: var(--card-back) center / 100% 100%;
+  box-shadow: 0 3px 0 0 #d8d2c4, 0 4px 0 1px #0b1012;
 }
 
 .deck[data-empty='true'] .deck-pile i {

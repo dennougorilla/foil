@@ -3,7 +3,7 @@ import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } f
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
-import { tuneGl } from './tune/model';
+import { restLight, tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
@@ -555,8 +555,9 @@ export class Stage {
       const amp = this.motion ? 1 : 0.5;
       // The device's tilt leans the card (and so its shine) on phones; not under reduced motion.
       const gyro = this.motion ? motion.gyroInput() : null;
-      // Brush mode holds the card too, so a spin eases back to face the viewer.
-      motion.step(dt, tune, !this.motion, over || this.drag.active || this.hold);
+      // Pointing at the card turns a spinning one to face the viewer; dragging it or holding it for
+      // the brush also eases the idle motion out.
+      motion.step(dt, tune, !this.motion, over, this.drag.active || this.hold);
       if (this.hold) {
         this.rx.target = 0;
         this.ry.target = 0;
@@ -584,8 +585,6 @@ export class Stage {
         this.rx.target = 0;
         this.rz.target = 0;
       }
-      // Idle float
-      const idle = this.motion && !this.drag.active && !this.hold ? 1 : 0;
       const sub = 4;
       for (let i = 0; i < sub; i++) {
         for (const s of [this.ox, this.oy, this.rx, this.ry, this.rz, this.sc]) s.step(dt / sub);
@@ -608,32 +607,28 @@ export class Stage {
         }
       }
 
-      // Idle motion and the light come from the tune (sway and pointer-follow by default).
-      const pose = motion.idle(tune, idle > 0);
-      const fy = pose.fy;
-      const rzIdle = pose.rz;
-      const rxIdle = pose.rx;
-      const ryIdle = pose.ry;
+      // Idle motion and the light come from the tune (sway and pointer-follow by default), timed by
+      // the same clock as an exported loop (see idlePose in tune/model.ts).
+      const pose = motion.pose(tune);
+      const fx = pose.dx * r.h;
+      const fy = pose.dy * r.h;
       const tk = motion.tiltScale(tune);
-      const RX = this.rx.x * tk + rxIdle;
+      const RX = this.rx.x * tk + pose.rx;
       motion.flip = flipAngle;
-      const RY = this.ry.x * tk + ryIdle + pose.spin + flipAngle;
-      const RZ = this.rz.x * tk + rzIdle;
+      const RY = this.ry.x * tk + pose.ry + pose.spin + flipAngle;
+      const RZ = this.rz.x * tk + pose.rz;
 
-      const orbit = motion.orbitSheen(tune);
-      const tilt: [number, number] = [
-        (this.ry.x + ryIdle) / 0.32 + pose.sheen[0] + orbit[0],
-        (this.rx.x + rxIdle) / 0.28 + pose.sheen[1] + orbit[1],
-      ];
-      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      const tilt = motion.tilt(tune, pose, this.rx.x + pose.rx, this.ry.x + pose.ry);
+      const cardPose = { cx: r.cx + this.ox.x + fx, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
       const pointed = over && !this.drag.active && !this.hold;
       let light: [number, number];
       if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);
       else if (pointed) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
-      else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
+      else light = restLight(tilt);
       light = motion.light(tune, light);
 
-      const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
+      // The card's shadow drops further as it lifts or rises off the table.
+      const lift = (this.sc.x * pose.scale - 1) * 120 - fy * 0.6 + (this.drag.active ? 14 : 0);
       this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
       this.cards.drawCard(
         {
@@ -644,7 +639,8 @@ export class Stage {
           tilt,
           light,
           alpha: 1,
-          flash: this.flash,
+          flash: this.flash + pose.flash,
+          glint: pose.glint,
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
@@ -655,7 +651,7 @@ export class Stage {
       // Info box sways a little with the card, like a hanging tag.
       // ...but holds still while someone is pointing at it or typing in it.
       if (this.o.info.matches(':hover, :focus-within')) this.o.info.style.transform = '';
-      else this.o.info.style.transform = `translate(${(this.ox.x * 0.12).toFixed(1)}px, ${(this.oy.x * 0.12 + fy * 0.4).toFixed(1)}px) rotate(${(RZ * 0.25).toFixed(4)}rad)`;
+      else this.o.info.style.transform = `translate(${(this.ox.x * 0.12 + fx * 0.4).toFixed(1)}px, ${(this.oy.x * 0.12 + fy * 0.4).toFixed(1)}px) rotate(${(RZ * 0.25).toFixed(4)}rad)`;
     }
 
     this.stepParticles(dt);
