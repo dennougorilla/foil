@@ -1,10 +1,11 @@
-// Sponsor-only finishes. Spliced into CARD_FS after COMMON, so hash/fbm/voronoi are in scope.
+// Supporter pack: Opal, Raden and Kintsugi (the showpiece). See docs/packs.md.
 // Shader indices start at 40 to stay clear of the regular editions.
+import type { FinishModule } from './types';
 
-export const SPONSOR_GLSL = /* glsl */ `
+const GLSL = /* glsl */ `
 // Roughly the pixel size of the card art, so effects can land on the same grid.
 const vec2 PIXEL_GRID = vec2(64.0, 89.6);
-// Set just before each sponsor finish runs: 1 inside the art window, 0 on the frame.
+// Set just before each supporter finish runs: 1 inside the art window, 0 on the frame.
 float artMask = 1.0;
 vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   // The picture stays the subject: a few fine seams of gold mend it, and the
@@ -78,11 +79,13 @@ vec3 raden(vec3 c, vec2 uv, vec2 t, float L) {
 }
 `;
 
-/** Continues the edition if/else chain in CARD_FS. */
-export const SPONSOR_DISPATCH = /* glsl */ `
+const DISPATCH = /* glsl */ `
   // Gold seams stay off the nameplate so the title reads cleanly.
   else if (e == 40) col = mix(c, kintsugi(c, uv, uTilt, L), 0.25 + 0.75 * m.r);
   else if (e == 41) col = opal(c, uv, uTilt, L);
   // Raden inlays the art; the frame only takes a light coat so the nameplate stays readable.
   else if (e == 43) { artMask = m.r; col = raden(c, uv, uTilt, L); }
 `;
+
+const finishes: FinishModule = { glsl: GLSL, dispatch: DISPATCH };
+export default finishes;

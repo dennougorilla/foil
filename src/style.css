@@ -831,25 +831,218 @@ button {
   opacity: 1;
 }
 
-.hand-wrap:hover .hand-hint,
-.hand-wrap:focus-within .hand-hint {
-  opacity: 0;
-}
-
 .hand-slot[aria-checked='true'] .key {
   background: var(--accent);
   color: #fff;
 }
 
-.hand-hint {
-  margin: 0;
-  padding: 2px 10px;
+/* The hand's row: the fan, then the deck and the pack button at its right end. */
+.hand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 1100px);
+}
+
+.hand-row .hand {
+  flex: 1;
+  min-width: 0;
+}
+
+.deck-dock {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 44px;
+  padding: 14px 18px 20px 6px;
+  padding-right: 8px;
+}
+
+/* The deck: face-down backs piled up, one pixel step per card, the count on a tag. */
+.deck {
+  position: relative;
+  width: 64px;
+  height: 90px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-out);
+}
+
+.deck-pile i {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--i) * 3px);
+  width: 60px;
+  height: 84px;
+  margin-left: calc(var(--i) * -2px);
   border-radius: 6px;
-  background: rgba(13, 19, 21, 0.7);
-  transition: opacity 0.2s;
-  font-size: 14px;
-  color: var(--text-dim);
-  text-shadow: 0 2px 0 var(--edge);
+  background:
+    radial-gradient(circle at 50% 50%, #f3eee2 0 9px, #161c1f 9px 12px, transparent 12px),
+    repeating-linear-gradient(45deg, #a82c25 0 4px, #c4382f 4px 8px);
+  box-shadow: inset 0 0 0 3px #f3eee2, inset 0 0 0 5px #161c1f, 0 0 0 2px #0b1012, 0 3px 0 2px #d8d2c4, 0 4px 0 2px #0b1012;
+  image-rendering: pixelated;
+}
+
+.deck[data-empty='true'] .deck-pile i {
+  background: rgba(13, 19, 21, 0.6);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+  border: 0;
+  outline: 2px dashed rgba(255, 255, 255, 0.25);
+  outline-offset: -6px;
+}
+
+.deck-count {
+  position: absolute;
+  right: -12px;
+  top: -10px;
+  z-index: 1;
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #0b1012;
+  color: var(--text);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
+  text-align: center;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2), 0 2px 0 2px #05080a;
+}
+
+.deck:hover {
+  transform: translateY(-3px) rotate(-2deg);
+}
+
+.deck.is-bump {
+  animation: deck-bump 0.45s var(--ease-back);
+}
+
+@keyframes deck-bump {
+  30% { transform: scale(1.14) rotate(3deg); }
+}
+
+/* The pack button: a little crimped pack in rainbow foil; it glows while one is still sealed. */
+.deck-packs {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #222c32;
+  box-shadow: inset 0 0 0 2px #3a4a53, 0 0 0 2px #05080a, 0 4px 0 2px #05080a;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-out);
+}
+
+.deck-pack {
+  width: 22px;
+  height: 30px;
+  background: linear-gradient(135deg, #ff6b5f, #ffb341 30%, #4fd3a3 60%, #4ab0ff);
+  clip-path: polygon(0 3px, 3px 0, 6px 3px, 9px 0, 12px 3px, 15px 0, 18px 3px, 22px 0, 22px 27px, 19px 30px, 16px 27px, 13px 30px, 10px 27px, 7px 30px, 4px 27px, 0 30px);
+}
+
+.deck-packs small {
+  position: absolute;
+  right: -7px;
+  top: -7px;
+  min-width: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 13px;
+  line-height: 20px;
+  box-shadow: 0 0 0 2px #05080a;
+}
+
+.deck-packs small:empty {
+  display: none;
+}
+
+.deck-packs:not([data-sealed='0']) {
+  animation: deck-glow 2.4s ease-in-out infinite;
+}
+
+.deck-packs:not([data-sealed='0']) .deck-pack {
+  animation: deck-wobble 2.4s ease-in-out infinite;
+}
+
+@keyframes deck-glow {
+  50% { box-shadow: inset 0 0 0 2px #3a4a53, 0 0 0 2px #05080a, 0 4px 0 2px #05080a, 0 0 22px 7px rgba(242, 193, 78, 0.8); }
+}
+
+@keyframes deck-wobble {
+  0%, 70%, 100% { transform: rotate(0); }
+  78% { transform: rotate(-10deg); }
+  86% { transform: rotate(8deg); }
+  94% { transform: rotate(-4deg); }
+}
+
+.deck-packs:hover {
+  transform: translateY(-2px);
+}
+
+.deck:focus-visible,
+.deck-packs:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 5px;
+}
+
+.deck-packs[aria-busy='true'] {
+  cursor: progress;
+}
+
+/* The words under the deck and the pack button. */
+.deck-cap {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin-top: 12px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(245, 242, 234, 0.8);
+  text-shadow: 0 2px 0 #05080a;
+  white-space: nowrap;
+}
+
+.deck .deck-cap {
+  margin-top: 14px;
+}
+
+.deck-packs .deck-cap {
+  margin-top: 8px;
+}
+
+/* "+3" floating up from the deck as cards arrive. */
+.deck-plus {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  z-index: 2;
+  font-size: 30px;
+  color: var(--gold);
+  text-shadow: 0 3px 0 #05080a;
+  transform: translateX(-50%);
+  animation: deck-plus 1.9s var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes deck-plus {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
+  20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-packs,
+  .deck-pack,
+  .deck.is-bump {
+    animation: none !important;
+  }
 }
 
 /* ---------- Panel ---------- */
@@ -2839,8 +3032,13 @@ input[type='range']:disabled {
   .stage {
     padding-bottom: 12px;
   }
-  .hand-hint {
-    display: none;
+  .deck {
+    width: 52px;
+    height: 74px;
+  }
+  .deck-pile i {
+    width: 48px;
+    height: 68px;
   }
   .panel {
     --pad: 20px;

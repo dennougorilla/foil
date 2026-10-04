@@ -1,0 +1,609 @@
+/* The deck builder (src/pack/deckView.ts): the hand's slots over a grid of everything owned. */
+
+.dv {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 8, 10, 0.78);
+  opacity: 0;
+  transition: opacity 0.18s var(--ease-out);
+}
+
+.dv.is-in {
+  opacity: 1;
+}
+
+.db {
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
+  width: min(1200px, 100%);
+  height: min(900px, calc(100dvh - 32px));
+  overflow: hidden;
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 50% 0%, #26323a, #121a1e 70%);
+  box-shadow: inset 0 0 0 6px #3a4a53, 0 0 0 4px #05080a, 0 14px 0 4px #05080a, 0 26px 40px rgba(0, 0, 0, 0.55);
+  transform: translateY(14px) scale(0.97);
+  transition: transform 0.25s var(--ease-back);
+}
+
+.dv.is-in .db {
+  transform: none;
+}
+
+.db-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 22px 8px;
+}
+
+.db-head b {
+  font-weight: 400;
+  font-size: 26px;
+  text-shadow: 0 3px 0 #05080a;
+}
+
+.db-count {
+  flex: 1;
+  font-size: 18px;
+  color: var(--gold);
+  text-shadow: 0 2px 0 #05080a;
+}
+
+.dv-x {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #f3eee2;
+  color: #0b1012;
+  box-shadow: 0 0 0 3px #05080a, 0 5px 0 3px #05080a;
+}
+
+.dv-x svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* The hand: seven slots on a felt strip. */
+.db-hand {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 124px));
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 22px 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #0d1316;
+  box-shadow: inset 0 4px 0 #05080a, inset 0 0 0 2px #2e3b42;
+}
+
+.db-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-radius: 10px;
+}
+
+.db-slot.is-empty {
+  aspect-ratio: 124 / 196;
+  outline: 2px dashed rgba(255, 255, 255, 0.22);
+  outline-offset: -6px;
+}
+
+.db-slot.is-next {
+  outline-color: var(--gold);
+  background: rgba(242, 193, 78, 0.08);
+}
+
+.db-slot.is-over {
+  background: rgba(242, 193, 78, 0.18);
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.db-empty {
+  font-size: 13px;
+  color: rgba(245, 242, 234, 0.45);
+}
+
+.db-hint {
+  margin: 8px 22px 0;
+  font-size: 14px;
+  color: rgba(245, 242, 234, 0.7);
+}
+
+.db-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 22px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.db-tab {
+  flex: none;
+  min-height: 36px;
+  padding: 2px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #222c32;
+  color: var(--text);
+  font-size: 15px;
+  box-shadow: inset 0 0 0 2px #3a4a53;
+}
+
+.db-tab[aria-selected='true'] {
+  background: #f3eee2;
+  color: #0b1012;
+  box-shadow: 0 3px 0 #05080a;
+}
+
+.db-grid {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 22px 20px;
+}
+
+.db-grid.is-over {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.dv-group + .dv-group {
+  margin-top: 14px;
+}
+
+.dv-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-weight: 400;
+  font-size: 17px;
+  color: var(--c);
+  text-shadow: 0 2px 0 #05080a;
+}
+
+.dv-group h3 i {
+  width: 12px;
+  height: 16px;
+  background: linear-gradient(160deg, var(--c), var(--b));
+  clip-path: polygon(0 2px, 3px 0, 6px 2px, 9px 0, 12px 2px, 12px 14px, 9px 16px, 6px 14px, 3px 16px, 0 14px);
+}
+
+.db-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+/* A card: its picture and name. In the grid, a card in the hand is lifted with a gold edge and tag. */
+.db-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 4px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: none;
+  transition: transform 0.15s var(--ease-out), background 0.15s, opacity 0.15s;
+}
+
+.db-pic {
+  display: block;
+  width: 100%;
+  aspect-ratio: 124 / 171;
+}
+
+.db-pic canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.db-pic:empty::before {
+  content: '';
+  display: block;
+  margin: 6% 6% 10%;
+  height: 84%;
+  border-radius: 8px;
+  background: repeating-linear-gradient(45deg, #1d262b 0 6px, #232e34 6px 12px);
+  animation: dv-wait 1s ease-in-out infinite;
+}
+
+@keyframes dv-wait {
+  50% { opacity: 0.55; }
+}
+
+.db-card b {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 400;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.db-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.db-card.is-hand {
+  background: none;
+}
+
+.db-tag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 20px;
+  box-shadow: 0 2px 0 #05080a;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.2s var(--ease-back);
+}
+
+.db-grid .db-card.is-in {
+  background: rgba(242, 193, 78, 0.16);
+  box-shadow: inset 0 0 0 2px var(--gold);
+  transform: translateY(-4px);
+}
+
+.db-grid .db-card.is-in .db-tag {
+  opacity: 1;
+  transform: none;
+}
+
+.db-card[disabled],
+.db-card.is-locked {
+  cursor: default;
+}
+
+.db-lock {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 14px;
+  height: 11px;
+  border-radius: 3px;
+  background: #0b1012;
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.db-lock::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -7px;
+  width: 8px;
+  height: 7px;
+  border: 2px solid var(--gold);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  box-sizing: border-box;
+}
+
+.db-card.is-dragging {
+  opacity: 0.35;
+}
+
+.db-card:focus-visible,
+.db-tab:focus-visible,
+.db-btn:focus-visible,
+.dv-x:focus-visible,
+.dv-shop:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 3px;
+}
+
+/* A card on its way between the deck and the hand, or under the finger. */
+.db-fly {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
+}
+
+.db-fly.is-drag {
+  transform: rotate(-4deg) scale(1.06);
+}
+
+.db-more {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.db-more p {
+  margin: 0;
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.8);
+}
+
+.dv-shop {
+  min-height: 48px;
+  padding: 6px 22px;
+  border: 0;
+  border-radius: 14px;
+  background: #ee4f32;
+  color: #fff;
+  font-size: 18px;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.3), 0 0 0 4px #05080a, 0 8px 0 4px #8a2414, 0 12px 0 4px #05080a;
+}
+
+/* Undo and reset on the left, Done on the right, in thumb reach. */
+.db-foot {
+  display: flex;
+  gap: 10px;
+  padding: 12px 22px 16px;
+  background: #1a2328;
+  box-shadow: inset 0 4px 0 #05080a;
+}
+
+.db-btn {
+  min-height: 46px;
+  padding: 4px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #26323a;
+  color: var(--text);
+  font-size: 16px;
+  box-shadow: inset 0 0 0 2px #3a4a53, 0 4px 0 #05080a;
+}
+
+.db-btn[disabled] {
+  opacity: 0.4;
+}
+
+.db-done {
+  margin-left: auto;
+  min-width: 120px;
+  background: #ee4f32;
+  color: #fff;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), 0 4px 0 #8a2414;
+}
+
+/* A low screen keeps the grid in view: smaller hand slots, tighter header. */
+@media (max-height: 760px) and (min-width: 601px) {
+  .db-hand {
+    grid-template-columns: repeat(7, minmax(0, 72px));
+    padding: 8px 12px;
+  }
+  .db-head {
+    padding-top: 10px;
+  }
+  .db-hint {
+    margin-top: 4px;
+  }
+  .db-tabs {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 600px) {
+  .db-hand {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .dv {
+    padding: 8px;
+  }
+  .db {
+    height: calc(100dvh - 16px);
+    border-radius: 18px;
+  }
+  .db-head {
+    padding: 12px 14px 6px;
+  }
+  .db-head b {
+    font-size: 21px;
+  }
+  .db-hand {
+    gap: 4px;
+    margin: 2px 10px 0;
+    padding: 8px 6px;
+  }
+  .db-card b {
+    font-size: 11px;
+  }
+  .db-hand .db-card b {
+    font-size: 10px;
+  }
+  .db-empty {
+    font-size: 10px;
+    text-align: center;
+  }
+  .db-hint,
+  .db-tabs {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  .db-hint {
+    font-size: 12px;
+  }
+  .db-grid {
+    padding: 8px 10px 14px;
+  }
+  .db-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .db-foot {
+    padding: 10px 10px 12px;
+  }
+  .db-btn {
+    padding: 4px 12px;
+    font-size: 14px;
+  }
+  .db-done {
+    min-width: 90px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db {
+    transition: none;
+  }
+  .db-pic:empty::before {
+    animation: none;
+  }
+}
+
+/* The card a full-hand tap will replace. */
+.db-card.is-next-out .db-pic {
+  outline: 2px dashed #ff8a6a;
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
+.db-out {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #ff8a6a;
+  color: #2a0d06;
+  font-size: 11px;
+  line-height: 17px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 0 #05080a;
+}
+
+.db-slot.is-next .db-empty {
+  color: var(--gold);
+}
+
+/* The tab strip fades at its right edge when it runs on. */
+.db-tabs {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  padding-right: 24px;
+}
+
+@media (max-height: 760px) and (min-width: 601px) {
+  .db-hand {
+    grid-template-columns: repeat(7, minmax(0, 88px));
+    padding: 10px 12px 6px;
+  }
+  .db-hint {
+    font-size: 12px;
+  }
+  .db-row {
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  }
+  .db-foot {
+    padding: 8px 22px 10px;
+  }
+  .db-btn {
+    min-height: 40px;
+  }
+}
+
+/* The count rides with the title; one instruction line under the hand, readable. */
+.db-count {
+  flex: none;
+}
+
+.db-gap {
+  flex: 1;
+}
+
+.db-hint {
+  color: rgba(245, 242, 234, 0.85);
+}
+
+/* "Next out" sits inside the hand strip, over its card's top edge. */
+.db-out {
+  top: 2px;
+}
+
+/* Base in the grid: the lock and "always" take the tag's place. */
+.db-grid .db-card.is-locked .db-tag {
+  opacity: 1;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3eee2;
+}
+
+.db-tag .db-lock {
+  position: relative;
+  top: 1px;
+  left: 0;
+  width: 9px;
+  height: 7px;
+  margin-top: 3px;
+  background: #0b1012;
+  box-shadow: none;
+}
+
+.db-tag .db-lock::before {
+  left: 1px;
+  top: -5px;
+  width: 7px;
+  height: 6px;
+  border-color: #0b1012;
+}
+
+.db-empty {
+  max-width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Pack names stay in view while the grid scrolls; the grid fades under the footer. */
+.dv-group h3 {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  padding: 6px 0;
+  background: linear-gradient(#141c20 70%, transparent);
+}
+
+.db-grid {
+  mask-image: linear-gradient(#000 calc(100% - 24px), transparent);
+}
+
+.db-card {
+  align-content: start;
+}
+
+@media (max-width: 600px) {
+  .db-tabs {
+    flex-wrap: wrap;
+    mask-image: none;
+    padding-right: 0;
+  }
+  .db-tab {
+    min-height: 32px;
+    padding: 2px 10px;
+    font-size: 14px;
+  }
+  .db-empty {
+    font-size: 9px;
+  }
+}

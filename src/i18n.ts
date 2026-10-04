@@ -3,6 +3,7 @@ import type { FoilTone, LetterStyle } from './lettering';
 import type { Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
 import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
+import { PACK_EN, PACK_JA } from './packText';
 
 export type Lang = 'ja' | 'en';
 
@@ -266,6 +267,7 @@ const ja = {
     reset: '初期値に戻す',
   },
   ...RANGE_COLOR_JA,
+  pack: PACK_JA,
 };
 
 type Dict = typeof ja;
@@ -530,6 +532,7 @@ const en: Dict = {
     reset: 'Reset to default',
   },
   ...RANGE_COLOR_EN,
+  pack: PACK_EN,
 };
 
 export const DICTS: Record<Lang, Dict> = { ja, en };

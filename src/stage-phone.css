@@ -5,19 +5,12 @@
  */
 @media (max-width: 900px) {
   .stage {
-    /* What the hand takes: one row of up to seven cards, or two rows for more; less on short screens. */
+    /* What the hand of up to seven cards takes; less on short screens. */
     --hand-h: clamp(112px, 21svh, 168px);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-  }
-  .stage:has(.hand[data-many]) {
-    --hand-h: clamp(200px, 34svh, 290px);
-  }
-  /* The second row's fan curves past the hand's box; keep the name clear of it. */
-  .hand[data-many] + .hand-bar {
-    margin-top: 16px;
   }
   .showcase {
     display: contents;
