@@ -2,7 +2,7 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { exportLoop, fixedLight, framePlan, loopView, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { exportLoop, exportView, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
@@ -32,6 +32,8 @@ export interface ExportInput {
   loopMs?: number;
   /** Fine-tuning of light and motion; defaults when left out. */
   tune?: Tune;
+  /** The motion of a GIF or APNG loop; the stage's own when left out. */
+  motion?: ExportMotion;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
@@ -158,8 +160,9 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
     out,
     ctx,
     draw(p, bgTime, loopSec, sourceMs) {
-      // The card's motion, sheen and light are the stage's at the same moment of its idle cycle.
-      const { pose, tilt, light } = loopView(tune, p);
+      // The card's motion, sheen and light: by default the stage's at the same moment of its idle cycle.
+      const view = exportView(tune, input.motion ?? 'stage', p);
+      const { pose, tilt, light } = view;
       const time = p * loopSec * tune.speed;
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
@@ -186,11 +189,11 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
           tilt,
           // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
-          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(time / TORCH_DRIFT) : light,
+          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(view.torch ?? time / TORCH_DRIFT) : light,
           alpha: 1,
           flash: pose.flash,
           glint: pose.glint,
-          shadow: shadow ? [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u] : null,
+          shadow: !shadow ? null : view.shadow ? [view.shadow[0] * k, view.shadow[1] * k] : [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u],
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
         },
@@ -250,7 +253,7 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs);
+  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs, input.motion);
   const delays = framePlan(loopMs, GIF_MIN_DELAY, GIF_MAX_FRAMES, 10);
   const frames = delays.length;
   const DUR = loopMs / 1000;

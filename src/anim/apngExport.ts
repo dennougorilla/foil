@@ -1,7 +1,7 @@
 // High-quality animated export: the same orbit as the GIF, but full colour and with the card's
 // rounded corners and soft shadow kept on a transparent background, saved as APNG.
 import { createScene, download, fileSafe, packLoaded, type ExportInput, type Scene } from '../exporter';
-import { exportLoop, framePlan, TUNE_DEFAULTS, type Tune } from '../tune/model';
+import { exportLoop, framePlan, TUNE_DEFAULTS, type ExportMotion, type Tune } from '../tune/model';
 import type { ApngRequest, ApngResponse } from './apngWorker';
 
 const W = 320;
@@ -26,9 +26,9 @@ export interface ApngPlan {
   sourceSpan: number;
 }
 
-/** Frame timing and expected size: one idle cycle at the tune's speed, as for the GIF. */
-export function apngPlan(tune: Tune, loopMs?: number): ApngPlan {
-  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs);
+/** Frame timing and expected size: the loop of the export's motion, as for the GIF. */
+export function apngPlan(tune: Tune, loopMs?: number, motion: ExportMotion = 'stage'): ApngPlan {
+  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs, motion);
   const delays = framePlan(ms, DELAY, MAX_FRAMES, 1);
   return { width: W, height: H, delays, bytes: delays.length * BYTES_PER_FRAME, sourceSpan };
 }
@@ -67,7 +67,7 @@ export async function exportApng(
   if (signal.aborted) throw aborted();
   await packLoaded(input.edition);
   if (signal.aborted) throw aborted();
-  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.loopMs);
+  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.loopMs, input.motion);
   const worker = new Worker(new URL('./apngWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: ApngRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   let drawn = 0;

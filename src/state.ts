@@ -1,7 +1,7 @@
 import { EDITIONS, type EditionId, type FrameId, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
-import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
+import { EXPORT_MOTIONS, sanitizeTune, TUNE_DEFAULTS, type ExportMotion, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
@@ -43,6 +43,8 @@ export interface State extends RangeColorState {
   gifClear: boolean;
   /** 'auto' keeps the card's own edge colour; otherwise '#rrggbb' to blend the edge into. */
   gifMatte: string;
+  /** The motion of GIF and APNG loops: the stage's own, or one made for exports. */
+  exportMotion: ExportMotion;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
 }
@@ -73,6 +75,7 @@ const PERSIST: (keyof State)[] = [
   'saveOptsOpen',
   'gifClear',
   'gifMatte',
+  'exportMotion',
   'text',
   ...RANGE_COLOR_PERSIST,
 ];
@@ -103,6 +106,7 @@ export function createStore() {
     saveOptsOpen: false,
     gifClear: false,
     gifMatte: 'auto',
+    exportMotion: 'stage',
     text: { ...DEFAULT_LETTERING },
     ...RANGE_COLOR_DEFAULTS,
   };
@@ -118,6 +122,7 @@ export function createStore() {
     state.saveOptsOpen = state.saveOptsOpen === true;
     state.gifClear = state.gifClear === true;
     if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
+    if (!EXPORT_MOTIONS.includes(state.exportMotion)) state.exportMotion = 'stage';
     Object.assign(state, sanitizeRangeColors(state));
   } catch {
     /* storage unavailable: defaults are fine */

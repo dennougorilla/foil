@@ -381,19 +381,159 @@ export function loopView(t: Tune, p: number): LoopView {
 }
 
 /**
- * Length of an exported loop and the source time it covers. It is one idle cycle at the tune's
+ * Length of an exported loop and the source time it covers. With the stage's motion it is one idle cycle at the tune's
  * speed; an animated picture plays a whole number of its own loops inside it, sped up or slowed
  * a little to fit. At speed zero nothing moves on its own, so the picture alone sets the loop:
  * short ones play whole cycles, long ones are sped up to fit six seconds.
  */
-export function exportLoop(t: Tune, sourceMs?: number): { loopMs: number; sourceSpan: number } {
-  if (t.speed <= 0) {
-    if (!sourceMs) return { loopMs: 2400, sourceSpan: 2400 };
-    const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
-    return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
-  }
+export function exportLoop(t: Tune, sourceMs?: number, motion: ExportMotion = 'stage'): { loopMs: number; sourceSpan: number } {
+  // The motions made for exports keep their own length, as v0.12's export did.
+  if (motion !== 'stage') return sourceLoop(sourceMs, SHOW_MS[motion]);
+  if (t.speed <= 0) return sourceLoop(sourceMs, 2400);
   const loopMs = Math.round((IDLE_CYCLE * 1000) / t.speed);
   return { loopMs, sourceSpan: sourceMs ? sourceMs * Math.max(1, Math.round(loopMs / sourceMs)) : loopMs };
+}
+
+// ---------- Export-only motions ----------
+
+/**
+ * The motion of an exported loop: the stage's own ('stage', the default), or one made only for
+ * exports to show the foil off: Showcase (the orbit FOIL exported up to v0.12), Sweep, Figure-8
+ * and Moment.
+ */
+export type ExportMotion = 'stage' | 'showcase' | 'sweep' | 'figure8' | 'moment';
+export const EXPORT_MOTIONS: ExportMotion[] = ['stage', 'showcase', 'sweep', 'figure8', 'moment'];
+
+export interface ExportView extends LoopView {
+  /** Showcase's own drop shadow, in px of a 900 px tall frame; the stage's shadow when absent. */
+  shadow?: [number, number];
+  /** Blacklight's lamp, in turns into its sweep; drifting as on the stage when absent. */
+  torch?: number;
+}
+
+/** Loop length of the motions made for exports at speed 1 (Showcase repeats round(speed) times in its 2.4 s). */
+const SHOW_MS: Record<Exclude<ExportMotion, 'stage'>, number> = { showcase: 2400, sweep: 2400, figure8: 3000, moment: 3000 };
+
+/**
+ * One full turn per 2π of `a`, holding on each face and flipping quickly between them. A
+ * weightless card vanishes edge-on, so poses within ~17° of edge-on are skipped: at flip speed
+ * the jump is invisible, and no exported frame ever comes out empty. (Showcase's Spin.)
+ */
+function flipTurn(a: number): number {
+  const turns = Math.floor(a / (Math.PI * 2));
+  const t = a / (Math.PI * 2) - turns;
+  // Most of the loop on the face (the picture is what people share): the back and the two
+  // flips together take about a fifth of it.
+  const step = (from: number) => smooth(Math.min(1, Math.max(0, (t - from) / 0.08)));
+  let ry = Math.PI * (step(0.5) + step(0.62));
+  const EDGE = 0.3;
+  const m = ry % Math.PI;
+  if (Math.abs(m - Math.PI / 2) < EDGE) ry += (m < Math.PI / 2 ? -EDGE : EDGE) - (m - Math.PI / 2);
+  return ry + turns * Math.PI * 2;
+}
+
+/** How many Showcase cycles fit in its loop: whole numbers only, so the clip loops seamlessly. */
+const showCycles = (t: Tune) => (t.speed <= 0 ? 0 : Math.max(1, Math.round(t.speed)));
+
+/**
+ * Showcase: FOIL's export orbit up to v0.12, unchanged. With the defaults, one gentle sway with
+ * the light sweeping round; Spin flips to the back and home; Breathe swells; any other idle motion
+ * holds the card and sweeps the sheen round.
+ */
+function showcase(t: Tune, p: number): ExportView {
+  const a = p * Math.PI * 2 * showCycles(t);
+  const k = t.tiltMax / TUNE_DEFAULTS.tiltMax;
+  const pose: IdlePose = { ...REST_POSE, sheen: [0, 0] };
+  /** Vertical bob in px of a 900 px tall frame, whose card is 640 px tall. */
+  let bob = 0;
+  if (t.idle === 'sway') {
+    pose.rx = Math.sin(a) * 0.22 * k;
+    pose.ry = Math.cos(a) * 0.3 * k;
+    pose.rz = Math.sin(a) * 0.03;
+    bob = Math.sin(a * 2) * 8;
+  } else if (t.idle === 'spin') {
+    pose.ry = flipTurn(a);
+    pose.rx = Math.sin(a) * 0.08 * k;
+  } else if (t.idle === 'breathe') {
+    pose.scale = 1 + Math.sin(a) * 0.035;
+    pose.rx = Math.sin(a) * 0.06 * k;
+    bob = -Math.sin(a) * 6;
+  }
+  pose.dy = bob / 640;
+  // The sheen keeps sweeping even when the card holds still, so a clip never looks frozen.
+  let tilt: [number, number] =
+    t.idle === 'sway' ? [(Math.cos(a) * 0.3) / 0.32, (Math.sin(a) * 0.22) / 0.28] : [Math.cos(a) * 0.9, Math.sin(a) * 0.9];
+  let light: [number, number] = [0.5 - Math.cos(a) * 0.3, 0.4 - Math.sin(a) * 0.25];
+  if (t.light === 'orbit') light = [0.5 + Math.cos(a) * 0.34, 0.5 + Math.sin(a) * 0.36];
+  else if (t.light === 'fixed') light = fixedLight(t.lightAngle);
+  if (t.speed <= 0) {
+    tilt = [0.35, -0.25];
+    light = t.light === 'fixed' ? fixedLight(t.lightAngle) : [0.32, 0.22];
+  }
+  const shadow: [number, number] = [12 - (t.idle === 'spin' ? Math.sin(pose.ry) : pose.ry) * 18, 18 + pose.rx * 10];
+  return { pose, tilt, light, shadow, torch: p * showCycles(t) };
+}
+
+/**
+ * The foil shines brightest as the angle of the light on it changes, so these move the sheen and
+ * the light a long way while the card itself only leans, and so still looks settled.
+ */
+function foilShow(m: 'sweep' | 'figure8' | 'moment', t: Tune, p: number): ExportView {
+  const a = p * Math.PI * 2;
+  const pose: IdlePose = { ...REST_POSE, sheen: [0, 0] };
+  let tilt: [number, number];
+  let light: [number, number];
+  if (m === 'sweep') {
+    // The card holds almost square on; a band of light sweeps across it corner to corner and back.
+    const s = -Math.cos(a);
+    pose.ry = s * 0.07;
+    pose.rx = Math.sin(a) * 0.03;
+    tilt = [s * 1.7, s * 1.1];
+    light = [0.5 - s * 0.45, 0.42 - s * 0.36];
+  } else if (m === 'figure8') {
+    // The card leans in a figure eight; the light goes round the other way, so it rakes the foil.
+    pose.ry = Math.sin(a) * 0.3;
+    pose.rx = Math.sin(2 * a) * 0.17;
+    pose.rz = Math.sin(a) * 0.02;
+    pose.dy = Math.sin(2 * a + 0.5) * 0.008;
+    tilt = [(pose.ry / 0.32) * 1.7, (pose.rx / 0.28) * 1.7];
+    light = [0.5 - Math.sin(a) * 0.38, 0.45 - Math.sin(2 * a) * 0.3];
+  } else {
+    // A moment: face on, then the card tips well over into a flash of light, holds, and settles back.
+    const ease = (u: number) => smooth(Math.min(1, Math.max(0, u)));
+    const e = p < 0.6 ? ease((p - 0.28) / 0.22) : 1 - ease((p - 0.66) / 0.26);
+    const rest = Math.sin(a) * 0.02;
+    pose.ry = e * 0.4 + rest;
+    pose.rx = -e * 0.14 + Math.sin(2 * a) * 0.012;
+    pose.rz = e * 0.03;
+    pose.scale = 1 + e * 0.03;
+    tilt = [-0.5 + e * 2.1 + rest * 5, 0.3 - e * 0.8];
+    light = [0.3 + e * 0.5, 0.25 + e * 0.35];
+    if (p > 0.44 && p < 0.62) {
+      const q = (p - 0.44) / 0.18;
+      pose.glint = -0.3 + 2 * q;
+      pose.flash = 0.12 * Math.sin(Math.PI * q) ** 4;
+    }
+  }
+  if (t.light === 'fixed') light = fixedLight(t.lightAngle);
+  return { pose, tilt, light, torch: p };
+}
+
+/** The card at loop position p∈[0,1) of an exported loop with the given motion. */
+export function exportView(t: Tune, m: ExportMotion, p: number): ExportView {
+  if (m === 'stage') return loopView(t, p);
+  if (m === 'showcase') return showcase(t, p);
+  return foilShow(m, t, p);
+}
+
+/**
+ * The v0.12 loop for an animated source: short sources play whole cycles, long ones are sped up
+ * to fit six seconds; without one, `fallbackMs`.
+ */
+function sourceLoop(sourceMs: number | undefined, fallbackMs: number): { loopMs: number; sourceSpan: number } {
+  if (!sourceMs) return { loopMs: fallbackMs, sourceSpan: fallbackMs };
+  const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
+  return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
 }
 
 /**

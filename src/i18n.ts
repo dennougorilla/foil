@@ -1,6 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
 import type { FoilTone, LetterStyle } from './lettering';
-import type { Metal } from './tune/model';
+import type { ExportMotion, Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
 import { RANGE_COLOR_EN, RANGE_COLOR_JA } from './featureText';
 import { PACK_EN, PACK_JA } from './packText';
@@ -65,7 +65,16 @@ const ja = {
   save: '{f} で保存',
   saveSub: { png: '背景透過・900×1260 px', gif: 'ループ・480×600 px' },
   saveSubGifClear: '背景透過のループ・480×600 px',
-  gifOpts: 'GIF の設定',
+  gifOpts: 'GIF・APNG の設定',
+  exportMotion: '動き',
+  exportMotionName: { stage: '画面と同じ', showcase: 'ショーケース', sweep: 'スイープ', figure8: '8の字', moment: '見せ場' } satisfies Record<ExportMotion, string>,
+  exportMotionHelp: {
+    stage: '画面で動いているとおりに、継ぎ目なくループします',
+    showcase: 'v0.12 までの書き出しの動き。ゆったり揺れて、光がぐるりと回ります (2.4 秒)',
+    sweep: 'カードはほぼ正面のまま、光の帯が斜めに一往復します (2.4 秒)',
+    figure8: 'カードが 8 の字に傾き、光が反対側へ回り込みます (3 秒)',
+    moment: '正面で止まり、大きく傾いてキラッと光り、戻ります (3 秒)',
+  } satisfies Record<ExportMotion, string>,
   gifBg: '背景',
   gifBgName: { swirl: 'うずまき', clear: '透過' },
   matte: '縁の色',
@@ -364,7 +373,16 @@ const en: Dict = {
   save: 'Save {f}',
   saveSub: { png: 'Transparent, 900×1260 px', gif: 'Loop, 480×600 px' },
   saveSubGifClear: 'Transparent loop, 480×600 px',
-  gifOpts: 'GIF options',
+  gifOpts: 'GIF and APNG options',
+  exportMotion: 'Motion',
+  exportMotionName: { stage: 'As on screen', showcase: 'Showcase', sweep: 'Sweep', figure8: 'Figure 8', moment: 'Moment' },
+  exportMotionHelp: {
+    stage: 'Moves exactly as the card does on screen, looping seamlessly',
+    showcase: 'The export motion up to v0.12: a slow sway with the light sweeping round (2.4 s)',
+    sweep: 'The card stays almost square on while a band of light sweeps across and back (2.4 s)',
+    figure8: 'The card tilts in a figure eight while the light circles the other way (3 s)',
+    moment: 'Rests face on, tips far over into a flash of light, and settles back (3 s)',
+  },
   gifBg: 'Background',
   gifBgName: { swirl: 'Swirl', clear: 'Transparent' },
   matte: 'Edge color',
