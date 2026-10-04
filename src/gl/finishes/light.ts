@@ -3,6 +3,7 @@ import { SHALLOWS_GLSL } from '../shallows';
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { GLOW_GLSL } from '../../touch/glow';
 import { HeatLayer } from '../../touch/layer';
+import { BLACKLIGHT_GLSL } from '../blacklight';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -51,12 +52,14 @@ vec3 aurora(vec3 c, vec2 uv, vec2 t, float L) {
 ${SHALLOWS_GLSL}
 ${TOUCH_GLSL}
 ${GLOW_GLSL}
+${BLACKLIGHT_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 7) col = galaxy(c, uv, uTilt, L);
   else if (e == 9) col = aurora(c, uv, uTilt, L);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 70) col = glow(c, uv, L, m.r);
+  else if (e == 72) col = blacklight(c, uv, L, lod, m);
 `,
   // Glow keeps the light shone on it in a touch field, like Warmth's heat (see touch/).
   layers: (gl) => {

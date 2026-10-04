@@ -97,6 +97,8 @@ export interface CardDraw {
   face?: string;
   /** The part of the face on this quad, x0, y0, x1, y1; the whole face when absent. */
   uv?: [number, number, number, number];
+  /** Blacklight's lamp power, 0..1; full when absent. */
+  lamp?: number;
 }
 
 export interface Particle {
@@ -297,6 +299,7 @@ export class CardRenderer {
     gl.uniform4f(p.u.uUvRect, uv[0], uv[1], uv[2], uv[3]);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
+    gl.uniform1f(p.u.uUvLamp, d.lamp ?? 1);
     applyTune(gl, p.u, this.tune);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
     for (const l of cp.layers) l.bind(p, d);

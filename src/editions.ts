@@ -24,6 +24,7 @@ export type EditionId =
   | 'cosmoholo'
   | 'stainedglass'
   | 'glow'
+  | 'blacklight'
   // Shaders in src/gl/finishes/supporter.ts
   | 'kintsugi'
   | 'opal'
@@ -42,6 +43,11 @@ export interface Edition {
   dither?: boolean;
   /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a field of this kind. */
   touch?: TouchKind;
+  /**
+   * Its light is an ultraviolet lamp: it sits exactly under the pointer, drifts slowly by itself
+   * otherwise, and a drag on the card moves it instead of tossing the card.
+   */
+  torch?: boolean;
 }
 
 /** Every finish. The hand starts with OPEN_EDITIONS; the rest come in packs (src/packs.ts). */
@@ -69,6 +75,8 @@ export const EDITIONS: Edition[] = [
   { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
   { id: 'stainedglass', shader: 26, color: '#e8a33c', swirl: ['#0a0710', '#3a1f4a', '#c0532e'], value: 6 },
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
+  // Shader in src/gl/blacklight.ts.
+  { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
   // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

@@ -33,7 +33,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'light',
-    finishes: ['galaxy', 'aurora', 'glow', 'shallows'],
+    finishes: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
     wrap: 'holo',
     colors: ['#06101f', '#2a5fa8', '#7fe3f0'],
     load: () => import('./gl/finishes/light'),

@@ -38,7 +38,7 @@ test('the four theme packs and the supporter pack, showpiece last', () => {
   const packs = Object.fromEntries(PACKS.map((p) => [p.id, [...p.finishes]]));
   assert.deepEqual(packs, {
     metal: ['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
-    light: ['galaxy', 'aurora', 'glow', 'shallows'],
+    light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
     nature: ['sakura', 'frost', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'shadowbox'],
     supporter: ['opal', 'raden', 'kintsugi'],
