@@ -59,9 +59,12 @@ what is picked.
   `src/binder/limits.ts`).
 - Arranging, as in a real binder: drag a card onto any pocket. An empty pocket takes it; a card
   already there swaps places with it. With a mouse the card lifts as soon as it moves; on a touch
-  screen a press held for a moment lifts it, then it follows the finger. Held at the outer edge of
-  the pages (or over ‹ ›), the page turns, again and again while it stays there, so a card can go
-  to any page. Alt+arrow keys move the focused card a pocket along or a row up or down, across
+  screen a press held for a moment lifts it, and it rides just above the finger so the pocket under
+  the finger stays in sight; that pocket is outlined in gold, and a card in it leans aside to swap.
+  Held at the outer edge of the pages (or over ‹ ›), a bar there fills and the page turns, again and
+  again while it stays there, so a card can go to any page; a card let go while a page is turning
+  lands once the page is down. The bar over the foot says where it went ("Moved to page 5", or
+  "Swapped two cards"). Alt+arrow keys move the focused card a pocket along or a row up or down, across
   pages too. Every move is kept at once, and the bar over the foot can take it back for six
   seconds.
 - Turning a page: the page on that side lifts at the rings and turns over, the page behind it on

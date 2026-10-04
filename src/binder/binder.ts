@@ -20,13 +20,14 @@ const TEXT = {
     title: 'バインダー',
     hint: 'クリックで選ぶ・ドラッグで好きなポケットへ・ダブルクリックですぐステージへ',
     hintTouch: 'タップで選ぶ・長押しで持ち上げて好きなポケットへ',
-    moved: '並べ替えました',
+    moved: '{page} ページへ移しました',
+    swapped: '入れ替えました',
     pickedOne: '{card}・{date} にしまったカード',
     pickedMany: '{n} 枚を選択中・ステージに出せるのは 1 枚です',
     empty: 'まだ空です。カードができたら「しまう」で入れましょう',
     full: '54 枚の上限です。捨てて空きを作ってください',
     fullBytes: '60 MB の上限です。捨てて空きを作ってください',
-    keepPocket: '今のカードをしまう',
+    keepPocket: '今のカードをここにしまう',
     play: 'ステージに出す',
     playLabel: '選んだカードをステージに出す',
     playOne: '1 枚だけ選んでください',
@@ -53,13 +54,14 @@ const TEXT = {
     title: 'Binder',
     hint: 'Click to pick · drag to any pocket · double-click to put it on the stage',
     hintTouch: 'Tap to pick · hold to lift it into any pocket',
-    moved: 'Moved',
+    moved: 'Moved to page {page}',
+    swapped: 'Swapped two cards',
     pickedOne: '{card}, kept {date}',
     pickedMany: '{n} picked · only one goes on the stage',
     empty: 'Empty for now. Finish a card, then press Keep.',
     full: '54-card limit reached. Discard to make room.',
     fullBytes: '60 MB limit reached. Discard to make room.',
-    keepPocket: 'Keep the card on the stage',
+    keepPocket: 'Put the current card here',
     play: 'To stage',
     playLabel: 'Put the picked card on the stage',
     playOne: 'Pick just one card',
@@ -251,6 +253,8 @@ export function mountBinder(host: BinderHost) {
     let undoTimer = 0;
     /** A page is being turned (the leaf is in the air). */
     let turning = false;
+    /** Settles when the page in the air has landed. */
+    let turned: Promise<unknown> = Promise.resolve();
 
     const root = document.createElement('div');
     root.className = 'bd';
@@ -403,7 +407,7 @@ export function mountBinder(host: BinderHost) {
       const first = spread * perSpread();
       // While there is room, the first empty pocket on these pages keeps the card on the stage.
       const keepAt = refusal(f, 0) ? -1 : firstFree(lay, first * PER_PAGE);
-      spreadEl.querySelectorAll(':scope > .bd-sheet:not(.bd-copy), :scope > .bd-rings').forEach((e) => e.remove());
+      spreadEl.querySelectorAll(':scope > .bd-sheet:not(.bd-copy)').forEach((e) => e.remove());
       spreadEl.style.setProperty('--pages', String(perSpread()));
       for (let p = first; p < first + perSpread(); p++) {
         const sheet = document.createElement('div');
@@ -432,8 +436,11 @@ export function mountBinder(host: BinderHost) {
           e.dataset.slot = String(at);
           sheet.append(e);
         });
-        // Two open pages meet at the binder's rings.
-        if (p > first) spreadEl.insertAdjacentHTML('beforeend', '<div class="bd-rings" aria-hidden="true"><i></i><i></i><i></i></div>');
+        // Two open pages meet at the binder's rings, which run through the left page's holes.
+        if (perSpread() > 1 && p === first) {
+          sheet.classList.add('is-left');
+          sheet.insertAdjacentHTML('beforeend', '<div class="bd-rings" aria-hidden="true"><i></i><i></i><i></i></div>');
+        }
         spreadEl.append(sheet);
       }
       const last = first + perSpread();
@@ -578,7 +585,7 @@ export function mountBinder(host: BinderHost) {
       render();
       host.sfx.tick();
       await place(after);
-      offerUndo({ moved: before }, t.moved);
+      offerUndo({ moved: before }, changed.length > 1 ? t.swapped : fill(t.moved, { page: Math.floor(to / PER_PAGE) + 1 }));
     }
 
     playBtn.addEventListener('click', () => void play());
@@ -653,7 +660,8 @@ export function mountBinder(host: BinderHost) {
         frames = [{ transform: 'rotateY(-110deg)', opacity: 0 }, { transform: 'rotateY(0deg)', opacity: 1 }];
       }
       spreadEl.append(leaf);
-      await leaf.animate(frames, { duration: 480, easing: 'cubic-bezier(0.45, 0.05, 0.3, 1)' }).finished.catch(() => {});
+      turned = leaf.animate(frames, { duration: 480, easing: 'cubic-bezier(0.45, 0.05, 0.3, 1)' }).finished.catch(() => {});
+      await turned;
       leaf.remove();
       under?.remove();
       landing.style.visibility = '';
@@ -670,7 +678,7 @@ export function mountBinder(host: BinderHost) {
     /** The end of a drag also fires a click on the card; it is not a pick. */
     let dragged = false;
     let held: { m: Placed; card: HTMLElement; x: number; y: number; id: number; timer: number; touch: boolean } | null = null;
-    let drag: { m: Placed; float: HTMLElement; dx: number; dy: number; over: number | null; edge: -1 | 0 | 1; edgeTimer: number } | null = null;
+    let drag: { m: Placed; float: HTMLElement; dx: number; dy: number; x: number; y: number; over: number | null; edge: -1 | 0 | 1; edgeTimer: number } | null = null;
 
     /** A press on a card: a mouse drags once it moves; a finger has to hold first, then lifts the card. */
     function press(e: PointerEvent, m: Placed, card: HTMLElement) {
@@ -689,7 +697,9 @@ export function mountBinder(host: BinderHost) {
       float.append(card.cloneNode(true));
       Object.assign(float.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
       root.append(float);
-      drag = { m, float, dx: x - r.left, dy: y - r.top, over: null, edge: 0, edgeTimer: 0 };
+      // Under a finger the card rides above it, so the pocket under the finger stays in sight.
+      const touch = held.touch;
+      drag = { m, float, dx: touch ? r.width / 2 : x - r.left, dy: touch ? r.height + 18 : y - r.top, x, y, over: null, edge: 0, edgeTimer: 0 };
       card.closest('.bd-slot')!.classList.add('is-lifted');
       root.classList.add('is-dragging');
       navigator.vibrate?.(8);
@@ -697,20 +707,28 @@ export function mountBinder(host: BinderHost) {
       follow(x, y);
     }
 
+    /** The real pocket at a point (not one on a page copy that is turning), or null. */
+    function pocketAt(x: number, y: number): HTMLElement | null {
+      const p = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-slot]');
+      return p && root.contains(p) && !p.closest('.bd-copy, .bd-leaf') ? p : null;
+    }
+
     function follow(x: number, y: number) {
       if (!drag) return;
+      drag.x = x;
+      drag.y = y;
       drag.float.style.translate = `${x - drag.dx - parseFloat(drag.float.style.left)}px ${y - drag.dy - parseFloat(drag.float.style.top)}px`;
       // The pocket under the finger lights up; held at a page's outer edge, the page turns.
-      const under = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-slot]');
-      const over = under && root.contains(under) ? +under.dataset.slot! : null;
+      const under = pocketAt(x, y);
+      const over = under ? +under.dataset.slot! : null;
       if (over !== drag.over) {
         root.querySelector('.is-target')?.classList.remove('is-target');
         if (over !== null && over !== drag.m.slot) under!.classList.add('is-target');
         drag.over = over;
       }
       const box = spreadEl.getBoundingClientRect();
-      const nearPrev = x < box.left + 40 || !!document.elementFromPoint(x, y)?.closest('.bd-prev');
-      const nearNext = x > box.right - 40 || !!document.elementFromPoint(x, y)?.closest('.bd-next');
+      const nearPrev = x < box.left + 24 || !!document.elementFromPoint(x, y)?.closest('.bd-prev');
+      const nearNext = x > box.right - 24 || !!document.elementFromPoint(x, y)?.closest('.bd-next');
       const edge = nearPrev && spread > 0 ? -1 : nearNext && spread < spreads() - 1 ? 1 : 0;
       if (edge !== drag.edge) {
         drag.edge = edge;
@@ -727,6 +745,8 @@ export function mountBinder(host: BinderHost) {
       drag.edgeTimer = window.setTimeout(async () => {
         if (!drag?.edge) return;
         await turnTo(spread + drag.edge);
+        // The pockets under a finger that held still are new ones now.
+        if (drag) follow(drag.x, drag.y);
         armEdge();
       }, 650);
     }
@@ -735,7 +755,7 @@ export function mountBinder(host: BinderHost) {
       if (held) clearTimeout(held.timer);
       held = null;
       if (!drag) return;
-      const { m, float, over, edgeTimer } = drag;
+      const { m, float, x, y, edgeTimer } = drag;
       clearTimeout(edgeTimer);
       drag = null;
       dragged = true;
@@ -745,7 +765,12 @@ export function mountBinder(host: BinderHost) {
       root.classList.remove('is-dragging', 'is-edge-prev', 'is-edge-next');
       root.querySelector('.is-target')?.classList.remove('is-target');
       root.querySelector('.is-lifted')?.classList.remove('is-lifted');
-      if (drop && over !== null && over !== m.slot) void move(m.slot, over);
+      // Dropped while a page turns, it lands in the pocket under it once the page is down.
+      if (drop)
+        void turned.then(() => {
+          const to = pocketAt(x, y)?.dataset.slot;
+          if (to !== undefined && +to !== m.slot) return move(m.slot, +to);
+        });
     }
 
     const onMove = (e: PointerEvent) => {

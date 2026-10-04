@@ -201,11 +201,11 @@
   background: radial-gradient(circle at 6px 6px, #05080a 4px, #4a3f5c 5px, transparent 6px) 0 0 / 12px 33.3% repeat-y;
 }
 
-.bd-sheet:first-child:not(:last-child) {
+.bd-sheet.is-left {
   padding: 14px 34px 14px 14px;
 }
 
-.bd-sheet:first-child:not(:last-child)::before {
+.bd-sheet.is-left::before {
   left: auto;
   right: 10px;
 }
@@ -220,7 +220,7 @@
 
 .bd-leaf > .bd-sheet {
   backface-visibility: hidden;
-  box-shadow: inset 0 0 0 2px #3a3149, 0 10px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px #3a3149, 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .bd-leaf-back {
@@ -282,7 +282,8 @@
   bottom: 8%;
   z-index: 5;
   display: none;
-  width: 34px;
+  overflow: hidden;
+  width: 18px;
   border-radius: 12px;
   background: rgba(183, 156, 255, 0.12);
   box-shadow: inset 0 0 0 2px rgba(183, 156, 255, 0.35);
@@ -324,6 +325,23 @@
   display: none;
 }
 
+/* Held at the edge, the bar fills up until the page turns. */
+.bd-edge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--binder);
+  opacity: 0.6;
+  scale: 1 0;
+  transform-origin: bottom;
+}
+
+.bd.is-edge-prev .bd-edge-prev::after,
+.bd.is-edge-next .bd-edge-next::after {
+  scale: 1 1;
+  transition: scale 0.65s linear;
+}
+
 .bd.is-edge-prev .bd-edge-prev,
 .bd.is-edge-next .bd-edge-next {
   background: rgba(183, 156, 255, 0.35);
@@ -345,7 +363,7 @@
   border: 0;
   border-radius: 8px;
   background: #110e17;
-  box-shadow: inset 0 3px 0 #05080a, inset 0 0 0 2px #2e263b;
+  box-shadow: inset 0 3px 0 #05080a, inset 0 0 0 2px #2e263b, inset 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
 .bd-pocket::after,
@@ -560,11 +578,6 @@
   .bd-del i {
     width: 22px;
     height: 22px;
-    background: #3a3149;
-  }
-
-  .bd-del:active i {
-    background: #d13d1f;
   }
 }
 
@@ -714,19 +727,21 @@
 
 /* Between two open pages, the binder's rings. */
 .bd-rings {
-  align-self: stretch;
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  right: -38px;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  width: 0;
-  padding: 12% 0;
+  pointer-events: none;
 }
 
 .bd-rings i {
   flex: none;
-  width: 40px;
+  width: 58px;
   height: 14px;
-  margin-left: -20px;
   border-radius: 7px;
   background: linear-gradient(#f1edf7, #9c94ab 55%, #6f6880);
   box-shadow: 0 0 0 2px #05080a, 0 4px 0 2px #05080a, inset 0 -3px 0 rgba(0, 0, 0, 0.25);
