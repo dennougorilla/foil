@@ -74,6 +74,7 @@ uniform vec3 uSpec;         // highlight color
 uniform float uAlpha;
 uniform float uShadow;      // 1: draw as the hard drop shadow
 uniform float uSeal;
+uniform float uMouth;       // the row the bag is torn open at (0 = still sealed)
 out vec4 o;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -97,7 +98,13 @@ float crumple(vec2 g) {
 void main() {
   vec4 base = texture(uTex, vec2(vUv.x, 1.0 - vUv.y));
   if (base.a < 0.01) discard;
-  if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.6 * uAlpha); return; }
+  if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
+  // Torn open: a dark inside under a bright silver lip along the tear.
+  if (uMouth > 0.0) {
+    float below = (vUv.y - uMouth) * uGrid.y;
+    if (below < 2.0) { o = vec4(vec3(0.93, 0.95, 1.0) * base.a, base.a) * uAlpha; return; }
+    if (below < 5.0) { o = vec4(vec3(0.05, 0.05, 0.08) * base.a, base.a) * uAlpha; return; }
+  }
   // Everything below is worked out per wrapper pixel.
   vec2 g = floor(vUv * uGrid) + 0.5;
   bool seal = vUv.y < uSeal || vUv.y > 1.0 - uSeal;
@@ -114,7 +121,7 @@ void main() {
   }
   vec3 L = normalize(vec3(uLightDir, 0.85));
   vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
-  float diff = 0.62 + 0.5 * max(dot(n, L), 0.0) - vRim * 0.28;
+  float diff = 0.6 + 0.55 * max(dot(n, L), 0.0) - vRim * 0.42;
   // In steps, like a palette.
   diff = floor(diff * 6.0 + 0.5) / 6.0;
   float sh = max(dot(n, H), 0.0);
@@ -243,7 +250,8 @@ export class Pillow {
     gl.uniform1f(u.uScale, d.scale);
     const rows = d.rows ?? [0, 1];
     gl.uniform2f(u.uV, rows[0], rows[1]);
-    gl.uniform1f(u.uBulge, d.w * 0.16);
+    gl.uniform1f(u.uBulge, d.w * 0.22);
+    gl.uniform1f(u.uMouth, rows[0] > 0 ? rows[0] : 0);
     gl.uniform1f(u.uSeal, 15 / GRID_H);
     gl.uniform2f(u.uGrid, GRID_W, GRID_H);
     gl.uniform2f(u.uLightDir, d.light[0], d.light[1]);

@@ -136,12 +136,14 @@ export function openPack(o: OpeningOptions) {
       </div>
     </header>
     <div class="pk-shop">
+      <div class="pk-unit">
       <div class="pk-tray" role="radiogroup"></div>
       <section class="pk-panel">
         <header class="pk-band"><b></b><span class="pk-tier"></span></header>
-        <div class="pk-body"><p class="pk-desc"></p><p class="pk-note"></p><div class="pk-minis" aria-hidden="true"></div></div>
+        <div class="pk-body"><p class="pk-desc"></p><p class="pk-note"></p></div>
         <div class="pk-buy-row"><button class="pk-buy" type="button"></button></div>
       </section>
+      </div>
     </div>
     <p class="pk-hint" aria-hidden="true"></p>
     <button class="pk-open" type="button"></button>
@@ -390,7 +392,7 @@ export function openPack(o: OpeningOptions) {
     b.className = 'pk-slot';
     b.setAttribute('role', 'radio');
     b.dataset.pack = sl.p.id;
-    b.innerHTML = `<span class="pk-price">${o.isOpened(sl.p.id) ? `✓ ${t.tagOpened}` : t.name[sl.p.id]}</span>`;
+    b.innerHTML = `<i class="pk-pick" aria-hidden="true"></i><span class="pk-price">${o.isOpened(sl.p.id) ? `✓ ${t.tagOpened}` : t.name[sl.p.id]}</span>`;
     b.setAttribute('aria-label', `${t.title.replace('{name}', t.name[sl.p.id])}${o.isOpened(sl.p.id) ? ` (${t.tagOpened})` : ''}`);
     b.addEventListener('pointerenter', () => {
       sl.hot = true;
@@ -418,11 +420,10 @@ export function openPack(o: OpeningOptions) {
     slots.forEach((x, k) => x.el.setAttribute('aria-checked', String(k === i)));
     const opened = o.isOpened(sl.p.id);
     $('.pk-band b').textContent = t.title.replace('{name}', name);
-    $('.pk-tier').textContent = rich ? t.supporterTag : '';
+    $('.pk-tier').textContent = rich ? t.thanksShort : '';
     const em = (s: string) => s.replace(/\{(\w+)\}/g, (_, k) => `<em>${k === 'name' ? name : n}</em>`);
     $('.pk-desc').innerHTML = em(t.shopDesc);
     $('.pk-note').textContent = opened ? t.shopOpened.replace('{list}', sl.p.finishes.map((id) => dict.edition[id]).join(' · ')) : t.shopNote.replace('{name}', name);
-    $('.pk-minis').innerHTML = sl.p.finishes.map((_, k) => `<i${k === n - 1 ? ' class="is-star"' : ''}></i>`).join('');
     $('.pk-buy').textContent = opened ? t.shopReplay : t.openBtn;
     $('.pk-buy').classList.toggle('is-replay', opened);
   }
@@ -1076,12 +1077,12 @@ export function openPack(o: OpeningOptions) {
     }
     // The shop's packs: bobbing, the chosen one lifted, the pointed-at one springing up and leaning.
     if (shopFade > 0) {
-      if (phase !== 'shop') shopFade = Math.max(0, shopFade - dt / 0.3);
+      if (phase !== 'shop') shopFade = Math.max(0, shopFade - dt / 0.18);
       // The chosen pack's cards start compiling while it is only being looked at.
       else for (const c of cards) r.ready(c.shader);
       slots.forEach((sl, i) => {
         const chosen = i === sel;
-        sl.lift.target = chosen ? 16 : 0;
+        sl.lift.target = chosen ? (vw < 640 ? 8 : 16) : 0;
         sl.s.target = (chosen ? 1.08 : 1) * (sl.hot ? 1.06 : 1);
         const rc = sl.el.getBoundingClientRect();
         const lean = sl.hot && time - pointer.at < 2 ? [clamp((pointer.x - (rc.left + rc.width / 2)) / (rc.width / 2), -1, 1), clamp((pointer.y - (rc.top + rc.height / 2)) / (rc.height / 2), -1, 1)] : [0, 0];
