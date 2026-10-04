@@ -273,7 +273,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uFaceTexels, this.faceTexels);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
-    gl.uniform1f(p.u.uLamp, d.lamp ?? 1);
+    gl.uniform1f(p.u.uUvLamp, d.lamp ?? 1);
     applyTune(gl, p.u, this.tune);
     this.relief.bind(p, 5, d.edition === RELIEF);
     this.range.bind(p, 4, d.rangeView ?? 0, time);

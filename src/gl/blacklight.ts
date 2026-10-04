@@ -22,7 +22,7 @@ export const TORCH_STILL: [number, number] = [0.55, 0.47];
 
 export const BLACKLIGHT_GLSL = /* glsl */ `
 // The lamp's power, 0..1.
-uniform float uLamp;
+uniform float uUvLamp;
 const vec2 BL_ASPECT = vec2(1.0, 1.4);
 // Where the seal is printed, in card uv: on the lamp's drift, low on the art.
 const vec2 BL_SEAL = vec2(0.62, 0.56);
@@ -162,9 +162,9 @@ vec3 blacklight(vec3 c, vec2 uv, float L, float lod, vec3 m) {
   float beam = 1.0 - smoothstep(BL_R * 0.84, BL_R, d);
   float spill = 1.0 - smoothstep(BL_R * 0.9, BL_R * 1.5, d);
   if (spill <= 0.0) return c;
-  float uvLight = (beam * (0.8 + 0.2 * (1.0 - smoothstep(0.0, BL_R, d))) + spill * 0.06) * uLamp;
-  beam *= uLamp;
-  spill *= uLamp;
+  float uvLight = (beam * (0.8 + 0.2 * (1.0 - smoothstep(0.0, BL_R, d))) + spill * 0.06) * uUvLamp;
+  beam *= uUvLamp;
+  spill *= uUvLamp;
 
   float sat = (max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b))) / max(max(c.r, max(c.g, c.b)), 1e-3);
   // Under the lamp the picture stays, only dimmed a little and washed in violet, so the beam reads
@@ -202,7 +202,7 @@ vec3 blacklight(vec3 c, vec2 uv, float L, float lod, vec3 m) {
   glow += tint * fib * 0.6;
   // The lamp's reflector leaves a faint lavender ring at the edge of the beam.
   float ring = exp(-pow((d - BL_R * 0.9) / (BL_R * 0.07), 2.0));
-  col += vec3(0.32, 0.18, 0.6) * ring * 0.14 * uLamp;
+  col += vec3(0.32, 0.18, 0.6) * ring * 0.14 * uUvLamp;
   return col + glow * uvLight;
 }
 `;
