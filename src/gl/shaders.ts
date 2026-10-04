@@ -6,6 +6,7 @@ import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
+import { GLOW_GLSL } from '../touch/glow';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
 
 const COMMON = /* glsl */ `
@@ -400,6 +401,7 @@ ${RELIEF_GLSL}
 
 ${SPONSOR_GLSL}
 ${TOUCH_GLSL}
+${GLOW_GLSL}
 ${SHADOWBOX_GLSL}
 void main() {
   if (!gl_FrontFacing) {
@@ -454,6 +456,7 @@ void main() {
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
+  else if (e == 70) col = glow(c, uv, L, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
@@ -471,7 +474,8 @@ void main() {
   float spec = 0.0;
   if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
-    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
+    // Glow's room is dim, so only a faint glare reaches it.
+    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.6, 4.0, 0.1);
