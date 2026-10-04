@@ -102,8 +102,12 @@
   transition: width 0.3s var(--ease-out);
 }
 
-.bd.is-full .bd-meter i {
+.bd[data-full='bytes'] .bd-meter i {
   background: #ff5a4f;
+}
+
+.bd[data-full='count'] .bd-count {
+  color: #ff8a80;
 }
 
 .bd-bytes {
@@ -253,6 +257,51 @@
 .bd-card img:not([src]) {
   background: repeating-linear-gradient(45deg, #1d1926 0 6px, #241f2f 6px 12px);
   animation: bd-wait 1s ease-in-out infinite;
+}
+
+/* A thumbnail that can't be read: a card back with the card's name and finish. */
+.bd-card.is-lost img {
+  display: none;
+}
+
+.bd-lost {
+  position: absolute;
+  inset: 6%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 6px;
+  background: repeating-linear-gradient(45deg, #2a2236 0 4px, #231d2e 4px 8px);
+  box-shadow: inset 0 0 0 2px #46395a;
+  color: #e6dcf5;
+  text-align: center;
+}
+
+.bd-lost i {
+  font-family: var(--display);
+  font-size: 22px;
+  font-style: normal;
+  color: var(--binder-hi);
+}
+
+.bd-lost b,
+.bd-lost small {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-lost b {
+  font-size: 13px;
+}
+
+.bd-lost small {
+  font-size: 11px;
+  color: #c9c1d6;
 }
 
 @keyframes bd-wait {
@@ -463,26 +512,7 @@
   white-space: nowrap;
 }
 
-/* How many are picked: a gold tag on Discard's corner. */
-.bd-n {
-  position: absolute;
-  top: -10px;
-  right: -8px;
-  padding: 0 6px;
-  border-radius: 6px;
-  background: var(--gold);
-  box-shadow: 0 0 0 2px #05080a;
-  color: #2a1600;
-  font-family: var(--display);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  text-shadow: none;
-}
 
-.bd-n:empty {
-  display: none;
-}
 
 .bd-btn:hover:not(:disabled) {
   animation: slab-wobble 0.45s var(--ease-out) forwards;
@@ -551,7 +581,12 @@
   }
 
   .bd-spread {
-    padding: 10px 8px;
+    align-items: flex-start;
+    padding: 12px 8px;
+  }
+
+  .bd-keep {
+    padding: 6px;
   }
 
   .bd-sheet {

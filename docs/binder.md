@@ -38,7 +38,8 @@ setting that is out of range falls back to its default, the same way a saved set
 
 **Limits**: 54 cards (six pages of nine) and 60 MB in all. A card that would go past either is
 refused with a note saying which, and the binder opens so one can be discarded. Its head shows
-the count and how much of the 60 MB is used.
+the count (11 / 54) and, as a bar, how much of the 60 MB is used; whichever ran out turns red.
+A thumbnail that can't be read shows as a card back with the card's name and finish.
 
 ## The binder
 
@@ -46,10 +47,12 @@ the count and how much of the 60 MB is used.
   is room (wide screens), one on phones. Newest first. While it is not full, the first pocket
   offers to keep the card on the stage now.
 - Tapping a card picks it (it lifts with a gold edge, like a card picked in a hand); tapping again
-  puts it down. Two buttons, as in the game FOIL is modelled on: **Play** (blue) puts the one
-  picked card back on the stage; **Discard** (red) throws away every picked card, and asks for a
-  second press first. Double-clicking a card plays it at once.
-- Playing a card replaces the picture and settings on the stage with the card's (the hand takes
+  puts it down. The line under the head names the picked card, its finish and the day it was kept (or how
+  many are picked). Two buttons, blue and red as in the game FOIL is modelled on: **To stage**
+  puts the one picked card back on the stage; **Discard** throws away every picked card, and asks
+  "Discard 2?" first. Double-clicking a card puts it on the stage at once. Keeping and discarding
+  are said to screen readers, not in a toast: the pockets and the chip already show them.
+- Putting a card on the stage replaces the picture and settings on the stage with the card's (the hand takes
   its finish in if it is not there; a finish whose pack is sealed falls back to Holographic).
   It is the only card drawn live.
 - The binder's code, its styles and its texts load the first time Keep or the binder chip is

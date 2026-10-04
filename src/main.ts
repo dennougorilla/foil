@@ -1199,6 +1199,7 @@ function renderShare() {
 function readyToShare(file: File | null) {
   shareReady = file;
   renderShare();
+  if (file) toast(t.shareReadyHint);
 }
 
 /** Only the site's address goes along with the card; the card itself leaves the device only through the sheet. */
@@ -1280,6 +1281,7 @@ function useBinder(): Promise<Binder> {
       play: playCard,
       pause: (on) => stage.pause(on),
       toast: (msg, error) => toast(msg, error),
+      announce,
       onCount: (n) => {
         try {
           localStorage.setItem(BINDER_COUNT, String(n));

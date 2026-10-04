@@ -14,23 +14,27 @@ import { MAX_BYTES, MAX_CARDS, pageCount, pocketsOn, refusal } from './limits';
 const TEXT = {
   ja: {
     title: 'バインダー',
-    hint: 'クリックで選ぶ・ダブルクリックですぐ出す',
-    hintTouch: 'タップで選んで「出す」でステージへ',
+    hint: 'クリックで選ぶ・ダブルクリックですぐステージへ',
+    hintTouch: 'タップで選んで「ステージに出す」',
+    pickedOne: '{card}・{date} にしまったカード',
+    pickedMany: '{n} 枚を選択中・ステージに出せるのは 1 枚です',
     empty: 'まだ空です。カードができたら「しまう」で入れましょう',
     full: 'いっぱいです。カードを捨てて空きを作ってください',
     fullBytes: '容量がいっぱいです。カードを捨てて空きを作ってください',
     keepPocket: '今のカードをしまう',
-    play: '出す',
+    play: 'ステージに出す',
     playLabel: '選んだカードをステージに出す',
     playOne: '1 枚だけ選んでください',
     discard: '捨てる',
-    confirm: '本当に捨てる？',
-    pages: '{a} / {n}',
+    confirm: '{n} 枚を捨てる？',
+    pages: '{a} / {n} ページ',
     pagesLabel: '{a} ページ目（全 {n} ページ）',
     prev: '前のページ',
     next: '次のページ',
     close: '閉じる',
-    bytes: '{used} / {max}',
+    count: '{n} / {max} 枚',
+    bytes: '容量 {used} / {max}',
+    lost: 'サムネイルを読めません',
     kept: 'バインダーにしまいました（{n} / {max}）',
     keepFailed: 'カードをしまえませんでした。もう一度お試しください。',
     playFailed: 'このカードは読み込めませんでした。',
@@ -39,23 +43,27 @@ const TEXT = {
   },
   en: {
     title: 'Binder',
-    hint: 'Click to pick · double-click to play at once',
-    hintTouch: 'Tap to pick, then Play puts it on the stage',
+    hint: 'Click to pick · double-click to put it on the stage',
+    hintTouch: 'Tap to pick, then To stage',
+    pickedOne: '{card}, kept {date}',
+    pickedMany: '{n} picked · only one goes on the stage',
     empty: 'Empty for now. Finish a card, then press Keep.',
     full: 'Full. Discard a card to make room.',
     fullBytes: 'Out of space. Discard a card to make room.',
     keepPocket: 'Keep the card on the stage',
-    play: 'Play',
+    play: 'To stage',
     playLabel: 'Put the picked card on the stage',
     playOne: 'Pick just one card',
     discard: 'Discard',
-    confirm: 'Really discard?',
-    pages: '{a} / {n}',
+    confirm: 'Discard {n}?',
+    pages: 'Page {a} / {n}',
     pagesLabel: 'Page {a} of {n}',
     prev: 'Previous page',
     next: 'Next page',
     close: 'Close',
-    bytes: '{used} / {max}',
+    count: '{n} / {max} cards',
+    bytes: 'Space {used} / {max}',
+    lost: 'No thumbnail',
     kept: 'Kept in the binder ({n} / {max})',
     keepFailed: "Couldn't keep the card. Please try again.",
     playFailed: "This card couldn't be read.",
@@ -87,6 +95,8 @@ export interface BinderHost {
   /** The stage rests while the binder covers it. */
   pause: (on: boolean) => void;
   toast: (msg: string, error?: boolean) => void;
+  /** Said to screen readers only: the binder and the chip already show it. */
+  announce: (msg: string) => void;
   onCount: (n: number) => void;
   /** The card on the stage is now in the binder. */
   onKept: () => void;
@@ -194,7 +204,7 @@ export function mountBinder(host: BinderHost) {
       host.sfx.coin();
       // From the stage into the chip; kept from the open binder, it simply lands in its pocket.
       if (!view) fly(thumb);
-      host.toast(fill(t.kept, { n, max: MAX_CARDS }));
+      host.announce(fill(t.kept, { n, max: MAX_CARDS }));
       await view?.refresh();
     } catch (err) {
       console.error(err);
@@ -235,7 +245,7 @@ export function mountBinder(host: BinderHost) {
             <button class="bd-turn bd-next" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2h2v2H5zm2 2h2v2H7zm2 2h2v4H9zm-2 4h2v2H7zm-2 2h2v2H5z"/></svg></button>
           </nav>
           <button class="bd-btn bd-play" type="button"><span></span></button>
-          <button class="bd-btn bd-discard" type="button"><span></span><b class="bd-n"></b></button>
+          <button class="bd-btn bd-discard" type="button"><span></span></button>
         </footer>
       </div>`;
     const $ = <T extends HTMLElement = HTMLElement>(q: string) => root.querySelector(q) as T;
@@ -262,15 +272,16 @@ export function mountBinder(host: BinderHost) {
     const spreads = () => Math.ceil(pageCount(metas.length) / perSpread());
 
     /** A pocket's thumbnail is read when its page is shown, and kept while the binder is open. */
-    async function picture(img: HTMLImageElement, id: string) {
+    async function picture(img: HTMLImageElement, id: string): Promise<boolean> {
       let url = urls.get(id);
       if (!url) {
         const blob = await thumb(id).catch(() => undefined);
-        if (!blob) return;
+        if (!blob) return false;
         url = URL.createObjectURL(blob);
         urls.set(id, url);
       }
       img.src = url;
+      return true;
     }
 
     function syncButtons() {
@@ -280,8 +291,8 @@ export function mountBinder(host: BinderHost) {
       discardBtn.disabled = n === 0;
       if (!n) unconfirm();
       const confirming = discardBtn.dataset.confirm === 'true';
-      $('.bd-discard span').textContent = confirming ? t.confirm : t.discard;
-      $('.bd-n').textContent = n > 1 ? `×${n}` : '';
+      $('.bd-discard span').textContent = confirming ? fill(t.confirm, { n }) : t.discard;
+      renderNote();
     }
 
     function unconfirm() {
@@ -292,11 +303,11 @@ export function mountBinder(host: BinderHost) {
     function render() {
       const f = fillOf(metas);
       const editions = host.dict().edition;
-      $('.bd-count').textContent = `${f.count} / ${MAX_CARDS}`;
+      $('.bd-count').textContent = fill(t.count, { n: f.count, max: MAX_CARDS });
       $('.bd-bytes').textContent = fill(t.bytes, { used: formatBytes(f.bytes), max: formatBytes(MAX_BYTES) });
-      const share = Math.max(f.count / MAX_CARDS, f.bytes / MAX_BYTES);
-      $('.bd-meter i').style.setProperty('--f', Math.min(1, share).toFixed(3));
-      root.classList.toggle('is-full', !!refusal(f, 0));
+      // The bar is the space; the count says the cards. Whichever ran out turns red.
+      $('.bd-meter i').style.setProperty('--f', Math.min(1, f.bytes / MAX_BYTES).toFixed(3));
+      root.dataset.full = refusal(f, 0) ?? '';
       root.classList.toggle('is-empty', f.count === 0);
       spread = Math.min(spread, spreads() - 1);
       const ids = metas.map((m) => m.id);
@@ -335,7 +346,17 @@ export function mountBinder(host: BinderHost) {
             img.alt = '';
             img.decoding = 'async';
             b.append(img);
-            void picture(img, m.id);
+            void picture(img, m.id).then((ok) => {
+              if (ok) return;
+              // A thumbnail that can't be read still says which card it is.
+              b.classList.add('is-lost');
+              const lost = document.createElement('span');
+              lost.className = 'bd-lost';
+              lost.innerHTML = '<i aria-hidden="true">?</i><b></b><small></small>';
+              lost.querySelector('b')!.textContent = m.name;
+              lost.querySelector('small')!.textContent = editions[m.edition] ?? t.lost;
+              b.append(lost);
+            });
             b.addEventListener('click', () => {
               host.sfx.tick();
               if (picked.has(m.id)) picked.delete(m.id);
@@ -371,13 +392,21 @@ export function mountBinder(host: BinderHost) {
     }
 
     let noteNow: 'count' | 'bytes' | undefined;
-    function renderNote() {
+    /** One line under the head: why it is full, what is picked, or how to use it. */
+    function renderNote(shake = false) {
       const f = fillOf(metas);
       const full = refusal(f, 0) ?? noteNow;
       const p = $('.bd-note');
       p.classList.toggle('bd-full', !!full);
-      p.textContent = full === 'count' ? t.full : full === 'bytes' ? t.fullBytes : metas.length ? (matchMedia('(pointer: coarse)').matches ? t.hintTouch : t.hint) : t.empty;
-      if (!noteNow) return;
+      const [one] = picked;
+      const m = one && metas.find((x) => x.id === one);
+      p.textContent = full === 'count' ? t.full
+        : full === 'bytes' ? t.fullBytes
+        : picked.size > 1 ? fill(t.pickedMany, { n: picked.size })
+        : m ? fill(t.pickedOne, { card: fill(t.card, { name: m.name, finish: host.dict().edition[m.edition] ?? m.edition }), date: new Date(m.at).toLocaleDateString(host.lang()) })
+        : metas.length ? (matchMedia('(pointer: coarse)').matches ? t.hintTouch : t.hint)
+        : t.empty;
+      if (!shake) return;
       // Asked to keep a card it had no room for: the note shakes.
       p.classList.remove('is-shake');
       void p.offsetWidth;
@@ -391,7 +420,7 @@ export function mountBinder(host: BinderHost) {
       for (const id of [...picked]) if (!metas.some((m) => m.id === id)) picked.delete(id);
       host.onCount(metas.length);
       render();
-      renderNote();
+      renderNote(!!note);
     }
 
     async function play() {
@@ -431,7 +460,7 @@ export function mountBinder(host: BinderHost) {
         urls.delete(id);
       }
       host.sfx.flip();
-      host.toast(fill(t.gone, { n: ids.length }));
+      host.announce(fill(t.gone, { n: ids.length }));
       await refresh();
       root.querySelector<HTMLElement>('.bd-card, .bd-keep')?.focus({ preventScroll: true });
     });
