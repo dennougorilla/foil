@@ -24,8 +24,15 @@ async function step(name, fn) {
 function expect(cond, msg) {
   if (!cond) throw new Error(msg);
 }
-/** Whether a button wears a solid face (inked) rather than an outline. */
-const filled = (id, p = page) => p.evaluate((id) => !/^rgba\(.*, 0\)$|transparent/.test(getComputedStyle(document.getElementById(id)).backgroundColor), id);
+/** Whether a button wears a step's bright colour rather than the board's slate (HSL saturation). */
+const loud = (id, p = page) =>
+  p.evaluate((id) => {
+    const [r, g, b] = getComputedStyle(document.getElementById(id)).backgroundColor.match(/[\d.]+/g).map((v) => v / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    return max > min && (max - min) / (1 - Math.abs(2 * l - 1)) > 0.5;
+  }, id);
 const tab = async (id) => {
   if (!(await page.isVisible('#panelTabs'))) await page.click('#adjustToggle');
   await page.click(`#panelTabs [role=tab][data-tab=${id}]`);
@@ -54,7 +61,7 @@ await step('the panel reads as three numbered steps', async () => {
 });
 
 await step('while a sample shows, choosing a picture outranks Save', async () => {
-  expect((await filled('pickBtn')) && !(await filled('saveBtn')), 'expected an inked pick button and a Save stamp still in outline');
+  expect((await loud('pickBtn')) && !(await loud('saveBtn')), 'expected a blue pick button and Save still resting in slate');
 });
 
 await step('the crop preview is sized to the picture', async () => {
@@ -95,7 +102,7 @@ await step('an unreadable file is explained beside the pick button', async () =>
   expect((await page.textContent('#imageError p')).includes('notes.txt'), 'the error does not name the file');
   await page
     .waitForFunction(() => document.getElementById('panel').classList.contains('has-more'), null, { timeout: 3000 })
-    .catch(() => expect(false, 'the steps pushed under the stub are not marked as more below'));
+    .catch(() => expect(false, 'the steps pushed under the Save box are not marked as more below'));
   await page.click('#imageErrorClose');
   expect(!(await page.isVisible('#imageError')), 'the error did not close');
   // Fine-tune folds the picture step away; a failed file opens it again to show why.
@@ -121,7 +128,7 @@ await step('load an image', async () => {
   await page.setInputFiles('#fileInput', { name: 'meadow.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').sample === -1, null, { timeout: 15000 });
   expect((await page.locator('#thumbs .thumb').count()) === 4, 'own image thumb missing');
-  expect((await filled('saveBtn')) && !(await filled('pickBtn')), 'with your own picture, Save should be the inked stamp and the pick button quiet');
+  expect((await loud('saveBtn')) && !(await loud('pickBtn')), 'with your own picture, Save should be the red slab and the pick button quiet');
 });
 
 await step('crop zoom', async () => {
@@ -144,6 +151,7 @@ await step('switch finish', async () => {
 await step('card tab: strength, pixelate, frame', async () => {
   await tab('card');
   await page.locator('#intensity').fill('0.5');
+  expect(await page.evaluate(() => document.getElementById('intensityOut').classList.contains('is-bump')), 'a changed value does not pop in its pocket');
   await page.locator('#pixel').fill('2');
   await page.click('#frameSeg [role=radio]:nth-child(2)');
   const s = await state();
@@ -526,7 +534,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
   }
 });
 
-await step('phones: the live preview rides in the Save stub, never over the controls', async () => {
+await step('phones: the live preview rides in the Save box, never over the controls', async () => {
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const p = await phone.newPage();
   p.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
@@ -534,13 +542,13 @@ await step('phones: the live preview rides in the Save stub, never over the cont
   await p.waitForTimeout(1500);
   await p.click('#adjustToggle');
   await p.click('#panelTabs [role=tab][data-tab=light]');
-  // Mid-tab, so the sheet runs on under the stub.
+  // Mid-tab, so the panel runs on under the Save box.
   await p.locator('#pane-light .tune-row').nth(3).scrollIntoViewIfNeeded();
   await p.waitForTimeout(600);
   expect(await p.isVisible('.tune-peek'), 'no preview once the card has scrolled away');
-  expect(await p.evaluate(() => !!document.querySelector('.tune-peek').closest('.sec-export')), 'the preview is not inside the Save stub');
+  expect(await p.evaluate(() => !!document.querySelector('.tune-peek').closest('.sec-export')), 'the preview is not inside the Save box');
   const fade = await p.evaluate(() => getComputedStyle(document.querySelector('.sec-export'), '::before'));
-  expect(fade.display !== 'none' && fade.opacity === '1' && parseFloat(fade.height) >= 24, `no fade above the Save stub on phones (${fade.display} / ${fade.opacity} / ${fade.height})`);
+  expect(fade.display !== 'none' && fade.opacity === '1' && parseFloat(fade.height) >= 24, `no fade above the Save box on phones (${fade.display} / ${fade.opacity} / ${fade.height})`);
   await phone.close();
 });
 
