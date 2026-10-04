@@ -137,6 +137,369 @@
   min-height: 1.5em;
 }
 
+/* ---------- Layers (docs/layering.md) ---------- */
+
+/* Layer 2 over layer 1, like sheets in a paint program: each a slot with a pixel card lit where it lands. */
+.layers {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.layer-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.layer-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'map no fin x' 'map no place x';
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 10px 8px 8px;
+  border-radius: 10px;
+  background: var(--pocket);
+  box-shadow: inset 0 2px 0 #000;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease-back), box-shadow 0.12s, background 0.12s;
+}
+
+/* Two layers: the upper sheet casts onto the one beneath, which sits a step back. */
+.layer-stack.is-two .layer-row[data-n='1']:not(.is-on) {
+  margin: 0 6px;
+}
+
+.layer-row.is-on {
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--edge), 0 0 0 2px var(--orange), 0 5px 0 2px var(--orange-lo);
+}
+
+.layer-stack.is-two .layer-row:not(.is-on):hover {
+  background: color-mix(in srgb, var(--pocket) 70%, var(--panel-hi));
+}
+
+.layer-row:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.layer-map {
+  grid-area: map;
+  width: 30px;
+  height: 42px;
+  border-radius: 4px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
+}
+
+.layer-no {
+  grid-area: no;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 5px;
+  background: var(--edge);
+  color: var(--text-dim);
+  font-family: var(--display);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.layer-row.is-on .layer-no {
+  background: var(--orange);
+  color: var(--orange-ink);
+}
+
+/* The finish: a slab in its own colours, opening the list of finishes. */
+.layer-finish {
+  grid-area: fin;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--slab, var(--panel-hi));
+  box-shadow: 0 3px 0 var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 16px;
+  text-shadow: var(--drop);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
+}
+
+.layer-row.is-on .layer-finish {
+  background: var(--pocket);
+}
+
+.layer-finish:hover {
+  transform: translateY(-1px);
+}
+
+.layer-finish:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+.layer-finish i,
+.layer-chip i {
+  flex: none;
+  width: 12px;
+  height: 17px;
+  border-radius: 2px;
+  background: linear-gradient(160deg, var(--c3) 0 18%, var(--c) 34% 52%, var(--c2) 72%, var(--c1));
+  box-shadow: 0 0 0 1.5px var(--edge);
+}
+
+.layer-finish i {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 40%, #fff) 0 18%, var(--c) 34% 60%, color-mix(in srgb, var(--c) 55%, #000));
+}
+
+.layer-finish b {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.layer-finish svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: var(--text-dim);
+}
+
+.layer-finish[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+
+/* Where it goes, in words; it leads to the area controls below. */
+.layer-place {
+  grid-area: place;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 1px 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.layer-place svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.layer-place span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.layer-row.is-on .layer-place {
+  color: color-mix(in srgb, var(--orange) 70%, #fff);
+}
+
+.layer-place.is-waiting span {
+  animation: layer-wait 1s steps(2) infinite;
+}
+
+@keyframes layer-wait {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer-place.is-waiting span {
+    animation: none;
+  }
+}
+
+.layer-place:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.layer-x {
+  grid-area: x;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.layer-x:hover {
+  background: var(--edge);
+  color: #fff;
+}
+
+.layer-x svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+/* Adding layer 2: a dashed empty slot above layer 1, waiting for a sheet. */
+.layer-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 2px dashed color-mix(in srgb, var(--orange) 55%, var(--panel-hi));
+  border-radius: 10px;
+  background: transparent;
+  color: color-mix(in srgb, var(--orange) 75%, #fff);
+  font-size: 15px;
+  order: -1;
+  transition: transform 0.25s var(--ease-back), background 0.12s;
+}
+
+.layer-add b {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--orange);
+  color: var(--orange-ink);
+  font-weight: 400;
+}
+
+.layer-add:hover {
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.layer-add[hidden],
+.layer-blend[hidden],
+.layer-pick[hidden],
+.layer-solo[hidden] {
+  display: none;
+}
+
+.layer-blend {
+  display: grid;
+  gap: 8px;
+  order: 1;
+}
+
+.layer-blend.is-apart :is(.seg-blend, .row) {
+  opacity: 0.45;
+}
+
+.blend-ico {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+/* Light only: a four-point glint. Laid over: one sheet over another. */
+.blend-ico.is-light {
+  background: currentColor;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+.blend-ico.is-over {
+  background: linear-gradient(currentColor 0 0) 0 0 / 9px 9px no-repeat, linear-gradient(currentColor 0 0) 5px 5px / 9px 9px no-repeat;
+  opacity: 0.9;
+}
+
+/* The finish list: owned finishes as chips, grouped like the deck, scrolling in its own pocket. */
+.layer-pick {
+  display: grid;
+  gap: 8px;
+  order: 0;
+}
+
+.layer-chips {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px 6px;
+  max-height: 252px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-hi) transparent;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--pocket);
+  box-shadow: inset 0 2px 0 #000;
+}
+
+.layer-group {
+  grid-column: 1 / -1;
+  margin: 4px 0 -2px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.layer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 13px;
+  text-shadow: var(--drop, none);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
+}
+
+.layer-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.layer-chip:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.layer-chip:active {
+  transform: translateY(3px);
+  box-shadow: none;
+  transition-duration: 0.05s;
+}
+
+/* The chosen one carries a tick, so it never reads like the focus ring. */
+.layer-chip[aria-checked='true'] {
+  background: var(--paper);
+  color: var(--paper-ink);
+  text-shadow: none;
+  box-shadow: 0 3px 0 #8f8a7e, 0 3px 0 2px var(--edge), 0 0 0 2px var(--edge);
+}
+
+.layer-chip[aria-checked='true']::after {
+  content: '✓';
+  margin-left: auto;
+  padding-left: 4px;
+}
+
 /* Two handles over one track: the window is the band of tones that keeps the finish.
    Above the track sits the card's own tones as a pixel histogram. */
 .tone-field {
@@ -512,6 +875,7 @@
   margin-left: 8px;
   background: repeating-conic-gradient(#8f8d86 0 25%, #77756f 0 50%) 0 0 / 4px 4px;
 }
+
 
 /* ---------- Brush mode ---------- */
 

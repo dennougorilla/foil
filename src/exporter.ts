@@ -1,5 +1,5 @@
 import { exportFrame } from './card/shape';
-import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
+import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
 import { exportLoop, exportView, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
@@ -13,16 +13,21 @@ import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 
 /** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
-export async function packLoaded(edition: Edition): Promise<void> {
+async function packLoaded(edition: Edition): Promise<void> {
   const pack = packOf(edition.id);
   if (pack) await loadPack(pack.id);
 }
+
+/** Both layers' finishes have arrived. */
+export const packsLoaded = (input: ExportInput) => Promise.all([input.edition, input.layer?.edition].map((e) => e && packLoaded(e)));
 
 export interface ExportInput {
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   back: HTMLCanvasElement;
   edition: Edition;
+  /** Layer 2 (docs/layering.md): its finish, how it is drawn, and its area. */
+  layer?: { edition: Edition; draw: LayerDraw; range: RangeSnapshot };
   intensity: number;
   pixel: number;
   name: string;
@@ -66,7 +71,7 @@ const STILL_PAD = 24;
 
 /** The card drawn once at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
 export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement> {
-  await packLoaded(input.edition);
+  await packsLoaded(input);
   const pad = STILL_PAD;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
@@ -75,6 +80,7 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
+  if (input.layer) r.range2.set(input.layer.range);
   if (input.layers) r.setLayers(input.layers);
   r.setFlip(input.flip ?? null);
   const W = input.face.width;
@@ -105,6 +111,7 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
+      layer: input.layer?.draw,
     },
     1.7,
   );
@@ -161,6 +168,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
+  if (input.layer) cards.range2.set(input.layer.range);
   if (input.layers) cards.setLayers(input.layers, !input.faceAt);
   cards.setFlip(input.flip ?? null);
   cards.resize(W, H, 1);
@@ -218,6 +226,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
           shadow: !shadow ? null : view.shadow ? [view.shadow[0] * k, view.shadow[1] * k] : [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u],
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
+          layer: input.layer?.draw,
         },
         time,
       );
@@ -282,7 +291,7 @@ export async function exportGif(
   onProgress?: (p: number, encoding: boolean) => void,
   opts: GifOptions = { clear: false, matte: 'auto' },
 ): Promise<File> {
-  await packLoaded(input.edition);
+  await packsLoaded(input);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   const result = new Promise<ArrayBuffer>((resolve, reject) => {
@@ -317,7 +326,7 @@ export async function exportGif(
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width, height, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
+    send({ type: 'encode', width, height, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.layer?.edition.dither) });
     const bytes = await result;
     return new File([bytes], `${fileSafe(input.name)}-${input.edition.id}.gif`, { type: 'image/gif' });
   } finally {

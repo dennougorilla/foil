@@ -385,6 +385,65 @@ await step('finish area tab and brush', async () => {
   expect(!(await page.isVisible('.brush')), 'brush bar did not close');
 });
 
+/** Pixels of a saved PNG at the given points, read back through the page. */
+const pngAt = (path, points) =>
+  page.evaluate(
+    async ({ b64, points }) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height);
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      return points.map(([px, py]) => [...x.getImageData(Math.round(px * img.width), Math.round(py * img.height), 1, 1).data]);
+    },
+    { b64: readFileSync(path).toString('base64'), points },
+  );
+const savePng = async () => {
+  await page.click('#formatSeg [role=radio][data-format=png]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return dl.path();
+};
+
+await step('layers: layer 2 from owned finishes, each layer its own area, the overlap blend, and the PNG shows both', async () => {
+  await tab('range');
+  if (await page.isVisible('#pane-range .range-reset')) await page.click('#pane-range .range-reset');
+  expect((await page.locator('.layer-row').count()) === 1 && (await page.isVisible('.layer-add')), 'one layer and a + slot to start with');
+  await page.click('.layer-add');
+  const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
+  const edition = (await state()).edition;
+  expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
+  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  const pick = chips.includes('negative') ? 'negative' : 'poly';
+  await page.click(`.layer-chip[data-v=${pick}]`);
+  let s = await state();
+  expect(s.layer2?.edition === pick && s.layer2.region === 'all' && s.layer2.blend === 'light', `layer 2 is ${JSON.stringify(s.layer2)}`);
+  expect((await page.locator('.layer-row').count()) === 2 && (await page.getAttribute('.layer-row[data-n="2"]', 'aria-checked')) === 'true', 'layer 2 is not listed and chosen');
+  expect(await page.isVisible('#tab-range .tab-dot'), 'the tab does not show it was changed');
+  // Each row hands the area controls to its layer: layer 1 on the art, layer 2 on the frame.
+  await page.click('.layer-row[data-n="1"] .layer-place');
+  await page.click('#pane-range .region-btn[data-v=art]');
+  await page.click('.layer-row[data-n="2"] .layer-place');
+  await page.click('#pane-range .region-btn[data-v=frame]');
+  s = await state();
+  expect(s.rangeRegion === 'art' && s.layer2.region === 'frame', `areas: layer 1 ${s.rangeRegion}, layer 2 ${s.layer2.region}`);
+  expect((await page.textContent('.layer-row[data-n="2"] .layer-place')).trim().length > 0, 'layer 2 does not say where it goes');
+  await page.click('.seg-blend [data-b=over]');
+  expect((await state()).layer2.blend === 'over', 'the blend did not change');
+  await page.click('.seg-blend [data-b=light]');
+  // The PNG (948 × 1308, 24 px of padding): a point in the art and one on the side of the frame.
+  const points = [[0.5, 0.42], [0.042, 0.42]];
+  const layered = await pngAt(await savePng(), points);
+  await page.click('.layer-row[data-n="2"] .layer-x');
+  expect((await state()).layer2 === null && (await page.locator('.layer-row').count()) === 1, '× did not remove layer 2');
+  const single = await pngAt(await savePng(), points);
+  const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+  expect(d(layered[0], single[0]) === 0, `the art changed: ${layered[0]} vs ${single[0]}`);
+  expect(d(layered[1], single[1]) > 24, `the frame did not take layer 2: ${layered[1]} vs ${single[1]}`);
+  // Left on (whole card, adding its light) for the exports below, so GIF and APNG are made with two layers.
+  await page.click('.layer-add');
+  await page.click(`.layer-chip[data-v=${pick}]`);
+});
+
 for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.png']]) {
   await step(`export ${format}`, async () => {
     await page.click(`#formatSeg [role=radio][data-format=${format}]`);

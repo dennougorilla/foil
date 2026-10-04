@@ -60,6 +60,7 @@ export const packs = {
 export function releaseSealedEdition(store: Store) {
   const s = store.get();
   if (!available(s.edition, opened)) store.set({ edition: FALLBACK });
+  if (s.layer2 && !available(s.layer2.edition, opened)) store.set({ layer2: null });
   // Cards of a pack sealed again leave the hand; the starters fill in.
   const hand = normalizeHand(s.hand, opened);
   if (hand.join() !== s.hand.join()) store.set({ hand });

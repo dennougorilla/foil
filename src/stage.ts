@@ -7,6 +7,7 @@ import { restLight, tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
+import { cardLayers } from './layers';
 import './stage-phone.css';
 import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
 import { cardK, contain, shapeById, type ShapeId } from './card/shape';
@@ -144,6 +145,8 @@ export class Stage {
   hold = false;
   /** 0..1: overlay on the main card showing where the finish lands. */
   rangeView = 0;
+  /** Which layer's area the overlay shows (the one being edited). */
+  rangeLayer: 1 | 2 = 1;
 
   constructor(o: StageOptions) {
     this.o = o;
@@ -646,7 +649,7 @@ export class Stage {
       this.cards.drawCard(
         {
           ...cardPose,
-          edition: ed.shader,
+          ...cardLayers(state, this.rangeView > 0 ? this.rangeLayer : 0),
           intensity: state.intensity,
           pixel: PIXEL_STEPS[state.pixel] ?? 0,
           tilt,

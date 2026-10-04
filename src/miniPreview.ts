@@ -2,7 +2,7 @@
 // a slim band across the top carries a small live copy of the card, so every change can be seen as it happens.
 import { CardRenderer } from './gl/renderers';
 import { tuneGl } from './tune/model';
-import { editionById } from './editions';
+import { cardLayers } from './layers';
 import type { RangeSnapshot } from './gl/range';
 import type { Dict } from './i18n';
 import type { Store } from './state';
@@ -20,6 +20,8 @@ export interface MiniPreviewOptions {
   card: HTMLElement;
   isPainting: () => boolean;
   reduced: MediaQueryList;
+  /** The stage's overlay, and which layer it shows: the copy shows the same. */
+  view: () => { rangeView: number; layer: 1 | 2 };
 }
 
 export class MiniPreview {
@@ -27,6 +29,7 @@ export class MiniPreview {
   private renderer: CardRenderer | null = null;
   private face: { face: HTMLCanvasElement; mask: HTMLCanvasElement } | null = null;
   private range: RangeSnapshot | null = null;
+  private range2: RangeSnapshot | null = null;
   private sectionSeen = false;
   private cardSeen = true;
   private dismissed = false;
@@ -99,6 +102,11 @@ export class MiniPreview {
     this.renderer?.range.set(s);
   }
 
+  setRange2(s: RangeSnapshot) {
+    this.range2 = s;
+    this.renderer?.range2.set(s);
+  }
+
   /** Re-checks visibility, e.g. when brush mode starts or ends. */
   hide() {
     this.update();
@@ -127,12 +135,14 @@ export class MiniPreview {
     this.renderer = new CardRenderer(this.el.querySelector('canvas')!);
     if (this.face) this.renderer.setFace(this.face.face, this.face.mask);
     if (this.range) this.renderer.range.set(this.range);
+    if (this.range2) this.renderer.range2.set(this.range2);
   }
 
   private frame = (now: number) => {
     const r = this.renderer;
     if (!this.shown || !r) return;
     const s = this.o.store.get();
+    const view = this.o.view();
     r.tune = tuneGl(s.tune);
     const motion = !this.o.reduced.matches;
     r.range.motion = motion;
@@ -154,7 +164,7 @@ export class MiniPreview {
         ry,
         rz: 0,
         scale: 1,
-        edition: editionById(s.edition).shader,
+        ...cardLayers(s, view.rangeView > 0 ? view.layer : 0),
         intensity: s.intensity,
         pixel: PIXEL_STEPS[s.pixel] ? Math.max(18, PIXEL_STEPS[s.pixel] * 0.5) : 0,
         tilt: [ry / 0.32, rx / 0.28],
@@ -162,7 +172,7 @@ export class MiniPreview {
         alpha: 1,
         flash: 0,
         shadow: [0, 0],
-        rangeView: 1,
+        rangeView: view.rangeView,
       },
       t,
     );

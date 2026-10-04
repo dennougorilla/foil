@@ -7,18 +7,22 @@ uniform sampler2D uRange;  // r: region preset, g: painted in, b: painted out
 uniform vec4 uRangeKey;    // brightness low, high, softness, invert (0 or 1)
 uniform float uRangeView;  // 0..1: shade what is left out and trace the edge
 uniform float uRangeAnts;  // animation phase for the proof overlay (0 when motion is reduced)
-float foilRange(vec2 uv, float L) {
+// In layer 2's pass (docs/layering.md) uRange holds layer 2's area and these hold layer 1's.
+uniform sampler2D uRangeUnder;
+uniform vec4 uRangeKeyUnder;
+float areaOf(sampler2D tex, vec4 key, vec2 uv, float L) {
   // Thumbnail cards paint their nameplate plain, so read the range there from the plain frame too.
   if (uPlate < 0.5 && uArt.y * uCardK.y < 0.1 && (uv.y - uArt.w) * uCardK.y > 0.009) uv = vec2(0.04 / uCardK.x, 0.5);
-  vec3 r = texture(uRange, uv).rgb;
-  float s = uRangeKey.z;
-  float k = (uRangeKey.x <= 0.001 ? 1.0 : smoothstep(uRangeKey.x - s, uRangeKey.x + s, L))
-          * (uRangeKey.y >= 0.999 ? 1.0 : 1.0 - smoothstep(uRangeKey.y - s, uRangeKey.y + s, L));
+  vec3 r = texture(tex, uv).rgb;
+  float s = key.z;
+  float k = (key.x <= 0.001 ? 1.0 : smoothstep(key.x - s, key.x + s, L))
+          * (key.y >= 0.999 ? 1.0 : 1.0 - smoothstep(key.y - s, key.y + s, L));
   float sel = r.r * k;
-  sel = mix(sel, 1.0 - sel, uRangeKey.w);
+  sel = mix(sel, 1.0 - sel, key.w);
   sel = max(sel, r.g);
   return min(sel, 1.0 - r.b);
 }
+float foilRange(vec2 uv, float L) { return areaOf(uRange, uRangeKey, uv, L); }
 vec3 showRange(vec3 col, vec2 uv, float sel) {
   if (uRangeView <= 0.0) return col;
   // A foil-stamping proof: left-out areas print as matte paper (pixel dither), the foil gets a
@@ -95,12 +99,17 @@ export class RangeLayer {
   }
 
   bind(p: Program, unit: number, view: number, time: number): void {
+    this.bindAs(p, unit, '');
+    this.gl.uniform1f(p.u.uRangeView, view);
+    this.gl.uniform1f(p.u.uRangeAnts, this.motion ? time * 1.6 : 0);
+  }
+
+  /** As layer 1's area under layer 2's pass ('Under'), or as the pass's own (''). */
+  bindAs(p: Program, unit: number, as: '' | 'Under'): void {
     const { gl } = this;
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.uniform1i(p.u.uRange, unit);
-    gl.uniform4fv(p.u.uRangeKey, this.key);
-    gl.uniform1f(p.u.uRangeView, view);
-    gl.uniform1f(p.u.uRangeAnts, this.motion ? time * 1.6 : 0);
+    gl.uniform1i(p.u[`uRange${as}`], unit);
+    gl.uniform4fv(p.u[`uRangeKey${as}`], this.key);
   }
 }

@@ -1,10 +1,11 @@
 // The panel's Area tab and brush mode: choose where on the card the finish lands.
-import { RangeModel } from './range';
+import { Paint, RangeModel } from './range';
 import { BRUSH_MAX, BRUSH_MIN, MIN_BAND, type RangeRegion } from './featureState';
 import { RANGE_H, RANGE_W } from './gl/range';
 import { sfx } from './audio';
-import { editionById } from './editions';
+import { editionById, type Area } from './editions';
 import { MiniPreview } from './miniPreview';
+import { initLayers } from './layersPanel';
 import type { FaceSpec } from './card/face';
 import type { Dict } from './i18n';
 import type { Stage } from './stage';
@@ -86,6 +87,27 @@ function fill(input: HTMLInputElement) {
 export function initRangePanel(host: RangeHost) {
   const { store, stage } = host;
   const model = new RangeModel();
+  // Each layer keeps its own brush strokes; the editor below works on the layer chosen in the list.
+  const paints = [new Paint('rangeBrush'), new Paint('rangeBrush2')];
+  const which = (s = store.get()): 1 | 2 => (s.areaLayer === 2 && s.layer2 ? 2 : 1);
+  const paint = () => {
+    const p = paints[which() - 1];
+    p.cellAspect = model.cellAspect;
+    return p;
+  };
+  const areaOf = (n: 1 | 2, s = store.get()): Area =>
+    n === 2 && s.layer2 ? s.layer2 : { region: s.rangeRegion, lo: s.rangeLo, hi: s.rangeHi, invert: s.rangeInvert };
+  const area = (s = store.get()) => areaOf(which(s), s);
+  function setArea(p: Partial<Area>) {
+    const s = store.get();
+    if (which(s) === 2) return store.set({ layer2: { ...s.layer2!, ...p } });
+    const patch: Partial<State> = {};
+    if (p.region !== undefined) patch.rangeRegion = p.region;
+    if (p.lo !== undefined) patch.rangeLo = p.lo;
+    if (p.hi !== undefined) patch.rangeHi = p.hi;
+    if (p.invert !== undefined) patch.rangeInvert = p.invert;
+    store.set(patch);
+  }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   stage.cards.range.motion = !reduced.matches;
   reduced.addEventListener('change', () => (stage.cards.range.motion = !reduced.matches));
@@ -94,6 +116,7 @@ export function initRangePanel(host: RangeHost) {
 
   const sec = document.getElementById('pane-range')!;
   sec.innerHTML = `
+    <div class="layers"></div>
     <div class="pane-tools"><button class="link range-reset" type="button" data-r="rangeReset"></button></div>
     <div class="field">
       <div class="field-head">
@@ -141,6 +164,19 @@ export function initRangePanel(host: RangeHost) {
   const tonePresets = q('.tone-presets');
   const paintBtn = q<HTMLButtonElement>('.range-paint');
   const cover = q('.range-cover');
+  const layers = initLayers({
+    store,
+    t: host.t,
+    announce: host.announce,
+    root: q('.layers'),
+    map: (n, w, h) => model.map(areaOf(n), paints[n - 1], w, h),
+    painted: (n) => paints[n - 1].painted,
+    ready: (id) => stage.cards.ready(editionById(id).shader),
+    clearPaint: (n) => {
+      paints[n - 1].clear();
+      void paints[n - 1].save();
+    },
+  });
 
   REGIONS.forEach((r) => {
     const b = el('button', 'seg-btn region-btn', `<svg class="rgn" viewBox="0 0 18 24" aria-hidden="true">${REGION_ICON[r]}</svg><span></span>`);
@@ -148,9 +184,9 @@ export function initRangePanel(host: RangeHost) {
     b.setAttribute('role', 'radio');
     b.dataset.v = r;
     b.onclick = () => {
-      if (store.get().rangeRegion === r) return;
+      if (area().region === r) return;
       sfx.tick();
-      store.set({ rangeRegion: r });
+      setArea({ region: r });
     };
     regionSeg.appendChild(b);
   });
@@ -162,27 +198,27 @@ export function initRangePanel(host: RangeHost) {
     c.dataset.i = String(i);
     c.onclick = () => {
       sfx.tick();
-      store.set({ rangeLo: a, rangeHi: b });
+      setArea({ lo: a, hi: b });
     };
     tonePresets.appendChild(c);
   });
 
   lo.addEventListener('input', () => {
-    const v = Math.min(+lo.value, store.get().rangeHi - MIN_BAND);
+    const v = Math.min(+lo.value, area().hi - MIN_BAND);
     lo.value = String(v);
-    store.set({ rangeLo: Math.max(0, v) });
+    setArea({ lo: Math.max(0, v) });
   });
   hi.addEventListener('input', () => {
-    const v = Math.max(+hi.value, store.get().rangeLo + MIN_BAND);
+    const v = Math.max(+hi.value, area().lo + MIN_BAND);
     hi.value = String(v);
-    store.set({ rangeHi: Math.min(1, v) });
+    setArea({ hi: Math.min(1, v) });
   });
   // The thumb nearest the pointer takes the drag, so a narrow band never traps the other one.
   tone.addEventListener('pointerdown', (e) => {
     const r = tone.getBoundingClientRect();
     const v = (e.clientX - r.left) / r.width;
-    const s = store.get();
-    const takeLo = Math.abs(v - s.rangeLo) < Math.abs(v - s.rangeHi) || (s.rangeLo === s.rangeHi - MIN_BAND && v < s.rangeLo);
+    const s = area();
+    const takeLo = Math.abs(v - s.lo) < Math.abs(v - s.hi) || (s.lo === s.hi - MIN_BAND && v < s.lo);
     lo.style.zIndex = takeLo ? '3' : '2';
     hi.style.zIndex = takeLo ? '2' : '3';
   });
@@ -190,19 +226,20 @@ export function initRangePanel(host: RangeHost) {
   sec.querySelectorAll<HTMLButtonElement>('.range-chip').forEach((b) => {
     b.addEventListener('click', () => {
       sfx.tick();
-      const k = b.dataset.k as 'rangeInvert' | 'rangeShow';
-      store.set({ [k]: !store.get()[k] } as Partial<State>);
+      if (b.dataset.k === 'rangeInvert') setArea({ invert: !area().invert });
+      else store.set({ rangeShow: !store.get().rangeShow });
     });
   });
 
   q('.range-reset').addEventListener('click', () => {
     sfx.tick();
-    if (model.painted) {
-      model.checkpoint();
-      model.clear();
-      void model.save();
+    const p = paint();
+    if (p.painted) {
+      p.checkpoint();
+      p.clear();
+      void p.save();
     }
-    store.set({ rangeRegion: 'all', rangeLo: 0, rangeHi: 1, rangeInvert: false });
+    setArea({ region: 'all', lo: 0, hi: 1, invert: false });
     push();
   });
 
@@ -219,29 +256,26 @@ export function initRangePanel(host: RangeHost) {
 
   /** What is holding the finish back, most direct cause first. */
   const blocker = () => {
-    const s = store.get();
-    if (s.rangeInvert) return 'invert';
-    if (s.rangeLo > 0 || s.rangeHi < 1) return 'tone';
-    if (s.rangeRegion === 'none') return painting ? 'painting' : 'paint';
+    const s = area();
+    if (s.invert) return 'invert';
+    if (s.lo > 0 || s.hi < 1) return 'tone';
+    if (s.region === 'none') return painting ? 'painting' : 'paint';
     return 'region';
   };
   q('.cover-fix').addEventListener('click', () => {
     sfx.tick();
     const b = blocker();
-    if (b === 'invert') store.set({ rangeInvert: false });
-    else if (b === 'tone') store.set({ rangeLo: 0, rangeHi: 1 });
+    if (b === 'invert') setArea({ invert: false });
+    else if (b === 'tone') setArea({ lo: 0, hi: 1 });
     else if (b === 'paint') enterPaint();
-    else if (b === 'region') store.set({ rangeRegion: 'all' });
+    else if (b === 'region') setArea({ region: 'all' });
   });
 
   // ---------- Overlay: shown while the section is in use, while painting, or when pinned ----------
 
-  let sectionActive = false;
-  const activeNow = () => sec.matches(':hover, :focus-within');
-  sec.addEventListener('pointerenter', () => (sectionActive = true));
-  sec.addEventListener('pointerleave', () => (sectionActive = activeNow()));
-  sec.addEventListener('focusin', () => (sectionActive = true));
-  sec.addEventListener('focusout', () => setTimeout(() => (sectionActive = activeNow())));
+  // Only the area controls bring the overlay up: in the layer list the card shows both layers as they are.
+  const layersEl = q('.layers');
+  const editing = () => sec.matches(':hover, :focus-within') && !layersEl.matches(':hover, :focus-within');
 
   {
     let last = performance.now();
@@ -249,7 +283,7 @@ export function initRangePanel(host: RangeHost) {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const s = store.get();
-      const target = painting || s.rangeShow || sectionActive ? 1 : 0;
+      const target = painting || s.rangeShow || editing() ? 1 : 0;
       stage.rangeView = reduced.matches ? target : stage.rangeView + (target - stage.rangeView) * (1 - Math.exp(-dt * 12));
       if (Math.abs(stage.rangeView - target) < 0.002) stage.rangeView = target;
       if (painting) placeLayer();
@@ -321,7 +355,7 @@ export function initRangePanel(host: RangeHost) {
 
   let painting = false;
   const narrow = matchMedia('(max-width: 900px)');
-  const preview = new MiniPreview({ store, section: sec, card: cardSlot, isPainting: () => painting, reduced });
+  const preview = new MiniPreview({ store, section: sec, card: cardSlot, isPainting: () => painting, reduced, view: () => ({ rangeView: stage.rangeView, layer: stage.rangeLayer }) });
 
   function enterPaint() {
     painting = true;
@@ -332,7 +366,7 @@ export function initRangePanel(host: RangeHost) {
     paintBtn.setAttribute('aria-pressed', 'true');
     sync();
     // With everything already covered, adding can't show anything: start with the eraser.
-    if (store.get().brushMode === 'add' && model.coverage(store.get()) > 0.995) store.set({ brushMode: 'erase' });
+    if (store.get().brushMode === 'add' && model.coverage(area(), paint()) > 0.995) store.set({ brushMode: 'erase' });
     placeLayer();
     sfx.tick();
     host.announce(host.t().brushOn);
@@ -361,16 +395,17 @@ export function initRangePanel(host: RangeHost) {
 
   function act(a: string) {
     const t = host.t();
-    if (a === 'undo' && model.undo()) host.announce(t.brushUndone);
-    else if (a === 'redo' && model.redo()) host.announce(t.brushRedone);
-    else if (a === 'clear' && model.painted) {
-      model.checkpoint();
-      model.clear();
+    const p = paint();
+    if (a === 'undo' && p.undo()) host.announce(t.brushUndone);
+    else if (a === 'redo' && p.redo()) host.announce(t.brushRedone);
+    else if (a === 'clear' && p.painted) {
+      p.checkpoint();
+      p.clear();
       host.announce(t.brushCleared);
     } else return;
     sfx.tick();
     push();
-    void model.save();
+    void p.save();
   }
 
   function placeLayer() {
@@ -415,10 +450,10 @@ export function initRangePanel(host: RangeHost) {
     e.preventDefault();
     layer.setPointerCapture(e.pointerId);
     down = true;
-    model.checkpoint();
+    paint().checkpoint();
     [lastX, lastY] = toTex(e);
     const s = store.get();
-    model.dab(lastX, lastY, s.brushSize, s.brushSoft, s.brushMode);
+    paint().dab(lastX, lastY, s.brushSize, s.brushSoft, s.brushMode);
     sparkle(e, true);
     sfx.tick();
     push();
@@ -428,7 +463,7 @@ export function initRangePanel(host: RangeHost) {
     if (!down) return;
     const [x, y] = toTex(e);
     const s = store.get();
-    model.stroke(lastX, lastY, x, y, s.brushSize, s.brushSoft, s.brushMode);
+    paint().stroke(lastX, lastY, x, y, s.brushSize, s.brushSoft, s.brushMode);
     lastX = x;
     lastY = y;
     sparkle(e, false);
@@ -469,7 +504,7 @@ export function initRangePanel(host: RangeHost) {
     if (!down) return;
     down = false;
     syncBrush();
-    void model.save();
+    void paint().save();
   };
   layer.addEventListener('pointerup', up);
   layer.addEventListener('pointercancel', up);
@@ -510,9 +545,16 @@ export function initRangePanel(host: RangeHost) {
     if (pending) return;
     pending = requestAnimationFrame(() => {
       pending = 0;
-      const snap = model.snapshot(store.get());
+      const s = store.get();
+      const snap = model.snapshot(areaOf(1, s), paints[0]);
       stage.cards.range.set(snap);
       preview.setRange(snap);
+      if (s.layer2) {
+        const snap2 = model.snapshot(s.layer2, paints[1]);
+        stage.cards.range2.set(snap2);
+        preview.setRange2(snap2);
+      }
+      layers.sync();
       syncBrush();
       sync();
       measure();
@@ -526,7 +568,7 @@ export function initRangePanel(host: RangeHost) {
       coverTimer = 0;
       const t = host.t();
       const s = store.get();
-      const f = model.coverage(s);
+      const f = model.coverage(area(s), paint());
       // Never round a partial area up to 100% or down to 0%.
       const n = f >= 0.9995 ? 100 : Math.min(99, Math.round(f * 100));
       const none = f <= 0.0005;
@@ -572,48 +614,54 @@ export function initRangePanel(host: RangeHost) {
   }
 
   function syncBrush() {
-    bar.querySelector<HTMLButtonElement>('[data-a=undo]')!.disabled = !model.canUndo;
-    bar.querySelector<HTMLButtonElement>('[data-a=redo]')!.disabled = !model.canRedo;
-    bar.querySelector<HTMLButtonElement>('[data-a=clear]')!.disabled = !model.painted;
+    const p = paint();
+    bar.querySelector<HTMLButtonElement>('[data-a=undo]')!.disabled = !p.canUndo;
+    bar.querySelector<HTMLButtonElement>('[data-a=redo]')!.disabled = !p.canRedo;
+    bar.querySelector<HTMLButtonElement>('[data-a=clear]')!.disabled = !p.painted;
   }
 
   function sync() {
     const s = store.get();
-    regionSeg.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => radio(b, b.dataset.v === s.rangeRegion));
-    lo.value = String(s.rangeLo);
-    hi.value = String(s.rangeHi);
-    tone.style.setProperty('--lo', String(s.rangeLo));
-    tone.style.setProperty('--hi', String(s.rangeHi));
-    tone.classList.toggle('is-invert', s.rangeInvert);
-    tone.classList.toggle('is-full', s.rangeLo <= 0 && s.rangeHi >= 1);
-    regionSeg.classList.toggle('is-invert', s.rangeInvert);
+    const a = area(s);
+    stage.rangeLayer = which(s);
+    // With two layers, the area controls name the finish they place.
+    const placing = which(s) === 2 ? s.layer2!.edition : s.edition;
+    q('#rangeWhereLabel').textContent = s.layer2 ? host.t().layerWhere.replace('{n}', String(which(s))).replace('{x}', host.t().edition[placing]) : host.t().rangeWhere;
+    regionSeg.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => radio(b, b.dataset.v === a.region));
+    lo.value = String(a.lo);
+    hi.value = String(a.hi);
+    tone.style.setProperty('--lo', String(a.lo));
+    tone.style.setProperty('--hi', String(a.hi));
+    tone.classList.toggle('is-invert', a.invert);
+    tone.classList.toggle('is-full', a.lo <= 0 && a.hi >= 1);
+    regionSeg.classList.toggle('is-invert', a.invert);
     // Brush strokes make the area custom: the chosen preset becomes its base, and the panel says so.
-    const custom = model.painted;
-    regionSeg.classList.toggle('is-custom', custom && !s.rangeInvert);
+    const custom = paint().painted;
+    regionSeg.classList.toggle('is-custom', custom && !a.invert);
     const tt = host.t();
     // Invert flips region and brightness together, so name both when the band is narrowed.
-    const narrowed = s.rangeLo > 0 || s.rangeHi < 1;
+    const narrowed = a.lo > 0 || a.hi < 1;
     const what = narrowed
-      ? tt.toneAt.replace('{r}', tt.region[s.rangeRegion]).replace('{lo}', String(Math.round(s.rangeLo * 100))).replace('{hi}', String(Math.round(s.rangeHi * 100)))
-      : tt.regionQ.replace('{r}', tt.region[s.rangeRegion]);
-    q('.region-hint').textContent = s.rangeInvert
+      ? tt.toneAt.replace('{r}', tt.region[a.region]).replace('{lo}', String(Math.round(a.lo * 100))).replace('{hi}', String(Math.round(a.hi * 100)))
+      : tt.regionQ.replace('{r}', tt.region[a.region]);
+    q('.region-hint').textContent = a.invert
       ? tt.invertHint.replace('{x}', what)
       : custom
-        ? tt.customHint.replace('{r}', tt.region[s.rangeRegion])
-        : tt.regionHint[s.rangeRegion];
-    q('.where-tag').hidden = !model.painted;
+        ? tt.customHint.replace('{r}', tt.region[a.region])
+        : tt.regionHint[a.region];
+    q('.where-tag').hidden = !paint().painted;
     paintBtn.querySelector('b')!.textContent = painting ? host.t().paintActive : host.t().paint;
     paintBtn.querySelector('small')!.textContent = painting ? host.t().paintActiveSub : host.t().paintSub;
     const pct = (v: number) => `${Math.round(v * 100)}%`;
-    toneOut.textContent = `${Math.round(s.rangeLo * 100)}${s.lang === 'ja' ? '〜' : '–'}${pct(s.rangeHi)}`;
-    lo.setAttribute('aria-valuetext', pct(s.rangeLo));
-    hi.setAttribute('aria-valuetext', pct(s.rangeHi));
+    toneOut.textContent = `${Math.round(a.lo * 100)}${s.lang === 'ja' ? '〜' : '–'}${pct(a.hi)}`;
+    lo.setAttribute('aria-valuetext', pct(a.lo));
+    hi.setAttribute('aria-valuetext', pct(a.hi));
     tonePresets.querySelectorAll<HTMLButtonElement>('.tone-chip').forEach((c) => {
-      const [a, b] = TONES[+c.dataset.i!];
-      c.setAttribute('aria-pressed', String(Math.abs(a - s.rangeLo) < 0.005 && Math.abs(b - s.rangeHi) < 0.005));
+      const [x, y] = TONES[+c.dataset.i!];
+      c.setAttribute('aria-pressed', String(Math.abs(x - a.lo) < 0.005 && Math.abs(y - a.hi) < 0.005));
     });
     sec.querySelectorAll<HTMLButtonElement>('.range-chip').forEach((b) => {
-      b.setAttribute('aria-pressed', String(s[b.dataset.k as 'rangeInvert' | 'rangeShow']));
+      b.setAttribute('aria-pressed', String(b.dataset.k === 'rangeInvert' ? a.invert : s.rangeShow));
     });
     modeSeg.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => radio(b, b.dataset.m === s.brushMode));
     layer.dataset.mode = s.brushMode;
@@ -631,8 +679,9 @@ export function initRangePanel(host: RangeHost) {
     softOut.style.setProperty('--blur', `${(s.brushSoft * 5).toFixed(1)}px`);
     softOut.title = pct(s.brushSoft);
     soft.setAttribute('aria-valuetext', pct(s.brushSoft));
-    const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || model.painted;
-    q<HTMLElement>('.pane-tools').hidden = !changed;
+    // The tab's gem: layer 1 moved off the whole card, either layer painted, or a second layer.
+    const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || paints.some((p) => p.painted) || s.layer2 !== null;
+    q<HTMLElement>('.pane-tools').hidden = !(a.region !== 'all' || a.lo > 0 || a.hi < 1 || a.invert || paint().painted);
     host.onRangeChanged(changed);
   }
 
@@ -668,7 +717,7 @@ export function initRangePanel(host: RangeHost) {
     measure();
   }
 
-  const RANGE_KEYS: (keyof State)[] = ['rangeRegion', 'rangeLo', 'rangeHi', 'rangeInvert'];
+  const RANGE_KEYS: (keyof State)[] = ['rangeRegion', 'rangeLo', 'rangeHi', 'rangeInvert', 'layer2', 'areaLayer'];
   store.on((_s, changed) => {
     if (changed.has('lang')) applyText();
     if (changed.has('edition')) measure();
@@ -694,13 +743,14 @@ export function initRangePanel(host: RangeHost) {
     }
   }
 
-  void model.load().then((ok) => ok && push());
+  for (const p of paints) void p.load().then((ok) => ok && push());
   applyText();
 
   return {
     onFace,
     applyText,
     /** What the exporter needs to put the finish in the same place. */
-    snapshot: () => model.snapshot(store.get()),
+    snapshot: () => model.snapshot(areaOf(1), paints[0]),
+    snapshot2: () => model.snapshot(areaOf(2), paints[1]),
   };
 }

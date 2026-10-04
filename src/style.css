@@ -2919,10 +2919,12 @@ input[type='range']:disabled {
   .adjust-toggle:hover:not(:active),
   .sw-add:hover:not(:active),
   .chip.range-chip:hover:not(:active),
+  .layer-chip:hover:not(:active),
+  .layer-row:hover:not(:active),
   .recap:hover:not(:active) .recap-go {
     transform: none;
   }
-  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .adjust-chev, .matte-sw, .recap-go, .sw-add, .lt-style, .chip.range-chip, .tone-chip) {
+  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .adjust-chev, .matte-sw, .recap-go, .sw-add, .lt-style, .chip.range-chip, .tone-chip, .layer-chip, .layer-row, .layer-add) {
     transition: none;
   }
   .panel input[type='range']::-webkit-slider-thumb {

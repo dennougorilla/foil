@@ -1,4 +1,4 @@
-import { EDITIONS, type EditionId, type FrameId, type RarityId } from './editions';
+import { EDITIONS, layerFromOutside, sanitizeLayer2, type EditionId, type FrameId, type Layer2, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import { shapeOf, type ShapeId } from './card/shape';
 import type { Lang } from './i18n';
@@ -19,6 +19,10 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
+  /** Layer 2: a finish laid over the card's own in an area of its own, or null (docs/layering.md). Layer 1 is `edition` with the range fields. */
+  layer2: Layer2 | null;
+  /** Which layer the Finish area tab is editing. */
+  areaLayer: 1 | 2;
   /** The seven finishes in the hand, in order (made valid against the opened packs in main.ts). */
   hand: EditionId[];
   rarity: RarityId;
@@ -73,6 +77,7 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
+  'layer2',
   'hand',
   'rarity',
   'frame',
@@ -133,6 +138,8 @@ const defaults = (): State => ({
   sound: true,
   crt: true,
   edition: 'holo',
+  layer2: null,
+  areaLayer: 1,
   hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
   rarity: 'rare',
   frame: 'paper',
@@ -180,6 +187,7 @@ function sanitize(state: State) {
   if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
   if (!EXPORT_MOTIONS.includes(state.exportMotion)) state.exportMotion = 'stage';
   Object.assign(state, sanitizeRangeColors(state));
+  state.layer2 = sanitizeLayer2(state.layer2);
 }
 
 /** A kept card made whole again: every card setting it lacks or that no longer fits is the default. */
@@ -197,6 +205,9 @@ export function createStore() {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     sanitize(state);
+    // A second finish saved by the first layering design ("outside the area") becomes layer 2.
+    const outside = (saved as { outside?: unknown }).outside;
+    state.layer2 ??= layerFromOutside(outside, { region: state.rangeRegion, lo: state.rangeLo, hi: state.rangeHi, invert: state.rangeInvert });
   } catch {
     /* storage unavailable: defaults are fine */
   }

@@ -111,6 +111,21 @@ export interface CardDraw {
   uv?: [number, number, number, number];
   /** Blacklight's lamp power, 0..1; full when absent. */
   lamp?: number;
+  /** Layer 2, drawn over the card in its own area (docs/layering.md); none when absent. */
+  layer?: LayerDraw;
+  /** 2: draw this card in layer 2's area instead of layer 1's (the Finish area's proof of layer 2). */
+  area?: 1 | 2;
+}
+
+export interface LayerDraw {
+  /** Shader index of layer 2's finish. */
+  edition: number;
+  /** Where layer 1 lies beneath: add only layer 2's light, or lay it over. */
+  light: boolean;
+  /** 0..1. */
+  strength: number;
+  /** Layer 1 is a finish (not Base), so the blend applies where they overlap. */
+  under: boolean;
 }
 
 export interface Particle {
@@ -149,8 +164,9 @@ export class CardRenderer {
   private layerPlate = 0;
   /** 0..1: how far the Shadowbox sheets stand up, and how deep 3D Lenticular reads (both flatten while a new cut is made). */
   layersRise = 1;
-  /** Where on the face the finish applies. */
+  /** Where on the face the finish applies: layer 1's area, and layer 2's. */
   readonly range: RangeLayer;
+  readonly range2: RangeLayer;
   cssW = 1;
   cssH = 1;
   dpr = 1;
@@ -198,6 +214,7 @@ export class CardRenderer {
     this.flip = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
     this.range = new RangeLayer(gl);
+    this.range2 = new RangeLayer(gl);
   }
 
   /** The program for a pack (or the open finishes), started on first ask; null until that pack's module has arrived. */
@@ -293,10 +310,21 @@ export class CardRenderer {
     gl.frontFace(gl.CW);
   }
 
-  /** Draws one card; returns false, drawing nothing, while its program is not ready (see ready). */
+  /**
+   * Draws one card; returns false, drawing nothing, while its program is not ready (see ready).
+   * Layer 2 is drawn over it in a second pass, once its own program is ready too.
+   */
   drawCard(d: CardDraw, time: number): boolean {
-    const { gl } = this;
     if (!this.ready(d.edition)) return false;
+    this.pass(d, time, null);
+    const l = d.layer;
+    if (l && l.strength > 0 && this.ready(l.edition)) this.pass({ ...d, edition: l.edition, shadow: null, rangeView: 0 }, time, l);
+    return true;
+  }
+
+  /** `layer`: this is layer 2's pass, in its own area over what is drawn. */
+  private pass(d: CardDraw, time: number, layer: LayerDraw | null): void {
+    const { gl } = this;
     const cp = this.program(packOfShader(d.edition) ?? 'open')!;
     const p = cp.pending.get();
     const f = this.faces.get(d.face ?? 'card');
@@ -341,8 +369,13 @@ export class CardRenderer {
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     gl.uniform1f(p.u.uUvLamp, d.lamp ?? 1);
+    gl.uniform1f(p.u.uLayer, layer ? 1 : 0);
+    gl.uniform1f(p.u.uLayerK, layer?.strength ?? 1);
+    gl.uniform1f(p.u.uBlend, layer?.light ? 1 : 0);
+    gl.uniform1f(p.u.uUnderOn, layer?.under ? 1 : 0);
     applyTune(gl, p.u, this.tune);
-    this.range.bind(p, 4, d.rangeView ?? 0, time);
+    (layer || d.area === 2 ? this.range2 : this.range).bind(p, 4, d.rangeView ?? 0, time);
+    if (layer) this.range.bindAs(p, 10, 'Under');
     for (const l of cp.layers) l.bind?.(p, d);
     gl.activeTexture(gl.TEXTURE7);
     gl.bindTexture(gl.TEXTURE_2D, this.layers);
@@ -368,7 +401,6 @@ export class CardRenderer {
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     for (const l of cp.layers) l.after?.(this, d, time);
-    return true;
   }
 
   drawParticles(list: Particle[]): void {
