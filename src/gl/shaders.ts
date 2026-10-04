@@ -6,6 +6,7 @@ import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
 import { PLATINUM_GLSL } from './platinum';
 import { COSMOHOLO_GLSL } from './cosmoholo';
+import { STAINED_GLASS_GLSL } from './stainedGlass';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
@@ -399,6 +400,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
 ${SHALLOWS_GLSL}
 ${PLATINUM_GLSL}
 ${COSMOHOLO_GLSL}
+${STAINED_GLASS_GLSL}
 ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
@@ -460,13 +462,14 @@ void main() {
   else if (e == 18) col = cosmoholo(c, uv, uTilt, L);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
   else if (e == 24) col = platinum(c, uv, uTilt, L, m.r);
+  else if (e == 26) col = stainedGlass(c, uv, uTilt, L, m.r);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
   if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12 || e == 24) amt = uIntensity; // these cover the frame in full
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26) amt = uIntensity; // these cover the frame in full
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);

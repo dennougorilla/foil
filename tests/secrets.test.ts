@@ -65,3 +65,9 @@ test('a beta finish (Cosmo Holo) is neither open nor a secret, so no unlock can 
 test('every finish past the open ones that is not beta is a secret, in hand order', () => {
   assert.deepEqual(secretEditions(['base', 'gold', 'cosmoholo', 'relief']), ['gold', 'relief']);
 });
+
+test('Stained Glass joins as a beta finish: a secret, out of the hand until it is unlocked', () => {
+  const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+  assert.ok((secrets as string[]).includes('stainedglass'));
+  assert.deepEqual(parseUnlocked('["stainedglass"]', secrets), ['stainedglass']);
+});
