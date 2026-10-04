@@ -187,6 +187,40 @@ await step('shine tab', async () => {
   expect((await state()).tune.scale === 1, 'reset all failed');
 });
 
+await step('the motion button above the deck switches the idle motion in one tap, in step with the Shine tab', async () => {
+  const btn = '#deckDock .qm-btn';
+  expect(await page.isVisible(btn), 'no motion button by the deck');
+  const deck = await page.locator('#deckBtn').boundingBox();
+  const b = await page.locator(btn).boundingBox();
+  expect(b.y + b.height <= deck.y && Math.abs(b.x + b.width / 2 - (deck.x + deck.width / 2)) < 30, 'the motion button is not just above the deck');
+  await page.click(btn);
+  expect((await page.getAttribute(btn, 'aria-expanded')) === 'true' && (await page.isVisible('.qm-tray')), 'the tray did not open');
+  const names = await page.locator('.qm-opt span').allTextContents();
+  expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
+  expect((await page.getAttribute('.qm-opt[aria-checked=true]', 'data-value')) === (await state()).tune.idle, 'the tray does not mark the current motion');
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('qm-opt')), 'focus did not move into the tray');
+  // Keyboard: Sway → Float, picked with Enter; the tray closes and focus returns to the button.
+  await page.keyboard.press('ArrowRight');
+  expect((await page.textContent('.qm-help')).length > 10, 'the focused motion is not described');
+  await page.keyboard.press('Enter');
+  expect((await state()).tune.idle === 'float', `Enter picked ${(await state()).tune.idle}`);
+  expect(!(await page.isVisible('.qm-tray')) && (await page.evaluate(() => document.activeElement?.classList.contains('qm-btn'))), 'the tray stayed open or focus was lost');
+  expect((await page.getAttribute(btn, 'data-value')) === 'float', 'the button does not show the new motion');
+  // The Shine tab shows the same choice, and a pick there shows on the button.
+  await tab('light');
+  expect((await page.getAttribute('#pane-light [data-key=idle] [aria-checked=true]', 'data-value')) === 'float', 'the Shine tab disagrees');
+  await page.click('#pane-light [data-key=idle] [role=radio][data-value=bounce]');
+  expect((await page.getAttribute(btn, 'data-value')) === 'bounce', 'a pick in the Shine tab did not reach the button');
+  // Escape and a press elsewhere close it without changing anything.
+  await page.click(btn);
+  await page.keyboard.press('Escape');
+  expect(!(await page.isVisible('.qm-tray')), 'Escape did not close the tray');
+  await page.click(btn);
+  await page.mouse.click(20, 450);
+  expect(!(await page.isVisible('.qm-tray')) && (await state()).tune.idle === 'bounce', 'a press elsewhere did not close the tray, or changed the motion');
+  await page.click('#pane-light .tune-reset-all');
+});
+
 await step('lettering from the name tag', async () => {
   await tab('card');
   // The name tag sways gently, so Playwright's "stable" wait can time out; the chip is still clickable.

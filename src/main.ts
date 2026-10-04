@@ -24,6 +24,7 @@ import { initPackStore, packs, releaseSealedEdition } from './packStore';
 import { addToHand, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
+import { mountQuickMotion } from './tune/quick';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -1535,6 +1536,8 @@ const deck = mountDeck({
   onShop: () => openShop(),
   onPrefetch: () => void import('./pack/opening'),
 });
+// The idle motion in one tap, just above the deck.
+mountQuickMotion(store, $('deckDock'));
 // The saved hand made valid; the earlier drawn card and the finish on the card take places in it.
 {
   const s = store.get();

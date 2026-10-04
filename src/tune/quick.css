@@ -1,0 +1,253 @@
+/* The motion button above the deck and its tray of motions (src/tune/quick.ts). */
+.deck-dock {
+  position: relative;
+}
+
+.qm {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 26px);
+  transform: translateX(-50%);
+  z-index: 6;
+  display: grid;
+  justify-items: center;
+}
+
+/* A dark slab with a lip, like the pack button, wearing the current motion's icon. */
+.qm-btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: #222c32;
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px #3a4a53, 0 0 0 2px #05080a, 0 4px 0 2px #05080a;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-out), background 0.15s;
+}
+
+.qm-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.qm-btn:hover {
+  transform: translateY(-2px);
+}
+
+.qm-btn:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 0 0 2px #3a4a53, 0 0 0 2px #05080a, 0 1px 0 2px #05080a;
+}
+
+.qm.is-open .qm-btn {
+  background: #f39a2b;
+  color: #1a1206;
+  box-shadow: inset 0 0 0 2px #ffc46b, 0 0 0 2px #05080a, 0 4px 0 2px #8a4a08;
+}
+
+.qm-btn:focus-visible,
+.qm-opt:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 4px;
+}
+
+.qm-cap {
+  margin-top: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text);
+  text-shadow: 0 2px 0 #05080a;
+  pointer-events: none;
+}
+
+/* The tray rises above the button, right-aligned with the dock so it never leaves the stage. */
+.qm-tray {
+  position: absolute;
+  right: -14px;
+  bottom: calc(100% + 12px);
+  width: max-content;
+  padding: 10px;
+  border-radius: 14px;
+  background: #141c20;
+  box-shadow: inset 0 0 0 2px #34454c, 0 0 0 2px #05080a, 0 6px 0 2px #05080a, 0 18px 40px rgba(0, 0, 0, 0.45);
+  transform-origin: calc(100% - 38px) 100%;
+  animation: qm-open 0.22s var(--ease-back);
+}
+
+.qm-tray[hidden] {
+  display: none;
+}
+
+/* A notch pointing down at the button. */
+.qm-tray::after {
+  content: '';
+  position: absolute;
+  right: 30px;
+  top: 100%;
+  border: 8px solid transparent;
+  border-top-color: #34454c;
+}
+
+.qm-title {
+  margin: 0 2px 8px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.qm-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 64px);
+  gap: 6px;
+}
+
+.qm-opt {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  height: 58px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 9px;
+  background: #26333a;
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px #34454c, 0 3px 0 0 #05080a;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.1;
+  cursor: pointer;
+  animation: qm-deal 0.26s var(--ease-back) both;
+  animation-delay: calc(var(--i) * 18ms);
+  transition: transform 0.12s var(--ease-out), background 0.12s;
+}
+
+.qm-opt svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.qm-opt span {
+  white-space: nowrap;
+}
+
+/* Pointed at or focused, a tile lifts, lights its rim and its icon acts out the motion (tune.css). */
+.qm-opt:hover {
+  transform: translateY(-3px);
+  background: #34464f;
+}
+
+.qm-opt:focus-visible {
+  transform: translateY(-3px);
+  background: #34464f;
+  box-shadow: inset 0 0 0 2px #f39a2b, 0 4px 0 0 #05080a;
+}
+
+.qm-opt:is(:hover, :focus-visible, [aria-checked='true']) svg {
+  animation: var(--act, none) 1.6s ease-in-out infinite;
+}
+
+.qm-opt[data-value='sway'] { --act: tune-act-sway; }
+.qm-opt[data-value='float'] { --act: tune-act-float; }
+.qm-opt[data-value='pendulum'] svg { transform-origin: 50% 6%; --act: tune-act-swing; }
+.qm-opt[data-value='wobble'] { --act: tune-act-wobble; }
+.qm-opt[data-value='bounce'] { --act: tune-act-bounce; }
+.qm-opt[data-value='glint'] { --act: tune-act-glint; }
+.qm-opt[data-value='spin'] { --act: tune-act-spin; }
+.qm-opt[data-value='turn'] { --act: tune-act-turn; }
+.qm-opt[data-value='breathe'] { --act: tune-act-breathe; }
+
+.qm-opt[aria-checked='true'] {
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: inset 0 0 0 2px #fff, 0 3px 0 0 #8f8a7c;
+}
+
+.qm-help {
+  max-width: calc(5 * 64px + 4 * 6px);
+  margin: 10px 2px 2px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text-dim);
+}
+
+.qm-help b {
+  font-weight: 400;
+  color: #f39a2b;
+}
+
+.qm-help b::after {
+  content: ' —';
+}
+
+@keyframes qm-open {
+  from { transform: scale(0.85) translateY(8px); opacity: 0; }
+}
+
+@keyframes qm-deal {
+  from { transform: translateY(10px) scale(0.7); opacity: 0; }
+}
+
+/* Tucked between the name tag and the deck: smaller, its word left to the tooltip. */
+.qm.is-tight {
+  bottom: calc(100% - 10px);
+  transform: translateX(calc(-50% - 14px));
+}
+
+.qm.is-tight .qm-btn {
+  width: 44px;
+  height: 32px;
+}
+
+.qm.is-tight .qm-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.qm.is-tight .qm-cap {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qm-tray,
+  .qm-opt,
+  .qm-opt svg {
+    animation: none !important;
+  }
+}
+
+/* Phones and narrow tablets: the dock stands beside the fan within the hand's height, so the
+   button rides just above it, beside the card, without taking any room from the layout. */
+@media (max-width: 900px) {
+  .qm {
+    bottom: calc(100% + 8px);
+  }
+  .qm-btn {
+    width: 40px;
+    height: 36px;
+  }
+  .qm-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  .qm-cap {
+    display: none;
+  }
+  .qm-tray {
+    right: 0;
+    bottom: calc(100% + 10px);
+  }
+  .qm-grid {
+    grid-template-columns: repeat(5, 58px);
+  }
+  .qm-help {
+    max-width: calc(5 * 58px + 4 * 6px);
+  }
+}
