@@ -472,7 +472,7 @@ void main() {
   if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
-    if (e == 82) spec *= 0.3; // a soft glare keeps the Fireworks night sky dark
+    if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.6, 4.0, 0.1);

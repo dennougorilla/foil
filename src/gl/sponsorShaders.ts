@@ -247,60 +247,130 @@ vec2 fwPath(float s) {
   return FW_C + vec2(-a + d - qr, -FW_H.y);
 }
 
-// One gold firework bursting at \`cen\` (card widths), \`u\` cycles after the burst (below zero the
-// rocket is still climbing). Returns the light of its sparks; \`glow\` gathers how much it lights
-// the picture at q.
-vec3 fwBurst(vec2 q, vec2 cen, float R, float u, float seed, vec2 t, inout float glow) {
-  if (u < 0.0) {
-    float k = -u / 0.15; // 1 at launch, 0 at the burst
-    vec2 head = cen + vec2(0.012 * sin(k * 9.0 + seed), k * 0.42);
-    float d = ceSeg(q, head, head + vec2(0.0, 0.07));
-    float tail = smoothstep(0.0025, 0.0, d) * 0.55 + exp(-d * 90.0) * 0.15;
-    return vec3(1.0, 0.78, 0.42) * tail + vec3(1.0, 0.95, 0.8) * smoothstep(0.006, 0.0, length(q - head));
-  }
-  float life = 1.0 - smoothstep(0.4, 0.8, u);
-  vec2 off = q - cen;
-  glow += (exp(-u * 16.0) * 1.2 + 0.2 * life) * R * R / (R * R + dot(off, off) * 3.0);
-  // Sparks fly out fast, slow down and droop like a willow as they burn out.
-  const float GRAV = 0.42;
-  float sag = GRAV * u * u * 0.5;
-  if (length(off - vec2(0.0, sag)) > R * 1.15 + sag + 0.03) return vec3(0.0);
-  const float RAYS = 26.0;
-  float sector = 6.2831853 / RAYS;
-  vec3 sum = vec3(0.0);
-  for (int j = 0; j < 10; j++) {
-    float uj = u - float(j) * 0.03;
-    if (uj < 0.0) break;
-    float fresh = 1.0 - float(j) / 10.0;
-    vec2 v = q - cen - vec2(0.0, GRAV * uj * uj);
-    float a = atan(v.y, v.x) / sector;
-    float s0 = floor(a);
-    for (int k = 0; k < 2; k++) {
-      float i = mod(s0 + (k == 0 ? 0.0 : (fract(a) > 0.5 ? 1.0 : -1.0)), RAYS);
-      float hi = hash12(vec2(i, seed));
-      float th = (i + 0.2 + 0.6 * hi) * sector;
-      vec2 dir = vec2(cos(th), sin(th)) * R * (0.8 + 0.28 * hash12(vec2(seed, i + 7.0)));
-      // The grain at this moment, and the streak it burnt on its way to the next one.
-      float un = min(uj + 0.03, u);
-      vec2 pj = cen + vec2(0.0, GRAV * uj * uj) + dir * (1.0 - exp(-uj * 11.0));
-      vec2 pn = cen + vec2(0.0, GRAV * un * un) + dir * (1.0 - exp(-un * 11.0));
-      float d = length(q - pj);
-      float line = ceSeg(q, pj, pn);
-      float w = 0.0028 + 0.004 * fresh;
-      // Late on, the grains crackle on and off.
-      float crackle = mix(1.0, step(0.4, hash12(vec2(i * 13.0 + float(j), floor(u * 60.0) + seed))), smoothstep(0.25, 0.45, u));
-      // Foil grains: each ray leans its own way and flashes as the card tilts.
-      vec2 n = hash22(vec2(i, seed + 3.0)) * 2.0 - 1.0;
-      float lit = 0.55 + 0.9 * pow(0.5 + 0.5 * sin(dot(n, t) * 3.0 + hi * 6.2831), 4.0);
-      vec3 hue = mix(vec3(1.0, 0.4, 0.06), vec3(1.0, 0.8, 0.36), fresh * life);
-      float streak = smoothstep(0.0022, 0.0006, line) * fresh * 0.75 + exp(-line / 0.012) * 0.12 * fresh;
-      sum += hue * (streak + smoothstep(w, w * 0.3, d) * fresh * 1.3 * crackle) * lit;
-    }
-  }
-  return sum * life;
+// Firework colours: gold, silver, crimson and jade.
+vec3 fwColor(float i) {
+  i = mod(i, 4.0);
+  return i < 0.5 ? vec3(1.0, 0.74, 0.28) : i < 1.5 ? vec3(0.84, 0.9, 1.0) : i < 2.5 ? vec3(1.0, 0.2, 0.28) : vec3(0.16, 1.0, 0.68);
 }
 
-// The sparkler (senko hanabi) running round the frame: a hot bead, a glowing fuse behind it
+// How far a burst reaches towards angle a (y down), 0..1: hearts and stars bend the ring into their shape.
+float fwReach(float kind, float a) {
+  if (kind == 2.0) {
+    // A polar heart, point down, with its notch at the burst point.
+    float s = -sin(a), c = cos(a);
+    return (s * sqrt(abs(c)) / (s + 1.4) - 2.0 * s + 2.0) * 0.25;
+  }
+  if (kind == 4.0) {
+    // A five-pointed star, one point up: where the ray meets the edge from a tip to the next notch.
+    const float SEG = 1.2566371;
+    float f = abs(mod(a + 1.5707963 + SEG * 0.5, SEG) - SEG * 0.5);
+    vec2 e = 0.4 * vec2(cos(SEG * 0.5), sin(SEG * 0.5)) - vec2(1.0, 0.0);
+    return e.y / (cos(f) * e.y - sin(f) * e.x);
+  }
+  return 1.0;
+}
+
+// One firework bursting at \`cen\` (card widths), \`u\` cycles after the burst (below zero its rocket
+// is still climbing). Kinds: 0 willow, 1 chrysanthemum, 2 heart, 3 peony, 4 star, 5 small bursts.
+// Adds its light to \`light\`; \`shade\` gathers the soft, tinted rim around each spark that lets it read
+// over a bright picture.
+void fwBurst(vec2 q, vec2 cen, float R, float u, float seed, float kind, vec3 colA, vec3 colB, vec2 t, inout vec3 light, inout vec3 shade) {
+  vec3 white = vec3(1.0, 0.96, 0.88);
+  if (u < 0.0) {
+    // The climb: a hot head slowing as it rises to the burst point, trailing a fading streak.
+    float k = -u / 0.18;
+    vec2 head = cen + vec2(0.012 * sin(k * 7.0 + seed), 0.6 * k * k);
+    vec2 ba = vec2(0.0, 0.05 + 0.14 * k);
+    float h = clamp(dot(q - head, ba) / dot(ba, ba), 0.0, 1.0);
+    float d = length(q - head - ba * h);
+    float fall = (1.0 - h) * (1.0 - h);
+    float core = smoothstep(0.007, 0.002, length(q - head));
+    light += colA * (smoothstep(0.0045, 0.001, d) * fall + exp(-d / 0.01) * 0.2 * fall) + white * (core * 1.3 + smoothstep(0.002, 0.0, d) * fall * 0.6);
+    shade = max(shade, smoothstep(0.014, 0.004, d) * fall * (1.0 - 0.65 * colA));
+    return;
+  }
+  vec2 off = q - cen;
+  // The flash as it opens.
+  float flash = exp(-u * 45.0);
+  float r2 = dot(off, off);
+  light += white * flash * (ceStar(off, 0.17) * 0.9 + exp(-r2 / 0.0025) * 0.9);
+  shade = max(shade, vec3(flash * exp(-r2 / 0.012) * 0.45));
+  if (kind == 5.0) {
+    // Small bursts: five little silver pops, one after another, that crackle out.
+    for (int m = 0; m < 5; m++) {
+      float fm = float(m);
+      float um = u - fm * 0.045;
+      if (um < 0.0 || um > 0.32) continue;
+      vec2 om = q - cen - (hash22(vec2(seed, fm)) - 0.5) * R * 1.5;
+      float lm = 1.0 - smoothstep(0.12, 0.32, um);
+      light += white * exp(-um * 50.0) * exp(-dot(om, om) / 0.0012);
+      if (length(om) > R * 0.5) continue;
+      float a = floor(atan(om.y, om.x) / 0.5235988 + 0.5) * 0.5235988;
+      vec2 p = vec2(cos(a), sin(a)) * R * 0.32 * (1.0 - exp(-um * 18.0)) + vec2(0.0, 0.12 * um * um);
+      float d = length(om - p);
+      float crackle = step(0.3, hash12(vec2(a * 7.0 + fm * 13.0, floor(um * 80.0) + seed)));
+      light += (colA * 1.2 + white * 0.3) * smoothstep(0.0045, 0.0012, d) * lm * crackle + colA * exp(-d / 0.012) * 0.12 * lm;
+      shade = max(shade, smoothstep(0.012, 0.004, d) * lm * crackle * (1.0 - 0.6 * colA));
+    }
+    return;
+  }
+  // Per kind: how hard it droops, how its trails are drawn, and when it fades.
+  float grav = kind == 0.0 ? 0.62 : kind == 1.0 ? 0.25 : kind == 3.0 ? 0.18 : 0.06;
+  float trail = kind == 0.0 ? 0.035 : kind == 1.0 ? 0.024 : 0.0; // cycles between trail samples; 0: grains only
+  float fadeA = kind == 0.0 ? 0.45 : 0.3;
+  float life = 1.0 - smoothstep(fadeA, kind == 0.0 ? 0.8 : 0.6, u);
+  float sag = grav * u * u;
+  // The picture dims a touch under the burst while it burns, so it stands out over bright art.
+  shade = max(shade, vec3(life * 0.08 * smoothstep(R * 1.4, R * 0.4, length(off - vec2(0.0, sag * 0.5)))));
+  if (life <= 0.0 || length(off - vec2(0.0, sag * 0.5)) > R * 1.15 + sag + 0.04) return;
+  bool shaped = kind == 2.0 || kind == 4.0;
+  float rays = shaped ? 40.0 : 28.0;
+  float sector = 6.2831853 / rays;
+  int samples = kind == 0.0 ? 10 : kind == 1.0 ? 7 : 2;
+  float dt = trail > 0.0 ? trail : 0.02;
+  for (int j = 0; j < 10; j++) {
+    if (j >= samples) break;
+    float uj = u - float(j) * dt;
+    if (uj < 0.0) break;
+    float fresh = 1.0 - float(j) / float(samples);
+    vec2 v = off - vec2(0.0, grav * uj * uj);
+    float a = atan(v.y, v.x) / sector - 0.5;
+    float s0 = floor(a + 0.5);
+    for (int k = 0; k < 2; k++) {
+      float i = mod(s0 + (k == 0 ? 0.0 : (fract(a + 0.5) > 0.5 ? 1.0 : -1.0)), rays);
+      float hi = hash12(vec2(i, seed));
+      float th = (i + 0.5 + (shaped ? 0.0 : (hi - 0.5) * 0.6)) * sector;
+      float reach = shaped ? fwReach(kind, th) : 0.82 + 0.26 * hash12(vec2(seed, i + 7.0));
+      vec2 dir = vec2(cos(th), sin(th)) * R * reach;
+      vec2 pj = cen + vec2(0.0, grav * uj * uj) + dir * (1.0 - exp(-uj * 11.0));
+      float d = length(q - pj);
+      float w = (trail > 0.0 ? 0.003 : 0.0036) + 0.0042 * fresh;
+      // Chrysanthemum tips turn colour halfway; a willow's trail cools to orange.
+      vec3 col = mix(colA, colB, smoothstep(0.14, 0.3, uj));
+      if (kind == 0.0) col = mix(col, vec3(1.0, 0.42, 0.08), 1.0 - fresh);
+      // Late on, the grains crackle on and off.
+      float crackle = mix(1.0, step(0.4, hash12(vec2(i * 13.0 + float(j), floor(u * 60.0) + seed))), smoothstep(fadeA - 0.15, fadeA + 0.05, u));
+      // Foil grains: each ray leans its own way and flashes as the card tilts.
+      vec2 n = hash22(vec2(i, seed + 3.0)) * 2.0 - 1.0;
+      float lit = 0.6 + 0.9 * pow(0.5 + 0.5 * sin(dot(n, t) * 3.0 + hi * 6.2831), 4.0);
+      float grain = smoothstep(w, w * 0.3, d) * fresh * crackle;
+      float halo = exp(-d / 0.014) * 0.16 * fresh;
+      float rim = smoothstep(w * 3.8, w, d) * fresh * crackle;
+      if (trail > 0.0) {
+        // The streak it burnt on its way to the next grain.
+        float un = min(uj + dt, u);
+        float line = ceSeg(q, pj, cen + vec2(0.0, grav * un * un) + dir * (1.0 - exp(-un * 11.0)));
+        grain += smoothstep(0.0022, 0.0006, line) * fresh * 0.75;
+        halo += exp(-line / 0.012) * 0.1 * fresh;
+        rim = max(rim, smoothstep(0.009, 0.0022, line) * fresh * 0.9);
+      }
+      light += (col * (grain * 1.2 + halo) + white * grain * 0.2 * fresh) * lit * life;
+      shade = max(shade, rim * life * (1.0 - 0.65 * col));
+    }
+  }
+}
+
+// The sparkler (senko hanabi) running round the frame: a hot bead, a long glowing fuse behind it
 // and pine-needle sparks that crackle off it.
 vec3 fwSparkler(vec2 q, float ps, float which, inout float soot) {
   float s = ps * 0.5 + which * 0.5 + 0.18;
@@ -308,10 +378,16 @@ vec3 fwSparkler(vec2 q, float ps, float which, inout float soot) {
   float d = length(q - head);
   vec3 add = vec3(1.0, 0.97, 0.85) * smoothstep(0.011, 0.004, d) + vec3(1.0, 0.5, 0.12) * exp(-d / 0.016) * 0.8;
   soot = max(soot, exp(-d / 0.04));
-  for (int k = 1; k < 7; k++) {
-    float fk = float(k);
-    float e = ceSeg(q, fwPath(s - fk * 0.004), fwPath(s - (fk - 1.0) * 0.004));
-    add += vec3(1.0, 0.42, 0.1) * smoothstep(0.003, 0.0, e) * (1.0 - fk / 7.0) * 0.7;
+  // The burnt fuse glows on behind it, cooling from orange to deep red.
+  vec2 prev = head;
+  for (int k = 1; k < 15; k++) {
+    float age = float(k) / 15.0;
+    vec2 p = fwPath(s - float(k) * 0.004);
+    float e = ceSeg(q, p, prev);
+    prev = p;
+    float ember = (1.0 - age) * (1.0 - age);
+    add += mix(vec3(1.0, 0.55, 0.15), vec3(0.8, 0.12, 0.04), age) * (smoothstep(0.003, 0.0008, e) * 1.1 + exp(-e / 0.01) * 0.12) * ember;
+    soot = max(soot, smoothstep(0.012, 0.0, e) * (1.0 - age) * 0.5);
   }
   // Shorter needles under the name.
   float reach = mix(1.0, 0.45, smoothstep(1.3, 1.36, head.y));
@@ -330,40 +406,50 @@ vec3 fwSparkler(vec2 q, float ps, float which, inout float soot) {
   return add;
 }
 
-vec3 fireworks(vec3 c, vec2 uv, vec2 t, float L, float art) {
+vec3 fireworks(vec3 c, vec2 uv, vec2 t, float art) {
   vec2 ruv = tuneFaceUv(uv);
   vec2 q = ruv * vec2(1.0, 1.4);
-  // Night falls on the picture: shadows sink to deep blue, light tones dim less, so lettering in
-  // the picture keeps (or gains) its contrast. The sky darkens a little more towards the top.
-  vec3 night = c * mix(vec3(0.3, 0.36, 0.62), vec3(0.6, 0.64, 0.82), smoothstep(0.08, 0.95, L));
-  night *= 1.0 - 0.22 * (1.0 - smoothstep(0.05, 0.75, ruv.y));
-  // Three bursts, staggered through a cycle; live, each comes back somewhere else.
+  // The picture stays as it is: the fireworks carry their own light, with a soft tinted rim and a
+  // touch of shade around each burst so they read over bright art too.
+  // Three bursts, unevenly staggered through a cycle, each a different kind; live, every cycle
+  // brings other kinds, colours, sizes and places.
   float P = cePeriod(3.0);
-  float x = uTime / P + 0.27;
-  float glow = 0.0;
-  vec3 sparks = vec3(0.0);
+  // Phased so a still card (time 0) shows a star and a willow, a PNG (1.7 s) a chrysanthemum and a
+  // peony, and an exported loop a star, a willow and a heart.
+  float x = uTime / P + 0.32;
+  vec3 light = vec3(0.0);
+  vec3 shade = vec3(0.0);
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
-    float xk = x + fk / 3.0;
+    float xk = x + fk / 3.0 + 0.05 * sin(fk * 2.3);
     float idx = ceCycle(xk, P);
+    // Every other kind of the list, so the three in a cycle always differ.
+    float kind = mod(idx + fk * 2.0 + 4.0, 6.0);
     vec2 hh = hash22(vec2(idx * 3.1 + fk, 5.0));
     float slot = mod(fk + idx, 3.0);
-    vec2 cen = vec2(0.24 + 0.26 * slot + (hh.x - 0.5) * 0.1, 0.22 + 0.26 * hh.y);
-    float R = 0.2 + 0.08 * hash12(vec2(idx, fk + 2.0));
-    sparks += fwBurst(q, cen, R, fract(xk) - 0.15, idx * 7.0 + fk, t, glow);
+    vec2 cen = vec2(0.24 + 0.26 * slot + (hh.x - 0.5) * 0.12, 0.2 + 0.28 * hh.y);
+    float size = 0.17 + 0.09 * hash12(vec2(idx, fk + 2.0));
+    float R = kind == 0.0 ? size * 1.15 : kind == 2.0 || kind == 4.0 ? size * 0.85 : size;
+    // A heart hangs below its notch.
+    if (kind == 2.0) cen.y -= R * 0.45;
+    float ci = floor(hash12(vec2(idx, fk + 9.0)) * 4.0);
+    vec3 colA = kind == 0.0 ? fwColor(ci < 3.0 ? 0.0 : 1.0) : kind == 2.0 ? fwColor(ci < 2.0 ? 2.0 : 0.0) : kind == 5.0 ? fwColor(1.0) : fwColor(ci);
+    vec3 colB = kind == 1.0 ? fwColor(ci + 1.0 + floor(hh.x * 2.0)) : colA;
+    fwBurst(q, cen, R, fract(xk) - 0.18, idx * 7.0 + fk, kind, colA, colB, t, light, shade);
   }
-  // A few stars printed in foil on the dark parts of the sky; they glint as the card tilts.
+  // A few stars printed in foil on the dark parts of the picture; they glint as the card tilts.
   vec4 bl = face(uv, 4.0);
-  float dark = 1.0 - smoothstep(0.3, 0.62, luma(bl.rgb / max(bl.a, 1e-4)));
+  float dark = 1.0 - smoothstep(0.25, 0.5, luma(bl.rgb / max(bl.a, 1e-4)));
   vec2 sg = q * 16.0;
   vec2 sc = floor(sg);
   float hs = hash12(sc + 4.2);
   if (hs > 0.84) {
     vec2 so = fract(sg) - 0.5 - (hash22(sc + 1.3) - 0.5) * 0.5;
     float lit = pow(0.5 + 0.5 * sin(dot(hash22(sc) * 2.0 - 1.0, t) * 3.4 + hs * 40.0), 6.0);
-    sparks += vec3(1.0, 0.86, 0.52) * ceStar(so, 0.18 + 0.22 * lit) * (0.3 + 1.1 * lit) * dark;
+    light += vec3(1.0, 0.86, 0.52) * ceStar(so, 0.18 + 0.22 * lit) * (0.3 + 1.1 * lit) * dark;
   }
-  vec3 sky = night + (c * 0.6 + 0.08) * glow * vec3(1.0, 0.78, 0.45) * 0.6 + sparks;
+  // The brighter the picture under a spark, the deeper its rim, so gold still shows on white.
+  vec3 sky = c * (1.0 - min(shade * (0.5 + 0.7 * luma(c)), vec3(0.92))) + light;
   // The frame stays as printed, with the sparkler running round it.
   float ps = fract(uTime / cePeriod(4.8) + 0.1);
   float soot = 0.0;
@@ -380,5 +466,5 @@ export const SPONSOR_DISPATCH = /* glsl */ `
   // Raden inlays the art; the frame only takes a light coat so the nameplate stays readable.
   else if (e == 43) { artMask = m.r; col = raden(c, uv, uTilt, L); }
   else if (e == 80) col = confetti(c, uv, uTilt, m.r);
-  else if (e == 82) col = fireworks(c, uv, uTilt, L, m.r);
+  else if (e == 82) col = fireworks(c, uv, uTilt, m.r);
 `;

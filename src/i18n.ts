@@ -144,7 +144,7 @@ const ja = {
     opal: '絵の奥を、虹の帯がゆっくり流れる',
     raden: '真珠の縁と、角度で揺らぐ虹の膜',
     confetti: '金銀と虹の箔が舞い、傾けると一枚ずつきらめく',
-    fireworks: '夜空に金の花火が開き、光の粒がしだれて消える',
+    fireworks: '柳・菊・ハート・星。色とりどりの花火が絵の上に開く',
   } satisfies Record<EditionId, string>,
   rarityName: {
     common: 'コモン',
@@ -403,7 +403,7 @@ const en: Dict = {
     opal: 'Bands of rainbow light drifting through the stone',
     raden: 'A pearl edge and a rainbow film that sways with the angle',
     confetti: 'Gold, silver and rainbow foil confetti that glints piece by piece',
-    fireworks: 'Gold fireworks bloom over a night sky and trail away in sparks',
+    fireworks: 'Willows, chrysanthemums, hearts and stars burst in gold, silver, crimson and jade',
   },
   rarityName: {
     common: 'Common',

@@ -258,6 +258,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
       for (let i = 0; i < a.length; i++) n += (a[i] - ma) * (b[i] - mb);
       return n / a.length / (sd(a) * sd(b));
     };
+    // Share of pixels that visibly differ, so a finish that leaves the art as it is and only adds sparks still counts.
+    const marked = (a, b) => a.filter((v, i) => Math.abs(v - b[i]) > 24).length / a.length;
     const diff = (a, b) => {
       let n = 0;
       for (let i = 0; i < a.length; i++) n += Math.abs(a[i] - b[i]);
@@ -269,7 +271,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
       const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 3.1)];
       out[id] = {
         shader: editionById(id).id,
-        change: diff(lumas(p0, ART), lumas(plain, ART)),
+        change: marked(lumas(p0, ART), lumas(plain, ART)),
         art: corr(lumas(p0, ART), lumas(plain, ART)),
         plate: diff(lumas(p0, PLATE), lumas(plain, PLATE)),
         plateContrast: sd(lumas(p0, PLATE)) / sd(lumas(plain, PLATE)),
@@ -282,7 +284,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
   for (const [id, r] of Object.entries(report)) {
     const f = (v) => v.toFixed(2);
     expect(r.shader === id, `${id} is not a finish`);
-    expect(r.change > 6, `${id} barely changes the picture (${f(r.change)})`);
+    expect(r.change > 0.03, `${id} barely changes the picture (${f(r.change * 100)}% of it)`);
     expect(r.art > 0.75, `${id} hides the message (correlation ${f(r.art)})`);
     expect(r.plate < 4 && r.plateContrast > 0.9, `${id} covers the name (diff ${f(r.plate)}, contrast ${f(r.plateContrast)})`);
     expect(r.seam < 0.6, `${id} jumps where its loop closes (${f(r.seam)})`);
