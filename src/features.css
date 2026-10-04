@@ -333,16 +333,17 @@
   color: var(--text);
 }
 
+.chip.range-chip:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* After the hover rule, so a pressed chip sinks rather than rising. */
 .tone-chip:active,
 .chip.range-chip:active {
   transform: translateY(3px);
   box-shadow: none;
   transition-duration: 0.05s;
-}
-
-.chip.range-chip:hover {
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 4px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
 .tone-chip[aria-pressed='true'],

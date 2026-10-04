@@ -484,6 +484,8 @@
   transform: translateY(3px);
   box-shadow: none;
   background: var(--orange);
+  color: var(--orange-ink);
+  text-shadow: none;
 }
 
 .tune-compare[hidden] {
@@ -531,9 +533,9 @@
   border-radius: 8px;
   background: var(--orange);
   box-shadow: 0 3px 0 var(--orange-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
-  color: #fff;
+  color: var(--orange-ink);
   font-size: 13px;
-  text-shadow: var(--drop);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
   white-space: nowrap;
   animation: tune-in 0.25s var(--ease-back);
 }
@@ -555,7 +557,7 @@
   right: 0;
   bottom: 0;
   height: 3px;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(42, 22, 0, 0.45);
   transform-origin: left;
   animation: tune-drain 8s linear forwards;
 }

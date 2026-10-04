@@ -1073,12 +1073,14 @@ button {
   --pocket: #0d1417;
   --slab: #435a61;
   --slab-lo: #1a2427;
-  --blue: #1a9cff;
-  --blue-lo: #0b5a96;
+  /* White text reaches 4.5:1 on blue, red and the saved green; orange carries dark ink. */
+  --blue: #0b78cc;
+  --blue-lo: #064a80;
   --orange: #ff9a2a;
   --orange-lo: #a35a08;
-  --red: #ee4f32;
-  --red-lo: #8a2414;
+  --red: #d13d1f;
+  --red-lo: #7a200f;
+  --orange-ink: #2a1600;
   --mark: #59e0a5;
   /* Side notes a step brighter than on the stage, so they read through the scanlines. */
   --text-dim: #b3c3c6;
@@ -1091,6 +1093,8 @@ button {
   --panel-hi: var(--slab);
   --hue: var(--orange);
   --hue-lo: var(--orange-lo);
+  --on-hue: var(--orange-ink);
+  --on-hue-drop: 0 1px 0 rgba(255, 255, 255, 0.35);
   grid-area: panel;
   position: relative;
   z-index: 4;
@@ -1129,11 +1133,15 @@ button {
 .sec-image {
   --hue: var(--blue);
   --hue-lo: var(--blue-lo);
+  --on-hue: #fff;
+  --on-hue-drop: var(--drop);
 }
 
 .sec-export {
   --hue: var(--red);
   --hue-lo: var(--red-lo);
+  --on-hue: #fff;
+  --on-hue-drop: var(--drop);
 }
 
 /* Scrolled, what has gone up fades into the board instead of being sliced. */
@@ -1177,11 +1185,11 @@ button {
   border-radius: 9px;
   background: var(--hue);
   box-shadow: 0 3px 0 var(--hue-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
-  color: #fff;
+  color: var(--on-hue);
   font-size: 16px;
   font-weight: 400;
   line-height: 1.4;
-  text-shadow: var(--drop);
+  text-shadow: var(--on-hue-drop);
 }
 
 .step {
@@ -1379,6 +1387,10 @@ button {
 
 .panel[data-picture='sample'] .pick:hover {
   animation: slab-wobble 0.45s var(--ease-out) forwards;
+}
+
+.panel[data-picture='sample'] .pick:active {
+  animation: none;
 }
 
 /* The crop frame beside its zoom, the same for any shape of picture: zoom, then what to do. */
@@ -1584,9 +1596,9 @@ button {
   border-radius: 8px;
   background: var(--orange);
   box-shadow: 0 var(--lip) 0 var(--orange-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
-  color: #fff;
+  color: var(--orange-ink);
   font-size: 14px;
-  text-shadow: var(--drop);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
   white-space: nowrap;
   transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
 }
@@ -1653,7 +1665,7 @@ button {
 .recap .step {
   background: var(--hue);
   box-shadow: 0 2px 0 var(--hue-lo);
-  text-shadow: var(--drop);
+  color: var(--on-hue);
 }
 
 .recap-thumb {
@@ -1696,6 +1708,8 @@ button {
   transform: scale(1.08);
   background: var(--hue);
   box-shadow: 0 3px 0 var(--hue-lo);
+  color: var(--on-hue);
+  text-shadow: var(--on-hue-drop);
 }
 
 .recap:active .recap-go {
@@ -1932,7 +1946,8 @@ button {
 
 .tab[aria-selected='true'] {
   background: var(--orange);
-  color: #fff;
+  color: var(--orange-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
   transform: translateY(-4px);
   box-shadow: 0 calc(var(--lip) + 4px) 0 var(--orange-lo), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
@@ -2289,8 +2304,8 @@ button {
 
 /* Saved: the slab turns green for a moment and a gold "done" tag pops onto it. */
 #saveBtn.is-saved {
-  --c: #2f9e72;
-  --lo: #17573e;
+  --c: #237a57;
+  --lo: #12402d;
 }
 
 #saveBtn.is-saved .btn-text small {
@@ -2424,7 +2439,7 @@ output {
   border-radius: 7px;
   background: var(--pocket);
   box-shadow: inset 0 2px 0 #000;
-  color: var(--hue);
+  color: color-mix(in srgb, var(--hue) 70%, #fff);
   font-size: 20px;
   line-height: 32px;
   text-align: center;
@@ -2638,9 +2653,13 @@ input[type='range']:disabled {
   background: linear-gradient(160deg, #4f6e86, #24384a);
 }
 
-/* Side notes on the board stay readable. */
+/* Side notes on the board stay readable, at full strength on the colour slabs. */
 .panel :is(.btn-text small, .hint) {
   font-size: 14px;
+}
+
+.panel .btn-text small {
+  opacity: 1;
 }
 
 .panel .field-label {
@@ -2669,17 +2688,25 @@ input[type='range']:disabled {
   .panel *::after {
     animation: none !important;
   }
-  .btn:hover,
-  .seg-btn:hover,
-  .tab:hover,
-  .thumb:hover,
-  .matte-sw:hover,
-  .adjust-toggle:hover,
-  .recap:hover .recap-go {
+  .btn:hover:not(:active),
+  .seg-btn:hover:not(:active, [aria-checked='true']),
+  .tab:hover:not(:active, [aria-selected='true']),
+  .thumb:hover:not([aria-checked='true']),
+  .matte-sw:hover:not([aria-checked='true']),
+  .adjust-toggle:hover:not(:active),
+  .sw-add:hover:not(:active),
+  .chip.range-chip:hover:not(:active),
+  .recap:hover:not(:active) .recap-go {
     transform: none;
   }
-  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .matte-sw, .recap-go) {
+  .panel :is(.btn, .seg-btn, .tab, .thumb, .finish-pick, .adjust-toggle, .adjust-chev, .matte-sw, .recap-go, .sw-add, .lt-style, .chip.range-chip, .tone-chip) {
     transition: none;
+  }
+  .panel input[type='range']::-webkit-slider-thumb {
+    transition: none;
+  }
+  .panel input[type='range']:hover:not(:active)::-webkit-slider-thumb {
+    transform: none;
   }
 }
 
