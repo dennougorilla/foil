@@ -844,8 +844,8 @@ button {
   flex: none;
   display: grid;
   justify-items: center;
-  gap: 36px;
-  padding-bottom: 20px;
+  gap: 44px;
+  padding: 14px 18px 20px 6px;
   padding-right: 8px;
 }
 
@@ -864,15 +864,15 @@ button {
 .deck-pile i {
   position: absolute;
   left: 0;
-  bottom: calc(var(--i) * 2px);
+  bottom: calc(var(--i) * 3px);
   width: 60px;
   height: 84px;
-  margin-left: calc(var(--i) * 0.5px);
+  margin-left: calc(var(--i) * -1px);
   border-radius: 6px;
   background:
     radial-gradient(circle at 50% 50%, #f3eee2 0 9px, #161c1f 9px 12px, transparent 12px),
     repeating-linear-gradient(45deg, #a82c25 0 4px, #c4382f 4px 8px);
-  box-shadow: inset 0 0 0 3px #f3eee2, inset 0 0 0 5px #161c1f, 0 0 0 2px #0b1012, 2px 3px 0 1px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 3px #f3eee2, inset 0 0 0 5px #161c1f, 0 0 0 2px #0b1012, 0 3px 0 2px #d8d2c4, 0 4px 0 2px #0b1012;
   image-rendering: pixelated;
 }
 
@@ -886,8 +886,9 @@ button {
 
 .deck-count {
   position: absolute;
-  right: -10px;
-  bottom: -8px;
+  right: -12px;
+  top: -10px;
+  z-index: 1;
   min-width: 26px;
   padding: 0 6px;
   border-radius: 6px;
@@ -917,8 +918,8 @@ button {
   position: relative;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   padding: 0;
   border: 0;
   border-radius: 12px;
@@ -962,7 +963,7 @@ button {
 }
 
 @keyframes deck-glow {
-  50% { box-shadow: inset 0 0 0 2px #3a4a53, 0 0 0 2px #05080a, 0 4px 0 2px #05080a, 0 0 16px 4px rgba(242, 193, 78, 0.55); }
+  50% { box-shadow: inset 0 0 0 2px #3a4a53, 0 0 0 2px #05080a, 0 4px 0 2px #05080a, 0 0 22px 7px rgba(242, 193, 78, 0.8); }
 }
 
 @keyframes deck-wobble {
@@ -1011,12 +1012,13 @@ button {
 .deck-plus {
   position: absolute;
   left: 50%;
-  top: -6px;
-  font-size: 22px;
+  top: -10px;
+  z-index: 2;
+  font-size: 30px;
   color: var(--gold);
   text-shadow: 0 3px 0 #05080a;
   transform: translateX(-50%);
-  animation: deck-plus 1.3s var(--ease-out) forwards;
+  animation: deck-plus 1.9s var(--ease-out) forwards;
   pointer-events: none;
 }
 
@@ -1026,17 +1028,26 @@ button {
   100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
 }
 
-/* The drawn card's mark: a tiny card back in its corner. */
+/* The drawn card's mark: a gold tab on its top edge saying it came from the deck. */
 .drawn-mark {
   position: absolute;
-  right: -5px;
-  top: -6px;
+  left: 50%;
+  top: -11px;
   z-index: 1;
-  width: 13px;
-  height: 18px;
-  border-radius: 2px;
-  background: radial-gradient(circle, #f3eee2 0 2px, transparent 2.5px), #c4382f;
-  box-shadow: 0 0 0 2px #f3eee2, 0 0 0 3px #05080a;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-style: normal;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 2px #05080a;
+}
+
+.drawn-mark::before {
+  content: var(--drawn-word, 'DRAWN');
 }
 
 /* The drawn card: the hand's eighth slot, set a little apart. */
@@ -1044,9 +1055,9 @@ button {
   content: '';
   position: absolute;
   left: -9px;
-  top: 18%;
-  bottom: 18%;
-  width: 3px;
+  top: 14%;
+  bottom: 14%;
+  width: 4px;
   border-radius: 2px;
   background: var(--gold);
   box-shadow: 0 0 0 1px #05080a;

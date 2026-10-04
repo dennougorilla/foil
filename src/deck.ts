@@ -72,7 +72,7 @@ export function mountDeck(o: DeckOptions) {
       plus.className = 'deck-plus';
       plus.textContent = `+${n}`;
       deckBtn.append(plus);
-      setTimeout(() => plus.remove(), 1400);
+      setTimeout(() => plus.remove(), 2000);
     },
     focusShop: () => packsBtn.focus(),
     focusDeck: () => deckBtn.focus(),

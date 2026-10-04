@@ -247,7 +247,8 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   const look = LOOKS[pack.id];
   const [dk, md, lt] = look.body.map(rgb);
   const ink = rgb(INK);
-  const silver = ['#5c6270', '#8e95a5', '#c3c9d6', '#eef2fa', '#ffffff'].map(rgb);
+  // Brushed silver foil: mostly mid greys, the light reserved for the ridges' crests.
+  const silver = ['#3e434e', '#666d7c', '#959cab', '#c4cad6', '#eef1f8'].map(rgb);
   const top = !!pack.supporter;
 
   for (let y = 0; y < GRID_H; y++) {

@@ -158,6 +158,7 @@ function applyText() {
   $('versionLink').title = t.version.replace('{v}', APP_VERSION_LABEL);
   $('versionLink').setAttribute('aria-label', $('versionLink').title);
   $('cardSlot').dataset.loading = t.loading;
+  document.documentElement.style.setProperty('--drawn-word', JSON.stringify(t.pack.drawnWord));
   $('hand').setAttribute('aria-label', t.handLabel);
   $('hand').title = t.handHint;
   stage.setHandLabels(t.edition, t.look);

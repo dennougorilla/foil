@@ -254,7 +254,7 @@ export function openPack(o: OpeningOptions) {
     vh = innerHeight;
     cardH = Math.min(vh * 0.54, (vw - 32) * 0.62 * 1.4, 540);
     cardW = (cardH * 5) / 7;
-    packW = cardW * 1.16;
+    packW = cardW * 1.08;
     packH = (packW * PACK_H) / PACK_W;
     cx = vw / 2;
     cy = vh * 0.45;
@@ -743,7 +743,7 @@ export function openPack(o: OpeningOptions) {
         setTimeout(() => {
           c.x.target = deck.left + deck.width / 2;
           c.y.target = deck.top + deck.height / 2;
-          c.s.target = (deck.height / cardH) * 0.9;
+          c.s.target = (deck.height / cardH) * 0.6;
           c.rz.target = 0.1;
           packSfx.deal(8 - i);
         }, i * 70);
@@ -1096,6 +1096,8 @@ export function openPack(o: OpeningOptions) {
         continue;
       }
       for (let i = 0; i < 4; i++) for (const sp of [c.x, c.y, c.rz, c.s]) sp.step(dt / 4);
+      // Into the deck: each card fades as it lands, so the deck itself stays in view.
+      if (phase === 'closing' && root.classList.contains('is-to-deck') && phaseT > 0.3) c.alpha = Math.max(0, c.alpha - dt * 2.2);
       c.flash = Math.max(0, c.flash - dt * 2);
     }
     // The shop's packs: bobbing, the chosen one lifted, the pointed-at one springing up and leaning.
@@ -1330,7 +1332,7 @@ export function openPack(o: OpeningOptions) {
     if (showGuide) guideEl.style.transform = `translate(${(pk.x.x - (packW * s) / 2 + 14).toFixed(1)}px, ${ty.toFixed(1)}px) rotate(${pk.rz.x.toFixed(4)}rad)`;
     guideEl.style.width = `${(packW * s - 28).toFixed(1)}px`;
     guideEl.style.setProperty('--run', `${(packW * s - 54).toFixed(0)}px`);
-    const hy = phase === 'pack' || phase === 'load' ? pk.y.x + (packH * s) / 2 + 20 : cy + cardH / 2 + 38 + labelEl.offsetHeight;
+    const hy = phase === 'pack' || phase === 'load' ? pk.y.x + (packH * s) / 2 + 36 : cy + cardH / 2 + 38 + labelEl.offsetHeight;
     root.style.setProperty('--hint-y', `${Math.min(hy, vh - 120).toFixed(0)}px`);
     const showCut = (cut.active || cut.draining || phase === 'rip') && cut.max > cut.min;
     cutEl.classList.toggle('is-on', showCut);

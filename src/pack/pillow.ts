@@ -95,7 +95,7 @@ float crumple(vec2 g) {
   float pinch = smoothstep(0.25, 0.0, toSeal) + smoothstep(0.2, 0.0, min(uv.x, 1.0 - uv.x)) * 0.6;
   // Gathered creases running from the seals into the body, where the foil is pulled in.
   float gather = (0.5 + 0.5 * sin(g.x * 0.75 + vnoise(g * 0.2) * 3.0)) * smoothstep(0.09, 0.0, toSeal);
-  return r * (0.18 + pinch * 0.8) + gather * 0.9;
+  return r * (0.3 + pinch * 0.8) + gather * 0.9;
 }
 
 void main() {
@@ -273,7 +273,7 @@ export class Pillow {
     gl.uniform1f(u.uShadow, 2);
     gl.uniform1f(u.uFlat, 1);
     gl.uniform2f(u.uShift, 0, 0);
-    gl.uniform1f(u.uDepth, d.w * 0.032);
+    gl.uniform1f(u.uDepth, d.w * 0.05);
     gl.drawArrays(gl.TRIANGLES, 0, this.count);
     gl.uniform1f(u.uDepth, 0);
     gl.uniform1f(u.uShadow, 0);

@@ -15,7 +15,7 @@ summary is in `README.md`; this note is the design behind it.
   goes into the **deck**, which sits at the right end of the hand like a draw pile: a stack of
   face-down pixel card backs that gets thicker with each finish in it, its count, and the word
   "Deck" under it. At the end of an opening the cards fly into it and "+3" floats up from it. The
-  drawn card sits a little apart after the seven, with a gold bar and a tiny card back in its corner.
+  drawn card sits a little apart after the seven, with a gold bar and a gold "引いた / DRAWN" tab.
 - Pressing the deck opens **View deck**: every finish owned, grouped pack by pack under a small
   mark in the pack's color, as small still thumbnails on the person's own picture (made only when
   the list is opened). Choosing one puts it in the hand's eighth slot — the drawn card — and onto

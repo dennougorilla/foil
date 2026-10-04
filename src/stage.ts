@@ -399,7 +399,8 @@ export class Stage {
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
     // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
-    const rows = hr.height > 240 && count > 7 ? 2 : 1;
+    // Seven, or seven plus the drawn card, stay one fan; only a longer hand would need two rows.
+    const rows = hr.height > 240 && count > 8 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
