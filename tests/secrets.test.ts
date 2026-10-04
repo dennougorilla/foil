@@ -1,10 +1,12 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret } from '../src/secrets.ts';
-import { EDITIONS } from '../src/editions.ts';
+import { BETA_EDITIONS, mergeUnlocked, OPEN_EDITIONS, parseUnlocked, pickSecret, secretEditions } from '../src/secrets.ts';
+import { EDITIONS, editionById } from '../src/editions.ts';
 
 const SECRETS = ['gold', 'relief', 'kintsugi'] as const;
+// The same list the app builds in src/sponsor.ts.
+const SECRET_EDITIONS = secretEditions(EDITIONS.map((e) => e.id));
 
 test('the hand opens with the five editions of the original game plus Prism and Glitch', () => {
   assert.deepEqual(OPEN_EDITIONS, ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch']);
@@ -15,7 +17,7 @@ test('open finishes come first in the hand, so unlocked secrets follow them', ()
 });
 
 test('Prism and Glitch are no longer drawn, and a saved unlock of them does no harm', () => {
-  const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+  const secrets = SECRET_EDITIONS;
   assert.ok(!(secrets as string[]).includes('prism') && !(secrets as string[]).includes('glitch'));
   assert.deepEqual(parseUnlocked('["prism","glitch","opal"]', secrets), ['opal']);
   for (let i = 0; i < 200; i++) assert.ok(!['prism', 'glitch'].includes(pickSecret(secrets, [], Math.random) as string));
@@ -45,9 +47,26 @@ test('two tabs unlocking at once both keep what they drew', () => {
 });
 
 test('a retired secret (Eclipse) saved by an earlier version is ignored and never drawn', () => {
-  // The same list the app builds in src/sponsor.ts.
-  const secrets = EDITIONS.map((e) => e.id).filter((id) => !OPEN_EDITIONS.includes(id));
+  const secrets = SECRET_EDITIONS;
   assert.ok(!(secrets as string[]).includes('eclipse'));
   assert.deepEqual(parseUnlocked('["eclipse","opal"]', secrets), ['opal']);
   for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(secrets, [], Math.random), 'eclipse');
+});
+
+test('a beta finish (Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
+  assert.deepEqual(BETA_EDITIONS, ['lenticular']);
+  assert.ok(EDITIONS.some((e) => e.id === 'lenticular'));
+  assert.ok(!OPEN_EDITIONS.includes('lenticular'));
+  assert.ok(!SECRET_EDITIONS.includes('lenticular'));
+  assert.deepEqual(parseUnlocked('["lenticular","opal"]', SECRET_EDITIONS), ['opal']);
+  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticular');
+});
+
+test('every finish past the open ones that is not beta is a secret, in hand order', () => {
+  assert.deepEqual(secretEditions(['base', 'gold', 'lenticular', 'relief']), ['gold', 'relief']);
+});
+
+test('Shadowbox and Lenticular read the picture depth; no other finish starts the depth model', () => {
+  assert.deepEqual(EDITIONS.filter((e) => e.depth).map((e) => e.id), ['shadowbox', 'lenticular']);
+  assert.equal(editionById('lenticular').shader, 74);
 });

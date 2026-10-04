@@ -69,7 +69,7 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
-// The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
+// Shadowbox and Lenticular read the art's depth; it only starts work once one is chosen.
 const depth = mountShadowDepth({
   store,
   cards: stage.cards,

@@ -1,4 +1,4 @@
-// The small chip on the card's top edge that says what the Shadowbox depth reader is doing.
+// The small chip on the card's top edge that says what the depth reader (Shadowbox, Lenticular) is doing.
 import './pill.css';
 import type { Dict } from '../i18n';
 

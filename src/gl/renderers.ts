@@ -122,7 +122,7 @@ export class CardRenderer {
   private plate: WebGLTexture;
   private layerCuts = 0;
   private layerPlate = 1;
-  /** 0..1: how far the Shadowbox sheets stand up (they lie flat while a new cut is made). */
+  /** 0..1: how far the Shadowbox sheets stand up, and how deep Lenticular reads (both flatten while a new cut is made). */
   layersRise = 1;
   /** Where on the face the finish applies. */
   readonly range: RangeLayer;
@@ -184,7 +184,7 @@ export class CardRenderer {
   }
 
   /**
-   * The Shadowbox sheets over the art window. Alpha carries depth, so it is never premultiplied.
+   * The Shadowbox sheets over the art window. Alpha carries depth (Lenticular reads only that), so it is never premultiplied.
    * `plate`: paint the cut pieces out of the back sheet (off for animated pictures, whose cut
    * comes from one frame and must not paint its pixels into the others).
    */
