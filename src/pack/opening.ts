@@ -668,7 +668,8 @@ export function openPack(o: OpeningOptions) {
     haulOrder.splice(Math.floor((rows === 2 ? perRow : n) / 2), 0, showpiece);
     // On a narrow screen one row of cards overlaps a little, like a dealt fan, so each stays big enough to see.
     const overlap = narrow && rows === 1 ? 0.24 : 0;
-    const room = vw - 44;
+    // A wide row keeps clear of the screen's edges.
+    const room = vw - (narrow ? 44 : Math.max(44, vw * 0.1));
     const space = narrow ? 10 : Math.max(12, vw * 0.02);
     const fit = (room - (overlap ? 0 : space * (perRow - 1))) / (perRow - (perRow - 1) * overlap);
     const h = Math.min(vh * (rows === 2 ? 0.25 : 0.44), fit * 1.4, 400);
