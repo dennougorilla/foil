@@ -26,7 +26,7 @@ export interface ExportInput {
   tune?: Tune;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
-  /** The Shadowbox sheets cut from the picture. */
+  /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
   layers?: LayerMap;
 }
 

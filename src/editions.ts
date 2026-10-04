@@ -25,6 +25,7 @@ export type EditionId =
   | 'stainedglass'
   | 'glow'
   | 'blacklight'
+  | 'lenticular3d'
   // Shaders in src/gl/finishes/supporter.ts
   | 'kintsugi'
   | 'opal'
@@ -48,6 +49,8 @@ export interface Edition {
    * otherwise, and a drag on the card moves it instead of tossing the card.
    */
   torch?: boolean;
+  /** Reads the picture's depth (src/depth), so choosing it starts the depth model. */
+  depth?: boolean;
 }
 
 /** Every finish. The hand starts with OPEN_EDITIONS; the rest come in packs (src/packs.ts). */
@@ -69,7 +72,7 @@ export const EDITIONS: Edition[] = [
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
   { id: 'relief', shader: 15, color: '#e3bf72', swirl: ['#07090d', '#1c2633', '#4d6274'], value: 7, dither: true },
   { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: 'warmth' },
-  { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6 },
+  { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6, depth: true },
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
   { id: 'platinum', shader: 24, color: '#dfe6ee', swirl: ['#0a0d12', '#2b3440', '#aeb9c6'], value: 7, dither: true },
   { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
@@ -77,6 +80,8 @@ export const EDITIONS: Edition[] = [
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
   // Shader in src/gl/blacklight.ts.
   { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
+  // Shader in src/gl/lenticular3d.ts.
+  { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
   // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

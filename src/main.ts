@@ -87,11 +87,11 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
-// The Shadowbox finish cuts the art into sheets by depth; its code loads the first time it is chosen.
+// Shadowbox and 3D Lenticular read the art's depth; its code loads the first time one is chosen.
 let depth: ShadowDepth | null = null;
 let depthLoading = false;
 function wakeDepth() {
-  if (depth || depthLoading || store.get().edition !== 'shadowbox') return;
+  if (depth || depthLoading || !editionById(store.get().edition).depth) return;
   depthLoading = true;
   void import('./depth/shadowDepth').then((m) => {
     depth = m.mountShadowDepth({

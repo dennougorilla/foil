@@ -3,6 +3,7 @@
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { HeatLayer } from '../../touch/layer';
 import { SHADOWBOX_GLSL } from '../shadowboxShader';
+import { LENTICULAR3D_GLSL } from '../lenticular3d';
 import { STAINED_GLASS_GLSL } from '../stainedGlass';
 import type { FinishModule } from './types';
 
@@ -35,11 +36,13 @@ vec3 halftone(vec3 c, vec2 uv, vec2 t, float L) {
 }
 ${TOUCH_GLSL}
 ${SHADOWBOX_GLSL}
+${LENTICULAR3D_GLSL}
 ${STAINED_GLASS_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 12) col = halftone(c, uv, uTilt, L);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
+  else if (e == 74) col = lenticular3d(c, uv, uTilt, lod);
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 26) col = stainedGlass(c, uv, uTilt, L, m.r);
 `,

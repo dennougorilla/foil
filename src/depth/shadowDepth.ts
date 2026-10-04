@@ -1,9 +1,10 @@
-// Keeps the Shadowbox sheets in step with the picture. Work starts only once the finish is
-// chosen: the art window goes to the depth worker, which answers with a quick cut from colour
+// Keeps the Shadowbox sheets (and the depth 3D Lenticular reads from them) in step with the
+// picture. Work starts only once a finish that reads depth is chosen: the art window goes to the depth worker, which answers with a quick cut from colour
 // and then, when the model can run, a better one. The sheets lie down while a new cut is made
 // and stand up again when it lands.
 import { ART, FACE_H, FACE_W } from '../card/face';
 import type { CardRenderer } from '../gl/renderers';
+import { editionById } from '../editions';
 import type { Dict } from '../i18n';
 import type { Store } from '../state';
 import { colorLayers, type LayerMap } from './layers';
@@ -17,7 +18,7 @@ const H = 518;
 const EMPTY: LayerMap = { w: 1, h: 1, cuts: 0, data: new Uint8ClampedArray(4), plate: new Uint8ClampedArray(4) };
 /** Shown with the data-saver offer; the CPU model's download. */
 const MODEL_BYTES = 27258801;
-/** How long the worker (and the model session in it) is kept after leaving Shadowbox. */
+/** How long the worker (and the model session in it) is kept after leaving a depth finish. */
 const IDLE_MS = 30000;
 
 export interface ShadowDepth {
@@ -52,7 +53,7 @@ export function mountShadowDepth(o: {
   /** A model cut is on its way; the worker stays until it lands. */
   let awaiting = false;
   const cuts = new Map<string, LayerMap>();
-  const active = () => o.store.get().edition === 'shadowbox';
+  const active = () => editionById(o.store.get().edition).depth === true;
   const pill = new DepthPill(o.slot, o.dict, () => {
     allowModel = true;
     wanted = shown = '';
@@ -129,7 +130,7 @@ export function mountShadowDepth(o: {
 
   function onReply(m: CutReply) {
     if (m.id !== sent.id) return;
-    // The chip speaks only while Shadowbox is on the card; replies landing after it left stay quiet.
+    // The chip speaks only while a depth finish is on the card; replies landing after it left stay quiet.
     const speak = active();
     if (m.type === 'layers') {
       if (m.source === 'model') {
@@ -152,7 +153,7 @@ export function mountShadowDepth(o: {
     }
   }
 
-  /** Lets the worker go a while after Shadowbox is left, freeing the model session it holds. */
+  /** Lets the worker go a while after the depth finishes are left, freeing the model session it holds. */
   function retire() {
     if (active() || !worker) return;
     if (awaiting) {
