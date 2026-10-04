@@ -71,6 +71,18 @@ export function viewDeck(o: DeckViewOptions) {
   let hand = [...o.hand];
   /** The slot last emptied: the next card added goes there. */
   let gap: number | null = null;
+  /** With the hand full, the slot the next grid tap replaces; it steps left after each replace. */
+  let outAt: number | null = null;
+  const lastOut = () => hand.map((x) => x !== 'base').lastIndexOf(true);
+  const outIndex = () => (outAt !== null && hand[outAt] && hand[outAt] !== 'base' ? outAt : lastOut());
+  /** The card before `i` that is not Base, wrapping round. */
+  const stepLeft = (i: number) => {
+    for (let k = 1; k <= hand.length; k++) {
+      const j = (i - k + hand.length) % hand.length;
+      if (hand[j] !== 'base') return j;
+    }
+    return i;
+  };
   const history: { hand: EditionId[]; gap: number | null }[] = [];
   let tab: PackId | 'open' | 'all' = 'all';
   /** The mini cards are being drawn (see paint). */
@@ -87,6 +99,7 @@ export function viewDeck(o: DeckViewOptions) {
       <header class="db-head">
         <b>${t.builderTitle}</b>
         <span class="db-count" aria-live="polite"></span>
+        <span class="db-gap"></span>
         <button class="dv-x" type="button" aria-label="${t.close2}" title="${t.close2}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></button>
       </header>
       <div class="db-hand" role="list" aria-label="${t.handRow}"></div>
@@ -149,7 +162,7 @@ export function viewDeck(o: DeckViewOptions) {
     while (slots.length < HAND_SIZE) slots.push(null);
     const next = gap === null ? hand.length : Math.min(gap, hand.length);
     // With the hand full, the card a grid tap will replace wears a "next out" tag.
-    const out = hand.length >= HAND_SIZE ? hand[hand.map((x) => x !== 'base').lastIndexOf(true)] : null;
+    const out = hand.length >= HAND_SIZE ? hand[outIndex()] : null;
     handEl.innerHTML = '';
     slots.forEach((id, i) => {
       const slot = document.createElement('div');
@@ -191,9 +204,11 @@ export function viewDeck(o: DeckViewOptions) {
       b.setAttribute('aria-pressed', String(inHand));
       b.setAttribute('aria-label', `${o.dict.edition[id]} — ${inHand ? t.inHandTag : t.addIn}`);
       if (id === 'base' && !b.disabled) {
+        // Base: a lock and "always" where the tag would be.
         b.disabled = true;
         b.title = t.deckBaseStays;
-        b.insertAdjacentHTML('beforeend', '<i class="db-lock" aria-hidden="true"></i>');
+        b.classList.add('is-locked');
+        b.querySelector('.db-tag')!.innerHTML = `<i class="db-lock" aria-hidden="true"></i>${t.alwaysTag}`;
       }
     }
     $('.db-count').textContent = t.handCount.replace('{n}', String(hand.length));
@@ -222,10 +237,16 @@ export function viewDeck(o: DeckViewOptions) {
     if (hand.includes(id)) return takeOut(id);
     const from = picOf(gridCards.get(id))!.getBoundingClientRect();
     const full = hand.length >= HAND_SIZE;
-    const out = full ? hand[hand.map((x) => x !== 'base').lastIndexOf(true)] : null;
+    const oi = outIndex();
+    const out = full ? hand[oi] : null;
     const outRect = out ? picOf(handEl.querySelector(`.db-card[data-id="${out}"]`))!.getBoundingClientRect() : null;
     const at = gap !== null && !full ? Math.min(gap, hand.length) : undefined;
-    commit(addToHand(hand, id, at), null);
+    // A full hand gives up its "next out" card, and the tag moves to the card before it.
+    commit(full ? placeAt(hand, id, oi) : addToHand(hand, id, at), null);
+    if (full) {
+      outAt = stepLeft(oi);
+      render();
+    }
     fly(id, from, slotRect(id));
     if (out && outRect) fly(out, outRect, picOf(gridCards.get(out))!.getBoundingClientRect());
   }
@@ -237,6 +258,7 @@ export function viewDeck(o: DeckViewOptions) {
 
   function takeOut(id: EditionId) {
     if (id === 'base') return;
+    outAt = null;
     const from = picOf(handEl.querySelector(`.db-card[data-id="${id}"]`))!.getBoundingClientRect();
     commit(removeFromHand(hand, id), hand.indexOf(id));
     fly(id, from, picOf(gridCards.get(id))!.getBoundingClientRect());
@@ -361,10 +383,14 @@ export function viewDeck(o: DeckViewOptions) {
     if (!prev) return;
     hand = prev.hand;
     gap = prev.gap;
+    outAt = null;
     render();
     o.onChange(hand);
   });
-  $('.db-reset').addEventListener('click', () => commit([...o.starters], null));
+  $('.db-reset').addEventListener('click', () => {
+    outAt = null;
+    commit([...o.starters], null);
+  });
   root.querySelectorAll<HTMLElement>('.db-tab').forEach((b) =>
     b.addEventListener('click', () => {
       tab = b.dataset.tab as typeof tab;

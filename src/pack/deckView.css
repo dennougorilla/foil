@@ -19,8 +19,8 @@
 .db {
   display: grid;
   grid-template-rows: auto auto auto auto 1fr auto;
-  width: min(1040px, 100%);
-  height: min(860px, calc(100dvh - 32px));
+  width: min(1200px, 100%);
+  height: min(900px, calc(100dvh - 32px));
   overflow: hidden;
   border-radius: 22px;
   background: radial-gradient(ellipse at 50% 0%, #26323a, #121a1e 70%);
@@ -74,7 +74,7 @@
 /* The hand: seven slots on a felt strip. */
 .db-hand {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 104px));
+  grid-template-columns: repeat(7, minmax(0, 124px));
   justify-content: center;
   gap: 10px;
   margin: 4px 22px 0;
@@ -503,7 +503,7 @@
 
 @media (max-height: 760px) and (min-width: 601px) {
   .db-hand {
-    grid-template-columns: repeat(7, minmax(0, 62px));
+    grid-template-columns: repeat(7, minmax(0, 88px));
     padding: 10px 12px 6px;
   }
   .db-hint {
@@ -517,5 +517,93 @@
   }
   .db-btn {
     min-height: 40px;
+  }
+}
+
+/* The count rides with the title; one instruction line under the hand, readable. */
+.db-count {
+  flex: none;
+}
+
+.db-gap {
+  flex: 1;
+}
+
+.db-hint {
+  color: rgba(245, 242, 234, 0.85);
+}
+
+/* "Next out" sits inside the hand strip, over its card's top edge. */
+.db-out {
+  top: 2px;
+}
+
+/* Base in the grid: the lock and "always" take the tag's place. */
+.db-grid .db-card.is-locked .db-tag {
+  opacity: 1;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3eee2;
+}
+
+.db-tag .db-lock {
+  position: relative;
+  top: 1px;
+  left: 0;
+  width: 9px;
+  height: 7px;
+  margin-top: 3px;
+  background: #0b1012;
+  box-shadow: none;
+}
+
+.db-tag .db-lock::before {
+  left: 1px;
+  top: -5px;
+  width: 7px;
+  height: 6px;
+  border-color: #0b1012;
+}
+
+.db-empty {
+  max-width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Pack names stay in view while the grid scrolls; the grid fades under the footer. */
+.dv-group h3 {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  padding: 6px 0;
+  background: linear-gradient(#141c20 70%, transparent);
+}
+
+.db-grid {
+  mask-image: linear-gradient(#000 calc(100% - 24px), transparent);
+}
+
+.db-card {
+  align-content: start;
+}
+
+@media (max-width: 600px) {
+  .db-tabs {
+    flex-wrap: wrap;
+    mask-image: none;
+    padding-right: 0;
+  }
+  .db-tab {
+    min-height: 32px;
+    padding: 2px 10px;
+    font-size: 14px;
+  }
+  .db-empty {
+    font-size: 9px;
   }
 }

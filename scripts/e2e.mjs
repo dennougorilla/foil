@@ -273,12 +273,12 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   const count = () => page.textContent('.db-count');
   await page.click('#deckBtn');
   await page.waitForSelector('.dv.is-in', { timeout: 15000 });
-  expect((await count()) === 'Hand 7 / 7', `count reads ${await count()}`);
+  expect((await count()) === '7 / 7', `count reads ${await count()}`);
   expect((await page.locator('.db-grid .db-card.is-in').count()) === 7, 'the grid does not mark the seven in the hand');
   await page.waitForSelector('.db-grid .db-pic canvas', { timeout: 30000 });
   // Out of the hand: its slot stays open, and the next card goes there.
   await page.click('.db-hand .db-card[data-id=holo]');
-  expect((await count()) === 'Hand 6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
+  expect((await count()) === '6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
   expect((await page.textContent('#deckBtn .deck-count')) === '4', 'the deck count did not rise');
   await page.click('.db-grid .db-card[data-id=relief]');
   expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
@@ -286,6 +286,11 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   await page.click('.db-grid .db-card[data-id=gold]');
   const full = await hand();
   expect(full.length === 7 && full[6] === 'gold' && !full.includes('crystal'), `a full hand did not give up its last card: ${full}`);
+  // The next tap swaps the card before it, not the card just added.
+  await page.click('.db-grid .db-card[data-id=glitch]');
+  const next = await hand();
+  expect(next[5] === 'glitch' && next[6] === 'gold', `the next tap replaced the card just added: ${next}`);
+  await page.click('.db-undo');
   await page.click('.db-undo');
   expect((await hand()).includes('crystal') && !(await hand()).includes('gold'), 'undo did not step back');
   // Base cannot leave.

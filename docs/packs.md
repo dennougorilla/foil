@@ -23,12 +23,13 @@ summary is in `README.md`; this note is the design behind it.
   the hand is lifted in the grid with a gold edge and a "手札 / In hand" tag.
   - One tap moves a card: a grid card goes into the hand (into the slot last emptied, else the end);
     tapping it again, or tapping it in the hand, sends it back to the deck and leaves its slot empty
-    for the next card. With the hand full, a grid card takes the place of the hand card tagged "次に出る /
-    Next out" (the last card that is not Base); to choose another, tap that card first (it goes
-    back and its slot says "次はここ / Next here"). Dragging a grid card onto a hand slot swaps it into exactly that slot; dragging a hand card
+    for the next card. With the hand full, a grid card takes the place of the hand card tagged "次に外れる /
+    Next out" (at first the last card that is not Base), and the tag steps to the card before it,
+    so several taps swap several different cards; to choose the card yourself, tap it first (it
+    goes back and its slot says "次はここ / Next here"). Dragging a grid card onto a hand slot swaps it into exactly that slot; dragging a hand card
     down to the grid sends it back. Cards fly between the two as they move.
-  - Changes apply at once (closing just closes). Undo steps back one move; "Restore starting seven" puts
-    the seven starters back. Base shows a lock in the hand and in the grid. The card's finish stays unless it was taken out of the hand, then the card
+  - Changes apply at once (closing just closes). Undo steps back one move; "初期の7枚に戻す / Reset to starters"
+    puts the seven starters back. Base shows a lock in the hand and in the grid. The card's finish stays unless it was taken out of the hand, then the card
     shows Base.
   - Putting a deck finish on the card any other way (a pick in the haul, a saved card) adds it to
     the hand, taking the last place that is not Base when the hand is full.
