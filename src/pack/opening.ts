@@ -655,21 +655,38 @@ export function openPack(o: OpeningOptions) {
   let haulOrder: CardSim[] = [];
   let haulAt: { x: number; y: number; w: number; h: number; rz: number }[] = [];
   const haulLayout = () => {
+    // A phone takes five or six cards in two rows, so each card and its name keep their room.
+    const narrow = vw < 600;
+    const rows = narrow && n > 4 ? 2 : 1;
+    const perRow = Math.ceil(n / rows);
     haulOrder = cards.slice(0, n - 1);
-    haulOrder.splice(Math.floor(n / 2), 0, showpiece);
-    // On a narrow screen the cards overlap a little, like a dealt fan, so each stays big enough to see.
-    const overlap = vw < 600 ? 0.24 : 0;
+    // The showpiece takes the middle (of the top row, when there are two).
+    haulOrder.splice(Math.floor((rows === 2 ? perRow : n) / 2), 0, showpiece);
+    // On a narrow screen one row of cards overlaps a little, like a dealt fan, so each stays big enough to see.
+    const overlap = narrow && rows === 1 ? 0.24 : 0;
     const room = vw - 44;
-    const fit = (room - (vw < 600 ? 0 : Math.max(12, vw * 0.02) * (n - 1))) / (n - (n - 1) * overlap);
-    const h = Math.min(vh * 0.44, fit * 1.4, 400);
+    const space = narrow ? 10 : Math.max(12, vw * 0.02);
+    const fit = (room - (overlap ? 0 : space * (perRow - 1))) / (perRow - (perRow - 1) * overlap);
+    const h = Math.min(vh * (rows === 2 ? 0.25 : 0.44), fit * 1.4, 400);
     const w = (h * 5) / 7;
-    const gap = overlap ? -w * overlap : Math.max(12, vw * 0.02);
-    const total = n * w + (n - 1) * gap;
-    const mid = (n - 1) / 2;
-    // The showpiece takes the middle, a size up; the block of title, cards, names and buttons sits mid-screen.
+    const gap = overlap ? -w * overlap : space;
+    // A second row sits under the first one's names (up to two lines).
+    const rowH = h + 72;
+    // The showpiece is a size up; the block of title, cards, names and buttons sits mid-screen.
     haulAt = haulOrder.map((c, i) => {
+      const r = Math.floor(i / perRow);
+      const j = i - r * perRow;
+      const inRow = Math.min(perRow, n - r * perRow);
+      const total = inRow * w + (inRow - 1) * gap;
+      const mid = (inRow - 1) / 2;
       const k = c === showpiece ? 1.12 : 1;
-      return { x: vw / 2 - total / 2 + w / 2 + i * (w + gap), y: vh * 0.5 - (vw < 600 ? 0 : 30) + Math.abs(i - mid) * h * 0.05, w: w * k, h: h * k, rz: (i - mid) * 0.05 };
+      return {
+        x: vw / 2 - total / 2 + w / 2 + j * (w + gap),
+        y: vh * 0.5 - (narrow ? 0 : 30) + (r - (rows - 1) / 2) * rowH + Math.abs(j - mid) * h * 0.05,
+        w: w * k,
+        h: h * k,
+        rz: (j - mid) * 0.05,
+      };
     });
   };
   let hoverHaul = -1;

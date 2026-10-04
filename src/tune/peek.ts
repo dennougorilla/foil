@@ -4,6 +4,7 @@
 // from the stage canvas. Tapping it scrolls back up.
 
 import { copyCard, facing } from '../proof';
+import { STAGE_RESUMED } from '../stage';
 
 export interface Peek {
   readonly el: HTMLElement;
@@ -38,9 +39,9 @@ export function mountPeek(): Peek {
     update();
   }).observe(slot);
   narrow.addEventListener('change', () => update());
-  // The stage restarts its frame loop when the tab comes back; queue ours after it so we
-  // always copy a finished frame.
-  document.addEventListener('visibilitychange', () => {
+  // The stage restarts its frame loop when the tab comes back or a pack opening closes; queue
+  // ours after it so we always copy a finished frame.
+  document.addEventListener(STAGE_RESUMED, () => {
     if (!raf) return;
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(draw);

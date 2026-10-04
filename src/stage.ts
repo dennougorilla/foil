@@ -79,6 +79,9 @@ function pinnedQuality(): number | undefined {
   return v !== null && /^\d$/.test(v) ? +v : undefined;
 }
 
+/** Fired on the document whenever the stage restarts its frame loop (tab shown again, pack opening closed). */
+export const STAGE_RESUMED = 'stageresumed';
+
 export class Stage {
   readonly cards: CardRenderer;
   readonly bg: BackgroundRenderer;
@@ -176,6 +179,8 @@ export class Stage {
     this.last = performance.now();
     this.quality.rest();
     requestAnimationFrame(this.frame);
+    // Copies of the card (src/proof.ts) queue their frame callbacks after this one again.
+    document.dispatchEvent(new Event(STAGE_RESUMED));
   }
 
   private get motion() {

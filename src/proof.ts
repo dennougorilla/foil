@@ -2,6 +2,7 @@
 // (so the finish is shown as it really looks, not as a colour chip) and the phone preview.
 
 import { motion } from './tune/motion';
+import { STAGE_RESUMED } from './stage';
 
 /** How squarely the card face looks at us; copies hold their last face-on frame while a spin or a flip shows the back. */
 export const facing = () => Math.cos(motion.spinAngle + motion.flip);
@@ -50,8 +51,8 @@ export function mountProof(el: HTMLElement): void {
   }
 
   raf = requestAnimationFrame(draw);
-  // The stage restarts its frame loop when the tab comes back; queue ours after it again.
-  document.addEventListener('visibilitychange', () => {
+  // The stage restarts its frame loop when the tab comes back or a pack opening closes; queue ours after it again.
+  document.addEventListener(STAGE_RESUMED, () => {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(draw);
   });

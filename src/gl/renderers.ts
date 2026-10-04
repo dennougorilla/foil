@@ -133,7 +133,8 @@ export class CardRenderer {
   /** Flip Lenticular's other picture, laid out like the face; `hasFlip` is off until one is chosen. */
   private flip: WebGLTexture;
   private hasFlip = false;
-  private layerPlate = 1;
+  /** Whether the back plate is painted (setLayers); off until a cut arrives, so a renderer without one (the pack opening, the deck builder) shows the picture. */
+  private layerPlate = 0;
   /** 0..1: how far the Shadowbox sheets stand up, and how deep 3D Lenticular reads (both flatten while a new cut is made). */
   layersRise = 1;
   /** Where on the face the finish applies. */

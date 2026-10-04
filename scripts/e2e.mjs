@@ -293,6 +293,16 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.click('.pk-try');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
+  // The proof beside step 2 still copies finished frames once the stage draws again after the opening.
+  await page.waitForTimeout(1500);
+  const proofLit = await page.evaluate(() => {
+    const c = document.querySelector('#finishProof canvas');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && d[i] + d[i + 1] + d[i + 2] > 120) lit++;
+    return lit / (d.length / 4);
+  });
+  expect(proofLit > 0.3, `the finish proof is blank after the opening (${(proofLit * 100).toFixed(0)}% lit)`);
   const hand = (await state()).hand;
   expect(hand.includes('crystal') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
   expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);

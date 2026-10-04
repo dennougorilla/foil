@@ -44,6 +44,27 @@
   .hand {
     height: var(--hand-h);
   }
+  /* The deck and the pack button stack beside the fan within the hand's own height. */
+  .deck-dock {
+    gap: 28px;
+    padding: 6px 4px 16px 0;
+  }
+  .deck {
+    width: 40px;
+    height: 56px;
+  }
+  .deck-pile i {
+    width: 36px;
+    height: 50px;
+  }
+  .deck-packs {
+    width: 44px;
+    height: 44px;
+  }
+  .deck-dock .deck-cap {
+    margin-top: 3px;
+    font-size: 11px;
+  }
   /* Just the finish's name, on one line between the steps; the panel below says more about it. */
   .hand-caption {
     margin: 0;
