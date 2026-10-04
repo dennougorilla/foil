@@ -22,7 +22,7 @@ import { mountApngExport } from './anim/apngUi';
 import { mountLettering } from './letteringPanel';
 import { bindMessageField, mountMessage } from './messagePanel';
 import { loadMessageFont } from './card/messageFace';
-import { changedKeys, EXPORT_MOTIONS } from './tune/model';
+import { changedKeys, EXPORT_MOTIONS, type ExportMotion } from './tune/model';
 import { DEFAULT_LETTERING, fieldAt, setFieldPrints, setTextRuns } from './lettering';
 import { initRangeColors } from './features';
 import { mountProof } from './proof';
@@ -1118,7 +1118,8 @@ function buildSaveOpts() {
   $('saveOptsToggle').setAttribute('aria-expanded', String(s.saveOptsOpen));
   $('saveOptsBody').hidden = !s.saveOptsOpen;
   $('saveOpts').classList.toggle('is-open', s.saveOptsOpen);
-  $('saveOptsSummary').textContent = [`${t.exportMotion}: ${t.exportMotionName[s.exportMotion]}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
+  const motionName = (m: ExportMotion) => (m === 'stage' ? `${t.exportMotionName.stage} (${t.tune.idleMode[s.tune.idle]})` : t.exportMotionName[m]);
+  $('saveOptsSummary').textContent = [`${t.exportMotion}: ${motionName(s.exportMotion)}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
   // The loop's motion, for GIF and APNG alike.
   const mo = $('exportMotionSeg');
   mo.textContent = '';
@@ -1128,7 +1129,7 @@ function buildSaveOpts() {
     b.className = 'seg-btn';
     b.dataset.v = m;
     b.setAttribute('role', 'radio');
-    b.textContent = t.exportMotionName[m];
+    b.textContent = motionName(m);
     b.title = t.exportMotionHelp[m];
     radio(b, s.exportMotion === m);
     b.onclick = () => {
@@ -1869,7 +1870,7 @@ store.on((s, changed) => {
   if (['sample', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
-  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'exportMotion', 'shape'].some((k) => changed.has(k as keyof State))) {
+  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'exportMotion', 'shape', 'tune'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }

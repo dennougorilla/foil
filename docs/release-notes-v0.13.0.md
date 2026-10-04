@@ -31,5 +31,5 @@
 - The export motions made for exports have a fixed length (2–3 s) and do not follow an orbiting
   light; they are candidates for the owner to narrow down.
 - On the trading-card layout the Gold rim's inner rule and the Ribbon are not drawn (their colors
-  apply).
+  apply), and on the wide shapes its bars and effect box get cramped.
 - Carried over: Snow Globe's export loop can show a seam; toasts can cover the hand's caption.

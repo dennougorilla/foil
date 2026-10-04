@@ -94,6 +94,15 @@ card carries the card keys only). The other branches' settings were sorted into 
 - foil-layering's one-time reading of its first design's `outside` into `layer2` is kept: the
   owner asked for it on that branch.
 
+### The phone's Save bar
+
+foil-phone-stage folds the Save box on a phone held upright into one slim bar (the pick button,
+the formats, Save; at most 80 px, so the card can fill the screen) and hides step 3's title row.
+foil-binder put Keep and Share in that title row, so they fell into a second row and the bar grew
+to 125 px. They now sit in the bar itself, as icon slabs between the formats and Save (their names
+stay for screen readers; Share spells out its second tap), and Save says just Save there, since
+the format is chosen right beside it. The bar stays one row from 360 px up.
+
 ### Smaller meeting points
 
 - Card shader: the light motions' local values are `beamLit` and `dark`, so they sit beside layer
