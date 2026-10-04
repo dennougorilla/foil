@@ -212,6 +212,8 @@ export function viewDeck(o: DeckViewOptions) {
       }
     }
     $('.db-count').textContent = t.handCount.replace('{n}', String(hand.length));
+    // The line under the hand says what a tap will do now.
+    $('.db-hint').textContent = out ? t.hintFull.replace('{name}', o.dict.edition[out]) : t.builderHint;
     $<HTMLButtonElement>('.db-undo').disabled = !history.length;
     $<HTMLButtonElement>('.db-reset').disabled = hand.join() === o.starters.join();
     for (const b of root.querySelectorAll<HTMLElement>('.db-tab')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
