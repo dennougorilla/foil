@@ -759,7 +759,9 @@ export function openPack(o: OpeningOptions) {
   function skip() {
     if (phase === 'haul' || phase === 'closing') return;
     if (phase === 'shop') return close(null);
+    // While loading, Skip goes to the haul once it can be drawn; a pack that failed to arrive just closes.
     if (phase === 'load') {
+      if (failed.has(pack.id)) return close(null);
       skipOnLoad = true;
       return;
     }
@@ -922,7 +924,7 @@ export function openPack(o: OpeningOptions) {
     keyboard = true;
     if (e.key === 'Escape') {
       e.preventDefault();
-      return phase === 'haul' || phase === 'shop' ? close(null) : skip();
+      return phase === 'haul' || phase === 'shop' || phase === 'load' ? close(null) : skip();
     }
     if (e.key === 'Tab') {
       // Keep focus inside the dialog.

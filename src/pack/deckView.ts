@@ -27,8 +27,8 @@ export interface DeckViewOptions {
   tune: Tune;
   /** Finish strength, as on the card. */
   intensity: number;
-  /** The hand changed (it applies at once). */
-  onChange: (hand: EditionId[]) => void;
+  /** The hand changed (it applies at once); answers with the hand as applied (a pack sealed meanwhile drops out). */
+  onChange: (hand: EditionId[]) => EditionId[];
   /** The way to the pack shop, for more finishes. */
   onShop: () => void;
   onClose: () => void;
@@ -223,14 +223,23 @@ export function viewDeck(o: DeckViewOptions) {
     paint();
   }
 
-  /** Commits a new hand: remembered for undo, applied at once. */
-  function commit(next: EditionId[], nextGap: number | null) {
+  /** Commits a new hand: remembered for undo (with the slots' marks), applied at once. */
+  function commit(next: EditionId[], nextGap: number | null, nextOut = outAt) {
     if (next.join() === hand.join()) return;
     history.push({ hand, gap, outAt });
     hand = next;
     gap = nextGap;
+    outAt = nextOut;
+    apply();
+  }
+
+  /** Shows the hand and hands it to the page, keeping what the page accepted. */
+  function apply() {
     render();
-    o.onChange(hand);
+    const applied = o.onChange(hand);
+    if (applied.join() === hand.join()) return;
+    hand = applied;
+    render();
   }
 
   // ---------- Moves ----------
@@ -262,9 +271,8 @@ export function viewDeck(o: DeckViewOptions) {
 
   function takeOut(id: EditionId) {
     if (id === 'base') return;
-    outAt = null;
     const from = picOf(handEl.querySelector(`.db-card[data-id="${id}"]`))!.getBoundingClientRect();
-    commit(removeFromHand(hand, id), hand.indexOf(id));
+    commit(removeFromHand(hand, id), hand.indexOf(id), null);
     fly(id, from, picOf(gridCards.get(id))!.getBoundingClientRect());
   }
 
@@ -388,13 +396,9 @@ export function viewDeck(o: DeckViewOptions) {
     hand = prev.hand;
     gap = prev.gap;
     outAt = prev.outAt;
-    render();
-    o.onChange(hand);
+    apply();
   });
-  $('.db-reset').addEventListener('click', () => {
-    outAt = null;
-    commit([...o.starters], null);
-  });
+  $('.db-reset').addEventListener('click', () => commit([...o.starters], null, null));
   root.querySelectorAll<HTMLElement>('.db-tab').forEach((b) =>
     b.addEventListener('click', () => {
       tab = b.dataset.tab as typeof tab;
@@ -445,15 +449,16 @@ export function viewDeck(o: DeckViewOptions) {
     drawing = true;
     const ids = o.owned.flatMap((g) => g.finishes).filter((id) => !cache.has(id));
     const packs = [...new Set(ids.map((id) => packOf(id)?.id).filter((p): p is PackId => !!p))];
-    // A pack that cannot be fetched (offline) leaves its cards blank; the next paint tries again.
-    void Promise.all(packs.map((p) => loadPack(p))).then(() => {
+    // A pack that cannot be fetched (offline) leaves only its own cards blank; the next paint tries them again.
+    void Promise.allSettled(packs.map((p) => loadPack(p))).then((loaded) => {
+      const missing = new Set(packs.filter((_, i) => loaded[i].status === 'rejected'));
       if (!renderer) {
         rendererCanvas = document.createElement('canvas');
         renderer = new CardRenderer(rendererCanvas, { preserve: true, settled: true });
       }
       renderer.setFace(o.face, o.mask);
       // The hand's cards first, then the rest in grid order.
-      const order = [...new Set([...hand, ...ids])].filter((id) => !cache.has(id));
+      const order = [...new Set([...hand, ...ids])].filter((id) => !cache.has(id) && !missing.has(packOf(id)?.id as PackId));
       const step = () => {
         const id = order.shift();
         if (!id || !root.isConnected) {
@@ -465,6 +470,6 @@ export function viewDeck(o: DeckViewOptions) {
         requestAnimationFrame(step);
       };
       step();
-    }, () => (drawing = false));
+    });
   }
 }

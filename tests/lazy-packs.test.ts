@@ -8,11 +8,11 @@ import { dirname, join, normalize } from 'node:path';
 
 const SRC = join(import.meta.dirname, '..', 'src');
 
-/** Static (not dynamic, not type-only) imports of a source file, resolved to .ts files. */
+/** Static (not dynamic, not type-only) imports and re-exports of a source file, resolved to .ts files. */
 function imports(file: string): string[] {
   const text = readFileSync(file, 'utf8');
   const out: string[] = [];
-  for (const m of text.matchAll(/^import\s+(?!type\b)(?:[^'"]*?\sfrom\s+)?['"](\.[^'"]+)['"]/gm)) {
+  for (const m of text.matchAll(/^(?:import|export)\s+(?!type\b)(?:[^'"]*?\sfrom\s+)?['"](\.[^'"]+)['"]/gm)) {
     const base = normalize(join(dirname(file), m[1]));
     for (const f of [base, `${base}.ts`, join(base, 'index.ts')]) if (f.endsWith('.ts') && existsSync(f)) out.push(f);
   }

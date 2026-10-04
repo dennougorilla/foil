@@ -66,6 +66,7 @@ export async function exportApng(
   onProgress: (p: number, frames: number) => void,
   signal: AbortSignal,
 ): Promise<ApngResult> {
+  if (signal.aborted) throw aborted();
   await packLoaded(input.edition);
   if (signal.aborted) throw aborted();
   const plan = apngPlan(input.loopMs);

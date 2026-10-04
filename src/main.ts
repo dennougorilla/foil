@@ -705,7 +705,10 @@ $('flipClear').addEventListener('click', () => {
 
 // ---------- Edition ----------
 
+/** Counts finish picks, so a pick queued earlier can tell it was overtaken. */
+let picks = 0;
 function selectEdition(id: EditionId) {
+  picks++;
   if (store.get().edition === id) {
     stage.juice(0.5);
     return;
@@ -1244,16 +1247,17 @@ function useCard(id: EditionId) {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (full) setTimeout(() => deck.bump(), still ? 0 : 420);
   // A card picked on the page meanwhile wins.
-  const was = store.get().edition;
-  if (id !== was) setTimeout(() => store.get().edition === was && store.get().hand.includes(id) && selectEdition(id), still ? 0 : 560);
+  const turn = ++picks;
+  if (id !== store.get().edition) setTimeout(() => turn === picks && store.get().hand.includes(id) && selectEdition(id), still ? 0 : 560);
 }
 
 /** The deck builder changed the hand: it applies at once; a finish taken off the hand leaves the card on Base. */
-function setHand(next: EditionId[]) {
+function setHand(next: EditionId[]): EditionId[] {
   // Another tab may have sealed a pack while the builder was open.
   next = normalizeHand(next, packs.get());
   store.set({ hand: next });
   if (!next.includes(store.get().edition)) selectEdition('base');
+  return next;
 }
 
 /** The deck builder: the hand's slots over everything owned; one tap moves a card. */

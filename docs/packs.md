@@ -198,7 +198,7 @@ is sized to leave room for that column; on a low screen (664 px, a phone on its 
 smaller instead of the words moving onto each other.
 
 **Skip** (「結果へ」, small in the top corner, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
-A replay starts at beat 0 too. Escape closes from the haul and skips the reveal from anywhere else; the
+A replay starts at beat 0 too. Escape closes from the shop, while the pack loads and from the haul, and skips the reveal from anywhere else (Skip while loading goes to the haul once the pack can be drawn); the
 pack counts as opened from the rip (or Skip) on, so closing before the rip leaves it sealed.
 With a keyboard at hand, each hint shows its key (Enter, →).
 
