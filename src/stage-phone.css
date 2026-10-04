@@ -234,7 +234,7 @@
   /* The pick button rides at the Save bar's left end. */
   .btn.stage-pick {
     position: fixed;
-    left: 8px;
+    left: 6px;
     bottom: calc(12px + env(safe-area-inset-bottom));
     z-index: 31;
     flex-direction: column;
@@ -263,14 +263,14 @@
     padding-left: 8px;
   }
 
-  /* Save folds into one bar: the formats by name, then Save. */
+  /* Save folds into one bar: the formats by name, Keep and Share as icons, then Save. */
   .sec-export {
     left: 0;
     right: 0;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'formats save';
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) 80px;
-    column-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'formats more save';
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom)) 76px;
+    column-gap: 6px;
     border-radius: 14px 14px 0 0;
     border-inline: 0;
   }
@@ -282,6 +282,33 @@
   }
   .sec-export .seg-format {
     gap: 4px;
+  }
+  .panel .sec-export .export-head {
+    grid-area: more;
+    align-self: start;
+  }
+  .sec-export .export-more {
+    gap: 6px;
+    margin-left: 0;
+  }
+  /* Icons only, their names kept for screen readers; Share spells out its second tap. */
+  .sec-export .mini-slab {
+    justify-content: center;
+    min-width: 40px;
+    min-height: 44px;
+    padding: 0 6px;
+  }
+  .sec-export .mini-slab:not([data-ready='true']) span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sec-export .mini-slab svg {
+    width: 20px;
+    height: 20px;
   }
   .panel .sec-export .seg-format .seg-btn {
     min-height: 48px;
@@ -302,6 +329,14 @@
   #saveBtn .btn-text b {
     font-size: 16px;
     white-space: nowrap;
+  }
+  /* The format shows beside it, so Save says just that (progress still shows while it works). */
+  #saveBtn:not([aria-busy]) .btn-text b {
+    font-size: 0;
+  }
+  #saveBtn:not([aria-busy]) .btn-text b::after {
+    content: attr(data-short);
+    font-size: 16px;
   }
 }
 

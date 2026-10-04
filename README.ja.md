@@ -1,0 +1,89 @@
+# FOIL
+
+[![FOIL — turn any picture into a collectible card with a rare finish](public/og.png)](https://dennougorilla.github.io/foil/)
+
+好きな絵をコレクションカードにして、レアな箔加工をかけるブラウザアプリです。
+
+**ここで遊べます:** https://dennougorilla.github.io/foil/
+
+[English](README.md) · 日本語
+
+## できること
+
+- **どんな絵でも。** ファイルを開く、ドロップする、貼り付ける (Ctrl+V)。動く GIF・APNG・WebP はカードの上でも動きます。
+- **33 種の加工。** 元になったゲームのエディション (ホログラフィック、ポリクローム、ネガティブなど) に、金属・光・自然・工房の加工が加わります。どれも傾きと光に反応します。
+- **パック。** はじめの手札は 7 種。ほかの加工はテーマごとのパックに入っていて、一度破って開けると中身が全部そろいます。ランダムな引きはありません。
+- **手札とデッキ。** 加工は扇形に広がる手札 (最大 7 枚、どれも実際の見た目のプレビュー) から選びます。残りはデッキに入り、カードゲームのデッキ編成のように入れ替えられます。
+- **カードの形。** トレカ、横長、正方形、はがき (縦・横)、名刺。お祝いカード向けに「金の縁」と「リボン」の枠もあります。
+- **メッセージとトレカのレイアウト。** 4 行までの言葉を 4 つの書体で入れられます。種別や効果文の欄がある本物のトレカ風レイアウトも選べ、文字ごとに刷り方 (印刷・型押し・浮き出し・箔押し・スポットUV) を変えたり、ドラッグで好きな場所に置いたりできます。
+- **レイヤー。** 1 枚のカードに 2 つの加工を重ねられます。それぞれ絵・枠・名前・明るい所などかける場所を選べ、ブラシで塗ることもできます。
+- **バインダー。** 作ったカードを 6 ページのバインダーにしまえます。このブラウザの中だけに残り、ポケット間をドラッグで並べ替えたり、いつでも画面に戻したりできます。
+- **共有。** スマホなら、カードを動く GIF にしてそのまま共有シートへ (X や LINE など)。
+- **書き出し。** 背景透過の PNG、ループする GIF、フルカラーで透過できる APNG で保存できます。ループの動きは画面と同じか、書き出し用の 13 種の動きから選べます。
+- **スマホ。** 端末を傾けるとカードも傾きます。縦持ちではカードが画面いっぱいに出ます。
+
+細かい仕様は加工ごとに [`docs/features.md`](docs/features.md) (英語) にまとめています。
+
+## 加工とパック
+
+| 入手 | 加工 |
+| --- | --- |
+| はじめの手札 | ノーマル、フォイル、ホログラフィック、ポリクローム、ネガティブ、プリズム、グリッチ |
+| 金属パック | レリーフ、ゴールド、プラチナ、コスモホロ、クリスタル |
+| 光パック | ギャラクシー、オーロラ、蓄光、ブラックライト、水底 |
+| 自然パック | サクラ、フロスト、星屑、スノードーム、マグマ |
+| 工房パック | ハーフトーン、ぬくもり、ステンドグラス、チェンジング、立体レンチキュラー、シャドーボックス |
+| サポーターパック | オパール、螺鈿、紙吹雪、花火、金継ぎ |
+
+全部で 33 種です。サポーターパックは、ヘッダーの応援リンクを一度開くとパックショップに並びます。支払いの確認はしない自己申告制です。パックと開封演出の設計は [`docs/packs.md`](docs/packs.md) にあります。
+
+## プライバシー
+
+- 絵がブラウザの外に出ることはありません。FOIL は静的なサイトで、自前のサーバーはありません。アカウントもアップロードもアクセス解析もありません。
+- 設定、開けたパック、いまの絵、バインダーは、このブラウザの保存領域 (localStorage と IndexedDB) にだけ残ります。
+- 共有は、ページで作った GIF を端末の共有シートに直接渡すだけです。どこにもアップロードせず、カードをリンクにすることもありません。
+- 画面の書体は Google Fonts から読み込みます。メッセージ用の書体も、メッセージを使ったときに読み込みます。
+- シャドーボックスと立体レンチキュラーは、はじめて選んだときに奥行きモデル (約 19〜27 MB) を Hugging Face からダウンロードします。ファイルは特定のリビジョンに固定され、SHA-256 で照合してから使います。絵の奥行きを読むのは端末の中です。
+
+## 開発
+
+```sh
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # 型チェック + 本番ビルド
+npm test         # ユニットテスト (Node 標準のテストランナー)
+npm run shoot -- <outDir> [filter]   # 開発サーバーを起動した状態で: スクリーンショットの一式を撮る
+npm run e2e      # 開発サーバーを起動した状態で: パネル、すべての書き出し、パック、バインダー、共有、スマホの画面を確かめる
+npm run og       # 開発サーバーを起動した状態で: public/og.png とホーム画面用アイコンを描き出す
+node scripts/layering-check.mjs [--measure]   # 開発サーバーを起動した状態で: 加工 1 つの見た目が 1 ピクセルも変わっていないこと (基準 URL と比較) と、2 つ目の加工のコストを測る
+```
+
+描画は WebGL2 です (うずまきの背景、カード、粒子)。カードシェーダーの核と、はじめの 7 種の加工は `src/gl/shaders.ts` に、各パックの加工は `src/gl/finishes/` にあります (加工の足し方は [`docs/packs.md`](docs/packs.md))。カードの面は `src/card/face.ts` で組み立て、形の一覧は `src/card/shape.ts` にあります。シェーダーは 5 : 7 のカードを前提にしません。`uCardK` は面の大きさを短辺を 1 とした単位で表し (トレカでは (1, 1.4))、`uArt` は面の uv で表した絵の窓です。設計メモ: [`docs/tcg.md`](docs/tcg.md) (トレカのレイアウト)、[`docs/arrange.md`](docs/arrange.md) (文字の自由配置)、[`docs/layering.md`](docs/layering.md) (レイヤー)、[`docs/binder.md`](docs/binder.md) (バインダー)。
+
+`main` への push とプルリクエストは `.github/workflows/ci.yml` で型チェックとビルドをします。デプロイはしません。
+
+## リリース
+
+```sh
+npm run release -- patch            # minor / major / x.y.z の指定も可。--dry-run でチェックだけ
+```
+
+`origin` と同期したクリーンな `main` から実行すると、ビルドしてバージョンを上げ (コミット + タグ `vX.Y.Z`)、両方を push します。タグで `.github/workflows/release.yml` が動き、GitHub Pages へデプロイして、自動生成のリリースノート (PR のラベルごと、`.github/release.yml` を参照) とビルド済みサイトの zip を添えた GitHub Release を公開します。リリースせずにデプロイし直すときは、Actions タブから Release ワークフローを手動で実行します。ビルドは `__APP_VERSION__` と `__APP_COMMIT__` (短い SHA) をグローバルに出します。
+
+## 着想
+
+FOIL は、LocalThunk による [Balatro](https://www.playbalatro.com/) のカードのエディション表現に着想を得た、非公式のファン制作です。LocalThunk および Playstack とは無関係で、公認も受けていません。ゲームのコード、アート、フォントなどの素材は一切使っていません。
+
+Balatro は LocalThunk LLC の登録商標です。
+
+## サードパーティ
+
+シャドーボックスと立体レンチキュラーは、[Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small) (Apache-2.0) と [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT) を使っています。モデルは実行時に [onnx-community の変換版](https://huggingface.co/onnx-community/depth-anything-v2-small) から、特定のリビジョンに固定して取得し、SHA-256 で照合します。モデルはこのリポジトリには含まれていません。書体 (DotGothic16、Silkscreen、Yusei Magic、Shippori Mincho、Mochiy Pop One。いずれも SIL Open Font License) は Google Fonts から配信されます。同梱しているサードパーティのコードのライセンスは、`THIRD_PARTY_NOTICES.txt` (`public/` から) としてサイトと一緒に配布しています。
+
+## 応援
+
+FOIL で楽しんでもらえたら: [GitHub Sponsors](https://github.com/sponsors/dennougorilla) · [Buy Me a Coffee](https://buymeacoffee.com/dennougorip)
+
+## ライセンス
+
+MIT。[`LICENSE`](LICENSE) を参照してください。

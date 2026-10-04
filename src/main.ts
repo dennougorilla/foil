@@ -1096,6 +1096,7 @@ function renderSave() {
   if (saveBtn.hasAttribute('aria-busy')) return;
   const f = store.get().exportFormat;
   saveBtn.dataset.format = f;
+  saveBtn.querySelector<HTMLElement>('.btn-text b')!.dataset.short = t.saveShort;
   if (f === 'apng') return apngExport.refresh();
   saveBtn.querySelector('.btn-text b')!.textContent = t.save.replace('{f}', t.format[f]);
   // The card's own size for a PNG; the GIF's frame turns with the shape.

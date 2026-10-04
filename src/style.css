@@ -2310,6 +2310,23 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* The loop's motion: As on screen across the top, then the motions made for exports, three a row. */
+.seg.seg-motions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.seg-motions .seg-btn {
+  min-height: 34px;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.seg-motions .seg-btn:first-child {
+  grid-column: 1 / -1;
+}
+
 .matte {
   display: flex;
   gap: 10px;

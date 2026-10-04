@@ -433,7 +433,7 @@ const pngAt = (path, points) =>
     },
     { b64: readFileSync(path).toString('base64'), points },
   );
-const savePng = async () => {
+const savePngPath = async () => {
   await page.click('#formatSeg [role=radio][data-format=png]');
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
@@ -468,10 +468,10 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   await page.click('.seg-blend [data-b=light]');
   // The PNG (948 × 1308, 24 px of padding): a point in the art and one on the side of the frame.
   const points = [[0.5, 0.42], [0.042, 0.42]];
-  const layered = await pngAt(await savePng(), points);
+  const layered = await pngAt(await savePngPath(), points);
   await page.click('.layer-row[data-n="2"] .layer-x');
   expect((await state()).layer2 === null && (await page.locator('.layer-row').count()) === 1, '× did not remove layer 2');
-  const single = await pngAt(await savePng(), points);
+  const single = await pngAt(await savePngPath(), points);
   const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
   expect(d(layered[0], single[0]) === 0, `the art changed: ${layered[0]} vs ${single[0]}`);
   expect(d(layered[1], single[1]) > 24, `the frame did not take layer 2: ${layered[1]} vs ${single[1]}`);
