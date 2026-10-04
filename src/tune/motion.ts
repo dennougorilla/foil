@@ -99,14 +99,19 @@ class LiveMotion {
 
   /**
    * Starts following the device's tilt. Where the sensor takes a permission (iOS), it is asked
-   * for only from a tap on the card or the hand (a card or a step), once per visit.
+   * for only from a tap on the card or the hand (a card or a step), once per visit. Under reduced
+   * motion the sensor is left alone (no prompt, no listener) until that is turned off.
    */
-  armGyro(stage: HTMLElement) {
+  armGyro(stage: HTMLElement, reduced: MediaQueryList) {
     if (!gyroAvailable()) return;
+    if (reduced.matches) {
+      reduced.addEventListener('change', () => this.armGyro(stage, reduced), { once: true });
+      return;
+    }
     const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
     if (typeof DOE.requestPermission !== 'function') return this.listen();
     const ask = (e: Event) => {
-      if (!(e.target as Element).closest('#cardSlot, .hand-slot, .hand-step') || this.gyro.asked) return;
+      if (!(e.target as Element).closest('#cardSlot, .hand-slot, .hand-step') || this.gyro.asked || reduced.matches) return;
       this.gyro.asked = true;
       stage.removeEventListener('click', ask);
       // Called straight from the tap, which iOS needs to show its prompt.

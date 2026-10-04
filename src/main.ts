@@ -693,11 +693,13 @@ mountTune(store, $('pane-light'));
 mountProof($('finishProof'));
 mountProof($('recapProof'));
 
-// A folded step leads back to itself: Fine-tune closes and the step is brought into view.
-for (const id of ['recapImage', 'recapFinish']) {
+// A folded step leads back to itself: Fine-tune closes, the step is brought into view and focus
+// moves to the step's own button (the recap it was on folds away).
+for (const [id, target] of [['recapImage', 'pickBtn'], ['recapFinish', 'finishPick']]) {
   $(id).addEventListener('click', () => {
     sfx.tick();
     store.set({ adjustOpen: false });
+    $(target).focus({ preventScroll: true });
     requestAnimationFrame(() => $(id).closest('.sec')!.scrollIntoView({ block: 'nearest' }));
   });
 }
@@ -1159,7 +1161,8 @@ addEventListener('resize', trackExportBar);
 function dismissToast(el: HTMLElement) {
   if (el.classList.contains('is-out')) return;
   // Don't strand keyboard focus on a toast that's about to vanish.
-  if (el.contains(document.activeElement)) $('pickBtn').focus({ preventScroll: true });
+  // The pick button is folded away while Fine-tune is open; its toggle is always there.
+  if (el.contains(document.activeElement)) $(store.get().adjustOpen ? 'adjustToggle' : 'pickBtn').focus({ preventScroll: true });
   el.classList.add('is-out');
   el.addEventListener('animationend', () => el.remove());
   setTimeout(() => el.remove(), 400);
@@ -1169,6 +1172,8 @@ function dismissToast(el: HTMLElement) {
 // A picture that can't be read is said right under the pick button (beside the stage); phones,
 // whose panel is far below, get a toast instead.
 function showImageError(msg: string) {
+  // The error sits in the picture step, which Fine-tune folds away.
+  store.set({ adjustOpen: false });
   const box = $('imageError');
   box.querySelector('p')!.textContent = msg;
   box.hidden = false;

@@ -130,7 +130,7 @@ export class Stage {
     }
     this.resume();
     this.syncQuality();
-    motion.armGyro(o.stage);
+    motion.armGyro(o.stage, this.reduced);
     // Nothing to see in a hidden tab, so stop drawing until it comes back.
     document.addEventListener('visibilitychange', () => this.resume());
   }
@@ -322,8 +322,9 @@ export class Stage {
         if (speed > 900) sfx.toss();
         else sfx.land();
       }
-      // A finger flicking the card sideways deals the next card in the hand (a mouse just tosses it).
-      const dir = this.drag.finger ? flickDir(e.clientX - this.drag.sx, e.clientY - this.drag.sy, this.drag.vx) : 0;
+      // A finger flicking the card sideways deals the next card in the hand (a mouse just tosses it;
+      // a gesture the browser cancels deals nothing).
+      const dir = this.drag.finger && e.type === 'pointerup' ? flickDir(e.clientX - this.drag.sx, e.clientY - this.drag.sy, this.drag.vx) : 0;
       if (dir) {
         // The card turns a little the way it was flicked as the next one is dealt.
         this.ry.v -= dir * 9;

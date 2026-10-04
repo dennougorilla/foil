@@ -89,6 +89,12 @@ await step('an unreadable file is explained beside the pick button', async () =>
     .catch(() => expect(false, 'the steps pushed under the stub are not marked as more below'));
   await page.click('#imageErrorClose');
   expect(!(await page.isVisible('#imageError')), 'the error did not close');
+  // Fine-tune folds the picture step away; a failed file opens it again to show why.
+  await page.click('#adjustToggle');
+  await page.setInputFiles('#fileInput', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+  await page.waitForTimeout(400);
+  expect(await page.isVisible('#imageError'), 'the error is hidden while Fine-tune is open');
+  await page.click('#imageErrorClose');
 });
 
 await step('load an image', async () => {
