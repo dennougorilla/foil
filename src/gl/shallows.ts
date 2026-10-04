@@ -7,7 +7,6 @@
 // gathered at a point is 1 / |det J| of that bending (J = I + depth x curvature): where the
 // surface folds the light, the floor lights up in sharp lines. Red, green and blue bend by
 // slightly different amounts, which shows as spectrum where the light gathers hardest.
-import { ART, FACE_H, FACE_W } from '../card/face';
 
 /** Phones and low-core machines share one refocusing step across the three colours. */
 const lite =
@@ -19,16 +18,16 @@ const f = (v: number) => v.toFixed(2);
 export const SHALLOWS_GLSL = /* glsl */ `
 const bool SH_LITE = ${lite};
 const int SH_WAVES = 7;
-// The art window in face pixels (card/face.ts); its corner matches the drawn window.
-const vec2 SH_FACE = vec2(${f(FACE_W)}, ${f(FACE_H)});
-const vec2 SH_ART_C = vec2(${f(ART.x + ART.w / 2)}, ${f(ART.y + ART.h / 2)});
-const vec2 SH_ART_H = vec2(${f(ART.w / 2)}, ${f(ART.h / 2)});
-const float SH_ART_R = ${f(FACE_W * 0.075 * 0.45)};
+// The art window in face pixels (card/face.ts, a short side of 900); its corner matches the drawn window.
+#define SH_FACE (uCardK * 900.0)
+#define SH_ART_C ((uArt.xy + uArt.zw) * 0.5 * SH_FACE)
+#define SH_ART_H ((uArt.zw - uArt.xy) * 0.5 * SH_FACE)
+const float SH_ART_R = ${f(900 * 0.075 * 0.45)};
 
 // Signed distance to the art window's edge in card widths, negative inside. ruv is face uv.
 float shWindow(vec2 ruv) {
   vec2 q = abs(ruv * SH_FACE - SH_ART_C) - SH_ART_H + SH_ART_R;
-  return (length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - SH_ART_R) / SH_FACE.x;
+  return (length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - SH_ART_R) / 900.0;
 }
 
 // Slope (dh/dx, dh/dy) and curvature (xx, yy, xy) of the surface at p. \`sway\` (the tilt)
@@ -66,9 +65,9 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   vec2 ruv = tuneFaceUv(uv);
   // The pool floor sits below the frame, so tilting slides it against the rim (parallax): on one
   // side the floor slips under the frame, on the other the window's wall comes into view.
-  vec2 par = -t * 0.012 * vec2(1.0, 1.0 / 1.4) * art;
+  vec2 par = -t * 0.012 / uCardK * art;
   float wallSeen = smoothstep(-0.005, 0.001, shWindow(ruv + par)) * art;
-  vec2 p = (uv - 0.5) * vec2(1.0, 1.4) + par * vec2(1.0, 1.4);
+  vec2 p = (uv - 0.5) * uCardK + par * uCardK;
   // The subject stays calm: the net goes soft and faint over skin, and somewhat over lit
   // tones near the middle of the picture (where a subject usually sits, coloured or not).
   vec4 bl = face(uv, lod + 5.0);
@@ -76,7 +75,7 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   float rg = b.r - b.g, gb = b.g - b.b;
   float skin = smoothstep(0.02, 0.08, rg) * (1.0 - smoothstep(0.25, 0.4, rg)) * smoothstep(0.0, 0.04, gb)
              * (1.0 - smoothstep(0.22, 0.35, gb)) * smoothstep(0.18, 0.32, luma(b));
-  float centre = 1.0 - smoothstep(0.22, 0.5, length((ruv - vec2(0.5, 0.4)) * vec2(1.0, 1.4)));
+  float centre = 1.0 - smoothstep(0.22, 0.5, length((ruv - vec2(0.5, 0.4)) * uCardK));
   float calm = max(smoothstep(0.0, 0.45, skin), centre * (0.55 + 0.35 * smoothstep(0.15, 0.45, luma(b)))) * art;
   // Tilting slants the sun: the net reshapes, draws into focus and its knots split into spectrum.
   // The floor's depth varies across the pool, so some of the net is sharp and some is soft.
@@ -92,7 +91,7 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   float inside = -sd;
   // Seen from above, the floor wavers with the same surface that bends the light; the
   // wavering fades out at the walls, so the window's outline stays a clean line.
-  vec2 bend = slope * vec2(1.0, 1.0 / 1.4) * 0.15 * art * smoothstep(0.004, 0.02, inside);
+  vec2 bend = slope / uCardK * 0.15 * art * smoothstep(0.004, 0.02, inside);
   vec4 fl = textureLod(uFace, ruv + par - bend, lod);
   // Near the rounded corners the bent ray can miss the card; keep the straight view there.
   vec3 floorC = fl.a > 0.5 ? fl.rgb / fl.a : c;
@@ -117,13 +116,13 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   float prism = smoothstep(3.5, 10.0, mean) * smoothstep(0.5, 1.3, slant) * (1.0 - calm);
   vec3 spectrum = clamp(gather / mean - 1.0, -0.6, 0.8) * prism;
   // The sun, as a direction on the card (towards the light), leaning in from the upper left.
-  vec2 sun = (uLight - 0.5) * vec2(1.0, 1.4) + vec2(-0.14, -0.2);
+  vec2 sun = (uLight - 0.5) * uCardK + vec2(-0.14, -0.2);
   vec2 sunN = normalize(sun);
   // The rim on the sun's side shades a band of the floor, wider the lower the light. The shade
   // is cast through the water, so its edge is bent by the same ripples (it wavers and drifts
   // with the net) and grows softer the further it falls from the rim, as a real penumbra does.
   vec2 reach = sun * 0.22;
-  vec2 shadeAt = ruv + par + reach / vec2(1.0, 1.4) + slope * vec2(1.0, 1.0 / 1.4) * 1.3;
+  vec2 shadeAt = ruv + par + reach / uCardK + slope / uCardK * 1.3;
   float rimDist = shWindow(shadeAt);
   float soft = 0.012 + 0.03 * smoothstep(0.0, 0.06, inside);
   float shade = smoothstep(-soft, soft, rimDist) * art;
@@ -145,7 +144,7 @@ vec3 shallows(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
   // Shade under clear water: darker and a touch cooler, never a flat grey slab.
   water *= mix(vec3(0.58, 0.63, 0.7), vec3(1.0), sunlit) * (1.0 - 0.2 * wall);
   // The wall facing the sun catches it: a thin lit lip along the far edge of the pool.
-  vec2 nrm = normalize(vec2(shWindow(ruv + vec2(0.002, 0.0)) - sd, (shWindow(ruv + vec2(0.0, 0.002)) - sd) / 1.4) + 1e-6);
+  vec2 nrm = normalize(vec2(shWindow(ruv + vec2(0.002, 0.0)) - sd, shWindow(ruv + vec2(0.0, 0.002)) - sd) / uCardK + 1e-6);
   float lip = (1.0 - smoothstep(0.004, 0.016, inside)) * smoothstep(0.0, 0.5, dot(nrm, sunN)) * art;
   water += warm * lip * 1.3;
   // A faint aqua water column over the floor.

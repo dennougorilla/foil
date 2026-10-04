@@ -6,7 +6,7 @@
 export const BLACKLIGHT_GLSL = /* glsl */ `
 // The lamp's power, 0..1.
 uniform float uUvLamp;
-const vec2 BL_ASPECT = vec2(1.0, 1.4);
+#define BL_ASPECT uCardK
 // Where the seal is printed, in card uv: on the lamp's drift, low on the art.
 const vec2 BL_SEAL = vec2(0.62, 0.56);
 // Lamp radius in card widths.
@@ -33,7 +33,7 @@ vec3 blFace(vec2 p, float lod) {
 // How sharply the picture changes colour around p (face uv), over a reach of r texels.
 float blEdge(vec2 p, float r, float lod) {
   vec2 ex = vec2(r / uFaceTexels, 0.0);
-  vec2 ey = vec2(0.0, r / uFaceTexels / 1.4);
+  vec2 ey = vec2(0.0, r / uFaceTexels * uCardK.x / uCardK.y);
   vec3 gx = blFace(p + ex, lod) - blFace(p - ex, lod);
   vec3 gy = blFace(p + ey, lod) - blFace(p - ey, lod);
   return sqrt(dot(gx, gx) + dot(gy, gy));
@@ -97,12 +97,13 @@ float blSeal(vec2 q) {
 // FOIL microtext round the frame, like security paper: one line running all the way round,
 // a little in from the edge, with the letters' tops to the edge. q in card widths.
 float blMicro(vec2 q) {
-  float dl = q.x, dr = 1.0 - q.x, dt = q.y, db = 1.4 - q.y;
+  vec2 k = uCardK;
+  float dl = q.x, dr = k.x - q.x, dt = q.y, db = k.y - q.y;
   float m = min(min(dl, dr), min(dt, db));
   if (m == dt) return blText(q.x, dt - 0.0225);
   if (m == dr) return blText(q.y, dr - 0.0225);
-  if (m == db) return blText(1.0 - q.x, db - 0.0225);
-  return blText(1.4 - q.y, dl - 0.0225);
+  if (m == db) return blText(k.x - q.x, db - 0.0225);
+  return blText(k.y - q.y, dl - 0.0225);
 }
 
 // The art engraved in fine parallel lines, thicker where the picture is brighter (b, 0..1).
@@ -162,14 +163,14 @@ vec3 blacklight(vec3 c, vec2 uv, float L, float lod, vec3 m) {
   // Hidden ink printed along the picture's outlines, in an ink picked by the picture's own hue.
   // Read at a coarse scale, so it traces shapes rather than texture, dithering or noise; only
   // inside the art window, so its own border never lights up as a band.
-  const vec2 BL_IN = vec2(0.022, 0.022 / 1.4);
+  vec2 BL_IN = 0.022 / uCardK;
   float inArt = min(min(texture(uMask, ruv + BL_IN).r, texture(uMask, ruv - BL_IN).r),
                     min(texture(uMask, ruv + vec2(BL_IN.x, -BL_IN.y)).r, texture(uMask, ruv - vec2(BL_IN.x, -BL_IN.y)).r));
   float line = smoothstep(0.2, 0.45, blEdge(ruv, 2.5, lod + 2.2)) * inArt;
   float halo = smoothstep(0.08, 0.3, blEdge(ruv, 9.0, lod + 4.2)) * inArt;
   vec3 blur = blFace(ruv, lod + 4.0);
   vec3 hsv = rgb2hsv(blur);
-  vec3 ink = blInk(hsv.x * smoothstep(0.08, 0.3, hsv.y) + vnoise(ruv * vec2(2.2, 3.1)) * 0.8);
+  vec3 ink = blInk(hsv.x * smoothstep(0.08, 0.3, hsv.y) + vnoise(ruv * uCardK * 2.2) * 0.8);
   vec3 glow = ink * (line * 1.35 + halo * 0.18);
   // Under them the art itself, engraved in the same ink.
   float art = m.r;
@@ -178,7 +179,7 @@ vec3 blacklight(vec3 c, vec2 uv, float L, float lod, vec3 m) {
   // The seal, the one mark that is there to be found.
   glow += BL_PINK * blSeal((ruv - BL_SEAL) * BL_ASPECT) * 0.95 * art;
   // FOIL microtext round the frame, faint behind the name; fibres everywhere.
-  float plate = smoothstep(0.865, 0.885, ruv.y);
+  float plate = smoothstep(uArt.w - 0.0136, uArt.w + 0.0064, ruv.y);
   glow += BL_YELLOW * blMicro(ruv * BL_ASPECT) * (1.0 - art) * mix(0.55, 0.3, plate);
   vec3 tint;
   float fib = blFibres(uv, tint);

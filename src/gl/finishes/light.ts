@@ -10,17 +10,18 @@ const finishes: FinishModule = {
   glsl: /* glsl */ `
 vec3 galaxy(vec3 c, vec2 uv, vec2 t, float L) {
   vec2 par = t * 0.08;
-  float n = fbm(uv * 3.0 + par * 2.0 + uTime * 0.02);
-  float n2 = fbm(uv * 5.0 - par * 3.0 + 4.0);
+  vec2 tu = asTrading(uv);
+  float n = fbm(tu * 3.0 + par * 2.0 + uTime * 0.02);
+  float n2 = fbm(tu * 5.0 - par * 3.0 + 4.0);
   vec3 nebula = mix(vec3(0.12, 0.05, 0.35), vec3(0.85, 0.25, 0.65), smoothstep(0.35, 0.75, n));
   nebula = mix(nebula, vec3(0.2, 0.55, 1.0), smoothstep(0.5, 0.85, n2) * 0.7);
   vec3 col = mix(c, c * 0.55 + nebula * 0.75, (1.0 - L) * 0.8 + 0.2);
-  vec2 cell = floor((uv + par) * vec2(110.0, 154.0));
+  vec2 cell = floor((uv + par) * uCardK * 110.0);
   float s = hash12(cell);
   float tw = 0.5 + 0.5 * sin(s * 50.0 + uTime * 2.2 + (t.x + t.y) * 6.0);
   col += vec3(1.0) * step(0.965, s) * tw * 1.1;
   // A few bright four-point stars that drift with parallax
-  vec2 sp = (uv + par * 2.5) * vec2(7.0, 9.8);
+  vec2 sp = (uv + par * 2.5) * uCardK * 7.0;
   vec2 sc = floor(sp);
   vec2 so = fract(sp) - 0.25 - 0.5 * hash22(sc);
   float big = step(0.72, hash12(sc + 9.0));

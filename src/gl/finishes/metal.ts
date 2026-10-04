@@ -15,7 +15,7 @@ vec3 gold(vec3 c, vec2 uv, vec2 t, float L) {
   vec3 col = mix(ramp, c * vec3(1.0, 0.85, 0.55), 0.22);
   float sweep = smoothstep(0.78, 1.0, 0.5 + 0.5 * sin((uv.x + uv.y * 0.6) * 8.0 + (t.x + t.y) * 6.0));
   col += vec3(1.0, 0.9, 0.6) * sweep * 0.55;
-  vec2 cell = floor(uv * vec2(90.0, 126.0));
+  vec2 cell = floor(uv * uCardK * 90.0);
   float g = hash12(cell);
   float tw = smoothstep(0.86, 1.0, sin(g * 40.0 + (t.x - t.y) * 9.0 + uTime * 0.8) * 0.5 + 0.5);
   col += vec3(1.0, 0.95, 0.8) * tw * step(0.93, g) * 0.8;
@@ -24,7 +24,7 @@ vec3 gold(vec3 c, vec2 uv, vec2 t, float L) {
 
 vec3 crystal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   // Triangular facets that each bend the picture a little and catch their own glint.
-  vec2 p = uv * vec2(8.0, 11.2);
+  vec2 p = uv * uCardK * 8.0;
   vec2 ip = floor(p), fp = fract(p);
   float upper = step(fp.x, fp.y);
   vec2 id = ip * 2.0 + upper;

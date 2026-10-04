@@ -1,10 +1,6 @@
 // Shadowbox: the picture stands in a lit box behind the art window as paper sheets, cut by depth
 // (src/depth). Spliced into CARD_FS after the shared helpers, the tune and the range code; reads
 // uFace, uMask, uLight and uIntensity besides its own sheets.
-import { ART, FACE_H, FACE_W } from '../card/face';
-
-const n = (v: number) => v.toFixed(5);
-
 export const SHADOWBOX_GLSL = /* glsl */ `
 uniform sampler2D uLayers; // over the art window: r, g, b = the cut sheets from the front, a = depth (1 = near)
 uniform float uLayerCuts;  // cut sheets in front of the back one, 0..3
@@ -13,9 +9,9 @@ uniform sampler2D uPlateBack; // the art with the cut-out subjects painted out
 uniform float uPlateMix;      // 1 = use it; 0 = animated picture, keep the current frame
 
 // Art window in uv (x0, y0, x1, y1), from the face layout.
-const vec4 SB_ART = vec4(${n(ART.x / FACE_W)}, ${n(ART.y / FACE_H)}, ${n((ART.x + ART.w) / FACE_W)}, ${n((ART.y + ART.h) / FACE_H)});
+#define SB_ART uArt
 // uv to square card units, so depth and light behave the same along both axes.
-const vec2 SB_K = vec2(1.0, 1.4);
+#define SB_K uCardK
 // A virtual eye a little closer than the real camera, so the box reads deep even face on.
 const float SB_EYE = 1.4;
 
@@ -168,7 +164,7 @@ vec3 shadowbox(vec3 c, vec2 puv, vec2 t, float lod) {
     if (!back) {
       float mx = sbPick(sbLayers(su + vec2(texel.x, 0.0), 0.0), k);
       float my = sbPick(sbLayers(su + vec2(0.0, texel.y), 0.0), k);
-      vec2 g = vec2((mx - mk) / texel.x, (my - mk) / texel.y / SB_K.y);
+      vec2 g = vec2((mx - mk) / texel.x / SB_K.x, (my - mk) / texel.y / SB_K.y);
       float slope = max(length(g) * px, 1e-4);
       float dpx = (mk - 0.5) / slope;
       vec2 out2 = -normalize(g + 1e-6);
@@ -181,7 +177,7 @@ vec3 shadowbox(vec3 c, vec2 puv, vec2 t, float lod) {
     float vignette = smoothstep(0.0, 0.12, min(dw.x, dw.y) + 0.03 * (1.0 - zf));
     vec3 sheet = img * mix(vec3(1.0), vec3(0.52, 0.52, 0.56), shadow * uLayerRise) * (1.0 - 0.08 * zf) * mix(0.62, 1.0, vignette);
     // The light falls into the box as a soft pool, over a faint paper grain.
-    sheet *= mix(0.84, 1.1, exp(-dot(p - lp, p - lp) * 2.2)) * (0.95 + 0.07 * vnoise(su * vec2(420.0, 590.0) + float(k) * 17.0) + 0.03 * vnoise(su * vec2(60.0, 1100.0) + float(k) * 5.0));
+    sheet *= mix(0.84, 1.1, exp(-dot(p - lp, p - lp) * 2.2)) * (0.95 + 0.07 * vnoise(su * uCardK * 420.0 + float(k) * 17.0) + 0.03 * vnoise(su * vec2(60.0, 1100.0) + float(k) * 5.0));
     // Paper edge: a lighter strip of the print where it faces the light, a darker one where it
     // turns away, so dark areas never get a stray white stroke.
     vec3 core = facing > 0.0 ? mix(img, vec3(0.97, 0.94, 0.88), 0.25 + 0.35 * luma(img)) * (0.85 + 0.4 * facing) : img * (0.7 + 0.3 * facing);

@@ -118,5 +118,5 @@ export const RARITIES: Rarity[] = [
 
 export const rarityById = (id: RarityId): Rarity => RARITIES.find((r) => r.id === id) ?? RARITIES[0];
 
-export type FrameId = 'paper' | 'ink' | 'gilt' | 'rarity';
-export const FRAMES: FrameId[] = ['paper', 'ink', 'gilt', 'rarity'];
+export type FrameId = 'paper' | 'ink' | 'gilt' | 'rarity' | 'rim' | 'ribbon';
+export const FRAMES: FrameId[] = ['paper', 'ink', 'gilt', 'rarity', 'rim', 'ribbon'];

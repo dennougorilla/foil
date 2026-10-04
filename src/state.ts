@@ -1,5 +1,6 @@
 import { EDITIONS, type EditionId, type FrameId, type RarityId } from './editions';
 import type { Crop } from './card/face';
+import { shapeOf, type ShapeId } from './card/shape';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, type Lettering } from './lettering';
@@ -20,6 +21,8 @@ export interface State extends RangeColorState {
   hand: EditionId[];
   rarity: RarityId;
   frame: FrameId;
+  /** The card's shape (card/shape.ts); the trading card unless chosen. */
+  shape: ShapeId;
   intensity: number;
   pixel: number;
   name: string;
@@ -58,6 +61,7 @@ const PERSIST: (keyof State)[] = [
   'hand',
   'rarity',
   'frame',
+  'shape',
   'intensity',
   'pixel',
   'name',
@@ -87,6 +91,7 @@ export function createStore() {
     hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
     rarity: 'rare',
     frame: 'paper',
+    shape: 'card',
     intensity: 1,
     pixel: 0,
     name: '',
@@ -110,6 +115,7 @@ export function createStore() {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     state.tune = sanitizeTune(state.tune);
+    state.shape = shapeOf(state.shape);
     state.adjustOpen = state.adjustOpen === true;
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';

@@ -15,7 +15,7 @@
 
 export const COSMOHOLO_GLSL = /* glsl */ `
 const float CH_CELLS = 10.0; // circles across the card
-const vec2 CH_ASPECT = vec2(1.0, 1.4);
+#define CH_ASPECT uCardK
 const vec2 CH_DIR = vec2(0.55, 0.835); // the bands' direction of travel
 
 // Where the bands sit at card position pos (card widths): s grows along CH_DIR, shifted by the tilt.

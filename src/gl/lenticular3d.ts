@@ -69,7 +69,7 @@ vec3 lenticular3d(vec3 c, vec2 puv, vec2 t, float lod) {
   if (amt < 1e-3) return c;
 
   // Thumbnails in the hand get coarser lenses, so the ridges still show at that size.
-  float lenses = (uPlate > 0.5 ? 84.0 : 30.0) / uTScale;
+  float lenses = (uPlate > 0.5 ? 84.0 : 30.0) * uCardK.x / uTScale;
   float x = uv.x * lenses;
   float lf = fract(x);
   float uc = (floor(x) + 0.5) / lenses;

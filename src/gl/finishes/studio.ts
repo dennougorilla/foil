@@ -12,7 +12,7 @@ const finishes: FinishModule = {
   glsl: /* glsl */ `
 float dots(vec2 uv, float ang, float ink) {
   float s = sin(ang), co = cos(ang);
-  vec2 p = mat2(co, -s, s, co) * (uv * vec2(1.0, 1.4)) * 62.0;
+  vec2 p = mat2(co, -s, s, co) * (uv * uCardK) * 62.0;
   vec2 f = fract(p) - 0.5;
   float r = sqrt(clamp(ink, 0.0, 1.0)) * 0.62;
   return smoothstep(r + 0.06, r - 0.06, length(f));

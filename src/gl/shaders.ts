@@ -117,13 +117,13 @@ void main() {
   p.yz = mat2(cx, sx, -sx, cx) * p.yz;
   float cy = cos(uRot.y), sy = sin(uRot.y);
   p.xz = mat2(cy, -sy, sy, cy) * p.xz;
-  float D = max(uSize.y, 120.0) * 3.2;
+  float D = max(max(uSize.x, uSize.y), 120.0) * 3.2;
   float w = (D - p.z) / D;
   vec2 s = uCenter + uShift + p.xy / w;
   vec2 ndc = vec2(s.x / uRes.x * 2.0 - 1.0, 1.0 - s.y / uRes.y * 2.0);
   gl_Position = vec4(ndc * w, 0.0, w);
   vUv = mix(uUvRect.xy, uUvRect.zw, aPos + 0.5);
-  vShade = p.z / (uSize.y * uScale);
+  vShade = p.z / (max(uSize.x, uSize.y) * uScale);
 }
 `;
 
@@ -150,6 +150,10 @@ uniform float uShadow;     // 1 = draw as drop shadow
 uniform float uAlpha;
 uniform float uFlash;      // white flash on juice
 uniform float uFaceTexels; // face texture width in px
+uniform vec2 uCardK;       // the face in units of its short side: (1, 1.4) on the trading card
+uniform vec4 uArt;         // the art window in face uv: x0, y0, x1, y1
+// uv scaled so a pattern tuned on the trading card keeps its size in px on every shape.
+vec2 asTrading(vec2 uv) { return uv * uCardK / vec2(1.0, 1.4); } // any shape
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
 out vec4 o;
@@ -160,7 +164,7 @@ ${RANGE_GLSL}
 vec4 face(vec2 uv, float lod) { return textureLod(uFace, tuneFaceUv(uv), lod); }
 
 vec3 foil(vec3 c, vec2 uv, vec2 t, float L) {
-  vec2 p = (uv - 0.5) * vec2(1.0, 1.4);
+  vec2 p = (uv - 0.5) * uCardK;
   // Brushed metal: fine streaks along a diagonal, catching light as you tilt.
   float brush = vnoise(vec2(dot(p, vec2(0.7, 0.7)) * 6.0, dot(p, vec2(-0.7, 0.7)) * 260.0));
   float band = 0.5 + 0.5 * sin(dot(p, vec2(0.8, 0.6)) * 5.0 - (t.x + t.y) * 3.2);
@@ -175,7 +179,7 @@ vec3 foil(vec3 c, vec2 uv, vec2 t, float L) {
 }
 
 vec3 holo(vec3 c, vec2 uv, vec2 t, float L) {
-  vec2 g = uv * vec2(26.0, 36.4);
+  vec2 g = uv * uCardK * 26.0;
   vec2 f = abs(fract(g) - 0.5);
   float lattice = smoothstep(0.38, 0.5, f.x + f.y);
   float hue = fract((uv.x * 0.7 + uv.y) * 1.3 + (t.x * 0.8 - t.y * 0.6) + (f.x - f.y) * 0.25);
@@ -212,7 +216,7 @@ vec3 negative(vec3 c, vec2 uv, vec2 t, float L) {
 
 
 vec3 prism(vec3 c, vec2 uv, vec2 t, float L) {
-  vec4 v = voronoi(uv * vec2(11.0, 15.4));
+  vec4 v = voronoi(uv * uCardK * 11.0);
   vec2 id = v.zw;
   float edge = 1.0 - smoothstep(0.0, 0.06, v.y - v.x);
   vec2 n = hash22(id * 1.7) * 2.0 - 1.0;
@@ -255,18 +259,19 @@ void main() {
   // Only the art window is pixelated; the frame and nameplate stay crisp.
   float inArt = texture(uMask, vUv).r;
   if (uPixel > 0.5 && inArt > 0.5) {
-    vec2 grid = vec2(uPixel, floor(uPixel * 1.4 + 0.5));
+    // uPixel cells across the short side, square on every shape.
+    vec2 grid = floor(uPixel * uCardK + 0.5);
     uv = (floor(uv * grid) + 0.5) / grid;
-    lod = max(log2(uFaceTexels / uPixel) - 0.5, 0.0);
+    lod = max(log2(uFaceTexels / uCardK.x / uPixel) - 0.5, 0.0);
   }
   vec4 base = face(uv, lod);
   if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
   if (base.a < 0.002) discard;
   vec3 c = base.rgb / max(base.a, 1e-4);
   vec3 m = texture(uMask, uv).rgb;
-  if (uPlate < 0.5 && uv.y > 0.885 && m.b < 0.5 && m.r < 0.5) {
+  if (uPlate < 0.5 && (uv.y - uArt.w) * uCardK.y > 0.009 && m.b < 0.5 && m.r < 0.5) {
     // At thumbnail size the name is unreadable noise; paint plain frame instead.
-    vec4 f = face(vec2(0.04, 0.5), 0.0);
+    vec4 f = face(vec2(0.04 / uCardK.x, 0.5), 0.0);
     c = f.rgb / max(f.a, 1e-4);
   }
   float L = luma(c);
@@ -301,12 +306,12 @@ void main() {
   if (e == 72) {
     // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
   } else if (e != 0) {
-    float d = length((uv - uLight) * vec2(1.0, 1.4));
+    float d = length((uv - uLight) * uCardK);
     // Glow's room is dim, so only a faint glare reaches it.
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
     if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
   } else {
-    float d = length((uv - uLight) * vec2(1.0, 1.4));
+    float d = length((uv - uLight) * uCardK);
     spec = tuneGlare(d, 1.6, 4.0, 0.1);
   }
   // Glare and glitter belong to the finish, so they stay inside the chosen Foil area.

@@ -449,15 +449,17 @@ export function paintShowpieceBack(back: HTMLCanvasElement, base: HTMLCanvasElem
   const ctx = back.getContext('2d')!;
   const W = back.width;
   const H = back.height;
+  // Sized by the short side, so a card of any shape gets the same panel and seal.
+  const S = Math.min(W, H);
   const [dark, mid, light] = pack.colors;
   ctx.drawImage(base, 0, 0);
   // The inner panel, inset like the printed back's.
-  const inset = W * 0.062;
+  const inset = S * 0.062;
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(inset, inset, W - inset * 2, H - inset * 2, W * 0.034);
+  ctx.roundRect(inset, inset, W - inset * 2, H - inset * 2, S * 0.034);
   ctx.clip();
-  const g = ctx.createRadialGradient(W / 2, H / 2, W * 0.05, W / 2, H / 2, H * 0.62);
+  const g = ctx.createRadialGradient(W / 2, H / 2, S * 0.05, W / 2, H / 2, Math.max(W, H) * 0.62);
   g.addColorStop(0, mid);
   g.addColorStop(1, dark);
   ctx.fillStyle = g;
@@ -480,15 +482,15 @@ export function paintShowpieceBack(back: HTMLCanvasElement, base: HTMLCanvasElem
   // A seal with the theme's mark in the middle.
   ctx.fillStyle = INK;
   ctx.beginPath();
-  ctx.arc(W / 2, H / 2, W * 0.2, 0, Math.PI * 2);
+  ctx.arc(W / 2, H / 2, S * 0.2, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = light;
   ctx.beginPath();
-  ctx.arc(W / 2, H / 2, W * 0.18, 0, Math.PI * 2);
+  ctx.arc(W / 2, H / 2, S * 0.18, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = INK;
   ctx.beginPath();
-  ctx.arc(W / 2, H / 2, W * 0.155, 0, Math.PI * 2);
+  ctx.arc(W / 2, H / 2, S * 0.155, 0, Math.PI * 2);
   ctx.fill();
-  emblem(ctx, pack.id, W / 2, H / 2, W * 0.2, light, PAPER);
+  emblem(ctx, pack.id, W / 2, H / 2, S * 0.2, light, PAPER);
 }
