@@ -1085,7 +1085,7 @@ function openShop() {
         onClose: (done, pick) => {
           opening = false;
           if (done && !wasOpened.has(done.id)) {
-            deck.bump();
+            deck.bump(done.finishes.length);
             toast(t.pack.intoDeck.replace('{name}', t.pack.name[done.id]).replace('{n}', String(done.finishes.length)));
           }
           // A pick in the haul is drawn into the hand and put on the card.

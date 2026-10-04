@@ -102,7 +102,7 @@ void main() {
   vec4 base = texture(uTex, vec2(vUv.x, 1.0 - vUv.y));
   if (base.a < 0.01) discard;
   // The back of the bag: the wrapper's own colors, deep in shade, so its thickness shows at the edges.
-  if (uShadow > 1.5) { o = vec4(base.rgb * 0.32, base.a) * uAlpha; return; }
+  if (uShadow > 1.5) { o = vec4(mix(base.rgb * 0.5, vec3(0.75, 0.78, 0.85) * base.a, 0.18), base.a) * uAlpha; return; }
   if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
   // Torn open: a dark inside under a bright silver lip along the tear.
   if (uMouth > 0.0) {
@@ -273,7 +273,7 @@ export class Pillow {
     gl.uniform1f(u.uShadow, 2);
     gl.uniform1f(u.uFlat, 1);
     gl.uniform2f(u.uShift, 0, 0);
-    gl.uniform1f(u.uDepth, d.w * 0.045);
+    gl.uniform1f(u.uDepth, d.w * 0.032);
     gl.drawArrays(gl.TRIANGLES, 0, this.count);
     gl.uniform1f(u.uDepth, 0);
     gl.uniform1f(u.uShadow, 0);

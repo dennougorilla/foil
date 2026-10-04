@@ -844,7 +844,8 @@ button {
   flex: none;
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 36px;
+  padding-bottom: 20px;
   padding-right: 8px;
 }
 
@@ -983,6 +984,59 @@ button {
 
 .deck-packs[aria-busy='true'] {
   cursor: progress;
+}
+
+/* The words under the deck and the pack button. */
+.deck-cap {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin-top: 12px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(245, 242, 234, 0.8);
+  text-shadow: 0 2px 0 #05080a;
+  white-space: nowrap;
+}
+
+.deck .deck-cap {
+  margin-top: 14px;
+}
+
+.deck-packs .deck-cap {
+  margin-top: 8px;
+}
+
+/* "+3" floating up from the deck as cards arrive. */
+.deck-plus {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  font-size: 22px;
+  color: var(--gold);
+  text-shadow: 0 3px 0 #05080a;
+  transform: translateX(-50%);
+  animation: deck-plus 1.3s var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes deck-plus {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
+  20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+}
+
+/* The drawn card's mark: a tiny card back in its corner. */
+.drawn-mark {
+  position: absolute;
+  right: -5px;
+  top: -6px;
+  z-index: 1;
+  width: 13px;
+  height: 18px;
+  border-radius: 2px;
+  background: radial-gradient(circle, #f3eee2 0 2px, transparent 2.5px), #c4382f;
+  box-shadow: 0 0 0 2px #f3eee2, 0 0 0 3px #05080a;
 }
 
 /* The drawn card: the hand's eighth slot, set a little apart. */

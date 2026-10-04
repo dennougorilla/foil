@@ -162,6 +162,8 @@ export class Stage {
       h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
       // The card drawn from the deck sits a little apart, after the seven.
       h.el.classList.toggle('is-drawn', !OPEN_EDITIONS.includes(id));
+      // A small card back on the drawn card: it came from the deck.
+      if (!OPEN_EDITIONS.includes(id)) h.el.insertAdjacentHTML('beforeend', '<i class="drawn-mark" aria-hidden="true"></i>');
       hand.appendChild(h.el);
       return h;
     });

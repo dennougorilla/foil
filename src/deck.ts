@@ -24,8 +24,8 @@ const MAX_LAYERS = 12;
 export function mountDeck(o: DeckOptions) {
   const { host } = o;
   host.innerHTML = `
-    <button class="deck" id="deckBtn" type="button"><span class="deck-pile" aria-hidden="true"></span><b class="deck-count"></b></button>
-    <button class="deck-packs" id="packsBtn" type="button"><i class="deck-pack" aria-hidden="true"></i><small></small></button>`;
+    <button class="deck" id="deckBtn" type="button"><span class="deck-pile" aria-hidden="true"></span><b class="deck-count"></b><span class="deck-cap" aria-hidden="true"></span></button>
+    <button class="deck-packs" id="packsBtn" type="button"><i class="deck-pack" aria-hidden="true"></i><small></small><span class="deck-cap" aria-hidden="true"></span></button>`;
   const deckBtn = host.querySelector<HTMLButtonElement>('.deck')!;
   const packsBtn = host.querySelector<HTMLButtonElement>('.deck-packs')!;
   deckBtn.addEventListener('click', () => {
@@ -46,6 +46,8 @@ export function mountDeck(o: DeckOptions) {
     pile.innerHTML = Array.from({ length: Math.max(1, Math.min(MAX_LAYERS, n)) }, (_, i) => `<i style="--i:${i}"></i>`).join('');
     deckBtn.dataset.empty = String(n === 0);
     deckBtn.querySelector('.deck-count')!.textContent = String(n);
+    deckBtn.querySelector('.deck-cap')!.textContent = t.deckShort;
+    packsBtn.querySelector('.deck-cap')!.textContent = t.packsShort;
     deckBtn.setAttribute('aria-label', t.deckLabel.replace('{n}', String(n)));
     deckBtn.title = t.deckLabel.replace('{n}', String(n));
     packsBtn.dataset.sealed = String(sealed);
@@ -61,11 +63,16 @@ export function mountDeck(o: DeckOptions) {
     render,
     /** Where the deck sits on screen, for cards flying into it. */
     rect: () => deckBtn.getBoundingClientRect(),
-    /** The deck takes cards in: a bump. */
-    bump() {
+    /** The deck takes cards in: a bump, and "+n" floating up from it. */
+    bump(n: number) {
       deckBtn.classList.remove('is-bump');
       void deckBtn.offsetWidth;
       deckBtn.classList.add('is-bump');
+      const plus = document.createElement('span');
+      plus.className = 'deck-plus';
+      plus.textContent = `+${n}`;
+      deckBtn.append(plus);
+      setTimeout(() => plus.remove(), 1400);
     },
     focusShop: () => packsBtn.focus(),
     focusDeck: () => deckBtn.focus(),

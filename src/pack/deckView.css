@@ -17,7 +17,9 @@
 }
 
 .dv-panel {
-  width: min(880px, 100%);
+  width: fit-content;
+  min-width: min(480px, 100%);
+  max-width: min(980px, 100%);
   max-height: calc(100dvh - 32px);
   overflow: auto;
   border-radius: 22px;
@@ -75,8 +77,9 @@
 }
 
 .dv-body {
-  display: grid;
-  gap: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px 34px;
   padding: 18px 22px 26px;
 }
 
@@ -190,9 +193,21 @@
 }
 
 @media (max-width: 600px) {
+  .dv-body {
+    padding: 14px 12px 20px;
+  }
+  .dv-row {
+    gap: 6px;
+  }
+  .dv-card {
+    padding: 4px 4px 6px;
+  }
   .dv-card canvas {
-    width: 88px;
-    height: 123px;
+    width: 86px;
+    height: 120px;
+  }
+  .dv-head small {
+    font-size: 13px;
   }
   .dv-head b {
     font-size: 22px;

@@ -1208,3 +1208,15 @@
   transform: translate(-50%, -2px);
   white-space: nowrap;
 }
+
+/* Into the deck: the room and words fade away first, so the cards fly over the page to the deck. */
+.pk.is-to-deck .pk-room,
+.pk.is-to-deck .pk-flash,
+.pk.is-to-deck .pk-rays,
+.pk.is-to-deck .pk-aura,
+.pk.is-to-deck .pk-haul,
+.pk.is-to-deck .pk-head,
+.pk.is-to-deck::after {
+  opacity: 0;
+  transition: opacity 0.25s var(--ease-out);
+}

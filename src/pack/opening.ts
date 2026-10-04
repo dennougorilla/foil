@@ -749,7 +749,7 @@ export function openPack(o: OpeningOptions) {
         }, i * 70);
       });
     }
-    setTimeout(() => root.classList.remove('is-in'), deck ? 560 : 0);
+    setTimeout(() => root.classList.remove('is-in'), deck ? 700 : 0);
     setTimeout(() => {
       cancelAnimationFrame(raf);
       removeEventListener('deviceorientation', onTilt);
@@ -760,7 +760,7 @@ export function openPack(o: OpeningOptions) {
       root.remove();
       o.pause(false);
       o.onClose(result, pick);
-    }, (reduced ? 120 : 220) + (deck ? 560 : 0));
+    }, (reduced ? 120 : 220) + (deck ? 700 : 0));
   }
 
   // ---------- Input ----------
