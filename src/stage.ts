@@ -4,12 +4,13 @@ import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
-import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
+import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
 import './stage-phone.css';
+import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
 
-class Spring {
+export class Spring {
   v = 0;
   constructor(
     public x: number,
@@ -33,6 +34,21 @@ interface HandCard {
   tiltX: Spring;
   tiltY: Spring;
   dealAt: number;
+  /** Coming in from the deck: its offset from its place, closing to nothing. */
+  fromDeck: boolean;
+  dx: Spring;
+  dy: Spring;
+  /** Its turn from face-down: a card from the deck leaves it as a back and turns over in flight. */
+  turn: Spring;
+  /** Where it was last drawn (canvas px), so a card leaving for the deck starts from there. */
+  at: { x: number; y: number; w: number; h: number; rz: number };
+}
+
+/** A card on its way from the hand into the deck. */
+interface Leaving {
+  shader: number;
+  from: { x: number; y: number; w: number; h: number; rz: number };
+  t: number;
 }
 
 const TAU = Math.PI * 2;
@@ -51,8 +67,10 @@ export interface StageOptions {
   onHover: (id: EditionId | null) => void;
   /** A finger flicked the card sideways: 1 for the next card in the hand, -1 for the previous. */
   onFlick: (dir: 1 | -1) => void;
-  /** Finishes left out of the hand (the hidden finishes until they are unlocked). */
-  isHidden?: (id: EditionId) => boolean;
+  /** The finishes in the hand, in order. */
+  handIds: () => EditionId[];
+  /** Where the deck sits on the page: swapped cards fly between it and the hand. */
+  deckRect?: () => DOMRect | null;
 }
 
 /** A level pinned with ?quality=0…3 in the address, if any. */
@@ -60,6 +78,9 @@ function pinnedQuality(): number | undefined {
   const v = new URLSearchParams(location.search).get('quality');
   return v !== null && /^\d$/.test(v) ? +v : undefined;
 }
+
+/** Fired on the document whenever the stage restarts its frame loop (tab shown again, pack opening closed). */
+export const STAGE_RESUMED = 'stageresumed';
 
 export class Stage {
   readonly cards: CardRenderer;
@@ -88,8 +109,11 @@ export class Stage {
   // Pointer
   private pointer = { x: -1, y: -1, inside: false, nx: 0, ny: 0, overCard: false };
   private drag = { active: false, id: -1, finger: false, sx: 0, sy: 0, lx: 0, ly: 0, lt: 0, vx: 0, vy: 0, moved: 0 };
-  /** A press on a finish that reacts to touch: it strokes the card instead of tossing it. */
+  /** A press on a finish that reacts to touch (or carries a lamp): it strokes the card instead of tossing it. */
   private rub = { active: false, id: -1 };
+  /** Where Blacklight's lamp shines on the main card (card uv); it glides to the pointer or its drift. */
+  private lamp: [number, number] = torchAt(0);
+  private lampPower = TORCH_IDLE;
   /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
   private lastTouch: [number, number] | null = null;
   private lastPointer: [number, number] = [0, 0];
@@ -97,11 +121,12 @@ export class Stage {
   private shown: EditionId | null = null;
   /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
   private greet: Swipe | null = null;
-  /** Heat left on the main card by touch, and the stroke the hand's preview card draws itself. */
-  readonly heat = new HeatField();
-  private demo = new AutoTouch();
+  /** What touch left on the main card, and the strokes the hand's preview cards draw themselves. */
+  private heat = new HeatField();
+  private demos = new Map<TouchKind, AutoTouch>();
 
   private hand: HandCard[] = [];
+  private leaving: Leaving[] = [];
   private hovered = -1;
   private focused = -1;
   private particles: Particle[] = [];
@@ -120,7 +145,7 @@ export class Stage {
     this.bg = new BackgroundRenderer(o.bgCanvas);
     const ed = EDITIONS.find((e) => e.id === o.store.get().edition) ?? EDITIONS[0];
     this.palette = ed.swirl.map(hexToRgb) as [RGB, RGB, RGB];
-    this.buildHand();
+    this.syncHand();
     this.bindPointer();
     // Deal-in: the card rises from below while spinning, the hand follows one by one.
     if (!this.reduced.matches) {
@@ -135,93 +160,119 @@ export class Stage {
     document.addEventListener('visibilitychange', () => this.resume());
   }
 
+  /** While a pack is being opened over the page, the stage stops drawing so the opening keeps its frames. */
+  private paused = false;
+
+  pause(on: boolean) {
+    this.paused = on;
+    this.resume();
+  }
+
   /** Exports draw and read back on every frame; their frames say nothing about the stage's own speed. */
   holdQuality(on: boolean) {
     this.quality.hold(on);
   }
 
   private resume() {
-    if (this.running || document.hidden) return;
+    if (this.running || document.hidden || this.paused) return;
     this.running = true;
     this.last = performance.now();
     this.quality.rest();
     requestAnimationFrame(this.frame);
+    // Copies of the card (src/proof.ts) queue their frame callbacks after this one again.
+    document.dispatchEvent(new Event(STAGE_RESUMED));
   }
 
   private get motion() {
     return !this.reduced.matches;
   }
 
-  private buildHand() {
+  /**
+   * Re-reads the hand. Cards already in it keep their place and motion; new ones (a folder just
+   * picked) are dealt in one after another once their shader is ready; cards no longer in it go.
+   * The number keys follow the order.
+   */
+  syncHand() {
     const { hand } = this.o;
-    hand.querySelectorAll('.hand-slot').forEach((el) => el.remove());
-    EDITIONS.forEach((e, i) => {
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'hand-slot';
-      el.setAttribute('role', 'radio');
-      el.dataset.id = e.id;
-      el.addEventListener('click', () => this.o.onSelect(e.id));
-      el.addEventListener('pointerenter', () => {
-        this.hovered = i;
-        sfx.hover(i);
-        this.o.onHover(e.id);
-      });
-      el.addEventListener('pointerleave', () => {
-        if (this.hovered === i) this.hovered = -1;
-        this.o.onHover(this.focused >= 0 ? EDITIONS[this.focused].id : null);
-      });
-      el.addEventListener('focus', () => {
-        this.focused = i;
-        this.o.onHover(e.id);
-      });
-      el.addEventListener('blur', () => {
-        if (this.focused === i) this.focused = -1;
-        this.o.onHover(this.hovered >= 0 ? EDITIONS[this.hovered].id : null);
-      });
-      el.addEventListener('keydown', (ev) => {
-        const dir = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0;
-        if (!dir) return;
-        ev.preventDefault();
-        let next = i;
-        do next = (next + dir + EDITIONS.length) % EDITIONS.length;
-        while (this.hand[next].el.hidden);
-        this.o.onSelect(EDITIONS[next].id);
-        this.hand[next].el.focus();
-      });
-      hand.appendChild(el);
-      this.hand.push({
-        id: e.id,
-        el,
-        lift: new Spring(0, 0, 260, 18),
-        scale: new Spring(1, 1, 260, 16),
-        deal: new Spring(this.motion ? 1 : 0, this.motion ? 1 : 0, 120, 13),
-        tiltX: new Spring(0, 0, 200, 16),
-        tiltY: new Spring(0, 0, 200, 16),
-        dealAt: 0,
-      });
-    });
-    this.syncHandHidden();
-    this.syncHandChecked();
-  }
-
-  /** The finishes the hand holds right now, in the order it shows them. */
-  shownIds(): EditionId[] {
-    return this.hand.filter((h) => !h.el.hidden).map((h) => h.id);
-  }
-
-  /** Re-reads which finishes are left out of the hand; the fan closes up around them and the number keys follow. */
-  syncHandHidden() {
-    let n = 0;
-    for (const h of this.hand) {
-      h.el.hidden = this.o.isHidden?.(h.id) ?? false;
-      if (h.el.hidden) continue;
-      h.dealAt = 0.35 + n * 0.04;
+    const ids = this.o.handIds();
+    const old = new Map(this.hand.map((h) => [h.id, h]));
+    const fresh = this.hand.length > 0;
+    let dealt = 0;
+    this.hand = ids.map((id, n) => {
+      let h = old.get(id);
+      old.delete(id);
+      if (!h) {
+        h = this.handCard(id);
+        // On boot the whole hand deals in after the card; later a newcomer flies in from the deck.
+        if (fresh && this.o.deckRect?.() && this.motion) {
+          h.fromDeck = true;
+          h.deal.x = h.deal.target = 0;
+          h.dealAt = this.time + 0.12 + dealt++ * 0.07;
+        } else h.dealAt = fresh ? this.time + 0.05 + dealt++ * 0.07 : 0.35 + n * 0.04;
+      }
       h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
-      n++;
+      hand.appendChild(h.el);
+      return h;
+    });
+    // Cards no longer in the hand fly back into the deck.
+    for (const h of old.values()) {
+      h.el.remove();
+      if (this.motion && h.at.w) this.leaving.push({ shader: editionById(h.id).shader, from: { ...h.at }, t: 0 });
     }
-    // Phones deal a hand of more than seven cards in two rows, in a taller box.
-    this.o.hand.toggleAttribute('data-many', n > 7);
+    this.hovered = this.focused = -1;
+    this.syncHandChecked();
+    this.applyHandLabels();
+  }
+
+  private handCard(id: EditionId): HandCard {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'hand-slot';
+    el.setAttribute('role', 'radio');
+    el.dataset.id = id;
+    const at = () => this.hand.findIndex((h) => h.id === id);
+    el.addEventListener('click', () => this.o.onSelect(id));
+    el.addEventListener('pointerenter', () => {
+      this.hovered = at();
+      sfx.hover(this.hovered);
+      this.o.onHover(id);
+    });
+    el.addEventListener('pointerleave', () => {
+      if (this.hovered === at()) this.hovered = -1;
+      this.o.onHover(this.focused >= 0 ? this.hand[this.focused].id : null);
+    });
+    el.addEventListener('focus', () => {
+      this.focused = at();
+      this.o.onHover(id);
+    });
+    el.addEventListener('blur', () => {
+      if (this.focused === at()) this.focused = -1;
+      this.o.onHover(this.hovered >= 0 ? this.hand[this.hovered].id : null);
+    });
+    el.addEventListener('keydown', (ev) => {
+      const dir = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      ev.preventDefault();
+      const next = this.hand[(at() + dir + this.hand.length) % this.hand.length];
+      this.o.onSelect(next.id);
+      next.el.focus();
+    });
+    const m = this.motion ? 1 : 0;
+    return {
+      id,
+      el,
+      lift: new Spring(0, 0, 260, 18),
+      scale: new Spring(1, 1, 260, 16),
+      deal: new Spring(m, m, 120, 13),
+      tiltX: new Spring(0, 0, 200, 16),
+      tiltY: new Spring(0, 0, 200, 16),
+      dealAt: 0,
+      fromDeck: false,
+      dx: new Spring(0, 0, 150, 15),
+      dy: new Spring(0, 0, 150, 15),
+      turn: new Spring(0, 0, 120, 14),
+      at: { x: 0, y: 0, w: 0, h: 0, rz: 0 },
+    };
   }
 
   syncHandChecked() {
@@ -233,10 +284,18 @@ export class Stage {
     }
   }
 
+  private labels: { names: Record<EditionId, string>; looks: Record<EditionId, string> } | null = null;
+
   setHandLabels(names: Record<EditionId, string>, looks: Record<EditionId, string>) {
+    this.labels = { names, looks };
+    this.applyHandLabels();
+  }
+
+  private applyHandLabels() {
+    if (!this.labels) return;
     for (const h of this.hand) {
-      h.el.setAttribute('aria-label', names[h.id]);
-      h.el.setAttribute('aria-description', looks[h.id]);
+      h.el.setAttribute('aria-label', this.labels.names[h.id]);
+      h.el.setAttribute('aria-description', this.labels.looks[h.id]);
     }
   }
 
@@ -281,7 +340,8 @@ export class Stage {
     });
     cardSlot.addEventListener('pointerdown', (e) => {
       cardSlot.setPointerCapture(e.pointerId);
-      if (editionById(this.o.store.get().edition).touch) {
+      const pressed = editionById(this.o.store.get().edition);
+      if (pressed.touch || pressed.torch) {
         // A finger lands without moving first, so take its position from the press itself.
         update(e);
         // The card gives a little under the finger and stays put to be stroked.
@@ -406,7 +466,8 @@ export class Stage {
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
     // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
-    const rows = hr.height >= 200 && count > 7 ? 2 : 1;
+    // Seven cards stay one fan.
+    const rows = hr.height > 240 && count > 8 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
@@ -427,7 +488,7 @@ export class Stage {
   }
 
   private frame = (now: number) => {
-    if (document.hidden) {
+    if (document.hidden || this.paused) {
       this.running = false;
       return;
     }
@@ -461,6 +522,7 @@ export class Stage {
     if (ed.id !== this.shown) {
       this.shown = ed.id;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
+      if (ed.touch) this.heat = new HeatField(ed.touch);
       this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && !this.motion) {
@@ -480,6 +542,7 @@ export class Stage {
 
     this.cards.begin();
     this.stepHand(dt, state);
+    this.stepLeaving(dt, state);
 
     if (r) {
       // Pointer relative to the card
@@ -562,13 +625,15 @@ export class Stage {
         (this.ry.x + ryIdle) / 0.32 + pose.sheen[0] + orbit[0],
         (this.rx.x + rxIdle) / 0.28 + pose.sheen[1] + orbit[1],
       ];
+      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      const pointed = over && !this.drag.active && !this.hold;
       let light: [number, number];
-      if (over && !this.drag.active && !this.hold) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
+      if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);
+      else if (pointed) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
       else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
       light = motion.light(tune, light);
 
       const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
-      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
       this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
       this.cards.drawCard(
         {
@@ -583,6 +648,7 @@ export class Stage {
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
+          lamp: this.lampPower,
         },
         motion.fx,
       );
@@ -600,6 +666,17 @@ export class Stage {
   /** Shows the drawing level on the page (data-quality), for anyone checking what the stage chose. */
   private syncQuality() {
     document.documentElement.dataset.quality = String(this.quality.level);
+  }
+
+  /**
+   * Blacklight's lamp: right under the pointer at full power, gliding more slowly back to its
+   * drift when let go, where it glows dimmer, so taking hold of it is unmistakable.
+   */
+  private aimLamp(at: [number, number], pointed: boolean, dt: number): [number, number] {
+    this.lampPower += ((pointed ? 1 : TORCH_IDLE) - this.lampPower) * (1 - Math.exp(-dt * 8));
+    const k = 1 - Math.exp(-dt * (pointed ? 24 : 3));
+    this.lamp = [this.lamp[0] + (at[0] - this.lamp[0]) * k, this.lamp[1] + (at[1] - this.lamp[1]) * k];
+    return this.lamp;
   }
 
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
@@ -631,24 +708,21 @@ export class Stage {
   }
 
   private stepHand(dt: number, state: ReturnType<Store['get']>) {
-    // Left-out cards take no room; everything else fans by its position among the shown ones.
-    const pos = new Map<number, number>();
-    this.hand.forEach((c, i) => !c.el.hidden && pos.set(i, pos.size));
-    const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(pos.size);
+    const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(this.hand.length);
     const ox = hr.left - this.canvasRect.left;
     const oy = hr.top - this.canvasRect.top;
     const active = this.hovered >= 0 ? this.hovered : this.focused;
     const order: number[] = [];
     this.hand.forEach((card, i) => {
-      if (card.el.hidden) return;
       const sel = card.id === state.edition;
       const hot = i === active;
-      if (this.time > card.dealAt) card.deal.target = 0;
+      // A folder's cards wait below until their pack's shader is ready, then deal in.
+      if (this.time > card.dealAt && this.cards.ready(editionById(card.id).shader)) card.deal.target = 0;
       card.lift.target = (sel ? 20 : 0) + (hot ? 12 : 0);
       card.scale.target = hot ? 1.1 : sel ? 1.04 : 1;
       // Hovered card leans toward the pointer
       if (hot && this.hovered === i) {
-        const { row, d } = slot(pos.get(i)!);
+        const { row, d } = slot(i);
         const cx = hr.left + hr.width / 2 + d * spacing;
         const cy = hr.top + top + row * rowH + 30 + h / 2;
         card.tiltY.target = clamp((this.pointer.x - cx) / (w / 2), -1, 1) * 0.35;
@@ -657,22 +731,36 @@ export class Stage {
         card.tiltX.target = 0;
         card.tiltY.target = 0;
       }
-      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY]) s.step(dt);
+      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY, card.dx, card.dy, card.turn]) s.step(dt);
       order.push(i);
     });
     // Draw so the selected and hovered cards sit on top of their neighbours.
     order.sort((a, b) => {
-      const rank = (i: number) => (i === active ? 2 : this.hand[i].id === state.edition ? 1 : 0);
+      // A card flying in from the deck stays on top until it lands.
+      const rank = (i: number) => (Math.abs(this.hand[i].dx.x) > 2 ? 3 : i === active ? 2 : this.hand[i].id === state.edition ? 1 : 0);
       return rank(a) - rank(b);
     });
     for (const i of order) {
       const card = this.hand[i];
-      const e = EDITIONS[i];
-      const { row, d } = slot(pos.get(i)!);
+      const e = editionById(card.id);
+      const { row, d } = slot(i);
       const fan = d * 0.045;
       const arc = d * d * arcK;
-      const x = hr.width / 2 + d * spacing;
-      const y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
+      let x = hr.width / 2 + d * spacing;
+      let y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
+      if (card.fromDeck) {
+        // Waiting on the deck until its moment, then springing to its place in the hand.
+        const deck = this.o.deckRect?.();
+        if (deck) {
+          card.dx.x = deck.left + deck.width / 2 - this.canvasRect.left - (ox + x);
+          card.dy.x = deck.top + deck.height / 2 - this.canvasRect.top - (oy + y);
+          card.scale.x = 0.55;
+          card.turn.x = Math.PI;
+        }
+        if (this.time > card.dealAt) card.fromDeck = false;
+      }
+      x += card.dx.x;
+      y += card.dy.x;
       const rot = fan * (1 - Math.min(card.lift.x / 40, 0.6));
       card.el.style.width = `${w}px`;
       card.el.style.height = `${h}px`;
@@ -685,6 +773,7 @@ export class Stage {
       }
       const t = this.time + i * 0.7;
       const idle = this.motion ? 1 : 0;
+      card.at = { x: ox + x, y: oy + y, w, h, rz: rot };
       this.cards.drawCard(
         {
           cx: ox + x,
@@ -692,19 +781,58 @@ export class Stage {
           w,
           h,
           rx: card.tiltX.x + Math.sin(t * 0.8) * 0.06 * idle,
-          ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle,
+          ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle + card.turn.x,
           rz: rot + card.deal.x * 0.6 * (d >= 0 ? 1 : -1),
           scale: card.scale.x,
           edition: e.shader,
           intensity: state.intensity,
           pixel: PIXEL_STEPS[state.pixel] ? Math.max(18, PIXEL_STEPS[state.pixel] * 0.5) : 0,
           tilt: [card.tiltY.x / 0.35 + Math.sin(t * 0.5) * 0.5 * idle, card.tiltX.x / 0.3 + Math.cos(t * 0.4) * 0.5 * idle],
-          light: [0.5, 0.35],
+          // Blacklight's preview drifts its lamp round by itself.
+          light: e.torch ? torchAt(motion.fx / TORCH_DRIFT + i * 0.1) : [0.5, 0.35],
           alpha: 1 - clamp(card.deal.x, 0, 1) * 0.6,
           flash: 0,
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],
           plate: false,
-          heat: e.touch ? this.demoAt(motion.fx) : undefined,
+          heat: e.touch ? this.demoAt(e.touch, motion.fx) : undefined,
+        },
+        motion.fx,
+      );
+    }
+  }
+
+  /** Cards leaving the hand: each shrinks along a short arc into the deck. */
+  private stepLeaving(dt: number, state: ReturnType<Store['get']>) {
+    const deck = this.o.deckRect?.();
+    for (let i = this.leaving.length - 1; i >= 0; i--) {
+      const c = this.leaving[i];
+      c.t += dt / 0.42;
+      if (c.t >= 1 || !deck) {
+        this.leaving.splice(i, 1);
+        continue;
+      }
+      const e = c.t * c.t * (3 - 2 * c.t);
+      const tx = deck.left + deck.width / 2 - this.canvasRect.left;
+      const ty = deck.top + deck.height / 2 - this.canvasRect.top;
+      this.cards.drawCard(
+        {
+          cx: c.from.x + (tx - c.from.x) * e,
+          cy: c.from.y + (ty - c.from.y) * e - Math.sin(Math.PI * c.t) * 50,
+          w: c.from.w,
+          h: c.from.h,
+          rx: 0,
+          ry: 0,
+          rz: c.from.rz * (1 - e) + 0.2 * e,
+          scale: 1 - 0.45 * e,
+          edition: c.shader,
+          intensity: state.intensity,
+          pixel: 0,
+          tilt: [0, 0],
+          light: [0.5, 0.35],
+          alpha: 1 - 0.7 * e,
+          flash: 0,
+          shadow: null,
+          plate: false,
         },
         motion.fx,
       );
@@ -712,9 +840,11 @@ export class Stage {
   }
 
   /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
-  private demoAt(time: number) {
-    this.demo.at(2 + AUTO_STILL + time / AUTO_LOOP);
-    return this.demo;
+  private demoAt(kind: TouchKind, time: number) {
+    let demo = this.demos.get(kind);
+    if (!demo) this.demos.set(kind, (demo = new AutoTouch(kind)));
+    demo.at(2 + AUTO_STILL[kind] + time / AUTO_LOOP);
+    return demo;
   }
 
   private stepParticles(dt: number) {

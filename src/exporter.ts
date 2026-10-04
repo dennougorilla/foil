@@ -2,12 +2,21 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { fixedLight, loopCycles, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
-import { AUTO_STILL } from './touch/heat';
+import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
+import { TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
+import { packOf } from './packs';
+import { loadPack } from './gl/finishes/registry';
+
+/** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
+export async function packLoaded(edition: Edition): Promise<void> {
+  const pack = packOf(edition.id);
+  if (pack) await loadPack(pack.id);
+}
 
 export interface ExportInput {
   face: HTMLCanvasElement;
@@ -25,8 +34,10 @@ export interface ExportInput {
   tune?: Tune;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
-  /** The Shadowbox sheets cut from the picture. */
+  /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
   layers?: LayerMap;
+  /** Flip Lenticular's other picture (card/face.ts drawFlip); the front one in pencil when absent. */
+  flip?: HTMLCanvasElement;
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -49,6 +60,7 @@ export function download(blob: Blob, name: string): string {
 
 /** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
 export async function exportPng(input: ExportInput): Promise<string> {
+  await packLoaded(input.edition);
   const pad = 24;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
@@ -58,8 +70,12 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
   if (input.layers) r.setLayers(input.layers);
+  r.setFlip(input.flip ?? null);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
   r.begin();
+  const tilt: [number, number] = [0.35, -0.25];
+  // Blacklight's lamp shines on the art.
+  const light: [number, number] = tune.light === 'fixed' ? fixedLight(tune.lightAngle) : input.edition.torch ? TORCH_STILL : [0.32, 0.22];
   r.drawCard(
     {
       cx: FACE_W / 2 + pad,
@@ -73,10 +89,11 @@ export async function exportPng(input: ExportInput): Promise<string> {
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
-      // A finish that reacts to touch shows a swipe made for this picture, caught while it is warm.
-      heat: input.edition.touch ? autoTouch(input.face, 3 + AUTO_STILL) : undefined,
-      // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
-      ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
+      // A finish that reacts to touch shows a swipe made for this picture, caught while it still shows.
+      heat: input.edition.touch ? autoTouch(input.face, input.edition.touch) : undefined,
+      // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
+      // except on Flip Lenticular, where a nudge could land between its two pictures.
+      ...(input.edition.id === 'lenticularflip' ? { tilt, light } : stillPose(tilt, light)),
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
@@ -89,9 +106,9 @@ export async function exportPng(input: ExportInput): Promise<string> {
   return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
 }
 
-function autoTouch(face: HTMLCanvasElement, phase: number) {
-  const a = autoTouchFor(face);
-  a.at(phase);
+function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
+  const a = autoTouchFor(face, kind);
+  a.at(3 + AUTO_STILL[kind]);
   return a;
 }
 
@@ -123,13 +140,15 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
   if (input.layers) cards.setLayers(input.layers, !input.faceAt);
+  cards.setFlip(input.flip ?? null);
   cards.resize(W, H, 1);
   const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
   // Animated sources repaint their own face canvases so the live card is left alone.
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
-  const touch = input.edition.touch ? autoTouchFor(input.face) : null;
+  const kind = input.edition.touch;
+  const touch = kind ? autoTouchFor(input.face, kind) : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
   const ch = 640 * k;
@@ -145,7 +164,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
-      touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL : p));
+      if (kind) touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL[kind] : p));
       if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const { rx, ry } = pose;
@@ -163,7 +182,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           intensity: input.intensity,
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
           tilt: pose.tilt,
-          light: pose.light,
+          // Blacklight's lamp sweeps slowly round the art instead (unless the tune fixes the light).
+          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(p * loopCycles(tune)) : pose.light,
           alpha: 1,
           flash: 0,
           shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
@@ -221,6 +241,7 @@ export async function exportGif(
   onProgress?: (p: number, encoding: boolean) => void,
   opts: GifOptions = { clear: false, matte: 'auto' },
 ): Promise<string> {
+  await packLoaded(input.edition);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   const result = new Promise<ArrayBuffer>((resolve, reject) => {

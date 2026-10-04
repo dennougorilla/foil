@@ -99,15 +99,17 @@
           </aside>
         </div>
         <div class="hand-wrap">
-          <div class="hand" id="hand" role="radiogroup">
-            <p class="hand-peek" id="handPeek" aria-hidden="true" hidden></p>
+          <div class="hand-row">
+            <div class="hand" id="hand" role="radiogroup">
+              <p class="hand-peek" id="handPeek" aria-hidden="true" hidden></p>
+            </div>
+            <div class="deck-dock" id="deckDock"></div>
           </div>
           <div class="hand-bar">
             <button class="chip chip-icon hand-step" id="handPrev" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2h2v2H9zM7 4h2v2H7zM5 6h2v4H5zm2 4h2v2H7zm2 2h2v2H9z" /></svg></button>
             <p class="hand-caption" id="handCaption" aria-hidden="true"><i data-t="finishLabel"></i><b></b><span></span></p>
             <button class="chip chip-icon hand-step" id="handNext" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2h2v2H5zm2 2h2v2H7zm2 2h2v4H9zm-2 4h2v2H7zm-2 2h2v2H5z" /></svg></button>
           </div>
-          <p class="hand-hint" data-t="handHint"></p>
         </div>
       </main>
 
@@ -172,6 +174,12 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5h4v8H1zm4-2h4v1H6v9H4V4h1zm5-1h4v8h-4zM9 3h1v9H9z" /></svg>
               <span data-t="finishPick"></span>
             </button>
+          </div>
+          <div class="flip-row" id="flipRow" hidden>
+            <span class="flip-thumb" id="flipThumb" aria-hidden="true"></span>
+            <span class="flip-text"><b data-t="flipLabel"></b><small><span id="flipNow"></span> <button class="link" id="flipClear" type="button" data-t="flipClear"></button></small></span>
+            <button class="finish-pick" id="flipPick" type="button" data-t="flipPick"></button>
+            <input type="file" id="flipInput" accept="image/png,image/apng,.apng,image/jpeg,image/webp,image/gif,image/avif,image/bmp" hidden />
           </div>
         </section>
 

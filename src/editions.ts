@@ -1,3 +1,5 @@
+import type { TouchKind } from './touch/heat';
+
 export type EditionId =
   | 'base'
   | 'foil'
@@ -18,10 +20,21 @@ export type EditionId =
   | 'warmth'
   | 'shadowbox'
   | 'shallows'
-  // Shaders in src/gl/sponsorShaders.ts
+  | 'platinum'
+  | 'cosmoholo'
+  | 'stainedglass'
+  | 'glow'
+  | 'blacklight'
+  | 'lenticular3d'
+  | 'lenticularflip'
+  | 'stardust'
+  | 'snowglobe'
+  // Shaders in src/gl/finishes/supporter.ts
   | 'kintsugi'
   | 'opal'
-  | 'raden';
+  | 'raden'
+  | 'confetti'
+  | 'fireworks';
 
 export interface Edition {
   id: EditionId;
@@ -34,11 +47,18 @@ export interface Edition {
   value: number;
   /** Smooth gradients that band in 256 colours: its GIF is dithered. */
   dither?: boolean;
-  /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a heat field. */
-  touch?: boolean;
+  /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a field of this kind. */
+  touch?: TouchKind;
+  /**
+   * Its light is an ultraviolet lamp: it sits exactly under the pointer, drifts slowly by itself
+   * otherwise, and a drag on the card moves it instead of tossing the card.
+   */
+  torch?: boolean;
+  /** Reads the picture's depth (src/depth), so choosing it starts the depth model. */
+  depth?: boolean;
 }
 
-/** Hand order. Only the first seven are out from the start; the rest are secrets (src/secrets.ts, src/sponsor.ts). */
+/** Every finish. The hand starts with OPEN_EDITIONS; the rest come in packs (src/packs.ts). */
 export const EDITIONS: Edition[] = [
   { id: 'base', shader: 0, color: '#c9d3d4', swirl: ['#142024', '#a83a33', '#25706b'], value: 0 },
   { id: 'foil', shader: 1, color: '#5fb4ff', swirl: ['#0f1c33', '#2d6fd6', '#9cc8ff'], value: 2 },
@@ -56,13 +76,27 @@ export const EDITIONS: Edition[] = [
   { id: 'crystal', shader: 13, color: '#e8f6ff', swirl: ['#101522', '#5a6ea8', '#d8e6ff'], value: 6 },
   { id: 'sakura', shader: 14, color: '#ffa8c8', swirl: ['#1e0f1a', '#b8497a', '#ffd0e0'], value: 4 },
   { id: 'relief', shader: 15, color: '#e3bf72', swirl: ['#07090d', '#1c2633', '#4d6274'], value: 7, dither: true },
-  { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: true },
-  { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6 },
+  { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: 'warmth' },
+  { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6, depth: true },
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
-  // Shaders in src/gl/sponsorShaders.ts.
+  { id: 'platinum', shader: 24, color: '#dfe6ee', swirl: ['#0a0d12', '#2b3440', '#aeb9c6'], value: 7, dither: true },
+  { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
+  { id: 'stainedglass', shader: 26, color: '#e8a33c', swirl: ['#0a0710', '#3a1f4a', '#c0532e'], value: 6 },
+  { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
+  // Shader in src/gl/blacklight.ts.
+  { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
+  // Shader in src/gl/lenticular3d.ts.
+  { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
+  { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6 },
+  { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
+  // Glitter particles on the GPU, see src/gl/snowglobe.ts.
+  { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7 },
+  // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
   { id: 'raden', shader: 43, color: '#b9a6ff', swirl: ['#07060a', '#2c1a3a', '#4fc0c8'], value: 8 },
+  { id: 'confetti', shader: 80, color: '#ffcf5a', swirl: ['#1a0f24', '#a8386a', '#e8b94e'], value: 8 },
+  { id: 'fireworks', shader: 82, color: '#ffc24a', swirl: ['#04061a', '#1a2658', '#d89a3a'], value: 8, dither: true },
 ];
 
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];

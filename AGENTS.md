@@ -2,6 +2,8 @@
 
 Instructions for coding agents working on FOIL. `README.md` describes the product, development and release commands.
 
+A new finish always goes into a pack (its shader in that pack's module, never the core card shader); `docs/packs.md` says how, and how the pack opening is designed.
+
 ## Premise
 
 FOIL is under active development (pre-1.0). **Do not keep backward compatibility or write data migrations.** Remove old formats, old APIs and compatibility branches instead of carrying them, and always rewrite toward the ideal, simplest (KISS) code. When saved settings (`localStorage`) or stored images (IndexedDB) no longer match the current shape, discard them and start from defaults instead of migrating.

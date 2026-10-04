@@ -49,7 +49,7 @@ const ICONS: Record<string, string> = {
 };
 
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
-const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'kintsugi', 'opal']);
+const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'blacklight', 'stardust', 'snowglobe', 'kintsugi', 'opal', 'confetti', 'fireworks']);
 
 const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -494,7 +494,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
     // the current finish or mode makes them do nothing.
     const row = (k: Key) => root.querySelector<HTMLElement>(`.tune-row[data-key="${k}"]`)!;
     row('lightAngle').hidden = tune.light !== 'fixed';
-    // The metal only shows on Relief, so a locked secret leaves no trace here.
+    // The metal only shows on Relief, so it stays out of sight until the Metal pack is opened and Relief picked.
     row('metal').hidden = s.edition !== 'relief';
     for (const def of GROUPS) {
       const reasons = new Map(def.keys.map((k) => [k, whyIdle(k, s)]));

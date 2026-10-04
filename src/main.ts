@@ -1,14 +1,14 @@
 import './style.css';
 import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
-import { EDITIONS, FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawBack, drawFace, type Crop } from './card/face';
-import { mountShadowDepth } from './depth/shadowDepth';
+import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
+import { clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
+import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
 import { exportGif, exportPng } from './exporter';
-import { loadUserImage, saveUserImage } from './imageStore';
+import { forgetUserImage, loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
 import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
@@ -17,14 +17,28 @@ import { mountLettering } from './letteringPanel';
 import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
-import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
+import { initPackStore, packs, releaseSealedEdition } from './packStore';
+import { addToHand, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
+import { loadPack } from './gl/finishes/registry';
+import { mountDeck } from './deck';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/** The finish of the earlier "drawn card" slot, read before the store rewrites its save (see docs/packs.md). */
+const legacyDrawn = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem('foil:v1') ?? '{}') as { drawn?: unknown; hand?: unknown };
+    return v.hand ? null : (v.drawn as EditionId | undefined) ?? null;
+  } catch {
+    return null;
+  }
+})();
 const store = createStore();
-releaseLockedEdition(store);
+releaseSealedEdition(store);
+/** The hand: seven cards, in their order. */
+const hand = () => store.get().hand;
 let t: Dict = DICTS[store.get().lang];
 
 // ---------- Images ----------
@@ -62,7 +76,8 @@ try {
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
     onFlick: (dir) => stepEdition(dir),
-    isHidden: isLocked,
+    handIds: hand,
+    deckRect: () => document.getElementById('deckBtn')?.getBoundingClientRect() ?? null,
   });
 } catch (err) {
   console.error(err);
@@ -72,14 +87,33 @@ try {
   throw err;
 }
 stage.cards.setBack(back);
-// The Shadowbox finish cuts the art into sheets by depth; it only starts work once chosen.
-const depth = mountShadowDepth({
-  store,
-  cards: stage.cards,
-  slot: $('cardSlot'),
-  dict: () => t,
-  animated: () => !!userAnim && store.get().sample < 0,
-});
+// Shadowbox and 3D Lenticular read the art's depth; its code loads the first time one is chosen.
+let depth: ShadowDepth | null = null;
+let depthLoading = false;
+function wakeDepth() {
+  if (depth || depthLoading || !editionById(store.get().edition).depth) return;
+  depthLoading = true;
+  void import('./depth/shadowDepth').then((m) => {
+    depth = m.mountShadowDepth({
+      store,
+      cards: stage.cards,
+      slot: $('cardSlot'),
+      dict: () => t,
+      animated: () => !!userAnim && store.get().sample < 0,
+    });
+    depth.update(face, artKey());
+  })
+    .catch((err) => console.error(err))
+    // A failed fetch (offline) is tried again the next time a depth finish is chosen.
+    .finally(() => (depthLoading = false));
+}
+
+/** Fetches the packs of the finish on the card and of the hand's cards; they deal in once ready. */
+function wakePacks() {
+  const s = store.get();
+  for (const id of new Set([s.edition, ...s.hand].map((e) => packOf(e)?.id))) if (id) loadPack(id).catch(() => toast(t.pack.failed, true));
+  wakeDepth();
+}
 const artIds = new WeakMap<object, number>();
 let artCount = 0;
 /** Names the art in the window (picture and crop), so depth is read once per art. */
@@ -95,12 +129,17 @@ function faceSpec(image: Img) {
   return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor };
 }
 
+/** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
+let faceVersion = 0;
+const thumbKey = () => `${faceVersion}|${JSON.stringify(store.get().tune)}|${store.get().intensity}`;
+
 function redrawFace() {
+  faceVersion++;
   const spec = faceSpec(currentImage());
   drawFace(face, mask, spec);
   stage.cards.setFace(face, mask);
   rangeColors.onFace(face, mask, spec);
-  depth.update(face, artKey());
+  depth?.update(face, artKey());
 }
 
 // ---------- Text ----------
@@ -145,6 +184,7 @@ function applyText() {
     $(id).setAttribute('aria-label', label);
     $(id).title = label;
   }
+  $('hand').title = t.handHint;
   stage.setHandLabels(t.edition, t.look);
   // Written into the fade at the foot of the sheet when more of it waits below.
   $('panel').style.setProperty('--more-text', JSON.stringify(t.moreBelow));
@@ -175,7 +215,7 @@ function renderInfo() {
   const pe = $('pillEdition');
   pe.textContent = t.edition[s.edition];
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
-  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal'].includes(s.edition));
+  pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal', 'confetti', 'fireworks'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
   // The panel names the finish on the card (beside a live proof of it) and points to the hand where it is picked.
   $('finishName').textContent = t.edition[s.edition];
@@ -183,6 +223,7 @@ function renderInfo() {
   $('recapFinishName').textContent = t.edition[s.edition];
   $('finishPick').setAttribute('aria-label', t.finishPick);
   $('finishPick').title = matchMedia('(max-width: 900px)').matches ? t.finishPickHintPhone : t.finishPickHint;
+  renderFlip();
 }
 
 $('finishPick').addEventListener('click', () => {
@@ -603,14 +644,76 @@ fileInput.addEventListener('change', () => {
   });
 }
 
+// ---------- Flip Lenticular's other picture ----------
+
+const flip = document.createElement('canvas');
+/** The picture Flip Lenticular flips to; null draws the front picture in pencil instead. */
+let flipImage: Img | null = null;
+/** Someone chose or removed the picture during this visit. */
+let flipChosen = false;
+
+function setFlip(img: Img | null) {
+  flipImage = img;
+  if (img) drawFlip(flip, img);
+  stage.cards.setFlip(img ? flip : null);
+  renderFlip();
+}
+
+/** One quiet row under the finish, shown only while Flip Lenticular is on the card. */
+function renderFlip() {
+  const s = store.get();
+  $('flipRow').hidden = s.edition !== 'lenticularflip';
+  const front = s.sample >= 0 ? samples[s.sample] : (userImage ?? samples[0]);
+  const thumb = $('flipThumb');
+  thumb.style.backgroundImage = `url(${thumbUrl(flipImage ?? front)})`;
+  thumb.classList.toggle('is-auto', !flipImage);
+  $('flipNow').textContent = flipImage ? t.flipOwn : t.flipAuto;
+  $('flipClear').hidden = !flipImage;
+  $('flipPick').setAttribute('aria-label', t.flipPickLabel);
+  $('flipClear').setAttribute('aria-label', t.flipClearLabel);
+}
+
+const flipInput = $<HTMLInputElement>('flipInput');
+$('flipPick').addEventListener('click', () => flipInput.click());
+flipInput.addEventListener('change', async () => {
+  const f = flipInput.files?.[0];
+  flipInput.value = '';
+  if (!f) return;
+  if (!ACCEPT.test(f.type)) {
+    toast(t.errType.replace('{name}', f.name), true);
+    return;
+  }
+  try {
+    // An animated picture flips to its first frame.
+    const { still } = await decodeImage(f);
+    flipChosen = true;
+    setFlip(still);
+    void saveUserImage(still, 'flip');
+    sfx.tick();
+    stage.juice(0.35);
+  } catch (err) {
+    console.error(err);
+    toast(t.errDecode, true);
+  }
+});
+$('flipClear').addEventListener('click', () => {
+  flipChosen = true;
+  setFlip(null);
+  void forgetUserImage('flip');
+  sfx.tick();
+});
+
 // ---------- Edition ----------
 
+/** Counts finish picks, so a pick queued earlier can tell it was overtaken. */
+let picks = 0;
 function selectEdition(id: EditionId) {
+  picks++;
   if (store.get().edition === id) {
     stage.juice(0.5);
     return;
   }
-  const i = EDITIONS.findIndex((e) => e.id === id);
+  const i = Math.max(0, hand().indexOf(id));
   store.set({ edition: id });
   announce(t.applied.replace('{name}', t.edition[id]));
   sfx.select(i);
@@ -620,7 +723,7 @@ function selectEdition(id: EditionId) {
 
 /** Steps to the next (1) or previous (-1) card the hand holds, whatever it holds right now. */
 function stepEdition(dir: 1 | -1) {
-  const id = stepIn(stage.shownIds(), store.get().edition, dir);
+  const id = stepIn(hand(), store.get().edition, dir);
   if (id) selectEdition(id);
 }
 
@@ -642,7 +745,7 @@ window.addEventListener('keydown', (e) => {
   // 1–9 then 0 pick the first ten finishes in the hand, like a keyboard row.
   const n = parseInt(e.key, 10);
   if (!Number.isNaN(n) && e.key.length === 1) {
-    const shown = stage.shownIds();
+    const shown = hand();
     const i = n === 0 ? 9 : n - 1;
     if (shown[i]) selectEdition(shown[i]);
     return;
@@ -828,7 +931,8 @@ function exportInput() {
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     ...rangeColors.exportExtras(),
-    layers: depth.current(),
+    layers: depth?.current(),
+    flip: flipImage ? flip : undefined,
   };
 }
 
@@ -1089,6 +1193,102 @@ const apngExport = mountApngExport({
   sfx,
 });
 
+// ---------- Packs ----------
+
+/** Opens the pack shop (every pack on a tray, the first sealed one chosen). Its code loads now. */
+let opening = false;
+function openShop() {
+  if (opening) return;
+  opening = true;
+  const btn = $('packsBtn');
+  btn.setAttribute('aria-busy', 'true');
+  const wasOpened = new Set(packs.get().opened);
+  const list = shelf(packs.get());
+  void import('./pack/opening')
+    .then((m) =>
+      m.openPack({
+        pack: firstSealed(packs.get()) ?? list[0],
+        shop: list,
+        from: btn.getBoundingClientRect(),
+        isOpened: (id) => packs.isOpened(id),
+        deckRect: () => deck.rect(),
+        dict: t,
+        face,
+        mask,
+        back,
+        tune: store.get().tune,
+        intensity: store.get().intensity,
+        pause: (on) => stage.pause(on),
+        onOpened: (id) => packs.open(id),
+        onClose: (done, pick) => {
+          opening = false;
+          if (done && !wasOpened.has(done.id)) {
+            deck.bump(done.finishes.length);
+            toast(t.pack.intoDeck.replace('{name}', t.pack.name[done.id]).replace('{n}', String(done.finishes.length)));
+          }
+          // A pick in the haul comes into the hand and onto the card.
+          if (pick) useCard(pick);
+          else deck.focusShop();
+        },
+      }),
+    )
+    .catch(() => {
+      opening = false;
+      toast(t.pack.failed, true);
+    })
+    .finally(() => btn.removeAttribute('aria-busy'));
+}
+
+/** Brings a finish into the hand (the last place that is not Base when it is full) and puts it on the card. */
+function useCard(id: EditionId) {
+  const full = store.get().hand.length >= 7;
+  store.set({ hand: addToHand(store.get().hand, id) });
+  // The cards trade places first: one lands on the deck (a bump), then the big card takes the new finish.
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (full) setTimeout(() => deck.bump(), still ? 0 : 420);
+  // A card picked on the page meanwhile wins.
+  const turn = ++picks;
+  if (id !== store.get().edition) setTimeout(() => turn === picks && store.get().hand.includes(id) && selectEdition(id), still ? 0 : 560);
+}
+
+/** The deck builder changed the hand: it applies at once; a finish taken off the hand leaves the card on Base. */
+function setHand(next: EditionId[]): EditionId[] {
+  // Another tab may have sealed a pack while the builder was open.
+  next = normalizeHand(next, packs.get());
+  store.set({ hand: next });
+  if (!next.includes(store.get().edition)) selectEdition('base');
+  return next;
+}
+
+/** The deck builder: the hand's slots over everything owned; one tap moves a card. */
+let deckOpen = false;
+function viewDeck() {
+  if (deckOpen) return;
+  deckOpen = true;
+  import('./pack/deckView').then((m) =>
+    m.viewDeck({
+      dict: t,
+      owned: ownedGroups(packs.get()),
+      hand: store.get().hand,
+      starters: [...OPEN_EDITIONS],
+      key: thumbKey(),
+      face,
+      mask,
+      tune: store.get().tune,
+      intensity: store.get().intensity,
+      onChange: (next) => setHand(next),
+      onShop: () => openShop(),
+      onClose: () => {
+        deckOpen = false;
+        deck.focusDeck();
+      },
+    }),
+  ).catch(() => {
+    deckOpen = false;
+    toast(t.pack.failed, true);
+  });
+}
+
 // ---------- Logo ----------
 
 {
@@ -1102,8 +1302,8 @@ const apngExport = mountApngExport({
     logo.classList.remove('is-flip');
     void logo.offsetWidth;
     logo.classList.add('is-flip');
-    const others = EDITIONS.filter((e) => e.id !== store.get().edition && !isLocked(e.id));
-    selectEdition(others[Math.floor(Math.random() * others.length)].id);
+    const others = hand().filter((id) => id !== store.get().edition);
+    if (others.length) selectEdition(others[Math.floor(Math.random() * others.length)]);
   });
   logo.addEventListener('animationend', (e) => {
     if ((e.target as HTMLElement).matches('.tile:last-of-type')) logo.classList.remove('is-flip');
@@ -1263,12 +1463,21 @@ store.on((s, changed) => {
   if (changed.has('lang')) {
     applyText();
     redrawFace();
+    deck.render();
     return;
   }
   if (changed.has('edition')) {
+    // A finish on the card is always in the hand, however it got there.
+    if (!s.hand.includes(s.edition)) store.set({ hand: addToHand(s.hand, s.edition) });
     stage.syncHandChecked();
     renderCaption(null);
-    depth.update(face, artKey());
+    wakePacks();
+    depth?.update(face, artKey());
+  }
+  if (changed.has('hand')) {
+    wakePacks();
+    stage.syncHand();
+    deck.render();
   }
   if (changed.has('rarity') || changed.has('frame')) buildSegments();
   if (['name', 'rarity', 'frame', 'crop'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
@@ -1304,7 +1513,25 @@ mountLettering({
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 applyText();
-initSponsor(stage, store);
+initPackStore(store);
+packs.on(() => stage.syncHand());
+const deck = mountDeck({
+  host: $('deckDock'),
+  hand,
+  dict: () => t,
+  onView: () => viewDeck(),
+  onShop: () => openShop(),
+  onPrefetch: () => void import('./pack/opening'),
+});
+// The saved hand made valid; the earlier drawn card and the finish on the card take places in it.
+{
+  const s = store.get();
+  let next = normalizeHand(s.hand, packs.get());
+  if (legacyDrawn) next = normalizeHand(addToHand(next, legacyDrawn), packs.get());
+  if (!next.includes(s.edition)) next = addToHand(next, s.edition);
+  store.set({ hand: next });
+}
+wakePacks();
 const boot = () => {
   redrawFace();
   drawCropPreview();
@@ -1312,6 +1539,11 @@ const boot = () => {
 // The nameplate uses the pixel font, so wait for it before painting the face.
 document.fonts.load('40px "DotGothic16"').then(boot, boot);
 boot();
+void loadUserImage('flip').then(async (blob) => {
+  const img = blob ? await decodeImage(blob).catch(() => null) : null;
+  // A picture chosen (or removed) meanwhile wins over last visit's.
+  if (img && !flipChosen) setFlip(img.still);
+});
 if (store.get().sample < 0) {
   // Bring back the image from last visit; if it's gone, fall back to the first sample.
   void loadUserImage().then(async (blob) => {

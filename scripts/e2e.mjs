@@ -1,4 +1,4 @@
-// End-to-end check of the side panel and exports: node scripts/e2e.mjs (with the dev server running)
+// End-to-end check of the side panel, exports, the packs and the deck: node scripts/e2e.mjs (with the dev server running)
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { decompressFrames, parseGIF } from 'gifuct-js';
@@ -65,6 +65,15 @@ await step('the crop preview is sized to the picture', async () => {
 await step('content fades out above the pinned Save bar', async () => {
   const fade = await page.evaluate(() => getComputedStyle(document.querySelector('.sec-export'), '::before'));
   expect(fade.display !== 'none' && parseFloat(fade.height) >= 24, `fade is ${fade.display} / ${fade.height}`);
+});
+
+await step('nothing of a pack loads before one is opened', async () => {
+  const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth/.test(n));
+  expect(pack.length === 0, `loaded early: ${pack.join(', ')}`);
+  expect((await page.locator('.hand-slot').count()) === 7, 'the hand does not start with seven');
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '4', 'the pack button does not count four sealed packs');
+  expect((await page.textContent('#deckBtn .deck-count')) === '0', 'the deck is not empty on a first visit');
 });
 
 await step('fine-tune opens with four tabs and is remembered', async () => {
@@ -226,24 +235,295 @@ await step('GIF with a clear background is really clear', async () => {
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
 });
 
-await step('the hand opens with seven finishes; each support link unlocks one secret', async () => {
-  const shown = () => page.locator('.hand-slot:not([hidden])').count();
-  expect((await shown()) === 7, `the hand opened with ${await shown()} finishes, not seven`);
-  for (let n = 1; n <= 2; n++) {
-    await page.click('#supportBtn');
-    const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click(`.support-link >> nth=${n - 1}`)]);
-    await popup.close();
-    await page.waitForTimeout(600);
-    const unlocked = await page.evaluate(() => JSON.parse(localStorage.getItem('foil:secrets') ?? '[]'));
-    expect(unlocked.length === n, `expected ${n} secrets unlocked, got ${unlocked.length}`);
-    expect((await shown()) === 7 + n, 'the unlocked secret did not join the hand');
-    await page.keyboard.press('Escape');
+const handCount = () => page.locator('.hand-slot').count();
+const packsSaved = () => page.evaluate(() => JSON.parse(localStorage.getItem('foil:packs') ?? 'null'));
+const phase = (p) => page.waitForSelector(`.pk[data-phase=${p}]`, { timeout: 30000 });
+const overlayGone = () => page.waitForSelector('.pk', { state: 'detached', timeout: 15000 });
+
+await step('open a pack: trace the top, swipe through, the showpiece last, then try it', async () => {
+  await page.click('#packsBtn');
+  // The shop: every pack on the tray, the first sealed one chosen.
+  await phase('shop');
+  expect((await page.locator('.pk-slot').count()) === 4, 'the shop does not show the four packs');
+  expect((await page.getAttribute('.pk-slot[data-pack=metal]', 'aria-checked')) === 'true', 'the first sealed pack is not the chosen one');
+  await page.click('.pk-buy');
+  await phase('pack');
+  // Wait for the pack to settle from its flight (the guide lies level across its top).
+  await page.waitForFunction(() => {
+    const r = document.querySelector('.pk-guide').getBoundingClientRect();
+    return r.height < 8 && r.top < innerHeight * 0.4;
+  }, null, { timeout: 20000 });
+  await page.waitForTimeout(500);
+  const g = await page.locator('.pk-guide').boundingBox();
+  await page.mouse.move(g.x + 4, g.y);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width * 0.5, g.y, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  expect(!(await packsSaved())?.opened?.length, 'a trace stopped halfway opened the pack');
+  await page.mouse.move(g.x + 4, g.y);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width, g.y, { steps: 12 });
+  await page.mouse.up();
+  await phase('deck');
+  expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
+  for (const name of ['Relief', 'Gold', 'Platinum', 'Cosmo Holo']) {
+    await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
+    await page.keyboard.press('ArrowRight');
   }
-  // Secrets follow the seven open finishes in the hand, so key 8 picks the first one unlocked.
-  const first = await page.locator('.hand-slot:not([hidden]) >> nth=7').getAttribute('data-id');
-  await page.keyboard.press('8');
-  await page.waitForTimeout(400);
-  expect((await state()).edition === first, 'the unlocked secret could not be applied');
+  await page.waitForSelector('.pk.is-waiting', { timeout: 10000 });
+  expect((await page.textContent('.pk-label b')) === '？？？', 'the showpiece showed its name before it was turned over');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Crystal', null, { timeout: 15000 });
+  // Under the card, top to bottom and never overlapping, even on a low screen: progress and tag,
+  // name, line, next-step button.
+  for (const [w, h] of [[1367, 664], [1440, 900]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(500);
+    const box = await page.evaluate(() => {
+      const r = (q) => document.querySelector(q).getBoundingClientRect();
+      return { tags: r('.pk-tags'), name: r('.pk-label b'), desc: r('.pk-label small'), hint: r('.pk-hint'), vh: innerHeight };
+    });
+    const ok = box.tags.bottom <= box.name.top && box.name.bottom <= box.desc.top && box.desc.bottom <= box.hint.top && box.hint.bottom <= box.vh;
+    expect(ok, `the words under the card overlap at ${w}x${h}: ${JSON.stringify(box)}`);
+  }
+  await page.keyboard.press('ArrowRight');
+  await phase('haul');
+  expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
+  await page.click('.pk-try');
+  await overlayGone();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
+  // The proof beside step 2 still copies finished frames once the stage draws again after the opening.
+  await page.waitForTimeout(1500);
+  const proofLit = await page.evaluate(() => {
+    const c = document.querySelector('#finishProof canvas');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && d[i] + d[i + 1] + d[i + 2] > 120) lit++;
+    return lit / (d.length / 4);
+  });
+  expect(proofLit > 0.3, `the finish proof is blank after the opening (${(proofLit * 100).toFixed(0)}% lit)`);
+  const hand = (await state()).hand;
+  expect(hand.includes('crystal') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
+  expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
+  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck does not hold the other four Metal finishes and the swapped-out Glitch');
+});
+
+await step('the deck builder: one tap moves a card, a full hand gives up its last card, undo, drag, reset', async () => {
+  const hand = async () => (await state()).hand;
+  const count = () => page.textContent('.db-count');
+  await page.click('#deckBtn');
+  await page.waitForSelector('.dv.is-in', { timeout: 15000 });
+  expect((await count()) === '7 / 7', `count reads ${await count()}`);
+  expect((await page.locator('.db-grid .db-card.is-in').count()) === 7, 'the grid does not mark the seven in the hand');
+  await page.waitForSelector('.db-grid .db-pic canvas', { timeout: 30000 });
+  // Out of the hand: its slot stays open, and the next card goes there.
+  await page.click('.db-hand .db-card[data-id=holo]');
+  expect((await count()) === '6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
+  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck count did not rise');
+  await page.click('.db-grid .db-card[data-id=relief]');
+  expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
+  // Full: the last card that is not Base gives way.
+  await page.click('.db-grid .db-card[data-id=gold]');
+  const full = await hand();
+  expect(full.length === 7 && full[6] === 'gold' && !full.includes('crystal'), `a full hand did not give up its last card: ${full}`);
+  // The next tap swaps the card before it, not the card just added.
+  await page.click('.db-grid .db-card[data-id=glitch]');
+  const next = await hand();
+  expect(next[5] === 'glitch' && next[6] === 'gold', `the next tap replaced the card just added: ${next}`);
+  await page.click('.db-undo');
+  await page.click('.db-undo');
+  expect((await hand()).includes('crystal') && !(await hand()).includes('gold'), 'undo did not step back');
+  // Base cannot leave.
+  await page.click('.db-hand .db-card[data-id=base]');
+  expect((await hand()).includes('base'), 'Base left the hand');
+  // Drag a grid card onto a slot: it swaps exactly that card.
+  const from = await page.locator('.db-grid .db-card[data-id=glitch]').boundingBox();
+  const to = await page.locator('.db-slot[data-slot="1"]').boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect((await hand())[1] === 'glitch', `dragging onto slot 2 did not put Glitch there: ${await hand()}`);
+  // Back to the starting seven, and closing keeps it.
+  await page.click('.db-reset');
+  await page.click('.db-done');
+  await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
+  expect((await hand()).join() === 'base,foil,holo,poly,negative,prism,glitch', `the starting seven did not come back: ${await hand()}`);
+  expect((await state()).edition === 'base', 'a finish taken out of the hand stayed on the card');
+  expect((await handCount()) === 7, 'the page hand is not seven');
+});
+
+await step('a replay from the shop can be skipped straight to the haul and closed', async () => {
+  await page.click('#packsBtn');
+  await phase('shop');
+  await page.click('.pk-slot[data-pack=metal]', { force: true });
+  expect((await page.textContent('.pk-buy')).includes('Watch'), 'an opened pack does not offer a replay');
+  await page.click('.pk-buy');
+  await phase('pack');
+  await page.click('.pk-skip');
+  await phase('haul');
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  expect((await state()).edition === 'base', 'closing a replay changed the finish');
+});
+
+await step('held still, the pack opens with a button and the haul fades in', async () => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.click('#packsBtn');
+  await phase('shop');
+  await page.click('.pk-slot[data-pack=nature]', { force: true });
+  await page.click('.pk-buy');
+  await phase('pack');
+  await page.click('.pk-open');
+  await phase('haul');
+  await page.click('.pk-name >> nth=0');
+  await overlayGone();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
+  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the deck does not hold both packs');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+});
+
+await step('a support link puts the Supporter pack in the shop, and only then', async () => {
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '2', 'expected two sealed packs before the support link');
+  await page.click('#supportBtn');
+  const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
+  await popup.close();
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#packsBtn[data-sealed="3"]', { timeout: 5000 });
+  expect((await packsSaved()).supporter === true, 'the support link was not remembered');
+});
+
+await step('finishes unlocked by the old support links carry over as opened packs', async () => {
+  await page.evaluate(() => {
+    localStorage.removeItem('foil:packs');
+    localStorage.setItem('foil:secrets', '["shallows","kintsugi"]');
+    const s = JSON.parse(localStorage.getItem('foil:v1'));
+    // The earlier "drawn card" save: no hand, a drawn finish.
+    const { hand, ...rest } = s;
+    localStorage.setItem('foil:v1', JSON.stringify({ ...rest, edition: 'holo', drawn: 'shallows' }));
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const saved = await packsSaved();
+  expect(saved.opened.join() === 'light,supporter' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
+  expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
+  const after = await state();
+  expect(after.hand.length === 7 && after.hand.includes('shallows') && !('drawn' in after), `the drawn card did not move into the hand: ${after.hand}`);
+  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the carried-over packs are not in the deck');
+});
+
+await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {
+  await page.evaluate(() => {
+    localStorage.setItem('foil:packs', '{"opened":[],"supporter":false}');
+    const s = JSON.parse(localStorage.getItem('foil:v1'));
+    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'magma', hand: ['base', 'magma', 'foil', 'holo', 'poly', 'negative', 'prism'] }));
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const s = await state();
+  expect(s.edition === 'holo' && !s.hand.includes('magma') && s.hand.includes('base'), `got ${s.edition} / ${s.hand}`);
+  expect((await handCount()) === s.hand.length, 'the page hand does not match the saved hand');
+});
+
+await step('Confetti and Fireworks keep the message and the name, and their loops close', async () => {
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    // Exports draw a pack finish once its pack's module has arrived.
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('supporter');
+    const { drawBack, drawFace } = await import('/src/card/face.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    // A birthday message: dark lettering on a pale picture.
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    x.fillStyle = '#f4e6d0';
+    x.fillRect(0, 0, 600, 800);
+    x.fillStyle = '#e07a8a';
+    x.beginPath();
+    x.arc(300, 520, 150, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = '#2a1a3a';
+    x.font = 'bold 84px sans-serif';
+    x.textAlign = 'center';
+    x.fillText('HAPPY', 300, 200);
+    x.fillText('BIRTHDAY', 300, 300);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = mask.width = back.width = 900;
+    face.height = mask.height = back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako' });
+    drawBack(back);
+    // A flat card (no idle motion) so the art and the nameplate land on known pixels.
+    const W = 360;
+    const H = 450;
+    const tune = { ...TUNE_DEFAULTS, idle: 'none' };
+    const cw = (320 * 5) / 7;
+    const box = (u0, v0, u1, v1) => [Math.round(W / 2 + (u0 - 0.5) * cw), Math.round(H / 2 + (v0 - 0.5) * 320), Math.round(W / 2 + (u1 - 0.5) * cw), Math.round(H / 2 + (v1 - 0.5) * 320)];
+    const ART = box(0.1, 0.08, 0.9, 0.85);
+    const PLATE = box(0.1, 0.9, 0.55, 0.965);
+    const grab = (id, intensity, ps, loop = 2.4) => {
+      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune }, W, H, true, true, false);
+      const out = ps.map((p) => {
+        s.draw(p, 40, loop);
+        return s.ctx.getImageData(0, 0, W, H).data;
+      });
+      s.dispose();
+      return out;
+    };
+    const lumas = (d, [x0, y0, x1, y1]) => {
+      const v = [];
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = (y * W + x) * 4;
+        v.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      }
+      return v;
+    };
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sd = (v) => Math.sqrt(mean(v.map((a) => (a - mean(v)) ** 2)));
+    const corr = (a, b) => {
+      const ma = mean(a);
+      const mb = mean(b);
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += (a[i] - ma) * (b[i] - mb);
+      return n / a.length / (sd(a) * sd(b));
+    };
+    // Share of pixels that visibly differ, so a finish that leaves the art as it is and only adds sparks still counts.
+    const marked = (a, b) => a.filter((v, i) => Math.abs(v - b[i]) > 24).length / a.length;
+    const diff = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += Math.abs(a[i] - b[i]);
+      return n / a.length;
+    };
+    const out = {};
+    for (const id of ['confetti', 'fireworks']) {
+      const [plain] = grab(id, 0, [0]);
+      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 3.1)];
+      out[id] = {
+        shader: editionById(id).id,
+        change: marked(lumas(p0, ART), lumas(plain, ART)),
+        art: corr(lumas(p0, ART), lumas(plain, ART)),
+        plate: diff(lumas(p0, PLATE), lumas(plain, PLATE)),
+        plateContrast: sd(lumas(p0, PLATE)) / sd(lumas(plain, PLATE)),
+        seam: Math.max(diff(p0, p1), diff(p0b, p1b)),
+        moves: diff(p0, half),
+      };
+    }
+    return out;
+  });
+  for (const [id, r] of Object.entries(report)) {
+    const f = (v) => v.toFixed(2);
+    expect(r.shader === id, `${id} is not a finish`);
+    expect(r.change > 0.02, `${id} barely changes the picture (${f(r.change * 100)}% of it)`);
+    expect(r.art > 0.75, `${id} hides the message (correlation ${f(r.art)})`);
+    expect(r.plate < 4 && r.plateContrast > 0.9, `${id} covers the name (diff ${f(r.plate)}, contrast ${f(r.plateContrast)})`);
+    expect(r.seam < 0.6, `${id} jumps where its loop closes (${f(r.seam)})`);
+    expect(r.moves > r.seam * 4, `${id} does not move along its loop (${f(r.moves)})`);
+  }
 });
 
 await step('phones: the live preview rides in the Save stub, never over the controls', async () => {
@@ -330,6 +610,86 @@ await step('phone: ?quality pins the drawing level and lowers the card resolutio
   const full = await width(0);
   const low = await width(3);
   expect(low < full * 0.6, `the lowest level drew ${low}px wide, full drew ${full}px`);
+});
+
+await step('Raden and Opal change the picture clearly, keep it, and answer the tilt', async () => {
+  // Held still (reduced motion), so two shots differ only by the finish and the pointer.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    localStorage.clear();
+    // The Supporter pack opened, with Raden and Opal in the hand.
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['supporter'], supporter: true }));
+    localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'raden', 'opal'] }));
+    sessionStorage.setItem('seeded', '1');
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(2000);
+  const card = p.locator('#cardSlot');
+  // Luminance and colour of the middle of the art window, read back from a screenshot.
+  const art = async (id, fx, fy) => {
+    await p.$eval(`.hand-slot[data-id=${id}]`, (el) => el.click());
+    const b = await card.boundingBox();
+    await p.mouse.move(b.x + b.width * fx, b.y + b.height * fy, { steps: 4 });
+    await p.waitForTimeout(900);
+    const png = (await p.screenshot({ clip: { x: b.x + b.width * 0.15, y: b.y + b.height * 0.12, width: b.width * 0.7, height: b.height * 0.66 } })).toString('base64');
+    return p.evaluate(async (src) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${src}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+      c.drawImage(img, 0, 0);
+      return Array.from(c.getImageData(0, 0, img.width, img.height).data);
+    }, png);
+  };
+  const diff = (a, b) => {
+    let s = 0;
+    for (let i = 0; i < a.length; i += 4) s += (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 765;
+    return s / (a.length / 4);
+  };
+  // How coloured the change is: a grey haze scores 0, a shift into a strong hue scores high.
+  const tint = (a, b) => {
+    let s = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      const d = [a[i] - b[i], a[i + 1] - b[i + 1], a[i + 2] - b[i + 2]];
+      s += (Math.max(...d) - Math.min(...d)) / 255;
+    }
+    return s / (a.length / 4);
+  };
+  const corr = (a, b) => {
+    const la = [], lb = [];
+    for (let i = 0; i < a.length; i += 4) {
+      la.push(a[i] * 0.299 + a[i + 1] * 0.587 + a[i + 2] * 0.114);
+      lb.push(b[i] * 0.299 + b[i + 1] * 0.587 + b[i + 2] * 0.114);
+    }
+    const n = la.length, ma = la.reduce((x, y) => x + y) / n, mb = lb.reduce((x, y) => x + y) / n;
+    let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < n; i++) {
+      sab += (la[i] - ma) * (lb[i] - mb);
+      saa += (la[i] - ma) ** 2;
+      sbb += (lb[i] - mb) ** 2;
+    }
+    return sab / Math.sqrt(saa * sbb);
+  };
+  for (const id of ['raden', 'opal']) {
+    const base = await art('base', 0.5, 0.5);
+    const front = await art(id, 0.5, 0.5);
+    const baseA = await art('base', 0.1, 0.12);
+    const tiltA = await art(id, 0.1, 0.12);
+    const baseB = await art('base', 0.92, 0.9);
+    const tiltB = await art(id, 0.92, 0.9);
+    // How much colour the finish brings to the picture, and how much of it changes between two tilts.
+    const strength = tint(front, base);
+    const keep = corr(front, base);
+    const layerA = tiltA.map((v, i) => v - baseA[i]);
+    const layerB = tiltB.map((v, i) => v - baseB[i]);
+    const swing = diff(layerA.map((v) => v + 128), layerB.map((v) => v + 128));
+    console.log(`  ${id} strength ${strength.toFixed(3)} keep ${keep.toFixed(2)} swing ${swing.toFixed(3)}`);
+    // The faint v0.9.1 versions scored about 0.1 strength and 0.03–0.05 swing here.
+    expect(strength > 0.2, `${id} barely changes the picture (${strength.toFixed(3)})`);
+    expect(keep > 0.6, `${id} loses the picture (${keep.toFixed(2)})`);
+    expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
+  }
+  await still.close();
 });
 
 await browser.close();

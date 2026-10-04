@@ -2,11 +2,7 @@
 import { TUNE_GLSL } from '../tune/glsl';
 import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
-import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
-import { SHALLOWS_GLSL } from './shallows';
-import { RELIEF_GLSL } from '../relief';
-import { TOUCH_GLSL } from '../touch/glsl';
-import { SHADOWBOX_GLSL } from './shadowboxShader';
+import type { FinishModule } from './finishes/types';
 
 const COMMON = /* glsl */ `
 float hash12(vec2 p) {
@@ -110,6 +106,7 @@ uniform vec2 uSize;     // card size in css px
 uniform vec3 uRot;      // rx, ry, rz in radians
 uniform float uScale;
 uniform vec2 uShift;    // extra screen offset (shadow)
+uniform vec4 uUvRect;   // the part of the face on this quad: x0, y0, x1, y1 (0, 0, 1, 1 = whole card)
 out vec2 vUv;
 out float vShade;
 void main() {
@@ -125,12 +122,18 @@ void main() {
   vec2 s = uCenter + uShift + p.xy / w;
   vec2 ndc = vec2(s.x / uRes.x * 2.0 - 1.0, 1.0 - s.y / uRes.y * 2.0);
   gl_Position = vec4(ndc * w, 0.0, w);
-  vUv = aPos + 0.5;
+  vUv = mix(uUvRect.xy, uUvRect.zw, aPos + 0.5);
   vShade = p.z / (uSize.y * uScale);
 }
 `;
 
-export const CARD_FS = /* glsl */ `#version 300 es
+/**
+ * The card shader: the core (helpers, tune, range, lettering) with the seven open finishes, plus one
+ * pack's finishes when given. Each pack gets its own program, compiled only once it is needed.
+ * The per-finish rules below (which ones cover the frame, Warmth tuning its own ink) name shader
+ * indices from src/editions.ts and are harmless when that finish is not in the program.
+ */
+export const cardFs = (pack?: FinishModule) => /* glsl */ `#version 300 es
 precision highp float;
 in vec2 vUv;
 in float vShade;
@@ -148,6 +151,7 @@ uniform float uAlpha;
 uniform float uFlash;      // white flash on juice
 uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
+uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
 out vec4 o;
 ${COMMON}
 ${TUNE_GLSL}
@@ -206,18 +210,6 @@ vec3 negative(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 
-vec3 gold(vec3 c, vec2 uv, vec2 t, float L) {
-  vec3 dark = vec3(0.22, 0.1, 0.02), mid = vec3(0.92, 0.62, 0.18), hi = vec3(1.0, 0.95, 0.72);
-  vec3 ramp = L < 0.55 ? mix(dark, mid, L / 0.55) : mix(mid, hi, (L - 0.55) / 0.45);
-  vec3 col = mix(ramp, c * vec3(1.0, 0.85, 0.55), 0.22);
-  float sweep = smoothstep(0.78, 1.0, 0.5 + 0.5 * sin((uv.x + uv.y * 0.6) * 8.0 + (t.x + t.y) * 6.0));
-  col += vec3(1.0, 0.9, 0.6) * sweep * 0.55;
-  vec2 cell = floor(uv * vec2(90.0, 126.0));
-  float g = hash12(cell);
-  float tw = smoothstep(0.86, 1.0, sin(g * 40.0 + (t.x - t.y) * 9.0 + uTime * 0.8) * 0.5 + 0.5);
-  col += vec3(1.0, 0.95, 0.8) * tw * step(0.93, g) * 0.8;
-  return col;
-}
 
 vec3 prism(vec3 c, vec2 uv, vec2 t, float L) {
   vec4 v = voronoi(uv * vec2(11.0, 15.4));
@@ -231,28 +223,6 @@ vec3 prism(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 
-vec3 galaxy(vec3 c, vec2 uv, vec2 t, float L) {
-  vec2 par = t * 0.08;
-  float n = fbm(uv * 3.0 + par * 2.0 + uTime * 0.02);
-  float n2 = fbm(uv * 5.0 - par * 3.0 + 4.0);
-  vec3 nebula = mix(vec3(0.12, 0.05, 0.35), vec3(0.85, 0.25, 0.65), smoothstep(0.35, 0.75, n));
-  nebula = mix(nebula, vec3(0.2, 0.55, 1.0), smoothstep(0.5, 0.85, n2) * 0.7);
-  vec3 col = mix(c, c * 0.55 + nebula * 0.75, (1.0 - L) * 0.8 + 0.2);
-  vec2 cell = floor((uv + par) * vec2(110.0, 154.0));
-  float s = hash12(cell);
-  float tw = 0.5 + 0.5 * sin(s * 50.0 + uTime * 2.2 + (t.x + t.y) * 6.0);
-  col += vec3(1.0) * step(0.965, s) * tw * 1.1;
-  // A few bright four-point stars that drift with parallax
-  vec2 sp = (uv + par * 2.5) * vec2(7.0, 9.8);
-  vec2 sc = floor(sp);
-  vec2 so = fract(sp) - 0.25 - 0.5 * hash22(sc);
-  float big = step(0.72, hash12(sc + 9.0));
-  float cross = max(smoothstep(0.012, 0.0, abs(so.x)) * smoothstep(0.09, 0.0, abs(so.y)),
-                    smoothstep(0.012, 0.0, abs(so.y)) * smoothstep(0.09, 0.0, abs(so.x)));
-  float tw2 = 0.6 + 0.4 * sin(uTime * 3.0 + hash12(sc) * 30.0);
-  col += vec3(0.85, 0.9, 1.0) * cross * big * tw2 * 1.2;
-  return col;
-}
 
 vec3 glitch(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   float tick = floor(uTime * 9.0);
@@ -269,138 +239,8 @@ vec3 glitch(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   col = mix(col, vec3(0.36, 1.0, 0.55) * L + vec3(0.1, 0.0, 0.2), blk * 0.7);
   return col;
 }
-
-vec3 aurora(vec3 c, vec2 uv, vec2 t, float L) {
-  // Vertical curtains whose hem ripples sideways; strongest near the top.
-  // Two layers of folded curtains; the hem ripples sideways as you tilt.
-  float wave = sin(uv.y * 4.0 + uTime * 0.35 + t.x * 1.5) * 0.08;
-  float x = (uv.x + wave) * 9.0 + t.x * 1.6;
-  float ray = fbm(vec2(x, uTime * 0.1 + t.y * 0.5));
-  float ray2 = fbm(vec2(x * 0.5 + 11.0, uTime * 0.07));
-  ray = smoothstep(0.3, 0.75, ray) * 0.75 + smoothstep(0.35, 0.8, ray2) * 0.5;
-  float hem = 0.78 + 0.08 * sin(uv.x * 5.0 + uTime * 0.5 + t.y * 2.0) + 0.04 * sin(uv.x * 17.0 - uTime);
-  float curtain = ray * smoothstep(hem, hem - 0.6, uv.y) * smoothstep(-0.05, 0.25, uv.y);
-  // Green body, a violet fringe at the very top, teal where it fades out.
-  vec3 tone = mix(vec3(0.18, 1.0, 0.58), vec3(0.72, 0.36, 1.0), smoothstep(0.72, 0.95, 1.0 - uv.y + ray * 0.1));
-  tone = mix(tone, vec3(0.25, 0.8, 0.95), smoothstep(0.55, 0.85, uv.y));
-  vec3 col = c * vec3(0.62, 0.7, 0.85);
-  col = screen(col, tone * curtain * 1.15);
-  col += tone * 0.2 * curtain;
-  return col;
-}
-
-vec3 frost(vec3 c, vec2 uv, vec2 t, float L) {
-  float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y) * 1.4);
-  float n = fbm(uv * 9.0 + 3.0);
-  float reach = smoothstep(0.26, 0.02, edge + (n - 0.5) * 0.22);
-  // Dendrite-like streaks: ridges of a stretched noise field.
-  float ridge = 1.0 - abs(vnoise(uv * vec2(70.0, 98.0)) * 2.0 - 1.0);
-  ridge = pow(ridge, 8.0);
-  float ridge2 = pow(1.0 - abs(vnoise(uv.yx * vec2(38.0, 52.0) + 7.0) * 2.0 - 1.0), 10.0);
-  vec3 cold = mix(vec3(L), c, 0.55) * vec3(0.82, 0.94, 1.12) + vec3(0.02, 0.05, 0.1);
-  vec3 ice = vec3(0.86, 0.95, 1.0) + (ridge + ridge2) * 0.3;
-  vec3 col = mix(cold, ice, reach * (0.55 + 0.35 * max(ridge, ridge2)));
-  vec2 cell = floor(uv * vec2(70.0, 98.0));
-  float s = hash12(cell);
-  float glint = step(0.96, s) * smoothstep(0.6, 1.0, sin(s * 40.0 + (t.x - t.y) * 8.0) * 0.5 + 0.5);
-  col += vec3(0.9, 0.97, 1.0) * glint * (0.3 + reach);
-  return col;
-}
-
-vec3 magma(vec3 c, vec2 uv, vec2 t, float L) {
-  vec4 v = voronoi(uv * vec2(6.0, 8.4) + vec2(0.0, 0.3));
-  float crack = 1.0 - smoothstep(0.0, 0.09, v.y - v.x);
-  float pulse = 0.65 + 0.35 * sin(uTime * 1.8 + hash12(v.zw) * 6.28 + (t.x + t.y) * 2.0);
-  vec3 stone = c * vec3(0.5, 0.38, 0.34) + vec3(0.03, 0.01, 0.0);
-  vec3 lava = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.85, 0.3), crack * pulse);
-  vec3 col = mix(stone, lava, crack * (0.75 + 0.25 * pulse));
-  // The brightest parts of the art glow like embers.
-  col += vec3(1.0, 0.45, 0.1) * smoothstep(0.6, 0.95, L) * 0.55 * pulse;
-  col += vec3(1.0, 0.5, 0.15) * smoothstep(0.25, 0.0, v.y - v.x) * 0.12;
-  return col;
-}
-
-float dots(vec2 uv, float ang, float ink) {
-  float s = sin(ang), co = cos(ang);
-  vec2 p = mat2(co, -s, s, co) * (uv * vec2(1.0, 1.4)) * 62.0;
-  vec2 f = fract(p) - 0.5;
-  float r = sqrt(clamp(ink, 0.0, 1.0)) * 0.62;
-  return smoothstep(r + 0.06, r - 0.06, length(f));
-}
-
-vec3 halftone(vec3 c, vec2 uv, vec2 t, float L) {
-  vec2 mis = t * 0.0025; // a little misregistration as you tilt
-  vec3 ink = 1.0 - c;
-  float k = min(ink.r, min(ink.g, ink.b));
-  vec3 cmy = (ink - k) / max(1.0 - k, 1e-3);
-  float dc = dots(uv + mis, 0.26, cmy.r);
-  float dm = dots(uv - mis, 1.31, cmy.g);
-  float dy = dots(uv, 0.0, cmy.b);
-  float dk = dots(uv, 0.79, k * 1.1);
-  vec3 paper = vec3(0.98, 0.95, 0.87);
-  vec3 col = paper;
-  col *= 1.0 - dc * vec3(0.9, 0.0, 0.0) * 0.95;
-  col *= 1.0 - dm * vec3(0.0, 0.85, 0.0) * 0.95;
-  col *= 1.0 - dy * vec3(0.0, 0.0, 0.9) * 0.95;
-  col *= 1.0 - dk * 0.88;
-  return col;
-}
-
-vec3 crystal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
-  // Triangular facets that each bend the picture a little and catch their own glint.
-  vec2 p = uv * vec2(8.0, 11.2);
-  vec2 ip = floor(p), fp = fract(p);
-  float upper = step(fp.x, fp.y);
-  vec2 id = ip * 2.0 + upper;
-  vec2 n = hash22(id + 4.0) * 2.0 - 1.0;
-  vec3 bent = face(uv + n * 0.012, lod).rgb;
-  float lit = pow(max(dot(normalize(vec3(n, 1.6)), normalize(vec3(t * 0.9, 1.0))), 0.0), 18.0);
-  float line = min(min(fp.x, 1.0 - fp.y), abs(fp.x - fp.y) * 0.7071);
-  float edge = 1.0 - smoothstep(0.0, 0.025, line);
-  vec3 col = bent * (0.88 + 0.18 * n.x) + vec3(0.92, 0.96, 1.0) * lit * 0.6;
-  col += vec3(1.0) * edge * (0.06 + 0.3 * lit);
-  float disp = 0.04 * dot(n, t);
-  col += hsv2rgb(vec3(fract(hash12(id) + disp), 0.4, 1.0)) * lit * 0.25;
-  return col;
-}
-
-vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
-  vec3 col = mix(c, c * vec3(1.06, 0.9, 0.96) + vec3(0.05, 0.0, 0.03), 0.6);
-  for (int i = 0; i < 3; i++) {
-    float fi = float(i);
-    float scale = 4.0 + fi * 2.5;
-    vec2 q = uv * vec2(scale, scale * 1.4);
-    q += vec2(sin(uTime * 0.4 + fi * 2.0 + uv.y * 3.0) * 0.35, -uTime * (0.25 + fi * 0.08));
-    q += t * (0.3 + fi * 0.25);
-    vec2 cell = floor(q);
-    vec2 f = fract(q) - 0.5;
-    float h = hash12(cell + fi * 13.0);
-    if (h < 0.62) continue;
-    f -= (hash22(cell + fi) - 0.5) * 0.5;
-    float a = h * 6.28 + uTime * (0.6 + h);
-    f = mat2(cos(a), -sin(a), sin(a), cos(a)) * f;
-    // Petal: a squashed teardrop with a notch at its tip.
-    // Petal: a teardrop (round base, pointed top) with a notch cut into the tip.
-    float sz = 0.2 * (1.0 - fi * 0.18);
-    vec2 g = f / sz;
-    float w = 0.62 * (1.0 - smoothstep(-0.9, 1.0, g.y)) + 0.18;
-    float d = length(vec2(g.x / w, g.y)) - 1.0;
-    d = max(d, -(length(g - vec2(0.0, 1.0)) - 0.28));
-    float petal = smoothstep(0.08, -0.08, d);
-    float vein = smoothstep(0.08, 0.0, abs(g.x)) * smoothstep(1.0, -0.6, g.y);
-    vec3 pink = mix(vec3(0.98, 0.55, 0.7), vec3(1.0, 0.86, 0.9), smoothstep(-0.2, -0.9, d));
-    pink = mix(pink, vec3(0.95, 0.45, 0.62), vein * 0.5);
-    col = mix(col, pink, petal * (0.95 - fi * 0.15));
-  }
-  return col;
-}
-${SHALLOWS_GLSL}
 ${LETTERING_GLSL}
-${RELIEF_GLSL}
-
-${SPONSOR_GLSL}
-${TOUCH_GLSL}
-${SHADOWBOX_GLSL}
+${pack?.glsl ?? ''}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -440,28 +280,17 @@ void main() {
   else if (e == 2) col = holo(c, uv, uTilt, L);
   else if (e == 3) col = poly(c, uv, uTilt, L);
   else if (e == 4) col = negative(c, uv, uTilt, L);
-  else if (e == 5) col = gold(c, uv, uTilt, L);
   else if (e == 6) col = prism(c, uv, uTilt, L);
-  else if (e == 7) col = galaxy(c, uv, uTilt, L);
   else if (e == 8) col = glitch(c, uv, uTilt, L, lod);
-  else if (e == 9) col = aurora(c, uv, uTilt, L);
-  else if (e == 10) col = frost(c, uv, uTilt, L);
-  else if (e == 11) col = magma(c, uv, uTilt, L);
-  else if (e == 12) col = halftone(c, uv, uTilt, L);
-  else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
-  else if (e == 14) col = sakura(c, uv, uTilt, L);
-  else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
-  else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
-  else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
-  else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
-  ${SPONSOR_DISPATCH}
+  ${pack?.dispatch ?? ''}
   tPattern = false;
   uv = artUv;
-  if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
+  // Warmth tunes its own ink (see touch/glsl.ts); Flip Lenticular shows two pictures, not a tint.
+  if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12) amt = uIntensity;
-  if (e == 13) amt *= m.r; // facets only cut the art, never the nameplate
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
+  if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
   amt *= sel;
@@ -469,9 +298,13 @@ void main() {
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
-  if (e != 0) {
+  if (e == 72) {
+    // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
+  } else if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
-    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
+    // Glow's room is dim, so only a faint glare reaches it.
+    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
+    if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.6, 4.0, 0.1);

@@ -16,6 +16,8 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
+  /** The seven finishes in the hand, in order (made valid against the opened packs in main.ts). */
+  hand: EditionId[];
   rarity: RarityId;
   frame: FrameId;
   intensity: number;
@@ -53,6 +55,7 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
+  'hand',
   'rarity',
   'frame',
   'intensity',
@@ -81,6 +84,7 @@ export function createStore() {
     sound: true,
     crt: true,
     edition: 'holo',
+    hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
     rarity: 'rare',
     frame: 'paper',
     intensity: 1,

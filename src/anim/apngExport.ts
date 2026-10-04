@@ -1,6 +1,6 @@
 // High-quality animated export: the same orbit as the GIF, but full colour and with the card's
 // rounded corners and soft shadow kept on a transparent background, saved as APNG.
-import { animLoop, createScene, download, fileSafe, type ExportInput, type Scene } from '../exporter';
+import { animLoop, createScene, download, fileSafe, packLoaded, type ExportInput, type Scene } from '../exporter';
 import type { ApngRequest, ApngResponse } from './apngWorker';
 
 const W = 320;
@@ -66,6 +66,8 @@ export async function exportApng(
   onProgress: (p: number, frames: number) => void,
   signal: AbortSignal,
 ): Promise<ApngResult> {
+  if (signal.aborted) throw aborted();
+  await packLoaded(input.edition);
   if (signal.aborted) throw aborted();
   const plan = apngPlan(input.loopMs);
   const worker = new Worker(new URL('./apngWorker.ts', import.meta.url), { type: 'module' });

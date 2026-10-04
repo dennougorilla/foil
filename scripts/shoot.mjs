@@ -26,7 +26,15 @@ const shots = [
   { name: 'mobile-en', w: 390, h: 844, lang: 'en', full: true, dpr: 2 },
 ].filter((s) => s.name.includes(filter));
 
-const editions = ['base', 'foil', 'holo', 'poly', 'negative', 'gold', 'prism', 'galaxy', 'glitch', 'aurora', 'frost', 'magma', 'halftone', 'crystal', 'sakura', 'relief', 'warmth', 'shadowbox', 'shallows'];
+// The seven starters, then every pack in its reveal order.
+const editions = [
+  ...['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
+  ...['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
+  ...['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
+  ...['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
+  ...['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
+  ...['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],
+];
 const errors = [];
 
 for (const s of shots) {
@@ -39,7 +47,11 @@ for (const s of shots) {
   const page = await ctx.newPage();
   page.on('console', (m) => m.type() === 'error' && errors.push(`${s.name}: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`${s.name}: ${e.message}`));
-  await page.addInitScript(() => localStorage.clear());
+  // Every pack opened, so each finish can be swapped in from the deck.
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['metal', 'light', 'nature', 'studio', 'supporter'], supporter: true }));
+  });
   // Pinned at full quality so a slow headless GPU never lowers what the shots show.
   await page.goto(`${URL}?lang=${s.lang}&quality=0`);
   await page.waitForTimeout(2600);
@@ -101,8 +113,17 @@ for (const s of shots) {
   }
   await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
   if (s.name === 'desktop-ja') {
-    // One frame per edition, cropped to the card (secrets too: their hidden slots still take a scripted click).
+    // One frame per edition, cropped to the card; a pack's finish is swapped in from the deck first.
     for (let i = 0; i < editions.length; i++) {
+      if (!(await page.$(`.hand-slot[data-id=${editions[i]}]`))) {
+        // A full hand: the card tagged "Next out" gives way.
+        await page.click('#deckBtn');
+        await page.waitForSelector('.dv.is-in');
+        await page.click(`.db-grid .db-card[data-id=${editions[i]}]`);
+        await page.click('.db-done');
+        await page.waitForSelector('.dv', { state: 'detached' });
+        await page.waitForTimeout(1500);
+      }
       await page.$eval(`.hand-slot[data-id=${editions[i]}]`, (el) => el.click());
       await page.waitForTimeout(900);
       const b = await card.boundingBox();

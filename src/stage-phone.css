@@ -5,19 +5,12 @@
  */
 @media (max-width: 900px) {
   .stage {
-    /* What the hand takes: one row of up to seven cards, or two rows for more; less on short screens. */
+    /* What the hand of up to seven cards takes; less on short screens. */
     --hand-h: clamp(112px, 21svh, 168px);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-  }
-  .stage:has(.hand[data-many]) {
-    --hand-h: clamp(200px, 30svh, 290px);
-  }
-  /* The second row's fan curves past the hand's box; keep the name clear of it. */
-  .hand[data-many] + .hand-bar {
-    margin-top: 16px;
   }
   .showcase {
     display: contents;
@@ -50,6 +43,27 @@
   }
   .hand {
     height: var(--hand-h);
+  }
+  /* The deck and the pack button stack beside the fan within the hand's own height. */
+  .deck-dock {
+    gap: 28px;
+    padding: 6px 4px 16px 0;
+  }
+  .deck {
+    width: 40px;
+    height: 56px;
+  }
+  .deck-pile i {
+    width: 36px;
+    height: 50px;
+  }
+  .deck-packs {
+    width: 44px;
+    height: 44px;
+  }
+  .deck-dock .deck-cap {
+    margin-top: 3px;
+    font-size: 11px;
   }
   /* Just the finish's name, on one line between the steps; the panel below says more about it. */
   .hand-caption {
