@@ -257,8 +257,10 @@
     width: 18px;
     height: 18px;
   }
-  /* While Shine is tuned, the bar carries the card's live view at its left instead. */
-  body:has(.tune-peek:not([hidden])) .btn.stage-pick {
+  /* While Shine is tuned, the bar carries the card's live view at its left instead; while the motion
+     tray is open, it covers the bar. */
+  body:has(.tune-peek:not([hidden])) .btn.stage-pick,
+  body:has(.qm-tray:not([hidden])) .btn.stage-pick {
     display: none;
   }
   .sec-export:has(.tune-peek:not([hidden])) {
