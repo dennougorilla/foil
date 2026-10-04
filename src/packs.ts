@@ -55,8 +55,8 @@ export const PACKS: readonly Pack[] = [
   {
     id: 'supporter',
     finishes: ['opal', 'raden', 'kintsugi'],
-    wrap: 'kintsugi',
-    colors: ['#0a0806', '#5a3b1c', '#e9b955'],
+    wrap: 'opal',
+    colors: ['#140f1e', '#6b5aa0', '#ffe9a8'],
     supporter: true,
     load: () => import('./gl/finishes/supporter'),
   },

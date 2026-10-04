@@ -34,7 +34,7 @@ Metal, not Relief, which is subtle until it is tilted).
 | `light` Light | 光 | Galaxy → Aurora → **Shallows** | Holographic | Cosmo Holo, Phosphor (蓄光), Blacklight |
 | `nature` Nature | 自然 | Sakura → Frost → **Magma** | Sakura | — |
 | `studio` Studio | 工房 | Halftone → Warmth → **Shadowbox** | Halftone | Stained Glass, Lenticular |
-| `supporter` Supporter | サポーター限定 | Opal → Raden → **Kintsugi** | Kintsugi (gold seams on black) | — |
+| `supporter` Supporter | サポーター限定 | Opal → Raden → **Kintsugi** | Opal (rainbow on a silver-white body) | — |
 
 Why not a separate 和 (Japanese) pack: today only Sakura would be in it (Kintsugi and Raden are
 supporter finishes), and a one-card pack has no build-up. Sakura sits with the other seasons and
@@ -76,12 +76,37 @@ Nothing of a pack loads before it is opened or its folder picked:
   when available so the frame never stalls. Cards whose program is still compiling wait (hand
   cards deal in when ready; the main card arrives with its deal-in).
 - Shadowbox's depth code (worker, model, pill) loads when Shadowbox is first put on the card.
-- The opening itself (`src/pack/`: overlay, pack art, motion, sounds, CSS) is its own chunk,
-  fetched when a sealed pack is tapped or a replay is asked for, in parallel with the pack module.
+- The shop and the opening (`src/pack/`: overlay, pack art, the pillow mesh, motion, sounds, CSS)
+  are one chunk, fetched when a sealed pack is tapped or a replay is asked for. The shop then loads
+  the modules of the packs on its tray for their wrappers.
 - The support links only flip a flag; the Supporter pack module loads on opening.
 
 Measured in the PR: the first-load JS (gzip) and the time to the first card frame must not be
 worse than v0.9.3.
+
+## The shop and the pack — measured against Balatro
+
+The first version opened straight onto one pack hanging in an empty room, printed as smooth vector
+art on a single flat quad. Next to Balatro's booster packs it read as a paper flyer. What was
+missing, compared with Balatro's shop and its packs (from the game's trailers and screenshots; no
+art, sprite or font from the game is used — only the grammar):
+
+| Balatro | FOIL before | FOIL now |
+|---|---|---|
+| Packs are pixel art: a coarse grid scaled up, hard edges, dithered shading. | Smooth vector art at full resolution. | Each wrapper is drawn on a 128 × 192 pixel grid (2 : 3) and scaled up with hard pixels; the wrapper finish is computed on the same grid, so its sheen moves in blocks. |
+| A pack is a pillow: silver crimp seals top and bottom with ridges that catch the light, a body that bulges, darker left and right edges, a slightly wavy outline. | A flat rectangle with grey stripes for seals. | Silver seals with zig-zag teeth and ridge highlights; the body is a real bulging mesh, lit per pixel (dark sides, a sharp highlight that runs along the bulge and the foil's wrinkles as it tilts), so its thickness shows in perspective. |
+| Each pack has its own big illustration on a theme color, and a huge white outlined title in an arc or a speech bubble. Higher tiers get a wavy word on top and a silver-white holo body. | The same fan of cards on every pack; a small title. | A big pixel illustration per theme (gem and coin, star, blossom branch, palette and brush, crowned heart) on its color, the title in an arc of outlined letters; the Supporter pack is the top tier: silver-white body in Opal's rainbow, a wavy SUPPORTER on top. |
+| Thick dark outline, a hard dark drop shadow. | No outline; a faint soft shadow. | A 2-pixel ink outline in the art, a hard offset shadow under every pack. |
+| The shop: items sit on a dark rounded tray with a thin light rim, each bobbing and slightly tilted; hovering springs it up with a wobble and leans it to the pointer. | One pack in an empty room. | Tapping a sealed pack opens the **pack shop**: every pack on a dark rounded tray, tilted a little, bobbing; hover or focus springs one up with a wobble and leans it to the pointer; the chosen one is lifted. |
+| Descriptions in a dark rounded panel with a colored title band; keywords colored. | Small grey text in a corner. | The chosen pack's panel: a band in its color with its name, what is inside ("all 3 finishes of the theme"), three face-down mini cards, and its state. |
+| Fat rounded buttons, saturated, a thick dark lip that disappears when pressed. | A cream generic button. | "Open" is a fat red button with a dark lip that sinks when pressed. |
+| A swirling psychedelic backdrop in the current colors, CRT scanlines and grain. | The swirl, low contrast; no grain. | FOIL's swirl, faster and in the chosen pack's colors (it eases over when the choice changes), a faint grain over everything; the CRT switch adds scanlines as on the page. |
+
+The shop leads into the opening: **Open** (or a click on the lifted pack, or Enter) flies the chosen
+pack from the tray to the middle, big, and the tray and panel sink away; from there the beats below
+run as before. Opened packs sit on the tray too, stamped "opened", and offer a replay instead. Showing
+the wrappers on the tray loads the finishes of the packs on display (only once the shop is open, a
+step the person asked for); until a wrapper's finish is compiled, that pack is printed in Foil.
 
 ## Opening — what makes the references feel good
 
@@ -145,8 +170,8 @@ motes float up, Nature's are petals that drift and sway, Studio's are print dots
 yellow and paper, the Supporter pack's gold leaf. The haul is calmer than the reveal: the room dims
 and the rays drop to 40 %. Back on the page, a folder just made by an opening pops once.
 
-**Supporter pack** — everything above, one step richer: a black wrapper mended with Kintsugi's gold
-seams, a gold frame and ribbon, gold dust drifting in the room the whole time, a golden shower at the rip, every card
+**Supporter pack** — everything above, one step richer: the top-tier wrapper (silver-white body in
+Opal's rainbow, a wavy SUPPORTER on top), gold dust drifting in the room the whole time, a golden shower at the rip, every card
 gets the next tier's entrance (the first already chimes), the showpiece gets a double ray set, gold
 confetti and a lower boom, and the room takes Kintsugi's colors.
 

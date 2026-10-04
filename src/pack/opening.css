@@ -25,6 +25,7 @@
 .pk-room {
   position: absolute;
   inset: 0;
+  z-index: -2;
   overflow: hidden;
   background: var(--a);
   transition: filter 0.5s var(--ease-out);
@@ -450,13 +451,21 @@
   left: 50%;
   top: calc(var(--hint-y, 80%) + 44px);
   width: auto;
-  min-width: 168px;
-  min-height: 46px;
+  min-width: 200px;
+  min-height: 52px;
+  padding: 6px 26px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ff6a4a, #e8452c);
+  color: #fff;
+  font-size: 20px;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 0 #8a2414, 0 12px 20px rgba(0, 0, 0, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
   transform: translateX(-50%);
 }
 
 .pk-open:active {
-  transform: translateX(-50%) translateY(5px);
+  box-shadow: 0 0 0 #8a2414, 0 4px 10px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%) translateY(6px);
 }
 
 .pk-open[hidden],
@@ -666,5 +675,262 @@
   /* The wrapper says it already; the header keeps to the pack's name beside the buttons. */
   .pk-title small {
     display: none;
+  }
+}
+
+/* ---------- The pack shop ---------- */
+
+/* A faint film grain over the whole overlay, as on a CRT. */
+.pk::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  animation: pk-grain 0.6s steps(3) infinite;
+}
+
+@keyframes pk-grain {
+  33% { transform: translate(-3%, 2%); }
+  66% { transform: translate(2%, -3%); }
+}
+
+/* Under the canvas, which draws the packs over their slots and lets pointers through in the shop. */
+.pk-shop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 72px 12px 24px;
+  transition: opacity 0.3s, transform 0.3s var(--ease-out);
+}
+
+.pk:not([data-phase='shop']) .pk-shop {
+  opacity: 0;
+  transform: translateY(40px);
+  pointer-events: none;
+}
+
+.pk.is-opening .pk-shop {
+  visibility: hidden;
+}
+
+/* The tray: dark, rounded, a thin light rim, a heavy lip beneath. */
+.pk-tray {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(var(--slot-gap, 26px) + 36px) var(--slot-gap, 26px);
+  max-width: min(1120px, calc(100vw - 24px));
+  padding: 26px 28px 46px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(20, 26, 31, 0.94), rgba(10, 14, 17, 0.96));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16), inset 0 3px 0 rgba(255, 255, 255, 0.06), 0 8px 0 #05080a, 0 24px 50px rgba(0, 0, 0, 0.55);
+}
+
+.pk-slot {
+  position: relative;
+  width: var(--slot-w, 160px);
+  height: var(--slot-h, 240px);
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pk-slot:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 8px;
+}
+
+/* A price-tag-like name under each pack. */
+.pk-price {
+  position: absolute;
+  left: 50%;
+  bottom: -30px;
+  padding: 1px 10px 2px;
+  border-radius: 6px;
+  background: #0b1012;
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14);
+  transform: translateX(-50%);
+}
+
+.pk-slot[aria-checked='true'] .pk-price {
+  background: var(--gold);
+  color: var(--paper-ink);
+  box-shadow: 0 2px 0 #8a6a1c;
+}
+
+/* The chosen pack's panel: a band in its color with its name, then what is inside. */
+.pk-panel {
+  width: min(540px, calc(100vw - 24px));
+  border-radius: 18px;
+  overflow: hidden;
+  background: #11171b;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14), 0 7px 0 #05080a, 0 18px 36px rgba(0, 0, 0, 0.5);
+}
+
+.pk-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 18px 9px;
+  background: var(--b);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.28), inset 0 2px 0 rgba(255, 255, 255, 0.18);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+.pk-band b {
+  font-weight: 400;
+  font-size: 24px;
+  color: #fff;
+}
+
+.pk-tier:empty {
+  display: none;
+}
+
+.pk-tier {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 14px;
+  text-shadow: none;
+  box-shadow: 0 2px 0 #8a6a1c;
+}
+
+.pk-body {
+  display: grid;
+  gap: 6px;
+  padding: 12px 18px 4px;
+}
+
+.pk-desc {
+  margin: 0;
+  font-size: 18px;
+}
+
+.pk-desc em {
+  font-style: normal;
+  color: var(--c);
+}
+
+.pk-note {
+  margin: 0;
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.75);
+}
+
+/* One small face-down card per finish inside, the showpiece's with a star. */
+.pk-minis {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pk-minis i {
+  position: relative;
+  width: 22px;
+  height: 31px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(135deg, var(--b) 0 4px, var(--a) 4px 8px);
+  box-shadow: 0 0 0 2px #f3eee2, 0 0 0 4px #0b1012, 0 4px 0 2px #0b1012;
+}
+
+.pk-minis i.is-star::after {
+  content: '★';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--gold);
+  text-shadow: 0 1px 0 #0b1012;
+}
+
+.pk-buy-row {
+  padding: 12px 18px 18px;
+}
+
+/* The one big button: fat, rounded, saturated, a dark lip that disappears when pressed. */
+.pk-buy {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 24px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ff6a4a, #e8452c);
+  color: #fff;
+  font-size: 24px;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 0 #8a2414, 0 12px 20px rgba(0, 0, 0, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.06s, box-shadow 0.06s, filter 0.15s;
+}
+
+.pk-buy:hover {
+  filter: brightness(1.1);
+}
+
+.pk-buy:active {
+  transform: translateY(6px);
+  box-shadow: 0 0 0 #8a2414, 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.pk-buy.is-replay {
+  background: linear-gradient(180deg, #4ab0ff, #2a7ad8);
+  box-shadow: 0 6px 0 #164a8a, 0 12px 20px rgba(0, 0, 0, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.pk-buy:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 5px;
+}
+
+/* In the shop the header keeps only the close button; the pack's own words are in the panel. */
+.pk[data-phase='shop'] .pk-title,
+.pk[data-phase='shop'] .pk-skip,
+.pk[data-phase='shop'] .pk-hint,
+.pk.is-leaving .pk-title {
+  visibility: hidden;
+}
+
+.pk.is-still::after {
+  animation: none;
+}
+
+.pk[data-phase='shop'] .pk-stage {
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .pk-shop {
+    gap: 14px;
+    padding: 64px 8px 16px;
+  }
+  .pk-tray {
+    padding: 18px 14px 40px;
+  }
+  .pk-band b {
+    font-size: 20px;
+  }
+  .pk-desc {
+    font-size: 16px;
+  }
+  .pk-price {
+    font-size: 13px;
+    bottom: -27px;
   }
 }

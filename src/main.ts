@@ -18,7 +18,7 @@ import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { handOf, packOf, type Pack } from './packs';
+import { handOf, packOf, shelf, type Pack } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountShelf } from './shelf';
 
@@ -1057,41 +1057,44 @@ const apngExport = mountApngExport({
 
 // ---------- Packs ----------
 
-/** Opens a sealed pack, or replays an opened one. The opening's code and the pack's finishes load now. */
+/**
+ * A sealed pack opens the pack shop (every pack on a tray, that one chosen); a replay starts the
+ * opening at once. The shop's and the opening's code load now, and the packs' finishes with them.
+ */
 let opening = false;
 function openPack(pack: Pack, from: DOMRect) {
   if (opening) return;
   opening = true;
   const chip = document.querySelector<HTMLElement>(`.pk-chip[data-pack="${pack.id}"]`);
   chip?.setAttribute('aria-busy', 'true');
-  const replay = packs.isOpened(pack.id);
-  const finishes = loadPack(pack.id);
+  const wasOpened = new Set(packs.get().opened);
   void import('./pack/opening')
     .then((m) =>
       m.openPack({
         pack,
+        shop: wasOpened.has(pack.id) ? undefined : shelf(packs.get()),
         from,
-        replay,
+        isOpened: (id) => packs.isOpened(id),
         dict: t,
         face,
         mask,
         back,
         tune: store.get().tune,
         intensity: store.get().intensity,
-        finishes,
         pause: (on) => stage.pause(on),
-        onOpened: () => packs.open(pack.id),
-        onClose: (pick) => {
+        onOpened: (id) => packs.open(id),
+        onClose: (done, pick) => {
           opening = false;
-          // A pack just opened becomes the folder in the hand; a pick also goes on the card. Closed
-          // before the tear, it stays sealed and nothing changes.
-          if (packs.isOpened(pack.id) && (!replay || pick)) store.set({ folder: pack.id });
-          if (packs.isOpened(pack.id) && !replay) {
-            shelfUi.greet(pack.id);
-            toast(t.pack.folded.replace('{name}', t.pack.name[pack.id]));
+          if (!done) return shelfUi.focus(pack.id);
+          // A pack just opened becomes the folder in the hand; a pick also goes on the card.
+          const fresh = !wasOpened.has(done.id);
+          if (fresh || pick) store.set({ folder: done.id });
+          if (fresh) {
+            shelfUi.greet(done.id);
+            toast(t.pack.folded.replace('{name}', t.pack.name[done.id]));
           }
           if (pick && pick !== store.get().edition) stage.flipTo(() => selectEdition(pick));
-          shelfUi.focus(pack.id);
+          shelfUi.focus(done.id);
         },
       }),
     )

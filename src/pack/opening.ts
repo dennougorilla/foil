@@ -8,40 +8,42 @@
 import './opening.css';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type CardDraw, type Particle, type RGB } from '../gl/renderers';
 import { editionById, type EditionId } from '../editions';
-import { tierOf, type Pack } from '../packs';
+import { PACKS, tierOf, type Pack } from '../packs';
 import type { Dict } from '../i18n';
 import type { PackId } from '../packs';
 import { tuneGl, type Tune } from '../tune/model';
-import type { FinishModule } from '../gl/finishes/types';
+import { loadPack } from '../gl/finishes/registry';
 import { Spring } from '../stage';
 import { sfx } from '../audio';
 import { paintPack, paintShowpieceBack, PACK_H, PACK_W, TEAR_Y } from './packArt';
 import { buzz, packSfx } from './sounds';
+import { Pillow, type Print } from './pillow';
 import { PACK_EN } from '../packText';
 
 export interface OpeningOptions {
+  /** The pack asked for: chosen in the shop at first, or opened straight away (a replay). */
   pack: Pack;
-  /** The shelf chip the pack flies out of. */
+  /** The packs on the shop's tray; without them the opening starts at once. */
+  shop?: Pack[];
+  /** The shelf chip the pack flies out of when there is no shop. */
   from: DOMRect;
-  /** Opened before: watching it again. */
-  replay: boolean;
+  /** Whether a pack was opened before (it is watched again). */
+  isOpened: (id: PackId) => boolean;
   dict: Dict;
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   back: HTMLCanvasElement;
   tune: Tune;
   intensity: number;
-  /** The pack's finishes arriving (src/gl/finishes/registry.ts). */
-  finishes: Promise<FinishModule>;
   /** Stops the stage underneath from drawing while the overlay is up. */
   pause: (on: boolean) => void;
   /** The pack counts as opened from the tear (or a skip) on. */
-  onOpened: () => void;
-  /** Closed; `pick` is the finish chosen to try, if any. */
-  onClose: (pick: EditionId | null) => void;
+  onOpened: (id: PackId) => void;
+  /** Closed; `opened` is the pack that was opened or watched (none if closed in the shop), `pick` the finish chosen to try. */
+  onClose: (opened: Pack | null, pick: EditionId | null) => void;
 }
 
-type Phase = 'load' | 'pack' | 'rip' | 'draw' | 'deck' | 'haul' | 'closing';
+type Phase = 'shop' | 'load' | 'pack' | 'rip' | 'draw' | 'deck' | 'haul' | 'closing';
 
 interface CardSim {
   id: EditionId;
@@ -83,32 +85,37 @@ const STYLES: Record<PackId, { palette: string[]; g: number; drag: number; sway:
 const GOLD: RGB = hexToRgb('#f2c14e');
 
 export function openPack(o: OpeningOptions) {
-  const { pack, dict } = o;
+  const { dict } = o;
   const t = dict.pack;
-  const rich = !!pack.supporter;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const coarse = matchMedia('(pointer: coarse)').matches;
-  const name = t.name[pack.id];
-  const n = pack.finishes.length;
-  const colors = pack.colors.map(hexToRgb) as [RGB, RGB, RGB];
-  const style = STYLES[pack.id];
-  const themed = style.palette.map(hexToRgb);
+  // The pack being opened and what follows from it; set by setPack (in the shop, when one is chosen).
+  let pack = o.pack;
+  let rich = false;
+  let name = '';
+  let n = 0;
+  let colors: [RGB, RGB, RGB] = [WHITE, WHITE, WHITE];
+  let style = STYLES[pack.id];
+  let themed: RGB[] = [];
   /** The room's swirl: the pack's dark and mid tones, its light one held back so the cards stay the brightest thing. */
-  const room = [colors[0], colors[1], colors[1].map((v, i) => v * 0.6 + colors[2][i] * 0.2)] as [RGB, RGB, RGB];
+  let room: [RGB, RGB, RGB] = [WHITE, WHITE, WHITE];
+  /** The swirl's colors now, easing toward `room` when the choice changes. */
+  let roomNow: [RGB, RGB, RGB] | null = null;
+  /** The pillow's highlight: white, warmed by the pack's light tone. */
+  let sheen: RGB = WHITE;
+  let replay = false;
+  let wrap = 0;
+  /** The pack's wrapper face in the renderer, and the texture it is printed into with its finish. */
+  let packKey = '';
 
   // ---------- DOM ----------
 
   const root = document.createElement('div');
   root.className = 'pk';
-  if (rich) root.classList.add('is-supporter');
   if (reduced) root.classList.add('is-still');
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
-  root.setAttribute('aria-label', t.dialog.replace('{name}', name));
   root.tabIndex = -1;
-  root.style.setProperty('--a', pack.colors[0]);
-  root.style.setProperty('--b', pack.colors[1]);
-  root.style.setProperty('--c', pack.colors[2]);
   root.innerHTML = `
     <div class="pk-room" aria-hidden="true"><canvas class="pk-swirl"></canvas></div>
     <div class="pk-flash" aria-hidden="true"></div>
@@ -128,8 +135,16 @@ export function openPack(o: OpeningOptions) {
         <button class="pk-x" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></button>
       </div>
     </header>
+    <div class="pk-shop">
+      <div class="pk-tray" role="radiogroup"></div>
+      <section class="pk-panel">
+        <header class="pk-band"><b></b><span class="pk-tier"></span></header>
+        <div class="pk-body"><p class="pk-desc"></p><p class="pk-note"></p><div class="pk-minis" aria-hidden="true"></div></div>
+        <div class="pk-buy-row"><button class="pk-buy" type="button"></button></div>
+      </section>
+    </div>
     <p class="pk-hint" aria-hidden="true"></p>
-    <button class="btn btn-paper pk-open" type="button"></button>
+    <button class="pk-open" type="button"></button>
     <div class="pk-label" aria-hidden="true"><span class="pk-tags"><span class="pk-step"></span><span class="pk-tag"></span></span><b></b><small></small></div>
     <div class="pk-haul">
       <p class="pk-haul-title"><b></b><small></small></p>
@@ -154,17 +169,11 @@ export function openPack(o: OpeningOptions) {
   const openBtn = $<HTMLButtonElement>('.pk-open');
   const skipBtn = $<HTMLButtonElement>('.pk-skip');
   const live = $('.pk-live');
-  $('.pk-title b').textContent = t.title.replace('{name}', name);
-  $('.pk-title small').textContent = rich ? t.thanks : t.count.replace('{n}', String(n));
   skipBtn.querySelector('span')!.textContent = t.skip;
   $('.pk-x').setAttribute('aria-label', t.close);
   $('.pk-x').title = t.close;
   openBtn.textContent = t.openBtn;
   hintEl.textContent = t.loading;
-  $('.pk-haul-title b').textContent = (o.replay ? t.haulReplay : t.haul).replace('{name}', name).replace('{n}', String(n));
-  // Under the title, the one thing to do now; where the folder went is said on the page afterwards.
-  $('.pk-haul-title small').textContent = t.haulHint;
-  $('.pk-try').textContent = t.try.replace('{finish}', dict.edition[pack.finishes[n - 1]]);
   $('.pk-close').textContent = t.close;
   document.body.appendChild(root);
   root.focus({ preventScroll: true });
@@ -179,30 +188,50 @@ export function openPack(o: OpeningOptions) {
   // ---------- GL ----------
 
   const r = new CardRenderer(canvas);
+  const pillow = new Pillow(r);
+  /** Each wrapper's printed texture (one per pack on the tray, or just the one being opened). */
+  const prints = new Map<PackId, Print>();
+  let print: Print | undefined;
   // The room: FOIL's own swirl, in the pack's colors, drawn small and scaled up pixelated.
   const swirl = new BackgroundRenderer($<HTMLCanvasElement>('.pk-swirl'));
   r.tune = tuneGl(o.tune);
   r.setFace(o.face, o.mask);
-  // Only the showpiece is ever seen face down, so the overlay's card back is its back.
-  const back = document.createElement('canvas');
-  paintShowpieceBack(back, o.back, pack);
-  r.setBack(back);
-  const packFace = document.createElement('canvas');
-  const packMask = document.createElement('canvas');
-  const wrap = editionById(pack.wrap).shader;
-  const paint = () =>
-    paintPack(packFace, packMask, pack, {
-      big: PACK_EN.name[pack.id].toUpperCase(),
-      count: t.count.replace('{n}', String(n)),
-      ribbon: rich ? t.supporterTag : undefined,
+  /** Paints a wrapper into the renderer under its own name ('pack-metal'…). */
+  const painted = new Set<PackId>();
+  const paintWrapper = (p: Pack) => {
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    paintPack(face, mask, p, {
+      big: p.supporter ? 'THANKS' : PACK_EN.name[p.id].toUpperCase(),
+      line: t.title.replace('{name}', t.name[p.id]),
+      top: p.supporter ? 'SUPPORTER' : undefined,
     });
-  paint();
-  r.setFace(packFace, packMask, 'pack');
-  // The pixel font may still be on its way the first time; repaint once it is in.
-  void document.fonts.load('76px Silkscreen').then(() => {
-    paint();
-    r.setFace(packFace, packMask, 'pack');
+    r.setFace(face, mask, `pack-${p.id}`);
+    painted.add(p.id);
+  };
+  // The pixel fonts may still be on their way the first time; repaint once they are in.
+  void Promise.all([document.fonts.load('700 24px Silkscreen'), document.fonts.load('16px Silkscreen'), document.fonts.load('16px DotGothic16')]).then(() => {
+    for (const id of painted) paintWrapper(PACKS.find((p) => p.id === id)!);
   });
+  const printOf = (p: Pack) => {
+    let pr = prints.get(p.id);
+    if (!pr) {
+      pr = pillow.createPrint();
+      prints.set(p.id, pr);
+    }
+    return pr;
+  };
+  /** Which packs' finishes have arrived (their wrappers and cards can be compiled). */
+  const arrived = new Set<PackId>();
+  let failed = false;
+  const fetchPack = (p: Pack) =>
+    loadPack(p.id).then(
+      () => arrived.add(p.id),
+      () => {
+        failed = true;
+        hint(t.failed);
+      },
+    );
 
   // ---------- Scene ----------
 
@@ -224,6 +253,24 @@ export function openPack(o: OpeningOptions) {
     packH = (packW * PACK_H) / PACK_W;
     cx = vw / 2;
     cy = vh * 0.45;
+    // The tray: one row on a wide screen, rows of three on a phone; packs at 2 : 3.
+    const count = o.shop?.length ?? 0;
+    if (count) {
+      const narrow = vw < 640;
+      const perRow = narrow ? Math.min(3, count) : count;
+      const gap = narrow ? 14 : 26;
+      const room = Math.min(vw - 24, 1120) - (narrow ? 28 : 56);
+      let sw = (room - gap * (perRow - 1)) / perRow;
+      let sh = sw * 1.5;
+      const maxH = narrow ? vh * 0.21 : vh * 0.36;
+      if (sh > maxH) {
+        sh = maxH;
+        sw = sh / 1.5;
+      }
+      root.style.setProperty('--slot-w', `${Math.floor(sw)}px`);
+      root.style.setProperty('--slot-h', `${Math.floor(sh)}px`);
+      root.style.setProperty('--slot-gap', `${gap}px`);
+    }
   };
   layout();
 
@@ -256,25 +303,144 @@ export function openPack(o: OpeningOptions) {
   /** The cut being traced, in screen x. */
   const cut = { active: false, auto: false, done: false, draining: false, x0: 0, min: 0, max: 0, p: 0, grains: 0, buzzes: 0, autoT: 0, autoDir: 1, pid: -1, downT: 0, moved: 0, lastX: 0, speed: 0 };
 
-  const cards: CardSim[] = pack.finishes.map((id, i) => ({
-    id,
-    shader: editionById(id).shader,
-    tier: Math.min(3, tierOf(pack, i) + (rich && i < n - 1 ? 1 : 0)) as 1 | 2 | 3,
-    x: new Spring(cx, cx, 150, 14),
-    y: new Spring(cy, cy, 150, 14),
-    rz: new Spring(0, 0, 200, 15),
-    s: new Spring(1, 1, 320, 14),
-    flip: i === n - 1 ? Math.PI : 0,
-    alpha: 0,
-    flying: false,
-    vx: 0,
-    vy: 0,
-    vr: 0,
-    flash: 0,
-    dealAt: 0,
-    dealt: false,
+  let cards: CardSim[] = [];
+  let showpiece: CardSim;
+
+  /** Makes `p` the pack being opened: its colors, words, wrapper, cards. */
+  function setPack(p: Pack) {
+    pack = p;
+    rich = !!p.supporter;
+    name = t.name[p.id];
+    n = p.finishes.length;
+    colors = p.colors.map(hexToRgb) as [RGB, RGB, RGB];
+    style = STYLES[p.id];
+    themed = style.palette.map(hexToRgb);
+    room = [colors[0], colors[1], colors[1].map((v, i) => v * 0.6 + colors[2][i] * 0.2)] as [RGB, RGB, RGB];
+    roomNow ??= room.map((c) => [...c]) as [RGB, RGB, RGB];
+    sheen = colors[2].map((v) => 0.55 + v * 0.45) as RGB;
+    replay = o.isOpened(p.id);
+    wrap = editionById(p.wrap).shader;
+    packKey = `pack-${p.id}`;
+    if (!painted.has(p.id)) paintWrapper(p);
+    print = printOf(p);
+    root.classList.toggle('is-supporter', rich);
+    root.setAttribute('aria-label', t.dialog.replace('{name}', name));
+    root.style.setProperty('--a', p.colors[0]);
+    root.style.setProperty('--b', p.colors[1]);
+    root.style.setProperty('--c', p.colors[2]);
+    $('.pk-title b').textContent = t.title.replace('{name}', name);
+    $('.pk-title small').textContent = rich ? t.thanks : t.count.replace('{n}', String(n));
+    $('.pk-haul-title b').textContent = (replay ? t.haulReplay : t.haul).replace('{name}', name).replace('{n}', String(n));
+    // Under the title, the one thing to do now; where the folder went is said on the page afterwards.
+    $('.pk-haul-title small').textContent = t.haulHint;
+    $('.pk-try').textContent = t.try.replace('{finish}', dict.edition[p.finishes[n - 1]]);
+    // Only the showpiece is ever seen face down, so the overlay's card back is its back.
+    const back = document.createElement('canvas');
+    paintShowpieceBack(back, o.back, p);
+    r.setBack(back);
+    cards = p.finishes.map((id, i) => ({
+      id,
+      shader: editionById(id).shader,
+      tier: Math.min(3, tierOf(p, i) + (rich && i < n - 1 ? 1 : 0)) as 1 | 2 | 3,
+      x: new Spring(cx, cx, 150, 14),
+      y: new Spring(cy, cy, 150, 14),
+      rz: new Spring(0, 0, 200, 15),
+      s: new Spring(1, 1, 320, 14),
+      flip: i === n - 1 ? Math.PI : 0,
+      alpha: 0,
+      flying: false,
+      vx: 0,
+      vy: 0,
+      vr: 0,
+      flash: 0,
+      dealAt: 0,
+      dealt: false,
+    }));
+    showpiece = cards[n - 1];
+    void fetchPack(p);
+  }
+
+  // ---------- The shop ----------
+
+  /** The packs on the tray, the chosen one, and each one's own motion. */
+  const shopPacks = o.shop ?? [];
+  let sel = Math.max(0, shopPacks.findIndex((p) => p.id === o.pack.id));
+  /** Slight, fixed tilts, so the tray looks set out by hand. */
+  const TILTS = [-0.05, 0.035, -0.025, 0.055, -0.04];
+  const slots = shopPacks.map((p, i) => ({
+    p,
+    el: document.createElement('button'),
+    lift: new Spring(0, 0, 240, 16),
+    s: new Spring(reduced ? 1 : 0.3, 1, 260, 13),
+    rz: new Spring(0, 0, 220, 7),
+    rx: new Spring(0, 0, 200, 16),
+    ry: new Spring(0, 0, 200, 16),
+    hot: false,
+    tilt: TILTS[i % TILTS.length],
   }));
-  const showpiece = cards[n - 1];
+  /** 1 while the shop is up; falls to 0 as it gives way to the opening. */
+  let shopFade = 1;
+  let fromShop = false;
+  let frameNo = 0;
+  const trayEl = $('.pk-tray');
+  slots.forEach((sl, i) => {
+    const b = sl.el;
+    b.type = 'button';
+    b.className = 'pk-slot';
+    b.setAttribute('role', 'radio');
+    b.dataset.pack = sl.p.id;
+    b.innerHTML = `<span class="pk-price">${o.isOpened(sl.p.id) ? `✓ ${t.tagOpened}` : t.name[sl.p.id]}</span>`;
+    b.setAttribute('aria-label', `${t.title.replace('{name}', t.name[sl.p.id])}${o.isOpened(sl.p.id) ? ` (${t.tagOpened})` : ''}`);
+    b.addEventListener('pointerenter', () => {
+      sl.hot = true;
+      if (!reduced) sl.rz.v += (Math.random() < 0.5 ? -1 : 1) * 5;
+      sfx.hover(i);
+    });
+    b.addEventListener('pointerleave', () => (sl.hot = false));
+    b.addEventListener('focus', () => (sl.hot = true));
+    b.addEventListener('blur', () => (sl.hot = false));
+    // A click picks a pack; a click on the one already picked opens it.
+    b.addEventListener('click', () => (i === sel ? openChosen() : choose(i)));
+    trayEl.appendChild(b);
+  });
+
+  /** Picks the pack at `i` on the tray: it is lifted, the room takes its colors, the panel describes it. */
+  function choose(i: number) {
+    sel = i;
+    const sl = slots[i];
+    setPack(sl.p);
+    if (!reduced) {
+      sl.s.v += 2.5;
+      sl.rz.v += 6;
+    }
+    packSfx.pop(i);
+    slots.forEach((x, k) => x.el.setAttribute('aria-checked', String(k === i)));
+    const opened = o.isOpened(sl.p.id);
+    $('.pk-band b').textContent = t.title.replace('{name}', name);
+    $('.pk-tier').textContent = rich ? t.supporterTag : '';
+    const em = (s: string) => s.replace(/\{(\w+)\}/g, (_, k) => `<em>${k === 'name' ? name : n}</em>`);
+    $('.pk-desc').innerHTML = em(t.shopDesc);
+    $('.pk-note').textContent = opened ? t.shopOpened.replace('{list}', sl.p.finishes.map((id) => dict.edition[id]).join(' · ')) : t.shopNote.replace('{name}', name);
+    $('.pk-minis').innerHTML = sl.p.finishes.map((_, k) => `<i${k === n - 1 ? ' class="is-star"' : ''}></i>`).join('');
+    $('.pk-buy').textContent = opened ? t.shopReplay : t.openBtn;
+    $('.pk-buy').classList.toggle('is-replay', opened);
+  }
+
+  /** The chosen pack leaves the tray for the middle, and the opening begins. */
+  function openChosen() {
+    if (phase !== 'shop') return;
+    const sl = slots[sel];
+    const rc = sl.el.getBoundingClientRect();
+    fromShop = true;
+    pk.x.x = rc.left + rc.width / 2;
+    pk.y.x = rc.top + rc.height / 2 - sl.lift.x;
+    pk.s.x = (rc.height / packH) * sl.s.x;
+    pk.rz.x = sl.tilt + sl.rz.x;
+    root.classList.add('is-leaving');
+    packSfx.whoosh();
+    buzz(8);
+    setPhase('load');
+  }
   let top = 0;
   /** The showpiece: face down, gathering itself, or turned up. */
   let hit: 'down' | 'charge' | 'up' = 'down';
@@ -358,7 +524,7 @@ export function openPack(o: OpeningOptions) {
   const markOpened = () => {
     if (opened) return;
     opened = true;
-    o.onOpened();
+    o.onOpened(pack.id);
   };
 
   /** The trace is complete: the strip tears off and light pours out. */
@@ -548,7 +714,7 @@ export function openPack(o: OpeningOptions) {
 
   function skip() {
     if (phase === 'haul' || phase === 'closing') return;
-    if (phase === 'load') return close(null);
+    if (phase === 'load' || phase === 'shop') return close(null);
     toHaul();
   }
 
@@ -556,6 +722,8 @@ export function openPack(o: OpeningOptions) {
   function close(pick: EditionId | null) {
     if (closed) return;
     closed = true;
+    // The pack opened or watched now, if any (closing in the shop, or before the tear, leaves none).
+    const result = phase !== 'shop' && (opened || (replay && phase !== 'load')) ? pack : null;
     setPhase('closing');
     if (pick) sfx.select(Math.max(0, pack.finishes.indexOf(pick)) + 3);
     root.classList.remove('is-in');
@@ -568,7 +736,7 @@ export function openPack(o: OpeningOptions) {
       swirl.gl.getExtension('WEBGL_lose_context')?.loseContext();
       root.remove();
       o.pause(false);
-      o.onClose(pick);
+      o.onClose(result, pick);
     }, reduced ? 120 : 220);
   }
 
@@ -606,6 +774,14 @@ export function openPack(o: OpeningOptions) {
       if (i >= 0) close(haulOrder[i].id);
     }
   });
+
+  root.addEventListener('pointermove', (e) => {
+    if (phase !== 'shop') return;
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+    pointer.at = time;
+  });
+  $('.pk-buy').addEventListener('click', openChosen);
 
   canvas.addEventListener('pointermove', (e) => {
     pointer.x = e.clientX;
@@ -682,7 +858,7 @@ export function openPack(o: OpeningOptions) {
     keyboard = true;
     if (e.key === 'Escape') {
       e.preventDefault();
-      return phase === 'haul' || phase === 'load' ? close(null) : skip();
+      return phase === 'haul' || phase === 'load' || phase === 'shop' ? close(null) : skip();
     }
     if (e.key === 'Tab') {
       // Keep focus inside the dialog.
@@ -699,7 +875,13 @@ export function openPack(o: OpeningOptions) {
     const go = e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowLeft';
     if (!go) return;
     e.preventDefault();
-    if (phase === 'pack') startAuto();
+    if (phase === 'shop') {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        const next = (sel + (e.key === 'ArrowRight' ? 1 : -1) + slots.length) % slots.length;
+        choose(next);
+        slots[next].el.focus();
+      } else openChosen();
+    } else if (phase === 'pack') startAuto();
     else if (phase === 'deck') {
       if (cards[top] === showpiece && hit !== 'up') charge();
       else throwTop(e.key === 'ArrowRight' ? 1 : -1);
@@ -714,15 +896,6 @@ export function openPack(o: OpeningOptions) {
   let last = performance.now();
   let swirlT = 0;
   let raf = 0;
-  let ready = false;
-  let failed = false;
-  o.finishes.then(
-    () => (ready = true),
-    () => {
-      failed = true;
-      hint(t.failed);
-    },
-  );
 
   const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
@@ -735,18 +908,30 @@ export function openPack(o: OpeningOptions) {
     swirl.resize(Math.ceil(vw / 4), Math.ceil(vh / 4));
     // The room's swirl winds up while the showpiece charges, then settles.
     if (!reduced) swirlT += dt * (hit === 'charge' ? 1 + 6 * clamp(hitT / 0.9, 0, 1) : 1);
-    swirl.render({ time: swirlT + 40, colors: room, pointer: [0.5, 0.5], focus: [0.5, 0.5] });
+    const ease = 1 - Math.exp(-dt * 3);
+    roomNow ??= room;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) roomNow[i][j] += (room[i][j] - roomNow[i][j]) * ease;
+    swirl.render({ time: swirlT + 40, colors: roomNow, pointer: [0.5, 0.5], focus: [0.5, 0.5] });
 
     if (phase === 'load') {
       // Wait for the pack's finishes and every program this opening draws.
       if (failed) return;
       if (phaseT > 0.25) hint(t.loading);
-      if (!ready || !r.ready(wrap) || !cards.every((c) => r.ready(c.shader))) return;
+      if (!arrived.has(pack.id) || !r.ready(wrap) || !cards.every((c) => r.ready(c.shader))) {
+        // Coming from the tray, the scene keeps moving while the last of it compiles.
+        if (fromShop) {
+          step(dt);
+          render();
+        }
+        return;
+      }
       // Draw every card once, unseen, so first-use work (Relief reading the picture, the driver's
       // own) lands here and not on the tear.
       r.begin();
       for (const c of cards) r.drawCard({ cx: -9999, cy: -9999, w: cardW, h: cardH, rx: 0, ry: 0, rz: 0, scale: 1, edition: c.shader, intensity: o.intensity, pixel: 0, tilt: [0, 0], light: [0.5, 0.5], alpha: 0, flash: 0, shadow: null }, 0);
       setPhase('pack');
+      root.classList.remove('is-leaving');
+      root.classList.add('is-opening');
       hint(t.trace, 'Enter');
       openBtn.hidden = false;
       if (!reduced) {
@@ -763,7 +948,7 @@ export function openPack(o: OpeningOptions) {
   function step(dt: number) {
     const motion = reduced ? 0 : 1;
     // Pack
-    if (phase === 'pack' || phase === 'rip' || phase === 'draw') {
+    if (phase === 'pack' || phase === 'rip' || phase === 'draw' || (phase === 'load' && fromShop)) {
       pk.x.target = cx;
       if (!pk.drop.on && phase !== 'draw') pk.y.target = cy;
       const pointing = time - pointer.at < 2.5 && !coarse;
@@ -888,6 +1073,22 @@ export function openPack(o: OpeningOptions) {
       for (let i = 0; i < 4; i++) for (const sp of [c.x, c.y, c.rz, c.s]) sp.step(dt / 4);
       c.flash = Math.max(0, c.flash - dt * 2);
     }
+    // The shop's packs: bobbing, the chosen one lifted, the pointed-at one springing up and leaning.
+    if (shopFade > 0) {
+      if (phase !== 'shop') shopFade = Math.max(0, shopFade - dt / 0.3);
+      // The chosen pack's cards start compiling while it is only being looked at.
+      else for (const c of cards) r.ready(c.shader);
+      slots.forEach((sl, i) => {
+        const chosen = i === sel;
+        sl.lift.target = chosen ? 16 : 0;
+        sl.s.target = (chosen ? 1.08 : 1) * (sl.hot ? 1.06 : 1);
+        const rc = sl.el.getBoundingClientRect();
+        const lean = sl.hot && time - pointer.at < 2 ? [clamp((pointer.x - (rc.left + rc.width / 2)) / (rc.width / 2), -1, 1), clamp((pointer.y - (rc.top + rc.height / 2)) / (rc.height / 2), -1, 1)] : [0, 0];
+        sl.ry.target = lean[0] * 0.35 * motion;
+        sl.rx.target = -lean[1] * 0.3 * motion;
+        for (let k = 0; k < 4; k++) for (const sp of [sl.lift, sl.s, sl.rz, sl.rx, sl.ry]) sp.step(dt / 4);
+      });
+    }
     // Particles and shake
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -966,13 +1167,11 @@ export function openPack(o: OpeningOptions) {
     }
   }
 
-  const draws: CardDraw[] = [];
   function render() {
     // Screen shake moves the stage, not the words and buttons.
     const k = shake.dur ? Math.max(0, 1 - shake.t / shake.dur) : 0;
     stageEl.style.transform = k > 0 ? `translate(${((Math.random() - 0.5) * 2 * shake.amp * k * k).toFixed(1)}px, ${((Math.random() - 0.5) * 2 * shake.amp * k * k).toFixed(1)}px)` : '';
     r.begin();
-    draws.length = 0;
     const idle = reduced ? 0 : 1;
     const sway = Math.sin(time * TAU * 0.5) * 6 * idle;
 
@@ -1016,65 +1215,87 @@ export function openPack(o: OpeningOptions) {
         shadow: [8 + (s - 1) * 40, 12 + (s - 1) * 60],
       });
     }
-    const packLayer: CardDraw[] = [];
-    if (pk.alpha > 0 && phase !== 'load' && phase !== 'haul') {
+    const packDraws: (() => void)[] = [];
+    if (shopFade > 0) drawShop();
+    if (pk.alpha > 0 && phase !== 'shop' && (phase !== 'load' || fromShop) && phase !== 'haul') {
       const s = pk.s.x;
       const lean: [number, number] = [pk.ry.x / 0.3, pk.rx.x / 0.25];
-      const base = {
-        rx: pk.rx.x,
-        ry: pk.ry.x,
-        scale: 1,
-        edition: wrap,
-        intensity: 1,
-        pixel: 0,
-        tilt: [lean[0] + Math.sin(time * 0.7) * 0.4 * idle, lean[1] + Math.cos(time * 0.55) * 0.3 * idle] as [number, number],
-        light: [clamp(0.5 + lean[0] * 0.4, 0, 1), clamp(0.35 + lean[1] * 0.3, 0, 1)] as [number, number],
-        alpha: pk.alpha,
-        flash: pk.flash,
-        plate: false,
-        face: 'pack',
-      };
-      const px = pk.x.x;
-      const py = pk.y.x + (phase === 'pack' ? sway : 0);
-      const W = packW * s;
-      const H = packH * s;
-      if (!cut.done) packLayer.push({ ...base, cx: px, cy: py, w: W, h: H, rz: pk.rz.x, shadow: [12, 18] });
-      else {
-        // The body below the tear; it rotates about the whole bag's centre.
-        const off = (H * TEAR_Y) / 2;
-        packLayer.push({ ...base, cx: px - Math.sin(pk.rz.x) * off, cy: py + Math.cos(pk.rz.x) * off, w: W, h: H * (1 - TEAR_Y), rz: pk.rz.x, uv: [0, TEAR_Y, 1, 1], shadow: [12, 18] });
-      }
+      // The wrapper's finish follows the tilt; the pillow's light comes from the upper left and swings with it.
+      const tilt: [number, number] = [lean[0] + Math.sin(time * 0.7) * 0.4 * idle, lean[1] + Math.cos(time * 0.55) * 0.3 * idle];
+      pillow.print(print!, packKey, wrap, tilt, [clamp(0.5 + lean[0] * 0.4, 0, 1), clamp(0.35 + lean[1] * 0.3, 0, 1)], time);
+      const draw = { cx: pk.x.x, cy: pk.y.x + (phase === 'pack' ? sway : 0), w: packW, h: packH, rx: pk.rx.x, ry: pk.ry.x, rz: pk.rz.x, scale: s, alpha: pk.alpha };
+      const light: [number, number] = [-0.45 - tilt[0] * 0.55, -0.6 - tilt[1] * 0.45];
+      const rows: [number, number] = cut.done ? [TEAR_Y, 1] : [0, 1];
+      packDraws.push(() => pillow.draw(print!, { ...draw, rows, light, spec: sheen, shadow: [12 * s, 20 * s] }));
     }
     if (strip.on) {
-      packLayer.push({
-        cx: strip.x,
-        cy: strip.y,
-        w: packW,
-        h: packH * TEAR_Y,
-        rx: 0,
-        ry: 0,
-        rz: strip.rot,
-        scale: 1,
-        edition: wrap,
-        intensity: 1,
-        pixel: 0,
-        tilt: [strip.rot, 0],
-        light: [0.5, 0.3],
-        alpha: strip.alpha,
-        flash: 0,
-        shadow: null,
-        plate: false,
-        face: 'pack',
-        uv: [0, 0, 1, TEAR_Y],
-      });
+      packDraws.push(() =>
+        r.drawCard(
+          {
+            cx: strip.x,
+            cy: strip.y,
+            w: packW,
+            h: packH * TEAR_Y,
+            rx: 0,
+            ry: 0,
+            rz: strip.rot,
+            scale: 1,
+            edition: wrap,
+            intensity: 0.7,
+            pixel: 0,
+            tilt: [strip.rot, 0],
+            light: [0.5, 0.3],
+            alpha: strip.alpha,
+            flash: 0,
+            shadow: null,
+            plate: false,
+            face: packKey,
+            uv: [0, 0, 1, TEAR_Y],
+          },
+          time,
+        ),
+      );
     }
-    draws.push(...(phase === 'draw' || phase === 'rip' ? [...cardLayer, ...packLayer] : [...packLayer, ...cardLayer]));
-    for (const d of draws) r.drawCard(d, time);
+    const cardDraws = cardLayer.map((d) => () => void r.drawCard(d, time));
+    for (const f of phase === 'draw' || phase === 'rip' ? [...cardDraws, ...packDraws] : [...packDraws, ...cardDraws]) f();
     r.drawParticles(particles);
     overlays(sway);
   }
 
   /** Places the CSS light (cut line, guide, aura, rays, sweep, label) on the scene. */
+  /** The tray's packs, printed in their wrapper finishes (Foil until a finish is compiled), as pillows over their slots. */
+  function drawShop() {
+    frameNo++;
+    const idle = reduced ? 0 : 1;
+    slots.forEach((sl, i) => {
+      if (fromShop && i === sel) return;
+      const rc = sl.el.getBoundingClientRect();
+      if (!rc.width) return;
+      const pr = printOf(sl.p);
+      const tilt: [number, number] = [sl.ry.x / 0.35 + Math.sin(time * 0.6 + i) * 0.3 * idle, sl.rx.x / 0.3 + Math.cos(time * 0.5 + i) * 0.3 * idle];
+      // The chosen and pointed-at packs print every frame; the rest take turns.
+      if (i === sel || sl.hot || frameNo % 3 === i % 3 || frameNo < 3) {
+        const finish = editionById(sl.p.wrap).shader;
+        if (!pillow.print(pr, `pack-${sl.p.id}`, finish, tilt, [0.4 - tilt[0] * 0.3, 0.3], time)) pillow.print(pr, `pack-${sl.p.id}`, 1, tilt, [0.4, 0.3], time);
+      }
+      const c = sl.p.colors.map(hexToRgb);
+      pillow.draw(pr, {
+        cx: rc.left + rc.width / 2,
+        cy: rc.top + rc.height / 2 - sl.lift.x + Math.sin(time * 1.7 + i * 1.3) * 3 * idle + (1 - shopFade) * 60,
+        w: rc.width,
+        h: rc.height,
+        rx: sl.rx.x,
+        ry: sl.ry.x,
+        rz: sl.tilt + sl.rz.x,
+        scale: sl.s.x,
+        alpha: shopFade,
+        light: [-0.45 - tilt[0] * 0.5, -0.6 - tilt[1] * 0.4],
+        spec: c[2].map((v) => 0.55 + v * 0.45) as RGB,
+        shadow: [8 + sl.lift.x * 0.4, 12 + sl.lift.x * 0.6],
+      });
+    });
+  }
+
   function overlays(sway: number) {
     const s = pk.s.x;
     const ty = pk.y.x + (phase === 'pack' ? sway : 0) - (packH * s) / 2 + packH * s * TEAR_Y;
@@ -1128,5 +1349,14 @@ export function openPack(o: OpeningOptions) {
     }
   }
 
+  if (slots.length) {
+    for (const sl of slots) {
+      paintWrapper(sl.p);
+      void fetchPack(sl.p);
+    }
+    choose(sel);
+    setPhase('shop');
+    requestAnimationFrame(() => slots[sel].el.focus({ preventScroll: true }));
+  } else setPack(o.pack);
   raf = requestAnimationFrame(frame);
 }

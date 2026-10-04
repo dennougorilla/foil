@@ -30,6 +30,11 @@ export const PACK_JA = {
   close: 'カードに戻る',
   folded: '「{name}」フォルダは手札の下にあります。選ぶと手札に加わります',
   loading: 'パックを準備中…',
+  tagOpened: '開封済み',
+  shopDesc: '{name}の加工が全{n}種、ぜんぶ入っています',
+  shopNote: '開けると手札の下に「{name}」フォルダができます',
+  shopOpened: '中身: {list}',
+  shopReplay: 'もう一度見る',
   failed: 'パックを読み込めませんでした。通信を確かめて、もう一度どうぞ',
 };
 
@@ -62,5 +67,10 @@ export const PACK_EN: typeof PACK_JA = {
   close: 'Done',
   folded: 'The {name} folder is under your hand: pick it to deal its finishes in',
   loading: 'Getting the pack ready…',
+  tagOpened: 'Opened',
+  shopDesc: 'Every {name} finish inside, all {n} of them',
+  shopNote: 'Opening it adds a {name} folder under your hand',
+  shopOpened: 'Inside: {list}',
+  shopReplay: 'Watch again',
   failed: "Couldn't load the pack. Check the connection and try again",
 };

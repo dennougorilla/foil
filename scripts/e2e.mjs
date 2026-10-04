@@ -210,6 +210,11 @@ const overlayGone = () => page.waitForSelector('.pk', { state: 'detached', timeo
 
 await step('open a pack: trace the top, swipe through, the showpiece last, then try it', async () => {
   await page.click('.pk-chip[data-pack=metal]');
+  // The shop first: every pack on the tray, the one tapped already chosen.
+  await phase('shop');
+  expect((await page.locator('.pk-slot').count()) === 4, 'the shop does not show the four packs');
+  expect((await page.getAttribute('.pk-slot[data-pack=metal]', 'aria-checked')) === 'true', 'the tapped pack is not the chosen one');
+  await page.click('.pk-buy');
   await phase('pack');
   // Wait for the pack to settle from its flight (the guide lies level across its top).
   await page.waitForFunction(() => {
@@ -272,6 +277,8 @@ await step('a replay can be skipped straight to the haul and closed', async () =
 await step('held still, the pack opens with a button and the haul fades in', async () => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.click('.pk-chip[data-pack=nature]');
+  await phase('shop');
+  await page.click('.pk-buy');
   await phase('pack');
   await page.click('.pk-open');
   await phase('haul');
