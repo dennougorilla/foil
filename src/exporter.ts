@@ -60,7 +60,7 @@ export function download(file: File): string {
 }
 
 /** Clear margin round the still card, so its tilted edge and glow are not cut. */
-export const STILL_PAD = 24;
+const STILL_PAD = 24;
 
 /** The card drawn once at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
 export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement> {

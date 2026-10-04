@@ -75,6 +75,29 @@ export async function put(meta: Meta, thumbnail: Blob, card: Kept): Promise<void
   });
 }
 
+/** A card as stored, read back whole so a discard can be undone. */
+export interface Stored {
+  meta: Meta;
+  thumb?: Blob;
+  card?: Kept;
+}
+
+export async function stored(meta: Meta): Promise<Stored> {
+  const [t, card] = await Promise.all([thumb(meta.id).catch(() => undefined), kept(meta.id).catch(() => undefined)]);
+  return { meta, thumb: t, card };
+}
+
+/** Puts discarded cards back as they were. */
+export async function restore(cards: Stored[]): Promise<void> {
+  await tx(['meta', 'thumbs', 'cards'], 'readwrite', (t) => {
+    for (const c of cards) {
+      t.objectStore('meta').put(c.meta);
+      if (c.thumb) t.objectStore('thumbs').put(c.thumb, c.meta.id);
+      if (c.card) t.objectStore('cards').put(c.card, c.meta.id);
+    }
+  });
+}
+
 export async function discard(ids: string[]): Promise<void> {
   await tx(['meta', 'thumbs', 'cards'], 'readwrite', (t) => {
     for (const id of ids) for (const s of ['meta', 'thumbs', 'cards']) t.objectStore(s).delete(id);

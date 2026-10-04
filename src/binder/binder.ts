@@ -5,10 +5,10 @@
 import './binder.css';
 import type { Card } from '../state';
 import type { Dict, Lang } from '../i18n';
-import { renderStill, STILL_PAD, type ExportInput } from '../exporter';
-import { FACE_H, FACE_W } from '../card/face';
+import { renderStill, type ExportInput } from '../exporter';
+import { fitIn, opaqueBounds } from './fit';
 import { formatBytes } from '../anim/apngUi';
-import { discard, fillOf, kept, list, put, thumb, type Kept, type Meta } from './db';
+import { discard, fillOf, kept, list, put, restore, stored, thumb, type Kept, type Meta, type Stored } from './db';
 import { MAX_BYTES, MAX_CARDS, pageCount, pocketsOn, refusal } from './limits';
 
 const TEXT = {
@@ -26,7 +26,10 @@ const TEXT = {
     playLabel: '選んだカードをステージに出す',
     playOne: '1 枚だけ選んでください',
     discard: '捨てる',
-    confirm: '{n} 枚を捨てる？',
+    discardN: '{n} 枚を捨てる',
+    discardOne: '{card} を捨てる',
+    undo: '元に戻す',
+    back: '{n} 枚を戻しました',
     pages: '{a} / {n} ページ',
     pagesLabel: '{a} ページ目（全 {n} ページ）',
     prev: '前のページ',
@@ -55,7 +58,10 @@ const TEXT = {
     playLabel: 'Put the picked card on the stage',
     playOne: 'Pick just one card',
     discard: 'Discard',
-    confirm: 'Discard {n}?',
+    discardN: 'Discard {n}',
+    discardOne: 'Discard {card}',
+    undo: 'Undo',
+    back: 'Brought back {n}',
     pages: 'Page {a} / {n}',
     pagesLabel: 'Page {a} of {n}',
     prev: 'Previous page',
@@ -105,15 +111,20 @@ export interface BinderHost {
 
 const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** The still card, without its clear margin, shrunk to the thumbnail. */
+/**
+ * The still card cut to its own outline and shrunk to fit the pocket: a trading card fills it, a
+ * card of another shape (when the card has one) keeps its shape and sits in the middle.
+ */
 async function thumbnail(input: ExportInput): Promise<Blob> {
   const src = await renderStill(input);
+  const box = opaqueBounds(src.getContext('2d')!.getImageData(0, 0, src.width, src.height).data, src.width, src.height);
+  const size = fitIn(box.w, box.h, TW, TH);
   const c = document.createElement('canvas');
-  c.width = TW;
-  c.height = TH;
+  c.width = size.w;
+  c.height = size.h;
   const x = c.getContext('2d')!;
   x.imageSmoothingQuality = 'high';
-  x.drawImage(src, STILL_PAD, STILL_PAD, FACE_W, FACE_H, 0, 0, TW, TH);
+  x.drawImage(src, box.x, box.y, box.w, box.h, 0, 0, c.width, c.height);
   const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/webp', 0.85));
   if (!blob) throw new Error('thumbnail');
   return blob;
@@ -221,7 +232,9 @@ export function mountBinder(host: BinderHost) {
     let spread = 0;
     const picked = new Set<string>();
     const urls = new Map<string, string>();
-    let confirmTimer = 0;
+    /** Cards discarded in the last few seconds, and the timer that forgets them. */
+    let undoable: Stored[] = [];
+    let undoTimer = 0;
 
     const root = document.createElement('div');
     root.className = 'bd';
@@ -246,6 +259,7 @@ export function mountBinder(host: BinderHost) {
           </nav>
           <button class="bd-btn bd-play" type="button"><span></span></button>
           <button class="bd-btn bd-discard" type="button"><span></span></button>
+          <div class="bd-undo" role="status" hidden><span></span><button class="bd-undo-btn" type="button"></button></div>
         </footer>
       </div>`;
     const $ = <T extends HTMLElement = HTMLElement>(q: string) => root.querySelector(q) as T;
@@ -259,13 +273,16 @@ export function mountBinder(host: BinderHost) {
     }
     $('.bd-play span').textContent = t.play;
     playBtn.title = t.playLabel;
+    $('.bd-undo-btn').textContent = t.undo;
 
     /** The card on the stage, faint in the pocket it would go into: its flat face, no finish drawn. */
     const ghost = () => {
+      const face = host.input().face;
+      const size = fitIn(face.width, face.height, TW / 2, TH / 2);
       const c = document.createElement('canvas');
-      c.width = TW / 2;
-      c.height = TH / 2;
-      c.getContext('2d')!.drawImage(host.input().face, 0, 0, c.width, c.height);
+      c.width = size.w;
+      c.height = size.h;
+      c.getContext('2d')!.drawImage(face, 0, 0, c.width, c.height);
       return c.toDataURL('image/webp', 0.8);
     };
     const perSpread = () => (wide.matches ? 2 : 1);
@@ -289,15 +306,8 @@ export function mountBinder(host: BinderHost) {
       playBtn.disabled = n !== 1;
       playBtn.setAttribute('aria-label', n > 1 ? t.playOne : t.playLabel);
       discardBtn.disabled = n === 0;
-      if (!n) unconfirm();
-      const confirming = discardBtn.dataset.confirm === 'true';
-      $('.bd-discard span').textContent = confirming ? fill(t.confirm, { n }) : t.discard;
+      $('.bd-discard span').textContent = n ? fill(t.discardN, { n }) : t.discard;
       renderNote();
-    }
-
-    function unconfirm() {
-      clearTimeout(confirmTimer);
-      delete discardBtn.dataset.confirm;
     }
 
     function render() {
@@ -334,14 +344,24 @@ export function mountBinder(host: BinderHost) {
             sheet.append(b);
           } else if (pocket) {
             const m = byId.get(pocket)!;
+            // The pocket holds the card and, on its corner, a way to throw just this one away.
+            const slot = document.createElement('div');
+            slot.className = 'bd-pocket bd-slot';
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'bd-pocket bd-card';
+            b.className = 'bd-card';
             b.dataset.id = m.id;
             b.setAttribute('aria-pressed', String(picked.has(m.id)));
             const label = fill(t.card, { name: m.name, finish: editions[m.edition] ?? m.edition });
             b.setAttribute('aria-label', label);
             b.title = label;
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'bd-del';
+            del.innerHTML = '<i aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 3h2v2h2v2h2V5h2V3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2V9H7v2H5v2H3v-2h2V9h2V7H5V5H3z"/></svg></i>';
+            del.setAttribute('aria-label', fill(t.discardOne, { card: label }));
+            del.title = fill(t.discardOne, { card: label });
+            del.addEventListener('click', () => void remove([m.id]));
             const img = document.createElement('img');
             img.alt = '';
             img.decoding = 'async';
@@ -363,7 +383,6 @@ export function mountBinder(host: BinderHost) {
               if (picked.has(m.id)) picked.delete(m.id);
               else picked.add(m.id);
               b.setAttribute('aria-pressed', String(picked.has(m.id)));
-              unconfirm();
               syncButtons();
             });
             b.addEventListener('dblclick', () => {
@@ -371,7 +390,8 @@ export function mountBinder(host: BinderHost) {
               picked.add(m.id);
               void play();
             });
-            sheet.append(b);
+            slot.append(b, del);
+            sheet.append(slot);
           } else {
             const e = document.createElement('span');
             e.className = 'bd-pocket bd-empty';
@@ -438,34 +458,56 @@ export function mountBinder(host: BinderHost) {
       await host.play(k);
     }
 
-    playBtn.addEventListener('click', () => void play());
-    discardBtn.addEventListener('click', async () => {
-      if (!picked.size) return;
-      if (discardBtn.dataset.confirm !== 'true') {
-        host.sfx.tick();
-        discardBtn.dataset.confirm = 'true';
-        clearTimeout(confirmTimer);
-        confirmTimer = window.setTimeout(() => {
-          unconfirm();
-          syncButtons();
-        }, 3000);
-        syncButtons();
-        return;
-      }
-      unconfirm();
-      const ids = [...picked];
-      picked.clear();
+    /**
+     * Throws cards away at once, no question asked: they are read back whole first, so the bar
+     * that says so can put them back for a few seconds. Focus stays where the card was.
+     */
+    async function remove(ids: string[]) {
+      const at = [...root.querySelectorAll('.bd-card')].findIndex((c) => ids.includes((c as HTMLElement).dataset.id!));
+      const gone = await Promise.all(metas.filter((m) => ids.includes(m.id)).map(stored));
       await discard(ids);
-      for (const id of ids) {
-        const url = urls.get(id);
-        if (url) URL.revokeObjectURL(url);
-        urls.delete(id);
-      }
+      for (const id of ids) picked.delete(id);
+      undoable = [...undoable, ...gone];
       host.sfx.flip();
-      host.announce(fill(t.gone, { n: ids.length }));
       await refresh();
-      root.querySelector<HTMLElement>('.bd-card, .bd-keep')?.focus({ preventScroll: true });
+      const bar = $('.bd-undo');
+      bar.querySelector('span')!.textContent = fill(t.gone, { n: undoable.length });
+      bar.hidden = false;
+      bar.classList.remove('is-in');
+      void bar.offsetWidth;
+      bar.classList.add('is-in');
+      clearTimeout(undoTimer);
+      undoTimer = window.setTimeout(forget, 6000);
+      const cards = root.querySelectorAll<HTMLElement>('.bd-card');
+      (cards[Math.min(Math.max(at, 0), cards.length - 1)] ?? root.querySelector<HTMLElement>('.bd-keep') ?? $('.bd-x')).focus({ preventScroll: true });
+    }
+
+    /** The undo bar goes, and with it the cards it could have brought back. */
+    function forget() {
+      clearTimeout(undoTimer);
+      for (const c of undoable) {
+        const url = urls.get(c.meta.id);
+        if (url) URL.revokeObjectURL(url);
+        urls.delete(c.meta.id);
+      }
+      undoable = [];
+      $('.bd-undo').hidden = true;
+    }
+
+    $('.bd-undo-btn').addEventListener('click', async () => {
+      const back = undoable;
+      undoable = [];
+      clearTimeout(undoTimer);
+      $('.bd-undo').hidden = true;
+      await restore(back);
+      host.sfx.tick();
+      host.announce(fill(t.back, { n: back.length }));
+      await refresh();
+      root.querySelector<HTMLElement>(`.bd-card[data-id="${back[0]?.meta.id}"]`)?.focus({ preventScroll: true });
     });
+
+    playBtn.addEventListener('click', () => void play());
+    discardBtn.addEventListener('click', () => picked.size && void remove([...picked]));
     $('.bd-prev').addEventListener('click', () => {
       host.sfx.tick();
       spread = Math.max(0, spread - 1);
@@ -485,7 +527,7 @@ export function mountBinder(host: BinderHost) {
       root.classList.remove('is-in');
       removeEventListener('keydown', onKey, true);
       wide.removeEventListener('change', onWide);
-      unconfirm();
+      forget();
       host.pause(false);
       setTimeout(() => {
         root.remove();
@@ -499,7 +541,10 @@ export function mountBinder(host: BinderHost) {
         e.stopPropagation();
         close();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (picked.size) discardBtn.click();
+        // The card under focus, or else the picked ones.
+        const on = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.bd-slot')?.querySelector<HTMLElement>('.bd-card')?.dataset.id;
+        if (on) void remove([on]);
+        else if (picked.size) void remove([...picked]);
       } else if (e.key === 'Tab') {
         // Keep focus inside the dialog.
         const items = [...root.querySelectorAll<HTMLElement>('button:not([disabled])')].filter((b) => b.offsetParent);

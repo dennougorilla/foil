@@ -306,16 +306,29 @@ await step('play a card from the binder: its picture and settings come back, the
   expect((await page.locator('#thumbs .thumb').count()) === 4, 'the kept picture is not the picture in step 1');
 });
 
-await step('discard asks twice, then the card is gone', async () => {
+await step('a card is thrown away from its own corner at once, and Undo brings it back', async () => {
   await page.click('#binderBtn');
   await binderOpen();
-  await page.click('.bd-card');
-  await page.click('.bd-discard');
-  expect((await page.locator('.bd-card').count()) === 1, 'one press discarded the card');
-  expect((await page.getAttribute('.bd-discard', 'data-confirm')) === 'true', 'Discard does not ask again');
-  await page.click('.bd-discard');
+  await page.mouse.move(5, 5);
+  expect((await page.$eval('.bd-del', (e) => getComputedStyle(e).opacity)) === '0', 'the delete tag shows before the pointer is on the card');
+  await page.hover('.bd-card');
+  await page.waitForTimeout(250);
+  // Its layout size: the tag pops in with a scale, so a box read mid-pop is smaller.
+  const del = await page.$eval('.bd-del', (e) => [e.offsetWidth, e.offsetHeight]);
+  expect(del[0] >= 32 && del[1] >= 32, `the place to press the delete tag is too small (${del})`);
+  await page.click('.bd-del');
   await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
   expect((await binderCount()) === 0, 'the chip still counts the card');
+  expect(await page.isVisible('.bd-undo'), 'no undo bar after discarding');
+  await page.click('.bd-undo-btn');
+  await page.waitForFunction(() => document.querySelectorAll('.bd-card').length === 1, null, { timeout: 5000 });
+  expect((await binderCount()) === 1, 'Undo did not bring the card back');
+  await page.waitForFunction(() => document.querySelector('.bd-card img')?.naturalWidth > 0, null, { timeout: 5000 });
+  // Picked cards go from the foot at once too; this one stays gone.
+  await page.click('.bd-card');
+  await page.click('.bd-discard');
+  await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
+  expect((await binderCount()) === 0, 'Discard from the foot left the card');
   await page.click('.bd-x');
   await binderClosed();
 });
@@ -406,6 +419,34 @@ await step('share: a small moving GIF goes to the share sheet with the site addr
   expect(alone.type === 'image/gif' && alone.text === null, `not the GIF alone: ${JSON.stringify(alone)}`);
   expect((await p.getAttribute('#shareBtn', 'data-ready')) !== 'true', 'Share stays ready after sending');
   await sharer.close();
+});
+
+await step('share on a Mac: one call, one GIF, no text (its Copy would put two items on the clipboard)', async () => {
+  const mac = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+  });
+  const p = await mac.newPage();
+  p.on('pageerror', (e) => errors.push(`mac share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__calls = [];
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File);
+    // The sheet stays open a moment, as a real one does: presses meanwhile must not share again.
+    navigator.share = (data) => {
+      window.__calls.push({ files: data.files.length, type: data.files[0]?.type, text: data.text ?? null, url: data.url ?? null });
+      return new Promise((resolve) => setTimeout(resolve, 1500));
+    };
+  });
+  await p.goto(`${URL}?lang=ja`);
+  await p.waitForTimeout(1500);
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__calls.length === 1, null, { timeout: 240000 });
+  await p.click('#shareBtn');
+  await p.waitForTimeout(2000);
+  const calls = await p.evaluate(() => window.__calls);
+  expect(calls.length === 1, `share was called ${calls.length} times`);
+  expect(calls[0].files === 1 && calls[0].type === 'image/gif' && calls[0].text === null && calls[0].url === null, `not one GIF alone: ${JSON.stringify(calls[0])}`);
+  await mac.close();
 });
 
 const handCount = () => page.locator('.hand-slot').count();

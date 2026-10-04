@@ -1204,15 +1204,23 @@ function readyToShare(file: File | null) {
 
 /** Only the site's address goes along with the card; the card itself leaves the device only through the sheet. */
 const SITE = 'https://dennougorilla.github.io/foil/';
+/**
+ * A Mac (not an iPad, which also says Macintosh but has touch): its share sheet's Copy puts every
+ * shared item on the clipboard, and pasting that into X attached the GIF twice, so the GIF goes alone.
+ */
+const macDesktop = /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints < 2;
+/** A share sheet is open: another press waits for it rather than opening a second one. */
+let sending = false;
 
 /**
  * Hands the GIF to the share sheet with a line and the site's address, or the GIF alone where the
- * sheet can't take both. On the first tap, a file made too late waits for a second one.
+ * sheet can't take both (and on a Mac). On the first tap, a file made too late waits for a second one.
  */
 async function send(file: File, firstTap: boolean) {
   const withText = { files: [file], text: `${t.shareText} ${SITE}` };
+  sending = true;
   try {
-    await navigator.share(navigator.canShare(withText) ? withText : { files: [file] });
+    await navigator.share(!macDesktop && navigator.canShare(withText) ? withText : { files: [file] });
   } catch (err) {
     const name = (err as DOMException).name;
     if (firstTap && name === 'NotAllowedError') return readyToShare(file);
@@ -1221,10 +1229,13 @@ async function send(file: File, firstTap: boolean) {
     console.error(err);
     sfx.error();
     toast(t.errShare, true);
+  } finally {
+    sending = false;
   }
 }
 
 shareBtn.addEventListener('click', async () => {
+  if (sending) return;
   if (shareReady) {
     const file = shareReady;
     readyToShare(null);

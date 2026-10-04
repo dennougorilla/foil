@@ -221,7 +221,8 @@
   box-shadow: inset 0 3px 0 #05080a, inset 0 0 0 2px #2e263b;
 }
 
-.bd-pocket::after {
+.bd-pocket::after,
+.bd-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -240,8 +241,21 @@
   outline: 2px dashed rgba(255, 255, 255, 0.1);
 }
 
-/* A card in its pocket. Picked, it lifts out with a gold edge, like a card picked in a hand. */
+/* A card in its pocket (the sleeve's sheen goes with the card). Picked, it lifts out with a gold
+   edge, like a card picked in a hand. */
+.bd-slot::after {
+  content: none;
+}
+
 .bd-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
   cursor: pointer;
   transition: transform 0.2s var(--ease-back), box-shadow 0.15s;
 }
@@ -308,12 +322,16 @@
   50% { opacity: 0.55; }
 }
 
-.bd-card:hover {
+.bd-slot:hover .bd-card {
   transform: translateY(-4px) rotate(-1deg);
 }
 
-.bd-card[aria-pressed='true'] {
+.bd-slot:has(.bd-card[aria-pressed='true']) {
   z-index: 1;
+}
+
+.bd-card[aria-pressed='true'],
+.bd-slot:hover .bd-card[aria-pressed='true'] {
   transform: translateY(-10px);
   box-shadow: 0 0 0 3px var(--gold), 0 0 18px rgba(242, 193, 78, 0.55), 0 10px 0 3px #05080a;
 }
@@ -326,6 +344,154 @@
 .bd-keep:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 3px;
+}
+
+/* Throw one card away: a red tag on its top corner, clear of the card's middle where it is picked.
+   The tag is small, the place to press is 32px. With a mouse it shows on the card under the pointer
+   (or focus); on touch screens it is always there, quieter. An undo bar follows every discard. */
+.bd-del {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  opacity: 0;
+  scale: 0.6;
+  pointer-events: none;
+  transition: opacity 0.12s, scale 0.2s var(--ease-back), transform 0.2s var(--ease-back);
+}
+
+.bd-del i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: #d13d1f;
+  box-shadow: 0 0 0 2px #05080a, 0 3px 0 2px #05080a, inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.bd-del svg {
+  width: 10px;
+  height: 10px;
+  fill: #fff;
+}
+
+.bd-slot:hover .bd-del,
+.bd-slot:focus-within .bd-del {
+  opacity: 1;
+  scale: 1;
+  pointer-events: auto;
+}
+
+/* The tag rides with the card when it lifts. */
+.bd-slot:hover .bd-del {
+  transform: translateY(-4px);
+}
+
+.bd-card[aria-pressed='true'] + .bd-del {
+  transform: translateY(-10px);
+}
+
+.bd-del:hover i {
+  background: #ef4b2a;
+}
+
+.bd-del:active i {
+  translate: 0 3px;
+  box-shadow: 0 0 0 2px #05080a, inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.bd-del:focus-visible {
+  outline: none;
+}
+
+.bd-del:focus-visible i {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .bd-del {
+    opacity: 1;
+    scale: 1;
+    pointer-events: auto;
+  }
+
+  .bd-del i {
+    width: 22px;
+    height: 22px;
+    background: #3a3149;
+  }
+
+  .bd-del:active i {
+    background: #d13d1f;
+  }
+}
+
+/* Discarded: a bar over the foot says how many, with the way to bring them back. */
+.bd-foot {
+  position: relative;
+}
+
+.bd-undo {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 12px;
+  background: #f3eee2;
+  box-shadow: 0 0 0 3px #05080a, 0 6px 0 3px #05080a;
+  color: #0b1012;
+  font-size: 16px;
+  white-space: nowrap;
+  translate: -50% 0;
+}
+
+.bd-undo[hidden] {
+  display: none;
+}
+
+.bd-undo.is-in {
+  animation: bd-undo-in 0.25s var(--ease-back);
+}
+
+@keyframes bd-undo-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+}
+
+.bd-undo-btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: #0b78cc;
+  box-shadow: 0 4px 0 #064a80, inset 0 2px 0 rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 16px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.bd-undo-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #064a80, inset 0 2px 0 rgba(255, 255, 255, 0.22);
+}
+
+.bd-undo-btn:focus-visible {
+  outline: 3px solid #0b1012;
+  outline-offset: 2px;
 }
 
 /* The first pocket, while there is room: keep the card on the stage. */
@@ -499,13 +665,6 @@
   --lo: #7a200f;
 }
 
-.bd-discard[data-confirm='true'] {
-  animation: bd-pulse 0.7s ease-in-out infinite alternate;
-}
-
-@keyframes bd-pulse {
-  to { box-shadow: 0 var(--lip) 0 var(--lo), inset 0 3px 0 rgba(255, 255, 255, 0.22), 0 0 0 4px rgba(255, 138, 128, 0.6); }
-}
 
 .bd-btn {
   position: relative;
@@ -518,9 +677,6 @@
   animation: slab-wobble 0.45s var(--ease-out) forwards;
 }
 
-.bd-discard[data-confirm='true']:hover {
-  animation: bd-pulse 0.7s ease-in-out infinite alternate;
-}
 
 .bd-btn:active:not(:disabled) {
   animation: none;
@@ -627,22 +783,26 @@
 @media (prefers-reduced-motion: reduce) {
   .bd-box,
   .bd-card,
+  .bd-del,
   .bd-keep {
     transition: none;
   }
 
-  .bd-card:hover,
+  .bd-slot:hover .bd-card,
+  .bd-slot:hover .bd-del,
   .bd-keep:hover {
     transform: none;
   }
 
-  .bd-card[aria-pressed='true'] {
+  .bd-card[aria-pressed='true'],
+  .bd-slot:hover .bd-card[aria-pressed='true'],
+  .bd-card[aria-pressed='true'] + .bd-del {
     transform: translateY(-10px);
   }
 
   .bd.is-empty .bd-keep i,
   .bd-btn:hover:not(:disabled),
-  .bd-discard[data-confirm='true'],
+  .bd-undo.is-in,
   .bd-note.is-shake {
     animation: none;
   }

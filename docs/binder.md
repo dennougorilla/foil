@@ -17,7 +17,11 @@ of cards must not slow the page down, so nothing is read or drawn before it is l
   1280 px on its long side as WebP; an animated picture keeps its own file when it is 8 MB or less
   (so it still moves), and its first frame otherwise. Flip Lenticular's other picture is not kept.
 - **A thumbnail**: the card drawn once, at the moment it is kept, by the same still renderer as the
-  PNG export, shrunk to 250ﾃ・50 and kept as WebP where the browser can write it (20窶・0 KB). The binder shows only these, as
+  PNG export, cut to the card's own outline and shrunk to fit 250×350 without stretching, kept as
+  WebP where the browser can write it (about 20 KB). The pockets are trading-card shaped; a card of
+  another shape (a wide, square or postcard card, where the card has a shape setting) keeps its
+  shape and sits in the middle of its pocket. Nothing here reads the shape setting itself, so the
+  binder works the same with or without it: a card's shape is part of its settings like any other. The binder shows only these, as
   plain `<img>` elements: no WebGL context, no shader, nothing animating.
 
 ## Storage
@@ -51,8 +55,11 @@ what is picked.
 - Tapping a card picks it (it lifts with a gold edge, like a card picked in a hand); tapping again
   puts it down. The line under the head names the picked card, its finish and the day it was kept (or how
   many are picked). Two buttons, blue and red as in the game FOIL is modelled on: **To stage**
-  puts the one picked card back on the stage; **Discard** throws away every picked card, and asks
-  "Discard 2?" first. Double-clicking a card puts it on the stage at once. Keeping and discarding
+  puts the one picked card back on the stage; **Discard** throws away every picked card.
+  A single card goes from the red × on its top corner: 32px to press, away from the middle where a
+  card is picked, shown under the pointer (or focus) and always there, quieter, on touch screens;
+  Delete does the same for the focused card. Nothing asks first: the cards are read back whole
+  before they go, and a bar over the foot says how many went with **Undo** for six seconds. Double-clicking a card puts it on the stage at once. Keeping and discarding
   are said to screen readers, not in a toast: the pockets and the chip already show them.
 - Putting a card on the stage replaces the picture and settings on the stage with the card's (the hand takes
   its finish in if it is not there; a finish whose pack is sealed falls back to Holographic).
@@ -66,11 +73,13 @@ what is picked.
   file (most phones; most desktop browsers have no such share sheet, and Save is the way out there).
 - It always sends a moving GIF, whatever format Save is set to: X plays a GIF, and most apps won't
   play an APNG. The GIF is made on the press, counting up on Share and on the Save button as Save shows
-  it, and keeps the GIF options (backdrop, edge). It is smaller than a saved GIF, 360ﾃ・50 and at
+  it, and keeps the GIF options (backdrop, edge). It is smaller than a saved GIF, 360×450 and at
   most 50 frames (a long animated loop keeps its length with longer frames), so even a noisy
-  picture stays well under the 15 MB X takes: 50 frames of 360ﾃ・50 are 8.1 MB before compression.
+  picture stays well under the 15 MB X takes: 50 frames of 360×450 are 8.1 MB before compression.
 - It goes with a short line and the site's address (`text`); where `canShare` refuses text along
-  with files, the GIF goes alone. The card is never put in a link, and nothing is sent to a server.
+  with files, the GIF goes alone. On a Mac it goes alone too: the share sheet's Copy put both items
+  on the clipboard, and pasting into X attached the GIF twice. A press while a sheet is open does
+  nothing, so one press is one share. The card is never put in a link, and nothing is sent to a server.
 - The share sheet only opens while the browser still counts the tap that asked for it. Making a
   GIF can take longer than that; then `share()` fails with `NotAllowedError`, and the button turns
   into **Send** with the file ready: the next tap opens the sheet at once. The ready file is
