@@ -100,7 +100,7 @@ test('held (a drag) the idle motion eases out; reduced motion stops it at once',
 });
 
 test('a spinning card being pointed at turns on to face the viewer, then waits', () => {
-  for (const idle of ['spin', 'turn'] as const) {
+  for (const idle of ['spin', 'turn', 'reveal'] as const) {
     const t = { ...TUNE_DEFAULTS, idle };
     const live = new IdleClock();
     for (let i = 0; i < 200; i++) live.step(1 / 60, t, false, false);

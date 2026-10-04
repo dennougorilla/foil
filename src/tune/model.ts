@@ -245,6 +245,10 @@ const REST_POSE: IdlePose = { dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1, spin:
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 const frac = (v: number) => v - Math.floor(v);
+/** 0 to 1, overshooting a little before it settles: a flip that snaps round. */
+const overshoot = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
+/** One heartbeat thump `x` seconds after it starts: a sharp rise and a soft fall, 1 at its peak. */
+const thump = (x: number, rise: number) => (x > 0 ? (x / rise) * Math.exp(1 - x / rise) : 0);
 
 /** The idle motion `s` idle seconds in. Periodic in loopCycle (spin and turn add whole turns). */
 export function idlePose(t: Tune, s: number): IdlePose {
@@ -416,9 +420,10 @@ export function idlePose(t: Tune, s: number): IdlePose {
 
 /** Where a turning idle motion next faces the viewer, in idle seconds; `s` itself when it already does. */
 export function facingAt(t: Tune, s: number): number {
-  if (t.idle !== 'spin' && t.idle !== 'turn') return s;
+  if (!TURNING.includes(t.idle)) return s;
   const turned = idlePose(t, s).spin / (Math.PI * 2);
-  return Math.abs(turned - Math.round(turned)) < 1e-6 ? s : Math.ceil(s / IDLE_CYCLE) * IDLE_CYCLE;
+  const P = period(t.idle);
+  return Math.abs(turned - Math.round(turned)) < 1e-6 ? s : Math.ceil(s / P) * P;
 }
 
 /** Position of the orbiting light in card uv, `s` idle seconds in. */
@@ -654,7 +659,7 @@ export class IdleClock {
       // Let go of a turn by easing forward to the next time the face looks straight on.
       this.idleTime += Math.min(face - this.idleTime, Math.max(dt * t.speed, (face - this.idleTime) * (1 - Math.exp(-dt * 5))));
       if (face - this.idleTime < 1e-3) this.idleTime = face;
-    } else if (!held && !(facing && face === this.idleTime && (t.idle === 'spin' || t.idle === 'turn'))) {
+    } else if (!held && !(facing && face === this.idleTime && TURNING.includes(t.idle))) {
       this.idleTime += dt * t.speed;
     }
     this.spinAngle = idlePose(t, this.idleTime).spin;

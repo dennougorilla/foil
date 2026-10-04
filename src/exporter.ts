@@ -156,6 +156,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   const k = H / 900;
   const ch = 640 * k;
   const cw = (ch * 5) / 7;
+  // Blacklight's lamp drifts once per idle cycle, so its loops cover the whole cycle.
+  const cycle = loopCycle(tune, !!input.edition.torch);
 
   return {
     out,
