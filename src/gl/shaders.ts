@@ -460,7 +460,7 @@ void main() {
   if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12) amt = uIntensity;
+  if (e == 5 || e == 4 || e == 12 || e == 80 || e == 82) amt = uIntensity; // celebration finishes paint the frame in full too
   if (e == 13) amt *= m.r; // facets only cut the art, never the nameplate
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
@@ -472,6 +472,7 @@ void main() {
   if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
+    if (e == 82) spec *= 0.3; // a soft glare keeps the Fireworks night sky dark
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.6, 4.0, 0.1);
