@@ -1,18 +1,18 @@
-// On phones the panel sits far below the card, so tuning would happen blind. While the drawer
-// is open and the card has scrolled away, a small live window shows it inside the drawer's
-// sticky action bar, copied each frame from the stage canvas. Tapping it scrolls back up.
+// On phones the panel sits far below the card, so tuning would happen blind. While the Light &
+// motion tab is open and the card has scrolled away, a small live window shows it inside the
+// Save stub pinned to the bottom of the screen (so it never covers a control), copied each frame
+// from the stage canvas. Tapping it scrolls back up.
+
+import { copyCard, facing } from '../proof';
 
 export interface Peek {
   readonly el: HTMLElement;
-  readonly shown: boolean;
   setActive(on: boolean): void;
   setLabel(text: string, caption: string): void;
 }
 
-/** `facing` is how squarely the card face looks at us; the preview holds its last face-on frame while a spin shows the back. */
-export function mountPeek(onShow: (shown: boolean) => void, facing: () => number): Peek {
+export function mountPeek(): Peek {
   const slot = document.getElementById('cardSlot');
-  const source = document.getElementById('cards') as HTMLCanvasElement | null;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'tune-peek';
@@ -22,7 +22,7 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
   cap.className = 'tune-peek-cap';
   cap.setAttribute('aria-hidden', 'true');
   btn.append(view, cap);
-  if (!slot || !source) return { el: btn, shown: false, setActive() {}, setLabel() {} };
+  if (!slot) return { el: btn, setActive() {}, setLabel() {} };
 
   const narrow = matchMedia('(max-width: 900px)');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -48,10 +48,7 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
 
   function update() {
     const show = active && offscreen && narrow.matches;
-    if (show !== !btn.hidden) {
-      btn.hidden = !show;
-      onShow(show);
-    }
+    btn.hidden = !show;
     if (show && !raf) raf = requestAnimationFrame(draw);
     if (!show && raf) {
       cancelAnimationFrame(raf);
@@ -63,34 +60,11 @@ export function mountPeek(onShow: (shown: boolean) => void, facing: () => number
     raf = requestAnimationFrame(draw);
     // Hold the last face-on frame while a spin shows the back (but always draw a first frame).
     if (facing() < 0.35 && drawn) return;
-    const c = source!.getBoundingClientRect();
-    const s = slot!.getBoundingClientRect();
-    if (!c.width || !s.width) return;
-    const k = source!.width / c.width;
-    // A little margin around the slot so tilts and bobs stay in frame.
-    const padX = s.width * 0.14;
-    const padY = s.height * 0.1;
-    const sx = (s.left - c.left - padX) * k;
-    const sy = (s.top - c.top - padY) * k;
-    const sw = (s.width + padX * 2) * k;
-    const sh = (s.height + padY * 2) * k;
-    const w = view.clientWidth * devicePixelRatio;
-    const h = view.clientHeight * devicePixelRatio;
-    if (view.width !== w || view.height !== h) {
-      view.width = w;
-      view.height = h;
-    }
-    const x = view.getContext('2d')!;
-    x.clearRect(0, 0, w, h);
-    x.drawImage(source!, sx, sy, sw, sh, 0, 0, w, h);
-    drawn = facing() >= 0.35;
+    drawn = copyCard(view, 0.14, 0.1) && facing() >= 0.35;
   }
 
   return {
     el: btn,
-    get shown() {
-      return !btn.hidden;
-    },
     setActive(on) {
       active = on;
       update();

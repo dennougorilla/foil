@@ -18,6 +18,8 @@ import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { initSponsor, isLocked, releaseLockedEdition } from './sponsor';
+import { mountProof } from './proof';
+import { stepIn } from './handStep';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -59,6 +61,7 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
+    onFlick: (dir) => stepEdition(dir),
     isHidden: isLocked,
   });
 } catch (err) {
@@ -138,7 +141,13 @@ function applyText() {
   $('versionLink').setAttribute('aria-label', $('versionLink').title);
   $('cardSlot').dataset.loading = t.loading;
   $('hand').setAttribute('aria-label', t.handLabel);
+  for (const [id, label] of [['handPrev', t.prevFinish], ['handNext', t.nextFinish]]) {
+    $(id).setAttribute('aria-label', label);
+    $(id).title = label;
+  }
   stage.setHandLabels(t.edition, t.look);
+  // Written into the fade at the foot of the sheet when more of it waits below.
+  $('panel').style.setProperty('--more-text', JSON.stringify(t.moreBelow));
   $('cropView').setAttribute('aria-label', t.cropHint);
   $('cropView').title = t.cropHint;
   // Paste is ⌘V on Apple keyboards; taps, not clicks, on touch screens.
@@ -168,13 +177,10 @@ function renderInfo() {
   pe.style.setProperty('--c', s.edition === 'base' ? '#5b6d73' : ed.color);
   pe.classList.toggle('is-light', ['foil', 'gold', 'prism', 'glitch', 'relief', 'kintsugi', 'opal'].includes(s.edition));
   document.documentElement.style.setProperty('--accent', ed.id === 'base' ? '#ff5a4f' : ed.color);
-  // The panel names the finish on the card and points to the hand where it is picked.
+  // The panel names the finish on the card (beside a live proof of it) and points to the hand where it is picked.
   $('finishName').textContent = t.edition[s.edition];
-  const chip = $('finishChip');
-  chip.style.setProperty('--c', s.edition === 'base' ? '#c9c2b2' : ed.color);
-  chip.style.setProperty('--a', ed.swirl[0]);
-  chip.style.setProperty('--b', ed.swirl[1]);
-  chip.style.setProperty('--c3', ed.swirl[2]);
+  $('finishLook').textContent = t.look[s.edition];
+  $('recapFinishName').textContent = t.edition[s.edition];
   $('finishPick').setAttribute('aria-label', t.finishPick);
   $('finishPick').title = matchMedia('(max-width: 900px)').matches ? t.finishPickHintPhone : t.finishPickHint;
 }
@@ -295,6 +301,10 @@ function buildThumbs() {
   samples.forEach((img, i) => add(img, t.samplesName[i], i));
   if (userImage) add(userImage, userAnim ? `${t.yourImage} (${animKind(userAnim)})` : t.yourImage, -1);
   $('thumbLabel').textContent = s.sample >= 0 ? t.sampleNow : userAnim ? t.yourGif.replace('GIF', animKind(userAnim)) : t.yourImage;
+  // While a sample shows, opening your own picture is the loud step; once it is yours, Save is.
+  $('panel').dataset.picture = s.sample >= 0 ? 'sample' : 'own';
+  $('recapThumb').style.backgroundImage = `url(${thumbUrl(currentImage())})`;
+  $('recapImageName').textContent = s.sample >= 0 ? t.samplesName[s.sample] : t.yourImage;
   apngExport.refresh();
 }
 
@@ -519,7 +529,7 @@ async function loadFile(file: File) {
   } finally {
     store.set({ loading: false });
     document.body.classList.remove('is-loading');
-    pickLabel.textContent = t.pick;
+    pickLabel.textContent = t.pickFile;
     $('pickBtn').removeAttribute('aria-busy');
     if (!saveBtn.hasAttribute('aria-busy')) saveBtn.disabled = false;
   }
@@ -608,6 +618,16 @@ function selectEdition(id: EditionId) {
   stage.burst(editionById(id).color);
 }
 
+/** Steps to the next (1) or previous (-1) card the hand holds, whatever it holds right now. */
+function stepEdition(dir: 1 | -1) {
+  const id = stepIn(stage.shownIds(), store.get().edition, dir);
+  if (id) selectEdition(id);
+}
+
+// Phones step through the hand from beside the finish's name too (see stage-phone.css).
+$('handPrev').addEventListener('click', () => stepEdition(-1));
+$('handNext').addEventListener('click', () => stepEdition(1));
+
 /** Tell screen readers which finish is on the card now. */
 function announce(msg: string) {
   const live = $('announcer');
@@ -622,19 +642,16 @@ window.addEventListener('keydown', (e) => {
   // 1–9 then 0 pick the first ten finishes in the hand, like a keyboard row.
   const n = parseInt(e.key, 10);
   if (!Number.isNaN(n) && e.key.length === 1) {
-    const shown = EDITIONS.filter((x) => !isLocked(x.id));
+    const shown = stage.shownIds();
     const i = n === 0 ? 9 : n - 1;
-    if (shown[i]) selectEdition(shown[i].id);
+    if (shown[i]) selectEdition(shown[i]);
     return;
   }
   // Arrows step through finishes when nothing else on the page wants them.
   const free = document.activeElement === document.body || document.activeElement?.id === 'cardSlot';
   if (free && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     e.preventDefault();
-    let next = EDITIONS.findIndex((x) => x.id === store.get().edition);
-    do next = (next + (e.key === 'ArrowRight' ? 1 : -1) + EDITIONS.length) % EDITIONS.length;
-    while (isLocked(EDITIONS[next].id));
-    selectEdition(EDITIONS[next].id);
+    stepEdition(e.key === 'ArrowRight' ? 1 : -1);
   }
 });
 
@@ -673,6 +690,19 @@ rovingKeys($('frameSeg'));
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
 mountTune(store, $('pane-light'));
+mountProof($('finishProof'));
+mountProof($('recapProof'));
+
+// A folded step leads back to itself: Fine-tune closes, the step is brought into view and focus
+// moves to the step's own button (the recap it was on folds away).
+for (const [id, target] of [['recapImage', 'pickBtn'], ['recapFinish', 'finishPick']]) {
+  $(id).addEventListener('click', () => {
+    sfx.tick();
+    store.set({ adjustOpen: false });
+    $(target).focus({ preventScroll: true });
+    requestAnimationFrame(() => $(id).closest('.sec')!.scrollIntoView({ block: 'nearest' }));
+  });
+}
 
 // ---------- Fine-tune: closed until asked for, then four tabs ----------
 
@@ -726,12 +756,12 @@ tabBar.addEventListener('keydown', (e) => {
   revealTabs();
 });
 
-/** Scrolls so the Fine-tune row and its tabs sit at the top, giving the tab the panel's whole height. */
+/** Scrolls to the top of the sheet: the folded steps, the Fine-tune row and its tabs, then the tab itself. */
 function revealTabs() {
   const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   requestAnimationFrame(() => {
     const panel = $('panel');
-    const top = $('adjust').getBoundingClientRect().top;
+    const top = panel.querySelector('.sec')!.getBoundingClientRect().top;
     // The panel scrolls on its own beside the stage; on phones the page does.
     if (getComputedStyle(panel).overflowY === 'visible') window.scrollBy({ top, behavior });
     else panel.scrollBy({ top: top - panel.getBoundingClientRect().top, behavior });
@@ -761,6 +791,9 @@ function syncAdjust() {
     ? t.adjustChanged.replace('{list}', changed.map((id) => t.tabs[id]).join(s.lang === 'ja' ? '・' : ', '))
     : t.adjustSub;
   summary.classList.toggle('is-changed', changed.length > 0);
+  // While tuning, steps 1 and 2 fold into one line each, so the tabs get the sheet.
+  $('panel').classList.toggle('is-tuning', s.adjustOpen);
+  requestAnimationFrame(trackExportBar);
 }
 
 $('cardReset').addEventListener('click', () => {
@@ -823,7 +856,9 @@ function buildFormats() {
     b.className = 'seg-btn';
     b.dataset.format = f;
     b.setAttribute('role', 'radio');
-    b.textContent = t.format[f];
+    b.innerHTML = '<b></b><small></small>';
+    b.firstElementChild!.textContent = t.format[f];
+    b.lastElementChild!.textContent = t.formatKind[f];
     radio(b, store.get().exportFormat === f);
     b.disabled = saveBtn.hasAttribute('aria-busy');
     b.onclick = () => {
@@ -938,6 +973,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   // One export at a time: the button, the format choice and the APNG shortcut rest while this one works.
   saveBtn.disabled = true;
   saveBtn.setAttribute('aria-busy', 'true');
+  exportBusy(true);
   $<HTMLButtonElement>('toApng').disabled = true;
   buildFormats();
   small.textContent = label;
@@ -956,6 +992,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     sfx.error();
     toast(fail, true);
   } finally {
+    exportBusy(false);
     saveBtn.removeAttribute('aria-busy');
     // A picture still loading keeps Save resting; the format buttons are rebuilt, not the old ones re-enabled.
     saveBtn.disabled = store.get().loading;
@@ -968,7 +1005,10 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   }
 }
 
-/** A saved card is a pulled card: it hops, sheds sparks in its finish's colour, and Save shines once. */
+/**
+ * A saved card is a pulled card: it hops and sheds sparks in its finish's colour, and a dated
+ * seal is pressed onto the Save stamp, the way a print shop signs off a job.
+ */
 let celebrateTimer = 0;
 function celebrate(file: string) {
   stage.juice(0.6);
@@ -976,13 +1016,27 @@ function celebrate(file: string) {
   saveBtn.classList.remove('is-saved');
   void saveBtn.offsetWidth;
   saveBtn.classList.add('is-saved');
-  saveBtn.querySelector('.btn-text b')!.textContent = `${t.savedShort} ✓`;
-  saveBtn.querySelector('.btn-text small')!.textContent = file;
+  // The stamp keeps its name (it can be pressed again); its note says what was written.
+  saveBtn.querySelector('.btn-text small')!.textContent = `${t.savedShort}: ${file}`;
+  const now = new Date();
+  $('seal').querySelector('b')!.textContent = t.sealDone;
+  $('seal').querySelector('small')!.textContent = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, '0')).join('.');
   clearTimeout(celebrateTimer);
   celebrateTimer = window.setTimeout(() => {
     saveBtn.classList.remove('is-saved');
     renderSave();
   }, 2400);
+}
+
+/**
+ * An export starts (on) or ends: the stage's quality governor rests meanwhile (an export's frames
+ * say nothing about the stage's own speed), and a seal still showing from the last save comes off.
+ */
+function exportBusy(on: boolean) {
+  stage?.holdQuality(on);
+  if (!on || !saveBtn.classList.contains('is-saved')) return;
+  clearTimeout(celebrateTimer);
+  saveBtn.classList.remove('is-saved');
 }
 
 saveBtn.addEventListener('click', () => {
@@ -1031,6 +1085,7 @@ const apngExport = mountApngExport({
   input: exportInput,
   toast: (msg, error) => toast(msg, error),
   onSaved: (file) => celebrate(file),
+  busy: exportBusy,
   sfx,
 });
 
@@ -1092,25 +1147,38 @@ new ResizeObserver(([e]) =>
   document.documentElement.style.setProperty('--export-h', `${Math.round(e.borderBoxSize[0].blockSize)}px`),
 ).observe(exportSec);
 
-/** Toasts rise from just above the Export bar, wherever it is now, so they never cover Save. */
-function placeToasts() {
+/**
+ * Toasts rise from just above the Export bar, wherever it is now, so they never cover Save.
+ * On phones the bar floats over the whole page; it fades the sheet's lines only over the sheet.
+ * Scrolled, the sheet fades what has gone up under its head, and marks when more waits below.
+ */
+function trackExportBar() {
   const top = exportSec.getBoundingClientRect().top;
   const bottom = Math.max(12, Math.min(innerHeight - top + 12, innerHeight - 160));
   $('toasts').style.bottom = `${Math.round(bottom)}px`;
+  const panel = $('panel');
+  const sheet = panel.getBoundingClientRect();
+  exportSec.classList.toggle('is-over-sheet', sheet.top < top && sheet.bottom > top);
+  panel.classList.toggle('is-scrolled', panel.scrollTop > 2);
+  panel.classList.toggle('has-more', panel.scrollHeight - panel.scrollTop - panel.clientHeight > 8);
 }
-new ResizeObserver(placeToasts).observe($('panel'));
-$('panel').addEventListener('scroll', placeToasts, { passive: true });
-addEventListener('scroll', placeToasts, { passive: true });
-addEventListener('resize', placeToasts);
+// The sheet keeps its height while its steps grow and shrink, so watch the steps as well.
+{
+  const ro = new ResizeObserver(trackExportBar);
+  ro.observe($('panel'));
+  $('panel').querySelectorAll('.sec').forEach((s) => ro.observe(s));
+}
+$('panel').addEventListener('scroll', trackExportBar, { passive: true });
+addEventListener('scroll', trackExportBar, { passive: true });
+addEventListener('resize', trackExportBar);
 
 function dismissToast(el: HTMLElement) {
   if (el.classList.contains('is-out')) return;
   // Don't strand keyboard focus on a toast that's about to vanish.
-  // Phones hide the panel's pick button, so land on whichever one is showing.
-  if (el.contains(document.activeElement)) {
-    const pick = [$('pickBtn'), $('pickBtnStage')].find((b) => b.getClientRects().length) ?? $('pickBtn');
-    pick.focus({ preventScroll: true });
-  }
+  // Focus goes to a pick button that is on screen: the stage's on phones, the panel's otherwise
+  // (folded away while Fine-tune is open, whose toggle stands in), brought into view if need be.
+  if (el.contains(document.activeElement))
+    ['pickBtnStage', store.get().adjustOpen ? 'adjustToggle' : 'pickBtn'].map((id) => $(id)).find((b) => b.offsetParent)?.focus();
   el.classList.add('is-out');
   el.addEventListener('animationend', () => el.remove());
   setTimeout(() => el.remove(), 400);
@@ -1120,6 +1188,8 @@ function dismissToast(el: HTMLElement) {
 // A picture that can't be read is said right under the pick button (beside the stage); phones,
 // whose panel is far below, get a toast instead.
 function showImageError(msg: string) {
+  // The error sits in the picture step, which Fine-tune folds away.
+  store.set({ adjustOpen: false });
   const box = $('imageError');
   box.querySelector('p')!.textContent = msg;
   box.hidden = false;

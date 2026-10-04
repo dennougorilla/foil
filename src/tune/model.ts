@@ -2,7 +2,7 @@
 // The defaults reproduce the look FOIL had before these controls existed, so leaving the
 // "More" drawer closed changes nothing.
 
-export type LightMode = 'pointer' | 'orbit' | 'fixed' | 'gyro';
+export type LightMode = 'pointer' | 'orbit' | 'fixed';
 export type IdleMode = 'none' | 'sway' | 'spin' | 'breathe';
 /** The metal the Relief finish is struck in; other finishes ignore it. */
 export type Metal = 'gold' | 'silver';
@@ -81,16 +81,21 @@ export const RANGES: Record<NumKey, Range> = {
   tiltMax: { min: 0, max: 40, step: 1 },
 };
 
-export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed', 'gyro'];
+export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed'];
 export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'spin', 'breathe'];
 export const METALS: Metal[] = ['gold', 'silver'];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
-/** Fills gaps and drops nonsense from a saved tune, so older or hand-edited storage still loads. */
+/**
+ * Fills gaps and drops nonsense from a saved tune, so hand-edited storage still loads. A tune
+ * saved with a light mode that no longer exists (Gyro, before v0.10) is from an older shape and
+ * starts over from the defaults.
+ */
 export function sanitizeTune(raw: unknown): Tune {
   const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const out = { ...TUNE_DEFAULTS };
+  if (src.light !== undefined && !LIGHT_MODES.includes(src.light as LightMode)) return out;
   for (const k of Object.keys(RANGES) as NumKey[]) {
     const v = src[k];
     if (typeof v === 'number' && Number.isFinite(v)) out[k] = clamp(v, RANGES[k].min, RANGES[k].max);

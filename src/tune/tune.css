@@ -1,13 +1,13 @@
-/* Light & motion tab (src/tune/panel.ts). Built from the panel's own tokens. */
+/* Shine tab (src/tune/panel.ts). Built from the job ticket's own inks (style.css). */
 
 .tune {
   /* Japanese wraps between phrases, never mid-word. */
   word-break: auto-phrase;
   --tune-fill: var(--slider-fill);
-  /* Notes about controls that do nothing right now: informational, so blue, not the gold of
-     changes and actions. */
-  --tune-info: #7cc6ff;
-  --tune-changed: var(--gold);
+  /* Notes about controls that do nothing right now: informational, so a quiet blue box, not the
+     violet of changes. */
+  --tune-info: #1d5a85;
+  --tune-changed: var(--mark);
 }
 
 .tune svg {
@@ -40,7 +40,7 @@
 /* Groups: Pattern, Light, Motion, each under a small heading. */
 .tune-groups {
   display: grid;
-  gap: 32px;
+  gap: 24px;
 }
 
 .tune-group {
@@ -54,7 +54,7 @@
   gap: 8px;
   margin: 0;
   padding-bottom: 8px;
-  border-bottom: 2px solid var(--panel-lo);
+  border-bottom: 2px solid var(--rule);
   font-size: 16px;
   font-weight: 400;
   color: var(--text);
@@ -62,18 +62,6 @@
 
 .group-title svg {
   color: var(--text-dim);
-}
-
-.tune-dot {
-  width: 7px;
-  height: 7px;
-  margin-left: 2px;
-  background: var(--tune-changed);
-  transform: rotate(45deg);
-}
-
-.tune-dot[hidden] {
-  display: none;
 }
 
 /* Rows */
@@ -87,6 +75,15 @@
 
 .tune-head {
   display: contents;
+}
+
+/* A dotted leader runs from the label to its value, as on a printed form. */
+.tune-row:not(.tune-row-choice, .tune-row-dial)::before {
+  content: '';
+  grid-area: 1 / 3;
+  align-self: end;
+  margin-bottom: 7px;
+  border-bottom: 2px dotted var(--rule);
 }
 
 .tune-label {
@@ -154,13 +151,13 @@
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--gold);
+  color: var(--tune-changed);
   transition: opacity 0.15s, background 0.15s, transform 0.08s;
 }
 
 .tune-reset:hover:not(:disabled) {
-  background: var(--panel-hi);
-  box-shadow: inset 0 0 0 2px var(--gold);
+  background: var(--sheet-lo);
+  box-shadow: inset 0 0 0 2px var(--tune-changed);
 }
 
 .tune-reset:active:not(:disabled) {
@@ -262,8 +259,8 @@
   margin: 6px 0 2px;
   padding: 5px 9px;
   border-radius: 6px;
-  background: rgba(26, 156, 255, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(124, 198, 255, 0.35);
+  background: rgba(29, 90, 133, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(29, 90, 133, 0.4);
   font-size: 12px;
   line-height: 1.45;
   color: var(--tune-info);
@@ -356,25 +353,11 @@
   }
 }
 
-.tune-help,
-.tune-note {
+.tune-help {
   margin: 4px 0 0;
   min-height: 1.5em;
   font-size: 13px;
   color: var(--text-dim);
-}
-
-.tune-note {
-  margin: 10px 0 2px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: rgba(242, 193, 78, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(242, 193, 78, 0.35);
-  color: var(--gold);
-}
-
-.tune-note[hidden] {
-  display: none;
 }
 
 /* Footer: the hint scrolls with the drawer; the actions dock sticks just above Export, so
@@ -386,8 +369,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 8px -24px -8px;
-  padding: 12px 24px;
+  margin: 8px calc(-1 * var(--pad)) -8px;
+  padding: 12px var(--pad);
   background: var(--panel);
   box-shadow: 0 -2px 0 var(--panel-lo);
 }
@@ -423,34 +406,23 @@
   display: none;
 }
 
-/* Phones: the preview on the left, Compare and Reset all stacked and left-aligned beside it. */
-@media (max-width: 900px) {
-  .tune-dock .tune-actions {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .tune-dock :is(.tune-reset-all, .tune-undo) {
-    margin-left: 0;
-  }
-}
-
 
 .tune-actions {
   display: flex;
   flex: 1 1 100%;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 8px 14px;
 }
 
 .tune-compare {
-  min-height: 30px;
+  min-height: 32px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
-  background: var(--panel);
-  box-shadow: inset 0 0 0 2px var(--panel-hi), 0 3px 0 var(--edge);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--ink);
   color: var(--text);
   font-size: 13px;
   white-space: nowrap;
@@ -507,14 +479,13 @@
 }
 
 .tune-compare:hover {
-  background: var(--panel-hi);
+  background: var(--sheet-lo);
 }
 
 .tune-compare[aria-pressed='true'] {
-  transform: translateY(3px);
-  background: var(--gold);
-  color: #12181a;
-  box-shadow: 0 0 0 var(--edge);
+  transform: translate(1px, 2px);
+  background: var(--ink);
+  color: var(--sheet);
 }
 
 .tune-compare[hidden] {
@@ -534,7 +505,7 @@
   padding: 4px 0;
   border: 0;
   background: none;
-  color: var(--gold);
+  color: var(--ink);
   font-size: 13px;
   white-space: nowrap;
   text-decoration: underline;
@@ -558,10 +529,10 @@
   min-height: 30px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
-  background: var(--gold);
-  box-shadow: 0 3px 0 var(--edge);
-  color: #12181a;
+  border-radius: 3px;
+  background: var(--ink);
+  box-shadow: 3px 3px 0 rgba(42, 36, 30, 0.3);
+  color: var(--sheet);
   font-size: 13px;
   white-space: nowrap;
   animation: tune-in 0.25s var(--ease-back);
@@ -584,7 +555,7 @@
   right: 0;
   bottom: 0;
   height: 3px;
-  background: rgba(18, 24, 26, 0.55);
+  background: color-mix(in srgb, var(--sheet) 55%, transparent);
   transform-origin: left;
   animation: tune-drain 8s linear forwards;
 }
@@ -746,9 +717,9 @@
   margin: -2px 0;
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: rgba(13, 19, 21, 0.88);
-  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--panel-hi);
+  border-radius: 3px;
+  background: #141c1f;
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .tune-peek[hidden] {
@@ -853,9 +824,9 @@
   height: 22px;
   margin: -11px 0 0 -11px;
   border-radius: 50%;
-  background: var(--edge);
-  box-shadow: 0 0 0 2px var(--gold);
-  color: var(--gold);
+  background: #fbf7ec;
+  box-shadow: 0 0 0 2px var(--ink);
+  color: var(--ink);
   transform: rotate(var(--a)) translateY(-29px) rotate(calc(var(--a) * -1));
 }
 
@@ -872,6 +843,7 @@
 }
 
 .tune-sample-row .tune-help {
+  min-width: 0;
   margin: 0;
 }
 

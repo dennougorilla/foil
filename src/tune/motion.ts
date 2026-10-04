@@ -1,9 +1,9 @@
 // Live light and idle motion for the stage. Pure bookkeeping: the stage asks for numbers each
 // frame and keeps doing all of the drawing itself.
 import { fixedLight, TUNE_DEFAULTS, type Tune } from './model';
+import { GyroTilt } from './gyro';
 
 const TAU = Math.PI * 2;
-const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 export interface IdlePose {
   fy: number;
@@ -17,11 +17,8 @@ export interface IdlePose {
   sheen: [number, number];
 }
 
-export type GyroResult = 'ok' | 'denied' | 'unsupported';
-
-/** Phones and tablets with a motion sensor can steer the light by tilting the device. */
-export const gyroAvailable = () =>
-  typeof window !== 'undefined' && 'DeviceOrientationEvent' in window && matchMedia('(pointer: coarse)').matches;
+/** Phones and tablets with a motion sensor tilt the card as the device tilts. */
+const gyroAvailable = () => 'DeviceOrientationEvent' in window && matchMedia('(pointer: coarse)').matches;
 
 class LiveMotion {
   /** While held, the stage shows the untouched defaults for a before/after comparison. */
@@ -33,11 +30,13 @@ class LiveMotion {
   private idleT = 0;
   private orbit = 0;
   private spin = 0;
+  /** The stage's flip to a new picture (radians, 0 when not flipping); set by the stage each frame. */
+  flip = 0;
   /** Current turntable angle of the spin idle (0 when not spinning). */
   get spinAngle() {
     return this.spin;
   }
-  private gyro = { listening: false, x: 0, y: 0, sx: 0, sy: 0, base: null as null | [number, number], last: 0 };
+  private gyro = { tilt: new GyroTilt(), asked: false, sx: 0, sy: 0, last: 0 };
 
   step(dt: number, t: Tune, still: boolean, holding: boolean) {
     if (!still) {
@@ -53,9 +52,9 @@ class LiveMotion {
       this.spin += (target - this.spin) * (1 - Math.exp(-dt * 5));
       if (Math.abs(target - this.spin) < 1e-3) this.spin = 0;
     }
-    const k = 1 - Math.exp(-dt * 10);
-    this.gyro.sx += (this.gyro.x - this.gyro.sx) * k;
-    this.gyro.sy += (this.gyro.y - this.gyro.sy) * k;
+    const k = 1 - Math.exp(-dt * 14);
+    this.gyro.sx += (this.gyro.tilt.x - this.gyro.sx) * k;
+    this.gyro.sy += (this.gyro.tilt.y - this.gyro.sy) * k;
   }
 
   /** Automatic motion on top of the springs. `on` is false while dragging or with reduced motion. */
@@ -94,57 +93,48 @@ class LiveMotion {
     return t.light === 'orbit' ? [Math.cos(this.orbit) * 0.6, Math.sin(this.orbit) * 0.6] : [0, 0];
   }
 
-  /** Device tilt as -1..1 on each axis while the gyro light is on and reporting. */
-  gyroInput(t: Tune): [number, number] | null {
-    if (t.light !== 'gyro' || performance.now() - this.gyro.last > 600) return null;
+  /** Device tilt as -1..1 on each axis while the sensor is reporting. */
+  gyroInput(): [number, number] | null {
+    if (performance.now() - this.gyro.last > 600) return null;
     return [this.gyro.sx, this.gyro.sy];
   }
 
-  async enableGyro(): Promise<GyroResult> {
-    if (!gyroAvailable()) return 'unsupported';
+  /**
+   * Starts following the device's tilt. Where the sensor takes a permission (iOS), it is asked
+   * for only from a tap on the card or the hand (a card or a step), once per visit. Under reduced
+   * motion the sensor is left alone: no prompt, and no listener while it is on.
+   */
+  armGyro(stage: HTMLElement, reduced: MediaQueryList) {
+    if (!gyroAvailable()) return;
+    let allowed = false;
+    const sync = () => {
+      if (allowed && !reduced.matches) window.addEventListener('deviceorientation', this.orient);
+      else window.removeEventListener('deviceorientation', this.orient);
+    };
+    reduced.addEventListener('change', sync);
     const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
-    if (typeof DOE.requestPermission === 'function') {
-      // iOS only grants this from a tap, which is where the panel calls us from.
-      const r = await DOE.requestPermission().catch(() => 'denied');
-      if (r !== 'granted') return 'denied';
+    if (typeof DOE.requestPermission !== 'function') {
+      allowed = true;
+      return sync();
     }
-    if (!this.gyro.listening) {
-      this.gyro.listening = true;
-      window.addEventListener('deviceorientation', this.onOrient);
-    }
-    this.gyro.base = null;
-    return 'ok';
+    const ask = (e: Event) => {
+      if (!(e.target as Element).closest('#cardSlot, .hand-slot, .hand-step') || this.gyro.asked || reduced.matches) return;
+      this.gyro.asked = true;
+      stage.removeEventListener('click', ask);
+      // Called straight from the tap, which iOS needs to show its prompt.
+      void DOE.requestPermission!().then((r) => {
+        allowed = r === 'granted';
+        sync();
+      }, () => {});
+    };
+    stage.addEventListener('click', ask);
   }
 
-  /** Stops listening to the sensor once another light source is chosen. */
-  disableGyro() {
-    if (!this.gyro.listening) return;
-    this.gyro.listening = false;
-    window.removeEventListener('deviceorientation', this.onOrient);
-    this.gyro.base = null;
-    this.gyro.last = 0;
-  }
-
-  /** True once the sensor has sent anything since it was enabled. */
-  gyroLive = () => performance.now() - this.gyro.last < 1000;
-
-  private onOrient = (e: DeviceOrientationEvent) => {
+  private orient = (e: DeviceOrientationEvent) => {
     if (e.beta == null || e.gamma == null) return;
-    // Map the sensor onto the screen as it is held.
-    const turn = (screen.orientation?.angle ?? 0) % 360;
-    let x = e.gamma;
-    let y = e.beta;
-    if (turn === 90) [x, y] = [e.beta, -e.gamma];
-    else if (turn === 270 || turn === -90) [x, y] = [-e.beta, e.gamma];
-    else if (turn === 180 || turn === -180) [x, y] = [-e.gamma, -e.beta];
-    const g = this.gyro;
-    if (!g.base) g.base = [x, y];
-    // The rest pose slowly follows how the phone is held, so any grip feels centred.
-    g.base[0] += (x - g.base[0]) * 0.01;
-    g.base[1] += (y - g.base[1]) * 0.01;
-    g.x = clamp((x - g.base[0]) / 22, -1, 1);
-    g.y = clamp((y - g.base[1]) / 22, -1, 1);
-    g.last = performance.now();
+    const now = performance.now();
+    this.gyro.tilt.feed(e.beta, e.gamma, screen.orientation?.angle ?? 0, now);
+    this.gyro.last = now;
   };
 }
 

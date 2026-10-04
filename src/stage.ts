@@ -5,6 +5,9 @@ import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
+import { flickDir } from './handStep';
+import { QualityGovernor } from './quality';
+import './stage-phone.css';
 
 class Spring {
   v = 0;
@@ -46,8 +49,16 @@ export interface StageOptions {
   info: HTMLElement;
   onSelect: (id: EditionId) => void;
   onHover: (id: EditionId | null) => void;
+  /** A finger flicked the card sideways: 1 for the next card in the hand, -1 for the previous. */
+  onFlick: (dir: 1 | -1) => void;
   /** Finishes left out of the hand (the hidden finishes until they are unlocked). */
   isHidden?: (id: EditionId) => boolean;
+}
+
+/** A level pinned with ?quality=0…3 in the address, if any. */
+function pinnedQuality(): number | undefined {
+  const v = new URLSearchParams(location.search).get('quality');
+  return v !== null && /^\d$/.test(v) ? +v : undefined;
 }
 
 export class Stage {
@@ -61,6 +72,8 @@ export class Stage {
   private running = false;
   // Phones and low-core machines get a lighter backbuffer; the pixel look hides the difference.
   private maxDpr = (navigator.hardwareConcurrency || 8) <= 4 || matchMedia('(pointer: coarse)').matches ? 1.5 : 2;
+  /** Steps the on-screen drawing down while the device keeps missing frames; ?quality=0…3 pins it. */
+  private quality = new QualityGovernor(pinnedQuality());
 
   // Main card motion
   private ox = new Spring(0, 0, 150, 14);
@@ -74,7 +87,7 @@ export class Stage {
 
   // Pointer
   private pointer = { x: -1, y: -1, inside: false, nx: 0, ny: 0, overCard: false };
-  private drag = { active: false, id: -1, sx: 0, sy: 0, lx: 0, ly: 0, lt: 0, vx: 0, vy: 0, moved: 0 };
+  private drag = { active: false, id: -1, finger: false, sx: 0, sy: 0, lx: 0, ly: 0, lt: 0, vx: 0, vy: 0, moved: 0 };
   /** A press on a finish that reacts to touch: it strokes the card instead of tossing it. */
   private rub = { active: false, id: -1 };
   /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
@@ -116,14 +129,22 @@ export class Stage {
       this.sc.x = 0.7;
     }
     this.resume();
+    this.syncQuality();
+    motion.armGyro(o.stage, this.reduced);
     // Nothing to see in a hidden tab, so stop drawing until it comes back.
     document.addEventListener('visibilitychange', () => this.resume());
+  }
+
+  /** Exports draw and read back on every frame; their frames say nothing about the stage's own speed. */
+  holdQuality(on: boolean) {
+    this.quality.hold(on);
   }
 
   private resume() {
     if (this.running || document.hidden) return;
     this.running = true;
     this.last = performance.now();
+    this.quality.rest();
     requestAnimationFrame(this.frame);
   }
 
@@ -184,6 +205,11 @@ export class Stage {
     this.syncHandChecked();
   }
 
+  /** The finishes the hand holds right now, in the order it shows them. */
+  shownIds(): EditionId[] {
+    return this.hand.filter((h) => !h.el.hidden).map((h) => h.id);
+  }
+
   /** Re-reads which finishes are left out of the hand; the fan closes up around them and the number keys follow. */
   syncHandHidden() {
     let n = 0;
@@ -194,6 +220,8 @@ export class Stage {
       h.el.innerHTML = n < 10 ? `<span class="key" aria-hidden="true">${(n + 1) % 10}</span>` : '';
       n++;
     }
+    // Phones deal a hand of more than seven cards in two rows, in a taller box.
+    this.o.hand.toggleAttribute('data-many', n > 7);
   }
 
   syncHandChecked() {
@@ -265,6 +293,7 @@ export class Stage {
       Object.assign(this.drag, {
         active: true,
         id: e.pointerId,
+        finger: e.pointerType !== 'mouse',
         sx: e.clientX,
         sy: e.clientY,
         lx: e.clientX,
@@ -297,6 +326,14 @@ export class Stage {
         this.rz.v += clamp(this.drag.vx, -3000, 3000) * 0.004;
         if (speed > 900) sfx.toss();
         else sfx.land();
+      }
+      // A finger flicking the card sideways deals the next card in the hand (a mouse just tosses it;
+      // a gesture the browser cancels deals nothing).
+      const dir = this.drag.finger && e.type === 'pointerup' ? flickDir(e.clientX - this.drag.sx, e.clientY - this.drag.sy, this.drag.vx) : 0;
+      if (dir) {
+        // The card turns a little the way it was flicked as the next one is dealt.
+        this.ry.v -= dir * 9;
+        this.o.onFlick(dir);
       }
     };
     cardSlot.addEventListener('pointerup', release);
@@ -331,7 +368,8 @@ export class Stage {
     if (!r) return;
     const c = hexToRgb(color);
     const white: RGB = [1, 1, 1];
-    for (let i = 0; i < 46; i++) {
+    const n = Math.round(46 * this.quality.current.sparks);
+    for (let i = 0; i < n; i++) {
       // Emit from the card outline
       const side = Math.floor(Math.random() * 4);
       const u = Math.random();
@@ -368,7 +406,7 @@ export class Stage {
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
     // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
-    const rows = hr.height > 240 && count > 7 ? 2 : 1;
+    const rows = hr.height >= 200 && count > 7 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
@@ -393,6 +431,7 @@ export class Stage {
       this.running = false;
       return;
     }
+    if (this.quality.frame(now - this.last)) this.syncQuality();
     const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000));
     this.last = now;
     // Advance by the clamped step so a long pause never jumps the animation ahead.
@@ -406,10 +445,11 @@ export class Stage {
     }
 
     // Resize canvases to their boxes
-    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
+    const q = this.quality.current;
+    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr) * q.res;
     this.canvasRect = this.o.canvas.getBoundingClientRect();
     this.cards.resize(this.canvasRect.width, this.canvasRect.height, dpr);
-    this.bg.resize(Math.ceil(innerWidth / 4), Math.ceil(innerHeight / 4));
+    this.bg.resize(Math.ceil(innerWidth / q.bg), Math.ceil(innerHeight / q.bg));
 
     // Background palette eases to the selected edition
     const ed = EDITIONS.find((e) => e.id === state.edition) ?? EDITIONS[0];
@@ -450,7 +490,8 @@ export class Stage {
       const over = this.pointer.inside && Math.abs(nx) < 1.05 && Math.abs(ny) < 1.05;
       this.pointer.overCard = over || this.drag.active;
       const amp = this.motion ? 1 : 0.5;
-      const gyro = motion.gyroInput(tune);
+      // The device's tilt leans the card (and so its shine) on phones; not under reduced motion.
+      const gyro = this.motion ? motion.gyroInput() : null;
       // Brush mode holds the card too, so a spin eases back to face the viewer.
       motion.step(dt, tune, !this.motion, over || this.drag.active || this.hold);
       if (this.hold) {
@@ -512,6 +553,7 @@ export class Stage {
       const ryIdle = pose.ry;
       const tk = motion.tiltScale(tune);
       const RX = this.rx.x * tk + rxIdle;
+      motion.flip = flipAngle;
       const RY = this.ry.x * tk + ryIdle + pose.spin + flipAngle;
       const RZ = this.rz.x * tk + rzIdle;
 
@@ -522,7 +564,6 @@ export class Stage {
       ];
       let light: [number, number];
       if (over && !this.drag.active && !this.hold) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
-      else if (gyro) light = [clamp(gyro[0] * 0.5 + 0.5, 0, 1), clamp(gyro[1] * 0.5 + 0.5, 0, 1)];
       else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
       light = motion.light(tune, light);
 
@@ -555,6 +596,11 @@ export class Stage {
     this.cards.drawParticles(this.particles);
     requestAnimationFrame(this.frame);
   };
+
+  /** Shows the drawing level on the page (data-quality), for anyone checking what the stage chose. */
+  private syncQuality() {
+    document.documentElement.dataset.quality = String(this.quality.level);
+  }
 
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
   private warm(at: [number, number] | null, dt: number) {

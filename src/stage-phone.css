@@ -1,0 +1,78 @@
+/*
+ * Phones: the card, its pick button and the hand share one screen above the pinned Save bar,
+ * so a finish is one tap (or one flick of the card) away without scrolling. The name tag
+ * follows below the hand. The side panel's own phone layout stays in style.css.
+ */
+@media (max-width: 900px) {
+  .stage {
+    /* What the hand takes: one row of up to seven cards, or two rows for more; less on short screens. */
+    --hand-h: clamp(112px, 21svh, 168px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .stage:has(.hand[data-many]) {
+    --hand-h: clamp(200px, 30svh, 290px);
+  }
+  /* The second row's fan curves past the hand's box; keep the name clear of it. */
+  .hand[data-many] + .hand-bar {
+    margin-top: 16px;
+  }
+  .showcase {
+    display: contents;
+  }
+  /* Short screens shrink the card rather than push the hand under the Save bar. Besides the
+     card and the hand, the header, the pick button, the caption and the gaps take about 200px. */
+  .card-slot {
+    margin-top: 12px;
+    width: clamp(64px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px));
+  }
+  .hand-wrap {
+    order: 1;
+    width: 100%;
+    margin-top: 0;
+  }
+  /* The finish's name, with a step to either side: the same steps a flick of the card takes. */
+  .hand-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    /* Pinned to the hand's edges, so the steps stay put whatever the finish is called. */
+    width: 100%;
+  }
+  .hand-step {
+    display: inline-flex;
+    justify-content: center;
+    width: 44px;
+    height: 40px;
+  }
+  .hand {
+    height: var(--hand-h);
+  }
+  /* Just the finish's name, on one line between the steps; the panel below says more about it. */
+  .hand-caption {
+    margin: 0;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    font-size: clamp(15px, 5vw, 20px);
+  }
+  .hand-caption span {
+    display: none;
+  }
+  .info {
+    order: 2;
+    margin-top: 8px;
+  }
+}
+
+/* The smallest phones (an SE in Safari) close up the gaps to keep the steps above Save. */
+@media (max-width: 900px) and (max-height: 620px) {
+  .stage {
+    gap: 6px;
+  }
+  .card-slot {
+    margin-top: 4px;
+  }
+}

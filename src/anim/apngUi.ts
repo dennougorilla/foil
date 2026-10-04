@@ -58,10 +58,12 @@ export interface ApngUiOptions {
   toast: (msg: string, error?: boolean) => void;
   /** After a file is written, for the panel's saved moment. */
   onSaved: (file: string) => void;
+  /** Told when a file starts being written and when that ends (stopped or not). */
+  busy: (on: boolean) => void;
   sfx: { coin(): void; error(): void; tick(): void };
 }
 
-export function mountApngExport({ btn, active, loading, lang, input, toast, onSaved, sfx }: ApngUiOptions) {
+export function mountApngExport({ btn, active, loading, lang, input, toast, onSaved, busy, sfx }: ApngUiOptions) {
   const [label, meta] = btn.querySelectorAll<HTMLElement>('.btn-text, .save-meta');
   const [b, small] = [label.querySelector('b')!, label.querySelector('small')!];
   const [mb, msmall] = [meta.querySelector('b')!, meta.querySelector('small')!];
@@ -95,6 +97,7 @@ export function mountApngExport({ btn, active, loading, lang, input, toast, onSa
     btn.classList.remove('is-stopped');
     const ctl = new AbortController();
     job = ctl;
+    busy(true);
     others().forEach((x) => (x.disabled = true));
     btn.setAttribute('aria-busy', 'true');
     btn.setAttribute('aria-label', t.cancelLabel);
@@ -126,6 +129,7 @@ export function mountApngExport({ btn, active, loading, lang, input, toast, onSa
       }
     } finally {
       job = null;
+      busy(false);
       others().forEach((x) => (x.disabled = false));
       btn.removeAttribute('aria-busy');
       btn.disabled = loading();
