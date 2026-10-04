@@ -1,7 +1,7 @@
 // The Foil range: which pixels of the card face take the finish.
 // Region presets come from the face mask (and a re-render without text), the brush paints on top,
 // and the brightness key is applied live in the shader so it follows animated sources.
-import { drawFace, type FaceSpec } from './card/face';
+import { artOf, drawFace, type FaceSpec } from './card/face';
 import { RANGE_H, RANGE_W, type RangeSnapshot } from './gl/range';
 import type { BrushMode, RangeRegion } from './featureState';
 import type { Area } from './editions';
@@ -56,8 +56,9 @@ export class RangeModel {
     this.face = face;
     this.spec = spec;
     this.cellAspect = (RANGE_H / RANGE_W) * (face.width / face.height);
-    // The mask is pure geometry; only look at it again when the frame or the shape could have changed.
-    const key = `${spec.frame}|${spec.frameColor ?? ''}|${spec.shape}`;
+    // The mask is pure geometry; only look at it again when the frame or the art window (shape, layout) changed.
+    const a = artOf(face);
+    const key = `${spec.frame}|${spec.frameColor ?? ''}|${face.width}x${face.height}|${a.x},${a.y},${a.w},${a.h}`;
     if (key === this.maskKey) return;
     this.maskKey = key;
     const m = sample(mask, this.scratch);

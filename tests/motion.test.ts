@@ -154,3 +154,11 @@ test('the motion size scales every idle motion; zero holds the card still, a tur
   assert.equal(sanitizeTune({ idleAmp: 5 }).idleAmp, 2);
   assert.equal(TUNE_DEFAULTS.idleAmp, 1);
 });
+
+test('at speed zero the stage holds still, and so does an exported loop', () => {
+  for (const idle of ['sway', 'spin', 'bounce'] as const) {
+    const t = { ...TUNE_DEFAULTS, idle, speed: 0 };
+    const a = loopView(t, 0);
+    for (const p of [0.25, 0.5, 0.9]) assert.deepEqual(loopView(t, p), a, `${idle} moves at speed zero`);
+  }
+});

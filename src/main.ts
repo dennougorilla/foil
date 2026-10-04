@@ -905,6 +905,7 @@ $('crtBtn').addEventListener('click', () => {
 rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
+rovingKeys($('layoutSeg'));
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
 mountTune(store, $('pane-light'));
@@ -1874,12 +1875,13 @@ store.on((s, changed) => {
     buildSaveOpts();
     renderSave();
   }
-  // The card changed: it is no longer the one kept, and a file waiting to be shared is out of date.
+  // The card changed: it is no longer the one kept, and a file waiting to be shared is out of date
+  // (as it is when the export's motion or transparency changes).
   if (CARD_KEYS.some((k) => changed.has(k))) {
     droppedId = null;
     if (isKept()) setKept(null);
-    if (shareReady) readyToShare(null);
   }
+  if (shareReady && [...CARD_KEYS, 'exportMotion', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);

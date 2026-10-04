@@ -390,7 +390,7 @@ export interface LoopView {
 
 /** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, one idle cycle long. */
 export function loopView(t: Tune, p: number): LoopView {
-  const s = p * IDLE_CYCLE;
+  const s = t.speed > 0 ? p * IDLE_CYCLE : 0;
   const pose = idlePose(t, s);
   const tilt = cardTilt(t, s, pose, pose.rx, pose.ry);
   return { pose, tilt, light: tunedLight(t, s, restLight(tilt)) };

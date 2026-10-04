@@ -188,9 +188,11 @@
   .hand-row .qm {
     position: absolute;
     left: 0;
-    top: 50%;
-    bottom: auto;
-    transform: translateY(-50%);
+    top: 0;
+    bottom: 0;
+    height: fit-content;
+    margin-block: auto;
+    transform: none;
   }
 
   /* Until the first flick, a note over the foot of the card says that a flick changes the finish. */
