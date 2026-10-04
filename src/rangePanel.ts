@@ -109,8 +109,9 @@ export function initRangePanel(host: RangeHost) {
     store.set(patch);
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  stage.cards.range.motion = !reduced.matches;
-  reduced.addEventListener('change', () => (stage.cards.range.motion = !reduced.matches));
+  const still = () => (stage.cards.range.motion = stage.cards.range2.motion = !reduced.matches);
+  still();
+  reduced.addEventListener('change', still);
 
   // ---------- Tab ----------
 

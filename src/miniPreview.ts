@@ -145,7 +145,7 @@ export class MiniPreview {
     const view = this.o.view();
     r.tune = tuneGl(s.tune);
     const motion = !this.o.reduced.matches;
-    r.range.motion = motion;
+    r.range.motion = r.range2.motion = motion;
     const t = motion ? (now - this.t0) / 1000 : 0;
     r.resize(W, H, 2);
     r.begin();

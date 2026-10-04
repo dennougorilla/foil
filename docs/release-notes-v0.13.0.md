@@ -26,10 +26,17 @@
 
 ## Known issues
 
-- First-load JavaScript grew from 84 kB to 118 kB (gzip) with the new panels (message, prints,
-  free placement, layers, motion tray); the binder, packs and depth model still load on demand.
+- First-load JavaScript grew from 84 kB to 118 kB (gzip). The largest share is the message
+  features (about +15 kB: the message panel, the trading-card face, per-piece prints and the
+  free-placement editor), then motion (about +6 kB: card back, motion tray, export motions) and
+  layers (about +5 kB); the binder, packs and depth model still load on demand.
 - The export motions made for exports have a fixed length (2–3 s) and do not follow an orbiting
   light; they are candidates for the owner to narrow down.
 - On the trading-card layout the Gold rim's inner rule and the Ribbon are not drawn (their colors
   apply), and on the wide shapes its bars and effect box get cramped.
+- The Text area on a trading card with a type line or effect box can take in some of the art.
+- Brush strokes of the Finish area are kept on a fixed grid, so after a change of shape they stretch.
+- Words placed freely over the name take the name's print where the two overlap.
+- The binder keeps a card's settings and picture, not its brush strokes or Flip Lenticular's second
+  picture; two very quick Keeps right at the binder's limit can both get in.
 - Carried over: Snow Globe's export loop can show a seam; toasts can cover the hand's caption.

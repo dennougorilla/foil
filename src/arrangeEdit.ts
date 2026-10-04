@@ -195,7 +195,7 @@ export function mountArrange(o: Options): void {
     return { ...q, x: s.x, y: s.y };
   }
 
-  /** Pulls every placed piece back inside the frame (after the card took another shape). */
+  /** Pulls every placed piece back inside the frame (after the shape, the words or their face changed). */
   function refit() {
     const cur = store.get().placements;
     const next = { ...cur };
@@ -511,7 +511,7 @@ export function mountArrange(o: Options): void {
 
   store.on((s, changed) => {
     if (changed.has('arrange') && s.arrange === 'free') seed();
-    if (changed.has('shape') && s.arrange === 'free') requestAnimationFrame(refit);
+    if (s.arrange === 'free' && ['shape', 'name', 'message', 'text', 'layout', 'cardType'].some((k) => changed.has(k as keyof typeof s))) requestAnimationFrame(refit);
     if (changed.has('arrange')) hint();
     if (changed.has('lang')) labels();
     // A piece that can no longer move is let go.
