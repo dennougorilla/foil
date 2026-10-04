@@ -2333,7 +2333,7 @@ input[type='range']:disabled {
     width: 100%;
   }
   .hand {
-    height: 290px;
+    height: 400px; /* PREVIEW ONLY: room for three fans (src/stage.ts handLayout). Never merge. */
   }
   .stage {
     padding-bottom: 12px;
