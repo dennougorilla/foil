@@ -25,6 +25,8 @@ export interface DeckViewOptions {
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   tune: Tune;
+  /** Finish strength, as on the card. */
+  intensity: number;
   /** The hand changed (it applies at once). */
   onChange: (hand: EditionId[]) => void;
   /** The way to the pack shop, for more finishes. */
@@ -48,7 +50,7 @@ function miniCard(id: EditionId, o: DeckViewOptions): HTMLCanvasElement {
   r.resize(TW + 16, TH + 20, 2);
   r.begin();
   // The same pose and light as a resting card in the hand.
-  r.drawCard({ cx: (TW + 16) / 2, cy: (TH + 16) / 2, w: TW, h: TH, rx: 0.04, ry: -0.06, rz: 0, scale: 1, edition: editionById(id).shader, intensity: 1, pixel: 0, tilt: [0.25, 0.2], light: [0.5, 0.35], alpha: 1, flash: 0, shadow: [4, 6], plate: false }, 1.7);
+  r.drawCard({ cx: (TW + 16) / 2, cy: (TH + 16) / 2, w: TW, h: TH, rx: 0.04, ry: -0.06, rz: 0, scale: 1, edition: editionById(id).shader, intensity: o.intensity, pixel: 0, tilt: [0.25, 0.2], light: [0.5, 0.35], alpha: 1, flash: 0, shadow: [4, 6], plate: false }, 1.7);
   return copyOf(rendererCanvas!);
 }
 
@@ -413,6 +415,13 @@ export function viewDeck(o: DeckViewOptions) {
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
       $<HTMLButtonElement>('.db-undo').click();
+    } else if (e.key === 'Tab') {
+      // Keep focus inside the dialog.
+      const items = [...root.querySelectorAll<HTMLElement>('button:not([disabled])')].filter((b) => b.offsetParent);
+      if (!items.length) return;
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      e.preventDefault();
+      items[e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : i === items.length - 1 ? 0 : i + 1].focus();
     }
   };
   addEventListener('keydown', onKey, true);

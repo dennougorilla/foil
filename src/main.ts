@@ -1264,6 +1264,7 @@ function viewDeck() {
       face,
       mask,
       tune: store.get().tune,
+      intensity: store.get().intensity,
       onChange: (next) => setHand(next),
       onShop: () => openShop(),
       onClose: () => deck.focusDeck(),
@@ -1445,6 +1446,7 @@ store.on((s, changed) => {
   if (changed.has('lang')) {
     applyText();
     redrawFace();
+    deck.render();
     return;
   }
   if (changed.has('edition')) {

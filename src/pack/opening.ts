@@ -228,13 +228,17 @@ export function openPack(o: OpeningOptions) {
   };
   /** Which packs' finishes have arrived (their wrappers and cards can be compiled). */
   const arrived = new Set<PackId>();
-  let failed = false;
+  /** Packs whose module could not be fetched (offline); only the one being opened stops on it. */
+  const failed = new Set<PackId>();
   const fetchPack = (p: Pack) =>
     loadPack(p.id).then(
-      () => arrived.add(p.id),
       () => {
-        failed = true;
-        hint(t.failed);
+        failed.delete(p.id);
+        arrived.add(p.id);
+      },
+      () => {
+        failed.add(p.id);
+        if (p.id === pack.id) hint(t.failed);
       },
     );
 
@@ -749,9 +753,15 @@ export function openPack(o: OpeningOptions) {
     else root.focus({ preventScroll: true });
   }
 
+  /** Skip was asked for while the pack was still loading: go straight to the haul once it can be drawn. */
+  let skipOnLoad = false;
   function skip() {
     if (phase === 'haul' || phase === 'closing') return;
-    if (phase === 'load' || phase === 'shop') return close(null);
+    if (phase === 'shop') return close(null);
+    if (phase === 'load') {
+      skipOnLoad = true;
+      return;
+    }
     toHaul();
   }
 
@@ -911,7 +921,7 @@ export function openPack(o: OpeningOptions) {
     keyboard = true;
     if (e.key === 'Escape') {
       e.preventDefault();
-      return phase === 'haul' || phase === 'load' || phase === 'shop' ? close(null) : skip();
+      return phase === 'haul' || phase === 'shop' ? close(null) : skip();
     }
     if (e.key === 'Tab') {
       // Keep focus inside the dialog.
@@ -968,7 +978,7 @@ export function openPack(o: OpeningOptions) {
 
     if (phase === 'load') {
       // Wait for the pack's finishes and every program this opening draws.
-      if (failed) return;
+      if (failed.has(pack.id)) return;
       if (phaseT > 0.25) hint(t.loading);
       if (!arrived.has(pack.id) || !r.ready(wrap) || !cards.every((c) => r.ready(c.shader))) {
         // Coming from the tray, the scene keeps moving while the last of it compiles.
@@ -987,6 +997,7 @@ export function openPack(o: OpeningOptions) {
       root.classList.add('is-opening');
       hint('');
       openBtn.hidden = false;
+      if (skipOnLoad) return toHaul();
       // The words and button come in once the pack has landed, not while it flies.
       setTimeout(() => root.classList.add('is-settled'), reduced ? 0 : 520);
       if (!reduced) {

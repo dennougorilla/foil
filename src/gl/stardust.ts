@@ -2,8 +2,9 @@
 // after COMMON, so hash/hsv2rgb/screen are in scope.
 
 export const STARDUST_GLSL = /* glsl */ `
-// Stardust's own clock: one beat every 0.8 s, so 2.4 s GIF and APNG loops close without a seam.
-const float SD_BEAT = 7.853982;
+// Stardust's own clock: one beat about every 0.8 s, stretched a little in an export so its loop
+// (uLoop) holds a whole number of beats and closes without a seam.
+float sdPeriod() { return uLoop > 0.0 ? uLoop / max(1.0, floor(uLoop / 0.8 + 0.5)) : 0.8; }
 
 // A four-point sparkle: a soft core and two thin rays. f is the offset from its centre.
 float sdSparkle(vec2 f, float core, float len, float thin) {
@@ -20,7 +21,7 @@ vec3 stardust(vec3 c, vec2 uv, vec2 t, float L) {
   float sweep = smoothstep(0.3, 1.0, 0.5 + 0.5 * sin(dot(p, vec2(0.55, 0.83)) * 4.5 - (t.x + t.y) * 2.6));
   float drift = dot(p, vec2(0.6, 0.9)) * 0.7 + t.x * 0.5 - t.y * 0.4;
   col = screen(col, hsv2rgb(vec3(fract(drift), 0.6, 1.0)) * 0.1 * sweep);
-  float T = uTime * SD_BEAT;
+  float T = uTime * 6.2831853 / sdPeriod();
 
   // Fine dust: one grain per cell, each a tiny facet that catches the light at its own angle.
   vec2 g = uv * vec2(110.0, 154.0);
@@ -63,7 +64,7 @@ vec3 stardust(vec3 c, vec2 uv, vec2 t, float L) {
     vec2 bf = b - id - 0.2 - 0.6 * hash22(id + 8.0);
     vec2 bn = hash22(id + 29.0) * 2.0 - 1.0;
     float aim = pow(0.5 + 0.5 * cos(dot(bn, t) * 3.0 + bh * 12.0), 10.0);
-    float ph = fract(uTime / 0.8 + bh * 7.0);
+    float ph = fract(uTime / sdPeriod() + bh * 7.0);
     float pop = step(0.62, fract(bh * 13.0)) * smoothstep(0.0, 0.04, ph) * exp(-ph * 7.0);
     float on = max(aim, pop * 0.85) * (0.5 + 0.5 * sweep + 0.3 * aim);
     if (on < 0.01) continue;
