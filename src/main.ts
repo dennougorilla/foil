@@ -1369,11 +1369,15 @@ function trackExportBar() {
 $('panel').addEventListener('scroll', trackExportBar, { passive: true });
 addEventListener('scroll', trackExportBar, { passive: true });
 
-// A value that changes pops in its pocket, the way a game's score counter does. A drag keeps
-// one pop going rather than restarting it, so no input event forces a layout.
-$('panel').addEventListener('input', (e) => {
-  (e.target as HTMLElement).closest('.row, .tune-row')?.querySelector('output')?.classList.add('is-bump');
-});
+// A value that changes pops in its pocket, the way a game's score counter does, whatever changed
+// it (a drag, a choice, a reset). A drag keeps one pop going rather than restarting it, so no
+// change forces a layout.
+new MutationObserver((records) => {
+  for (const r of records) {
+    const node = r.target instanceof Element ? r.target : r.target.parentElement;
+    node?.closest('output')?.classList.add('is-bump');
+  }
+}).observe($('panel'), { subtree: true, childList: true, characterData: true });
 $('panel').addEventListener('animationend', (e) => (e.target as HTMLElement).classList.remove('is-bump'));
 addEventListener('resize', trackExportBar);
 
