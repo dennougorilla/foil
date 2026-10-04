@@ -6,6 +6,7 @@ import { cardLayers } from './layers';
 import type { RangeSnapshot } from './gl/range';
 import type { Dict } from './i18n';
 import type { Store } from './state';
+import type { EditionId } from './editions';
 import { contain } from './card/shape';
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -74,7 +75,7 @@ export class MiniPreview {
     // The card counts as visible only when most of it is on screen.
     watch(o.card, (v) => (this.cardSeen = v), 0.6);
     this.narrow.addEventListener('change', () => this.update());
-    o.store.on((_s, changed) => changed.has('edition') && this.label());
+    o.store.on((s, changed) => changed.has('edition') && this.label(s.edition));
   }
 
   applyText(t: Dict) {
@@ -88,8 +89,12 @@ export class MiniPreview {
     this.label();
   }
 
-  private label() {
-    if (this.dict) this.el.querySelector('.mini-finish')!.textContent = this.dict.edition[this.o.store.get().edition];
+  /** The finish the preview shows (layer 2's while it proves layer 2), named under it. */
+  private named: EditionId | null = null;
+
+  private label(id: EditionId = this.named ?? this.o.store.get().edition) {
+    this.named = id;
+    if (this.dict) this.el.querySelector('.mini-finish')!.textContent = this.dict.edition[id];
   }
 
   setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement) {
@@ -143,6 +148,8 @@ export class MiniPreview {
     if (!this.shown || !r) return;
     const s = this.o.store.get();
     const view = this.o.view();
+    const showing = view.rangeView > 0 && view.layer === 2 && s.layer2 ? s.layer2.edition : s.edition;
+    if (showing !== this.named) this.label(showing);
     r.tune = tuneGl(s.tune);
     const motion = !this.o.reduced.matches;
     r.range.motion = r.range2.motion = motion;

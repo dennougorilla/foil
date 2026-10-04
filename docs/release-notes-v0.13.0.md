@@ -39,4 +39,5 @@
 - Words placed freely over the name take the name's print where the two overlap.
 - The binder keeps a card's settings and picture, not its brush strokes or Flip Lenticular's second
   picture; two very quick Keeps right at the binder's limit can both get in.
+- Turning a tablet while the binder is open can show a different page than the one you were on.
 - Carried over: Snow Globe's export loop can show a seam; toasts can cover the hand's caption.
