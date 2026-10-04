@@ -114,32 +114,52 @@ export const HAND_SIZE = 7;
 /** Every finish is open or in exactly one pack (tested), so these are all the finishes there are. */
 const isEdition = (id: unknown): id is EditionId => OPEN_EDITIONS.includes(id as EditionId) || PACKS.some((p) => p.finishes.includes(id as EditionId));
 
-/** A saved hand made valid: owned finishes once each, Base among them, seven in all (gaps filled from the starters). */
+/** A saved hand made valid: owned finishes once each, at most seven, Base always among them. */
 export function normalizeHand(saved: unknown, o: Opened): EditionId[] {
-  const list = Array.isArray(saved) ? saved : [];
-  let hand = list.filter((id, i): id is EditionId => isEdition(id) && available(id, o) && list.indexOf(id) === i);
-  if (!hand.includes('base')) hand = [...hand.slice(0, HAND_SIZE - 1), 'base'];
-  hand = hand.slice(0, HAND_SIZE);
-  for (const id of OPEN_EDITIONS) if (hand.length < HAND_SIZE && !hand.includes(id)) hand.push(id);
-  return hand;
+  if (!Array.isArray(saved)) return [...OPEN_EDITIONS];
+  let hand = saved.filter((id, i): id is EditionId => isEdition(id) && available(id, o) && saved.indexOf(id) === i);
+  if (!hand.includes('base')) hand = ['base', ...hand];
+  return hand.slice(0, HAND_SIZE);
 }
 
-/** The deck: every owned finish not in the hand, the starters swapped out first, then pack by pack. */
-export function deckOf(hand: readonly EditionId[], o: Opened): { group: PackId | 'open'; finishes: EditionId[] }[] {
-  const groups = [
-    { group: 'open' as const, finishes: OPEN_EDITIONS.filter((id) => !hand.includes(id)) },
-    ...PACKS.filter((p) => o.opened.includes(p.id)).map((p) => ({ group: p.id, finishes: p.finishes.filter((id) => !hand.includes(id)) })),
-  ];
-  return groups.filter((g) => g.finishes.length);
+type Group = { group: PackId | 'open'; finishes: EditionId[] };
+
+/** Everything owned, grouped: the starters, then each opened pack in pack order. */
+export const ownedGroups = (o: Opened): Group[] => [
+  { group: 'open', finishes: [...OPEN_EDITIONS] },
+  ...PACKS.filter((p) => o.opened.includes(p.id)).map((p) => ({ group: p.id, finishes: [...p.finishes] })),
+];
+
+/** The deck: every owned finish not in the hand, grouped the same way (empty groups left out). */
+export const deckOf = (hand: readonly EditionId[], o: Opened): Group[] =>
+  ownedGroups(o)
+    .map((g) => ({ group: g.group, finishes: g.finishes.filter((id) => !hand.includes(id)) }))
+    .filter((g) => g.finishes.length);
+
+/**
+ * Adds a card to the hand: at `at` (a slot just emptied) or the end; a full hand gives up its last
+ * card that is not Base.
+ */
+export function addToHand(hand: readonly EditionId[], id: EditionId, at?: number): EditionId[] {
+  if (hand.includes(id)) return [...hand];
+  if (hand.length < HAND_SIZE) {
+    const i = at === undefined ? hand.length : Math.max(0, Math.min(at, hand.length));
+    return [...hand.slice(0, i), id, ...hand.slice(i)];
+  }
+  const last = hand.map((x) => x !== 'base').lastIndexOf(true);
+  return hand.map((x, i) => (i === last ? id : x));
 }
 
-/** Swaps a deck card into the hand in place of `out` (or, without one, the last card that is not Base). Base stays. */
-export function swapIn(hand: readonly EditionId[], out: EditionId | null, into: EditionId): EditionId[] {
-  if (hand.includes(into) || out === 'base') return [...hand];
-  const at = out ? hand.indexOf(out) : hand.map((id) => id !== 'base').lastIndexOf(true);
-  if (at < 0) return [...hand];
-  return hand.map((id, i) => (i === at ? into : id));
+/** Puts a card exactly in slot `at`, swapping out what is there (never Base); past the end it is added. */
+export function placeAt(hand: readonly EditionId[], id: EditionId, at: number): EditionId[] {
+  if (hand[at] === 'base') return [...hand];
+  const rest = hand.filter((x) => x !== id);
+  if (at >= rest.length) return addToHand(rest, id);
+  return rest.map((x, i) => (i === at ? id : x));
 }
+
+/** Sends a card back to the deck; Base stays. */
+export const removeFromHand = (hand: readonly EditionId[], id: EditionId): EditionId[] => (id === 'base' ? [...hand] : hand.filter((x) => x !== id));
 
 /** The first pack on the shelf that is still sealed: the one the shop offers first. */
 export const firstSealed = (o: Opened): Pack | undefined => shelf(o).find((p) => !o.opened.includes(p.id));

@@ -268,27 +268,45 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   expect((await page.textContent('#deckBtn .deck-count')) === '3', 'the deck does not hold Relief, Gold and the swapped-out Glitch');
 });
 
-await step('a deck card swaps with the hand card chosen for it; Base stays', async () => {
+await step('the deck builder: one tap moves a card, a full hand gives up its last card, undo, drag, reset', async () => {
+  const hand = async () => (await state()).hand;
+  const count = () => page.textContent('.db-count');
   await page.click('#deckBtn');
   await page.waitForSelector('.dv.is-in', { timeout: 15000 });
-  expect((await page.locator('.dv-body .dv-card').count()) === 3, 'the deck view does not show the three deck cards');
-  await page.waitForSelector('.dv-body .dv-pic canvas', { timeout: 30000 });
-  await page.click('.dv-body .dv-card[data-id=relief]');
-  await page.waitForSelector('.dv-hand:not([hidden])', { timeout: 5000 });
-  expect((await page.locator('.dv-hand .dv-card').count()) === 7, 'the hand to swap with does not show seven cards');
-  expect(await page.isDisabled('.dv-hand .dv-card[data-id=base]'), 'Base can be swapped out');
-  await page.click('.dv-hand .dv-card[data-id=holo]');
+  expect((await count()) === 'Hand 7 / 7', `count reads ${await count()}`);
+  expect((await page.locator('.db-grid .db-card.is-in').count()) === 7, 'the grid does not mark the seven in the hand');
+  await page.waitForSelector('.db-grid .db-pic canvas', { timeout: 30000 });
+  // Out of the hand: its slot stays open, and the next card goes there.
+  await page.click('.db-hand .db-card[data-id=holo]');
+  expect((await count()) === 'Hand 6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
+  expect((await page.textContent('#deckBtn .deck-count')) === '4', 'the deck count did not rise');
+  await page.click('.db-grid .db-card[data-id=relief]');
+  expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
+  // Full: the last card that is not Base gives way.
+  await page.click('.db-grid .db-card[data-id=gold]');
+  const full = await hand();
+  expect(full.length === 7 && full[6] === 'gold' && !full.includes('crystal'), `a full hand did not give up its last card: ${full}`);
+  await page.click('.db-undo');
+  expect((await hand()).includes('crystal') && !(await hand()).includes('gold'), 'undo did not step back');
+  // Base cannot leave.
+  await page.click('.db-hand .db-card[data-id=base]');
+  expect((await hand()).includes('base'), 'Base left the hand');
+  // Drag a grid card onto a slot: it swaps exactly that card.
+  const from = await page.locator('.db-grid .db-card[data-id=glitch]').boundingBox();
+  const to = await page.locator('.db-slot[data-slot="1"]').boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect((await hand())[1] === 'glitch', `dragging onto slot 2 did not put Glitch there: ${await hand()}`);
+  // Back to the starting seven, and closing keeps it.
+  await page.click('.db-reset');
+  await page.click('.db-done');
   await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'relief', null, { timeout: 10000 });
-  const hand = (await state()).hand;
-  expect(hand[2] === 'relief' && !hand.includes('holo'), `Relief did not take Holographic's place: ${hand}`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '3', 'the deck count changed on a swap');
-  await page.locator('#cardSlot').focus();
-  await page.keyboard.press('1');
-  await page.waitForTimeout(300);
-  await page.keyboard.press('3');
-  await page.waitForTimeout(300);
-  expect((await state()).edition === 'relief', 'key 3 does not pick the swapped-in card');
+  expect((await hand()).join() === 'base,foil,holo,poly,negative,prism,glitch', `the starting seven did not come back: ${await hand()}`);
+  expect((await state()).edition === 'base', 'a finish taken out of the hand stayed on the card');
+  expect((await handCount()) === 7, 'the page hand is not seven');
 });
 
 await step('a replay from the shop can be skipped straight to the haul and closed', async () => {
@@ -302,7 +320,7 @@ await step('a replay from the shop can be skipped straight to the haul and close
   await phase('haul');
   await page.keyboard.press('Escape');
   await overlayGone();
-  expect((await state()).edition === 'relief', 'closing a replay changed the finish');
+  expect((await state()).edition === 'base', 'closing a replay changed the finish');
 });
 
 await step('held still, the pack opens with a button and the haul fades in', async () => {
@@ -359,8 +377,8 @@ await step('a card on a finish whose pack is sealed goes back to Holographic', a
   await page.reload();
   await page.waitForTimeout(1500);
   const s = await state();
-  expect(s.edition === 'holo' && !s.hand.includes('magma') && s.hand.length === 7, `got ${s.edition} / ${s.hand}`);
-  expect((await handCount()) === 7, 'the hand is not seven');
+  expect(s.edition === 'holo' && !s.hand.includes('magma') && s.hand.includes('base'), `got ${s.edition} / ${s.hand}`);
+  expect((await handCount()) === s.hand.length, 'the page hand does not match the saved hand');
 });
 
 await browser.close();

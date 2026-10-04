@@ -5,8 +5,11 @@ import {
   available,
   fromSecrets,
   deckOf,
+  addToHand,
   normalizeHand,
-  swapIn,
+  ownedGroups,
+  placeAt,
+  removeFromHand,
   firstSealed,
   mergePacks,
   OPEN_EDITIONS,
@@ -88,27 +91,41 @@ test('the shelf shows the supporter pack only after a support link was opened', 
 
 const M = { opened: ['metal' as const], supporter: false };
 
-test('a saved hand keeps seven owned finishes, Base among them, and fills gaps from the starters', () => {
+test('a saved hand keeps up to seven owned finishes, once each, with Base always in it', () => {
   assert.deepEqual(normalizeHand(null, M), [...OPEN_EDITIONS]);
-  assert.deepEqual(normalizeHand(['relief', 'foil', 'magma', 'relief', 'nope'], M), ['relief', 'foil', 'base', 'holo', 'poly', 'negative', 'prism']);
-  assert.deepEqual(normalizeHand(['holo', 'foil', 'poly', 'negative', 'prism', 'glitch', 'gold', 'crystal'], M), ['holo', 'foil', 'poly', 'negative', 'prism', 'glitch', 'base']);
+  assert.deepEqual(normalizeHand(['relief', 'foil', 'magma', 'relief', 'nope'], M), ['base', 'relief', 'foil']);
+  assert.deepEqual(normalizeHand(['holo', 'base', 'foil', 'poly', 'negative', 'prism', 'glitch', 'gold'], M), ['holo', 'base', 'foil', 'poly', 'negative', 'prism', 'glitch']);
+  assert.deepEqual(normalizeHand([], M), ['base']);
 });
 
-test('the deck is every owned finish not in the hand: starters swapped out first, then pack by pack', () => {
+test('the deck is every owned finish not in the hand; the builder lists everything owned', () => {
   const hand = ['base', 'relief', 'holo', 'poly', 'negative', 'prism', 'glitch'] as const;
   assert.deepEqual(deckOf([...hand], M), [
     { group: 'open', finishes: ['foil'] },
     { group: 'metal', finishes: ['gold', 'crystal'] },
   ]);
   assert.deepEqual(deckOf([...OPEN_EDITIONS], { opened: [], supporter: false }), []);
+  assert.deepEqual(ownedGroups(M), [
+    { group: 'open', finishes: [...OPEN_EDITIONS] },
+    { group: 'metal', finishes: ['relief', 'gold', 'crystal'] },
+  ]);
 });
 
-test('a swap puts the deck card where the hand card was; Base cannot leave', () => {
-  assert.deepEqual(swapIn([...OPEN_EDITIONS], 'holo', 'gold'), ['base', 'foil', 'gold', 'poly', 'negative', 'prism', 'glitch']);
-  assert.deepEqual(swapIn([...OPEN_EDITIONS], 'base', 'gold'), [...OPEN_EDITIONS]);
-  // Without a choice, the last card that is not Base makes room.
-  assert.deepEqual(swapIn([...OPEN_EDITIONS], null, 'gold'), ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'gold']);
-  assert.deepEqual(swapIn(['gold', 'foil', 'holo', 'poly', 'negative', 'prism', 'base'], null, 'relief'), ['gold', 'foil', 'holo', 'poly', 'negative', 'relief', 'base']);
+test('adding fills the given slot, else the end; a full hand gives up its last card that is not Base', () => {
+  const six = ['base', 'foil', 'holo', 'poly', 'negative', 'prism'] as const;
+  assert.deepEqual(addToHand([...six], 'gold'), [...six, 'gold']);
+  assert.deepEqual(addToHand([...six], 'gold', 2), ['base', 'foil', 'gold', 'holo', 'poly', 'negative', 'prism']);
+  assert.deepEqual(addToHand([...OPEN_EDITIONS], 'gold'), ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'gold']);
+  assert.deepEqual(addToHand(['gold', 'foil', 'holo', 'poly', 'negative', 'prism', 'base'], 'relief'), ['gold', 'foil', 'holo', 'poly', 'negative', 'relief', 'base']);
+  assert.deepEqual(addToHand([...OPEN_EDITIONS], 'holo'), [...OPEN_EDITIONS]);
+});
+
+test('placing onto a slot swaps exactly that card, never Base; taking out leaves Base', () => {
+  assert.deepEqual(placeAt([...OPEN_EDITIONS], 'gold', 2), ['base', 'foil', 'gold', 'poly', 'negative', 'prism', 'glitch']);
+  assert.deepEqual(placeAt([...OPEN_EDITIONS], 'gold', 0), [...OPEN_EDITIONS]);
+  assert.deepEqual(placeAt(['base', 'foil'], 'gold', 5), ['base', 'foil', 'gold']);
+  assert.deepEqual(removeFromHand([...OPEN_EDITIONS], 'holo'), ['base', 'foil', 'poly', 'negative', 'prism', 'glitch']);
+  assert.deepEqual(removeFromHand(['base'], 'base'), ['base']);
 });
 
 test('the first sealed pack on the shelf is the one the shop offers first', () => {

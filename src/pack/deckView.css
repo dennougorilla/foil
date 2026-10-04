@@ -1,4 +1,4 @@
-/* View deck (src/pack/deckView.ts): a dark rounded panel over the page, finishes grouped by pack. */
+/* The deck builder (src/pack/deckView.ts): the hand's slots over a grid of everything owned. */
 
 .dv {
   position: fixed;
@@ -7,7 +7,7 @@
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(5, 8, 10, 0.72);
+  background: rgba(5, 8, 10, 0.78);
   opacity: 0;
   transition: opacity 0.18s var(--ease-out);
 }
@@ -16,12 +16,12 @@
   opacity: 1;
 }
 
-.dv-panel {
-  width: fit-content;
-  min-width: min(480px, 100%);
-  max-width: min(980px, 100%);
-  max-height: calc(100dvh - 32px);
-  overflow: auto;
+.db {
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
+  width: min(1040px, 100%);
+  height: min(860px, calc(100dvh - 32px));
+  overflow: hidden;
   border-radius: 22px;
   background: radial-gradient(ellipse at 50% 0%, #26323a, #121a1e 70%);
   box-shadow: inset 0 0 0 6px #3a4a53, 0 0 0 4px #05080a, 0 14px 0 4px #05080a, 0 26px 40px rgba(0, 0, 0, 0.55);
@@ -29,36 +29,31 @@
   transition: transform 0.25s var(--ease-back);
 }
 
-.dv.is-in .dv-panel {
+.dv.is-in .db {
   transform: none;
 }
 
-.dv-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+.db-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
-  padding: 18px 22px 12px;
-  background: #1a2328;
-  box-shadow: inset 0 -4px 0 #05080a;
+  padding: 16px 22px 8px;
 }
 
-.dv-head b {
+.db-head b {
   font-weight: 400;
-  font-size: 28px;
+  font-size: 26px;
   text-shadow: 0 3px 0 #05080a;
 }
 
-.dv-head small {
+.db-count {
   flex: 1;
-  font-size: 15px;
-  color: rgba(245, 242, 234, 0.75);
+  font-size: 18px;
+  color: var(--gold);
+  text-shadow: 0 2px 0 #05080a;
 }
 
 .dv-x {
-  align-self: center;
   display: grid;
   place-items: center;
   width: 44px;
@@ -76,25 +71,106 @@
   fill: currentColor;
 }
 
-.dv-body {
+/* The hand: seven slots on a felt strip. */
+.db-hand {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  margin: 4px 22px 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #0d1316;
+  box-shadow: inset 0 4px 0 #05080a, inset 0 0 0 2px #2e3b42;
+}
+
+.db-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-radius: 10px;
+}
+
+.db-slot.is-empty {
+  aspect-ratio: 124 / 196;
+  outline: 2px dashed rgba(255, 255, 255, 0.22);
+  outline-offset: -6px;
+}
+
+.db-slot.is-next {
+  outline-color: var(--gold);
+  background: rgba(242, 193, 78, 0.08);
+}
+
+.db-slot.is-over {
+  background: rgba(242, 193, 78, 0.18);
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.db-empty {
+  font-size: 13px;
+  color: rgba(245, 242, 234, 0.45);
+}
+
+.db-hint {
+  margin: 8px 22px 0;
+  font-size: 14px;
+  color: rgba(245, 242, 234, 0.7);
+}
+
+.db-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 22px 34px;
-  padding: 18px 22px 26px;
+  gap: 8px;
+  margin: 12px 22px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.db-tab {
+  flex: none;
+  min-height: 36px;
+  padding: 2px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #222c32;
+  color: var(--text);
+  font-size: 15px;
+  box-shadow: inset 0 0 0 2px #3a4a53;
+}
+
+.db-tab[aria-selected='true'] {
+  background: #f3eee2;
+  color: #0b1012;
+  box-shadow: 0 3px 0 #05080a;
+}
+
+.db-grid {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 22px 20px;
+}
+
+.db-grid.is-over {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.dv-group + .dv-group {
+  margin-top: 14px;
 }
 
 .dv-group h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-weight: 400;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--c);
   text-shadow: 0 2px 0 #05080a;
 }
 
-/* The pack's small mark: a crimped swatch in its colors. */
 .dv-group h3 i {
   width: 12px;
   height: 16px;
@@ -102,43 +178,46 @@
   clip-path: polygon(0 2px, 3px 0, 6px 2px, 9px 0, 12px 2px, 12px 14px, 9px 16px, 6px 14px, 3px 16px, 0 14px);
 }
 
-.dv-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
+.db-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
 }
 
-.dv-card {
+/* A card: its picture and name. In the grid, a card in the hand is lifted with a gold edge and tag. */
+.db-card {
   position: relative;
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding: 6px 6px 8px;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 4px 6px;
   border: 0;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   cursor: pointer;
-  transition: transform 0.15s var(--ease-out), background 0.15s;
+  touch-action: none;
+  transition: transform 0.15s var(--ease-out), background 0.15s, opacity 0.15s;
 }
 
-.dv-pic {
+.db-pic {
   display: block;
-  width: 124px;
-  height: 171px;
+  width: 100%;
+  aspect-ratio: 124 / 171;
 }
 
-.dv-pic canvas {
+.db-pic canvas {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-/* Not drawn yet: a soft placeholder card. */
-.dv-pic:empty {
-  margin: 8px 8px 12px;
-  width: 108px;
-  height: 151px;
+.db-pic:empty::before {
+  content: '';
+  display: block;
+  margin: 6% 6% 10%;
+  height: 84%;
   border-radius: 8px;
   background: repeating-linear-gradient(45deg, #1d262b 0 6px, #232e34 6px 12px);
   animation: dv-wait 1s ease-in-out infinite;
@@ -148,137 +227,219 @@
   50% { opacity: 0.55; }
 }
 
-.dv-card b {
+.db-card b {
+  max-width: 100%;
+  overflow: hidden;
   font-weight: 400;
-  font-size: 15px;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.dv-card:hover {
-  transform: translateY(-4px) rotate(-1deg);
+.db-card:hover {
+  transform: translateY(-3px);
   background: rgba(255, 255, 255, 0.08);
 }
 
-.dv-card:focus-visible,
-.dv-hand:focus-visible,
+.db-card.is-hand {
+  background: none;
+}
+
+.db-tag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 12px;
+  line-height: 20px;
+  box-shadow: 0 2px 0 #05080a;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.2s var(--ease-back);
+}
+
+.db-grid .db-card.is-in {
+  background: rgba(242, 193, 78, 0.16);
+  box-shadow: inset 0 0 0 2px var(--gold);
+  transform: translateY(-4px);
+}
+
+.db-grid .db-card.is-in .db-tag {
+  opacity: 1;
+  transform: none;
+}
+
+.db-card[disabled],
+.db-card.is-locked {
+  cursor: default;
+}
+
+.db-lock {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 14px;
+  height: 11px;
+  border-radius: 3px;
+  background: #0b1012;
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.db-lock::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -7px;
+  width: 8px;
+  height: 7px;
+  border: 2px solid var(--gold);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  box-sizing: border-box;
+}
+
+.db-card.is-dragging {
+  opacity: 0.35;
+}
+
+.db-card:focus-visible,
+.db-tab:focus-visible,
+.db-btn:focus-visible,
 .dv-x:focus-visible,
 .dv-shop:focus-visible {
   outline: 3px dashed #fff;
   outline-offset: 3px;
 }
 
-.dv-card.is-chosen {
-  background: rgba(242, 193, 78, 0.16);
-  box-shadow: inset 0 0 0 2px var(--gold);
-  transform: translateY(-4px);
+/* A card on its way between the deck and the hand, or under the finger. */
+.db-fly {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.45));
 }
 
-/* The hand, shown once a deck card is chosen: pick the one to swap. */
-.dv-hand {
-  position: sticky;
-  bottom: 0;
-  padding: 12px 22px 18px;
-  background: #1a2328;
-  box-shadow: inset 0 4px 0 #05080a;
+.db-fly.is-drag {
+  transform: rotate(-4deg) scale(1.06);
 }
 
-.dv-ask {
-  display: none;
-  margin: 0 0 8px;
-  font-size: 16px;
-  color: var(--gold);
+.db-more {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin-top: 18px;
 }
 
-.dv-hand .dv-row {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: 4px;
-}
-
-.dv-hand .dv-pic {
-  width: 86px;
-  height: 119px;
-}
-
-.dv-hand .dv-card b {
-  font-size: 13px;
-}
-
-.dv-card[disabled] {
-  cursor: not-allowed;
-}
-
-.dv-card[disabled] .dv-pic,
-.dv-card[disabled] b {
-  opacity: 0.45;
-}
-
-.dv-stays {
-  font-size: 11px;
-  color: var(--gold);
-}
-
-.dv-card[disabled]:hover {
-  transform: none;
-}
-
-.dv-empty {
+.db-more p {
   margin: 0;
-  font-size: 18px;
-  color: rgba(245, 242, 234, 0.85);
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.8);
 }
 
 .dv-shop {
-  justify-self: start;
-  min-height: 52px;
-  padding: 6px 24px;
+  min-height: 48px;
+  padding: 6px 22px;
   border: 0;
   border-radius: 14px;
   background: #ee4f32;
   color: #fff;
-  font-size: 20px;
+  font-size: 18px;
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
   box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.3), 0 0 0 4px #05080a, 0 8px 0 4px #8a2414, 0 12px 0 4px #05080a;
 }
 
+/* Undo and reset on the left, Done on the right, in thumb reach. */
+.db-foot {
+  display: flex;
+  gap: 10px;
+  padding: 12px 22px 16px;
+  background: #1a2328;
+  box-shadow: inset 0 4px 0 #05080a;
+}
+
+.db-btn {
+  min-height: 46px;
+  padding: 4px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #26323a;
+  color: var(--text);
+  font-size: 16px;
+  box-shadow: inset 0 0 0 2px #3a4a53, 0 4px 0 #05080a;
+}
+
+.db-btn[disabled] {
+  opacity: 0.4;
+}
+
+.db-done {
+  margin-left: auto;
+  min-width: 120px;
+  background: #ee4f32;
+  color: #fff;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), 0 4px 0 #8a2414;
+}
+
 @media (max-width: 600px) {
-  .dv-body {
-    padding: 14px 12px 20px;
+  .dv {
+    padding: 8px;
   }
-  .dv-row {
+  .db {
+    height: calc(100dvh - 16px);
+    border-radius: 18px;
+  }
+  .db-head {
+    padding: 12px 14px 6px;
+  }
+  .db-head b {
+    font-size: 21px;
+  }
+  .db-hand {
+    gap: 4px;
+    margin: 2px 10px 0;
+    padding: 8px 6px;
+  }
+  .db-card b {
+    font-size: 11px;
+  }
+  .db-hand .db-card b {
+    font-size: 10px;
+  }
+  .db-hint,
+  .db-tabs {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  .db-hint {
+    font-size: 12px;
+  }
+  .db-grid {
+    padding: 8px 10px 14px;
+  }
+  .db-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
   }
-  .dv-card {
-    padding: 4px 4px 6px;
+  .db-foot {
+    padding: 10px 10px 12px;
   }
-  .dv-pic {
-    width: 92px;
-    height: 127px;
+  .db-btn {
+    padding: 4px 12px;
+    font-size: 14px;
   }
-  .dv-hand {
-    padding: 10px 10px 14px;
-  }
-  /* All seven in view: two rows instead of a strip that runs off the screen. */
-  .dv-hand .dv-row {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .dv-hand .dv-pic {
-    width: 64px;
-    height: 88px;
-  }
-  .dv-head small {
-    font-size: 13px;
-  }
-  .dv-head b {
-    font-size: 22px;
+  .db-done {
+    min-width: 90px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dv-panel {
+  .db {
     transition: none;
   }
-  .dv-card canvas:not(.is-ready) {
+  .db-pic:empty::before {
     animation: none;
   }
 }

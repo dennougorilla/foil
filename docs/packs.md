@@ -11,21 +11,28 @@ summary is in `README.md`; this note is the design behind it.
 - Every other finish sits in a **theme pack**. A pack holds every finish of its theme, so its size
   is the size of the theme. It is opened **once**, and opening it shows everything inside — there
   is no random draw. The excitement comes from the order: the rarest finish waits until last.
-- The **hand** is always seven cards; it starts as the seven above. Every finish owned that is
-  not in the hand is in the **deck**, which sits at the hand's right end like a draw pile: a few
-  face-down pixel card backs (a couple of steps of thickness at most) and the count, which falls
-  when a card goes to the hand and rises when one comes back. Opening a pack adds its finishes to
-  the deck; at the end of an opening the cards fly into it and "+3" floats up from it.
-- Pressing the deck opens **View deck**: the cards in it, grouped (the starter finishes swapped
-  out, then pack by pack under a small mark in the pack's color), each drawn as the same mini card
-  as in the hand — the person's own picture in that finish. Choosing one shows the hand underneath
-  ("swap with which?"); choosing a hand card swaps the two: the hand card flies into the deck, the
-  deck card leaves the deck face-down and turns over as it flies into its place in the hand (on
-  top of the others until it lands); the deck bumps as the old card lands on it, and then the big
-  card takes the new finish with a short pop. Base never leaves the hand ("always in hand" under it). The hand's order is remembered. Putting a deck finish on the card any other way (a pick in
-  the haul, a saved card) swaps it in for the last card that is not Base.
-- The mini cards are still pictures, drawn one by one with a single WebGL context when View deck
-  opens and kept until the picture, the frame or the light changes; nothing in the list animates.
+- The **hand** holds up to seven cards (at least Base, which never leaves it); it starts as the seven
+  above. Every finish owned that is not in the hand is in the **deck**, which sits at the hand's
+  right end like a draw pile: a few face-down pixel card backs (a couple of steps of thickness at
+  most) and the count. Opening a pack adds its finishes to the deck; at the end of an opening the
+  cards fly into it and "+3" floats up from it.
+- Pressing the deck opens the **deck builder**, laid out like a card game's deck-editing screen
+  (Slay the Spire, Hearthstone, Marvel Snap): the hand's seven slots across the top with "6 / 7",
+  and below every finish owned as a grid of the same mini cards as the hand (the person's own
+  picture in that finish), with tabs for All, the starters and each opened pack. A card that is in
+  the hand is lifted in the grid with a gold edge and a "手札 / In hand" tag.
+  - One tap moves a card: a grid card goes into the hand (into the slot last emptied, else the end);
+    tapping it again, or tapping it in the hand, sends it back to the deck and leaves its slot empty
+    for the next card. With the hand full, a grid card takes the place of the last card that is not
+    Base. Dragging a grid card onto a hand slot swaps it into exactly that slot; dragging a hand card
+    down to the grid sends it back. Cards fly between the two as they move.
+  - Changes apply at once (closing just closes). Undo steps back one move; "Starting seven" puts the
+    seven starters back. The card's finish stays unless it was taken out of the hand, then the card
+    shows Base.
+  - Putting a deck finish on the card any other way (a pick in the haul, a saved card) adds it to
+    the hand, taking the last place that is not Base when the hand is full.
+- The mini cards are still pictures, drawn one by one with a single WebGL context when the builder
+  opens and kept until the picture, the frame or the light changes; nothing in the grid animates.
 - From the earlier "drawn card" slot (saved as `drawn`): that finish takes the hand's last place,
   so nobody loses the card they had out.
 - The way to new packs is a small pixel pack beside the deck. It glows gently while a pack is still

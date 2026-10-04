@@ -18,7 +18,7 @@ import { changedKeys } from './tune/model';
 import { DEFAULT_LETTERING } from './lettering';
 import { initRangeColors } from './features';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { deckOf, firstSealed, normalizeHand, packOf, shelf, swapIn } from './packs';
+import { addToHand, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 
@@ -1104,7 +1104,7 @@ function openShop() {
             toast(t.pack.intoDeck.replace('{name}', t.pack.name[done.id]).replace('{n}', String(done.finishes.length)));
           }
           // A pick in the haul comes into the hand and onto the card.
-          if (pick) swapCard(null, pick);
+          if (pick) useCard(pick);
           else deck.focusShop();
         },
       }),
@@ -1116,27 +1116,35 @@ function openShop() {
     .finally(() => btn.removeAttribute('aria-busy'));
 }
 
-/** Swaps a deck card into the hand in place of `out` (the last card that is not Base if none) and puts it on the card. */
-function swapCard(out: EditionId | null, into: EditionId) {
-  store.set({ hand: swapIn(store.get().hand, out, into) });
-  // The two cards trade places first: the old one lands on the deck (a bump), then the big card takes the new finish.
+/** Brings a finish into the hand (the last place that is not Base when it is full) and puts it on the card. */
+function useCard(id: EditionId) {
+  const full = store.get().hand.length >= 7;
+  store.set({ hand: addToHand(store.get().hand, id) });
+  // The cards trade places first: one lands on the deck (a bump), then the big card takes the new finish.
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  setTimeout(() => deck.bump(), still ? 0 : 420);
-  if (into !== store.get().edition) setTimeout(() => selectEdition(into), still ? 0 : 560);
+  if (full) setTimeout(() => deck.bump(), still ? 0 : 420);
+  if (id !== store.get().edition) setTimeout(() => selectEdition(id), still ? 0 : 560);
 }
 
-/** View deck: everything owned, grouped by pack; choosing one draws it. */
+/** The deck builder changed the hand: it applies at once; a finish taken off the hand leaves the card on Base. */
+function setHand(next: EditionId[]) {
+  store.set({ hand: next });
+  if (!next.includes(store.get().edition)) selectEdition('base');
+}
+
+/** The deck builder: the hand's slots over everything owned; one tap moves a card. */
 function viewDeck() {
   void import('./pack/deckView').then((m) =>
     m.viewDeck({
       dict: t,
-      deck: deckOf(store.get().hand, packs.get()),
+      owned: ownedGroups(packs.get()),
       hand: store.get().hand,
+      starters: [...OPEN_EDITIONS],
       key: thumbKey(),
       face,
       mask,
       tune: store.get().tune,
-      onSwap: (out, into) => swapCard(out, into),
+      onChange: (next) => setHand(next),
       onShop: () => openShop(),
       onClose: () => deck.focusDeck(),
     }),
@@ -1306,7 +1314,7 @@ store.on((s, changed) => {
   }
   if (changed.has('edition')) {
     // A finish on the card is always in the hand, however it got there.
-    if (!s.hand.includes(s.edition)) store.set({ hand: swapIn(s.hand, null, s.edition) });
+    if (!s.hand.includes(s.edition)) store.set({ hand: addToHand(s.hand, s.edition) });
     stage.syncHandChecked();
     renderCaption(null);
     wakePacks();
@@ -1365,8 +1373,8 @@ const deck = mountDeck({
 {
   const s = store.get();
   let next = normalizeHand(s.hand, packs.get());
-  if (legacyDrawn) next = normalizeHand(swapIn(next, null, legacyDrawn), packs.get());
-  if (!next.includes(s.edition)) next = swapIn(next, null, s.edition);
+  if (legacyDrawn) next = normalizeHand(addToHand(next, legacyDrawn), packs.get());
+  if (!next.includes(s.edition)) next = addToHand(next, s.edition);
   store.set({ hand: next });
 }
 wakePacks();
