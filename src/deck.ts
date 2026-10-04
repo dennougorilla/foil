@@ -67,10 +67,11 @@ export function mountDeck(o: DeckOptions) {
     /** Where the deck sits on screen, for cards flying into it. */
     rect: () => deckBtn.getBoundingClientRect(),
     /** The deck takes cards in: a bump, and "+n" floating up from it. */
-    bump(n: number) {
+    bump(n = 0) {
       deckBtn.classList.remove('is-bump');
       void deckBtn.offsetWidth;
       deckBtn.classList.add('is-bump');
+      if (!n) return;
       const plus = document.createElement('span');
       plus.className = 'deck-plus';
       plus.textContent = `+${n}`;

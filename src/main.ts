@@ -1119,8 +1119,10 @@ function openShop() {
 /** Swaps a deck card into the hand in place of `out` (the last card that is not Base if none) and puts it on the card. */
 function swapCard(out: EditionId | null, into: EditionId) {
   store.set({ hand: swapIn(store.get().hand, out, into) });
-  // The two cards trade places first; the big card turns over once the new one has landed.
-  if (into !== store.get().edition) setTimeout(() => stage.flipTo(() => selectEdition(into)), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520);
+  // The two cards trade places first: the old one lands on the deck (a bump), then the big card takes the new finish.
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(() => deck.bump(), still ? 0 : 420);
+  if (into !== store.get().edition) setTimeout(() => selectEdition(into), still ? 0 : 560);
 }
 
 /** View deck: everything owned, grouped by pack; choosing one draws it. */

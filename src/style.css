@@ -864,10 +864,10 @@ button {
 .deck-pile i {
   position: absolute;
   left: 0;
-  bottom: calc(var(--i) * 2px);
+  bottom: calc(var(--i) * 3px);
   width: 60px;
   height: 84px;
-  margin-left: calc(var(--i) * -1px);
+  margin-left: calc(var(--i) * -2px);
   border-radius: 6px;
   background:
     radial-gradient(circle at 50% 50%, #f3eee2 0 9px, #161c1f 9px 12px, transparent 12px),

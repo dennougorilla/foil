@@ -114,6 +114,8 @@ export function viewDeck(o: DeckViewOptions) {
     chosen = id;
     root.querySelectorAll('.dv-body .dv-card').forEach((b) => b.classList.toggle('is-chosen', (b as HTMLElement).dataset.id === id));
     root.querySelector('.dv-ask')!.textContent = t.deckAsk.replace('{name}', o.dict.edition[id]);
+    // One instruction at a time: the header now asks for the hand card too.
+    root.querySelector('.dv-sub')!.textContent = t.deckAsk.replace('{name}', o.dict.edition[id]);
     const row = handBar.querySelector('.dv-row')!;
     if (!row.childElementCount)
       for (const h of o.hand) {
@@ -129,6 +131,7 @@ export function viewDeck(o: DeckViewOptions) {
     fill();
     (handBar.querySelector<HTMLElement>('.dv-card:not([disabled])') ?? handBar).focus();
     handBar.scrollIntoView({ block: 'nearest' });
+    root.querySelector('.dv-body .dv-card.is-chosen')?.scrollIntoView({ block: 'nearest' });
   }
 
   function swap(out: EditionId) {
@@ -154,6 +157,7 @@ export function viewDeck(o: DeckViewOptions) {
     if (chosen) {
       chosen = null;
       handBar.hidden = true;
+      root.querySelector('.dv-sub')!.textContent = t.deckSub.replace('{n}', String(total));
       root.querySelectorAll('.dv-card.is-chosen').forEach((b) => b.classList.remove('is-chosen'));
       root.querySelector<HTMLElement>('.dv-body .dv-card')?.focus();
     } else close();

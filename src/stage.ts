@@ -34,6 +34,8 @@ interface HandCard {
   fromDeck: boolean;
   dx: Spring;
   dy: Spring;
+  /** Its turn from face-down: a card from the deck leaves it as a back and turns over in flight. */
+  turn: Spring;
   /** Where it was last drawn (canvas px), so a card leaving for the deck starts from there. */
   at: { x: number; y: number; w: number; h: number; rz: number };
 }
@@ -238,6 +240,7 @@ export class Stage {
       fromDeck: false,
       dx: new Spring(0, 0, 150, 15),
       dy: new Spring(0, 0, 150, 15),
+      turn: new Spring(0, 0, 120, 14),
       at: { x: 0, y: 0, w: 0, h: 0, rz: 0 },
     };
   }
@@ -664,7 +667,7 @@ export class Stage {
         card.tiltX.target = 0;
         card.tiltY.target = 0;
       }
-      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY, card.dx, card.dy]) s.step(dt);
+      for (const s of [card.lift, card.scale, card.deal, card.tiltX, card.tiltY, card.dx, card.dy, card.turn]) s.step(dt);
       order.push(i);
     });
     // Draw so the selected and hovered cards sit on top of their neighbours.
@@ -688,6 +691,7 @@ export class Stage {
           card.dx.x = deck.left + deck.width / 2 - this.canvasRect.left - (ox + x);
           card.dy.x = deck.top + deck.height / 2 - this.canvasRect.top - (oy + y);
           card.scale.x = 0.55;
+          card.turn.x = Math.PI;
         }
         if (this.time > card.dealAt) card.fromDeck = false;
       }
@@ -713,7 +717,7 @@ export class Stage {
           w,
           h,
           rx: card.tiltX.x + Math.sin(t * 0.8) * 0.06 * idle,
-          ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle,
+          ry: card.tiltY.x + Math.cos(t * 0.7) * 0.08 * idle + card.turn.x,
           rz: rot + card.deal.x * 0.6 * (d >= 0 ? 1 : -1),
           scale: card.scale.x,
           edition: e.shader,

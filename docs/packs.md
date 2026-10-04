@@ -20,8 +20,9 @@ summary is in `README.md`; this note is the design behind it.
   out, then pack by pack under a small mark in the pack's color), each drawn as the same mini card
   as in the hand — the person's own picture in that finish. Choosing one shows the hand underneath
   ("swap with which?"); choosing a hand card swaps the two: the hand card flies into the deck, the
-  deck card flies into its place in the hand (on top of the others until it lands), and then the
-  big card turns over to it. Base never leaves the hand ("always in hand" under it). The hand's order is remembered. Putting a deck finish on the card any other way (a pick in
+  deck card leaves the deck face-down and turns over as it flies into its place in the hand (on
+  top of the others until it lands); the deck bumps as the old card lands on it, and then the big
+  card takes the new finish with a short pop. Base never leaves the hand ("always in hand" under it). The hand's order is remembered. Putting a deck finish on the card any other way (a pick in
   the haul, a saved card) swaps it in for the last card that is not Base.
 - The mini cards are still pictures, drawn one by one with a single WebGL context when View deck
   opens and kept until the picture, the frame or the light changes; nothing in the list animates.
