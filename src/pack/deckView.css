@@ -203,8 +203,17 @@
 }
 
 .dv-card[disabled] {
-  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.dv-card[disabled] .dv-pic,
+.dv-card[disabled] b {
+  opacity: 0.45;
+}
+
+.dv-stays {
+  font-size: 11px;
+  color: var(--gold);
 }
 
 .dv-card[disabled]:hover {
@@ -247,9 +256,14 @@
   .dv-hand {
     padding: 10px 10px 14px;
   }
+  /* All seven in view: two rows instead of a strip that runs off the screen. */
+  .dv-hand .dv-row {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
   .dv-hand .dv-pic {
-    width: 62px;
-    height: 86px;
+    width: 64px;
+    height: 88px;
   }
   .dv-head small {
     font-size: 13px;

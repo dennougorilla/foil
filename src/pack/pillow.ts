@@ -271,7 +271,7 @@ export class Pillow {
     gl.uniform1f(u.uShadow, 2);
     gl.uniform1f(u.uFlat, 1);
     gl.uniform2f(u.uShift, 0, 0);
-    gl.uniform1f(u.uDepth, d.w * 0.05);
+    gl.uniform1f(u.uDepth, d.w * 0.035);
     gl.drawArrays(gl.TRIANGLES, 0, this.count);
     gl.uniform1f(u.uDepth, 0);
     gl.uniform1f(u.uShadow, 0);

@@ -1119,7 +1119,8 @@ function openShop() {
 /** Swaps a deck card into the hand in place of `out` (the last card that is not Base if none) and puts it on the card. */
 function swapCard(out: EditionId | null, into: EditionId) {
   store.set({ hand: swapIn(store.get().hand, out, into) });
-  if (into !== store.get().edition) stage.flipTo(() => selectEdition(into));
+  // The two cards trade places first; the big card turns over once the new one has landed.
+  if (into !== store.get().edition) setTimeout(() => stage.flipTo(() => selectEdition(into)), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520);
 }
 
 /** View deck: everything owned, grouped by pack; choosing one draws it. */

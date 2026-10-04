@@ -121,6 +121,7 @@ export function viewDeck(o: DeckViewOptions) {
         if (h === 'base') {
           b.disabled = true;
           b.title = t.deckBaseStays;
+          b.insertAdjacentHTML('beforeend', `<small class="dv-stays">${t.deckBaseShort}</small>`);
         }
         row.append(b);
       }
@@ -133,14 +134,16 @@ export function viewDeck(o: DeckViewOptions) {
   function swap(out: EditionId) {
     if (!chosen) return;
     const into = chosen;
-    close();
+    // Gone at once, so nothing covers the two cards trading places.
+    close(true);
     o.onSwap(out, into);
   }
 
-  const close = () => {
+  const close = (now = false) => {
     root.classList.remove('is-in');
     removeEventListener('keydown', onKey, true);
-    setTimeout(() => root.remove(), 180);
+    if (now) root.remove();
+    else setTimeout(() => root.remove(), 180);
     o.onClose();
   };
   const onKey = (e: KeyboardEvent) => {
@@ -156,7 +159,7 @@ export function viewDeck(o: DeckViewOptions) {
     } else close();
   };
   addEventListener('keydown', onKey, true);
-  root.querySelector('.dv-x')!.addEventListener('click', close);
+  root.querySelector('.dv-x')!.addEventListener('click', () => close());
   root.addEventListener('pointerdown', (e) => e.target === root && close());
   document.body.append(root);
   requestAnimationFrame(() => root.classList.add('is-in'));

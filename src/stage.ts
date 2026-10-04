@@ -669,7 +669,8 @@ export class Stage {
     });
     // Draw so the selected and hovered cards sit on top of their neighbours.
     order.sort((a, b) => {
-      const rank = (i: number) => (i === active ? 2 : this.hand[i].id === state.edition ? 1 : 0);
+      // A card flying in from the deck stays on top until it lands.
+      const rank = (i: number) => (Math.abs(this.hand[i].dx.x) > 2 ? 3 : i === active ? 2 : this.hand[i].id === state.edition ? 1 : 0);
       return rank(a) - rank(b);
     });
     for (const i of order) {

@@ -20,8 +20,8 @@ summary is in `README.md`; this note is the design behind it.
   out, then pack by pack under a small mark in the pack's color), each drawn as the same mini card
   as in the hand — the person's own picture in that finish. Choosing one shows the hand underneath
   ("swap with which?"); choosing a hand card swaps the two: the hand card flies into the deck, the
-  deck card flies into its place in the hand, and it goes onto the card. Base never leaves the
-  hand. The hand's order is remembered. Putting a deck finish on the card any other way (a pick in
+  deck card flies into its place in the hand (on top of the others until it lands), and then the
+  big card turns over to it. Base never leaves the hand ("always in hand" under it). The hand's order is remembered. Putting a deck finish on the card any other way (a pick in
   the haul, a saved card) swaps it in for the last card that is not Base.
 - The mini cards are still pictures, drawn one by one with a single WebGL context when View deck
   opens and kept until the picture, the frame or the light changes; nothing in the list animates.
@@ -174,9 +174,9 @@ follows the sound toggle.
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
 | 8 | **Try it** | The title says what happened ("You have all 3 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 3". Primary: "Use Magma" (the showpiece by name) — closes, sends the other cards into the deck and swaps this one into the hand for its last card that is not Base, and onto the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "To the deck". Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
 
-**Skip reveal** (top right, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
+**Skip** (「結果へ」, small in the top corner, from beat 0) jumps to the haul (the cards deal in); **×** beside it closes.
 A replay starts at beat 0 too. Escape closes from the haul and skips the reveal from anywhere else; the
-pack counts as opened from the rip (or Skip reveal) on, so closing before the rip leaves it sealed.
+pack counts as opened from the rip (or Skip) on, so closing before the rip leaves it sealed.
 With a keyboard at hand, each hint shows its key (Enter, →).
 
 **Each theme's particles** are its own: Metal throws hot sparks that fall fast, Light lets star
