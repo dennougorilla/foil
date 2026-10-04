@@ -239,9 +239,22 @@ export interface IdlePose {
   flash: number;
   /** A streak of light crossing the face (see CardDraw.glint), below -1 when none. */
   glint: number;
+  /** Where a light motion puts the light, in card uv; null leaves it to the light setting. */
+  light: [number, number] | null;
+  /** A band of light across the face (see CardDraw.beam): place, width, angle, power. */
+  beam: [number, number, number, number];
+  /** A round spot of light centred on the light (see CardDraw.spot): radius, power. */
+  spot: [number, number];
+  /** How far the face falls into shadow away from the band or spot, 0..1. */
+  dim: number;
+  /** A pixel star twinkling on the face (see CardDraw.star): x, y in card uv, power. */
+  star: [number, number, number];
 }
 
-const REST_POSE: IdlePose = { dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1, spin: 0, sheen: [0, 0], flash: 0, glint: -2 };
+const REST_POSE: IdlePose = {
+  dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1, spin: 0, sheen: [0, 0], flash: 0, glint: -2,
+  light: null, beam: [0, 0.1, 0, 0], spot: [0.3, 0], dim: 0, star: [0, 0, 0],
+};
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 const frac = (v: number) => v - Math.floor(v);
@@ -253,7 +266,7 @@ const thump = (x: number, rise: number) => (x > 0 ? (x / rise) * Math.exp(1 - x 
 /** The idle motion `s` idle seconds in. Periodic in loopCycle (spin and turn add whole turns). */
 export function idlePose(t: Tune, s: number): IdlePose {
   const a = W * s;
-  const p: IdlePose = { ...REST_POSE, sheen: [0, 0] };
+  const p: IdlePose = { ...REST_POSE, sheen: [0, 0], beam: [...REST_POSE.beam], spot: [...REST_POSE.spot], star: [...REST_POSE.star] };
   switch (t.idle) {
     case 'sway':
       p.dy = Math.sin(a) * 0.012;
@@ -434,15 +447,19 @@ export const orbitLight = (s: number): [number, number] => [0.5 + Math.cos(W * s
  * sheen and an orbiting light's.
  */
 export function cardTilt(t: Tune, s: number, pose: IdlePose, rx: number, ry: number): [number, number] {
-  const orbit = t.light === 'orbit' ? [Math.cos(W * s) * 0.6, Math.sin(W * s) * 0.6] : [0, 0];
+  const orbit = t.light === 'orbit' && !pose.light ? [Math.cos(W * s) * 0.6, Math.sin(W * s) * 0.6] : [0, 0];
   return [ry / 0.32 + pose.sheen[0] + orbit[0], rx / 0.28 + pose.sheen[1] + orbit[1]];
 }
 
 /** Where the light sits when nobody points at the card: opposite the way it leans. */
 export const restLight = (tilt: [number, number]): [number, number] => [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
 
-/** The light the tune asks for; `follow` is where the pointer (or the card's lean) puts it. */
-export function tunedLight(t: Tune, s: number, follow: [number, number]): [number, number] {
+/**
+ * The light the tune asks for; `follow` is where the pointer (or the card's lean) puts it. A light
+ * motion's own light (`pose.light`) comes before the light setting.
+ */
+export function tunedLight(t: Tune, s: number, follow: [number, number], pose?: IdlePose): [number, number] {
+  if (pose?.light) return pose.light;
   if (t.light === 'orbit') return orbitLight(s);
   if (t.light === 'fixed') return fixedLight(t.lightAngle);
   return follow;
@@ -461,7 +478,7 @@ export function loopView(t: Tune, p: number, cycle = loopCycle(t)): LoopView {
   const s = p * cycle;
   const pose = idlePose(t, s);
   const tilt = cardTilt(t, s, pose, pose.rx, pose.ry);
-  return { pose, tilt, light: tunedLight(t, s, restLight(tilt)) };
+  return { pose, tilt, light: tunedLight(t, s, restLight(tilt), pose) };
 }
 
 /**
@@ -681,12 +698,20 @@ export class IdleClock {
       sheen: [p.sheen[0] * w, p.sheen[1] * w],
       flash: p.flash * w,
       glint: w > 0.5 ? p.glint : -2,
+      light: w > 0.5 ? p.light : null,
+      beam: [p.beam[0], p.beam[1], p.beam[2], p.beam[3] * w],
+      spot: [p.spot[0], p.spot[1] * w],
+      dim: p.dim * w,
+      star: [p.star[0], p.star[1], p.star[2] * w],
     };
   }
 
   /** The sheen for a card turned by `rx`, `ry` (spin left out) with this idle pose. */
   tilt = (t: Tune, pose: IdlePose, rx: number, ry: number) => cardTilt(t, this.idleTime, pose, rx, ry);
 
-  /** Light position in card uv. `follow` is where the pointer or the card's lean would put it. */
-  light = (t: Tune, follow: [number, number]) => tunedLight(t, this.idleTime, follow);
+  /**
+   * Light position in card uv. `follow` is where the pointer or the card's lean would put it; a
+   * light motion's `pose` (left out while the pointer is on the card) puts it itself.
+   */
+  light = (t: Tune, follow: [number, number], pose?: IdlePose) => tunedLight(t, this.idleTime, follow, pose);
 }

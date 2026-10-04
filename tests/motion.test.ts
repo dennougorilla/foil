@@ -30,7 +30,7 @@ test('every idle motion moves, and none holds still', () => {
     let travel = 0;
     let last = idlePose(t, 0);
     for (let i = 1; i <= 240; i++) {
-      const p = idlePose(t, (i / 240) * IDLE_CYCLE);
+      const p = idlePose(t, (i / 240) * idleCycle(t));
       travel += Math.abs(p.dx - last.dx) + Math.abs(p.dy - last.dy) + Math.abs(p.rx - last.rx) + Math.abs(p.ry - last.ry) + Math.abs(p.rz - last.rz);
       travel += Math.abs(p.scale - last.scale) + Math.abs(p.spin - last.spin) + Math.abs(p.sheen[0] - last.sheen[0]) + Math.abs(p.sheen[1] - last.sheen[1]) + Math.abs(p.flash - last.flash) + Math.abs(p.glint - last.glint);
       last = p;
@@ -52,8 +52,10 @@ test('every idle motion closes on itself after one cycle, without a jump at the 
       assert.equal(diff, '', `${idle}/${light} pose differs across the seam: ${diff}`);
       assert.equal(poseClose({ tilt: a.tilt, light: a.light }, { tilt: b.tilt, light: b.light }), '', `${idle}/${light} light differs across the seam`);
       // The last frame before the seam is close to the first (no snap back).
+      // A flash, a streak or a star may end the loop; a band of light may jump back while it is off the card.
       const c = loopView(t, 1 - 1 / 400);
-      assert.equal(poseClose({ ...c.pose, spin: 0, flash: 0, glint: 0 }, { ...a.pose, spin: 0, flash: 0, glint: 0 }, 0.05), '', `${idle} jumps at the seam`);
+      const calm = (q: typeof a.pose) => ({ ...q, spin: 0, flash: 0, glint: 0, star: [0, 0, 0], ...(q.beam[3] < 0.01 ? { beam: [0, 0, 0, 0], light: null } : {}) });
+      assert.equal(poseClose(calm(c.pose), calm(a.pose), 0.05), '', `${idle} jumps at the seam`);
     }
 });
 
@@ -74,7 +76,7 @@ test('the stage left alone moves exactly as the exported loop at the same moment
         const want = loopView(t, p);
         const pose = live.pose(t);
         const tilt = live.tilt(t, pose, pose.rx, pose.ry);
-        const got = { pose, tilt, light: live.light(t, restLight(tilt)) };
+        const got = { pose, tilt, light: live.light(t, restLight(tilt), pose) };
         const diff = poseClose({ ...want.pose, spin: 0 }, { ...got.pose, spin: 0 }, 1e-6) || poseClose({ tilt: want.tilt, light: want.light }, { tilt: got.tilt, light: got.light }, 1e-6);
         assert.equal(diff, '', `${idle}/${light} at speed ${speed}: ${diff}`);
         assert.ok(close(Math.cos(want.pose.spin), Math.cos(got.pose.spin)) && close(Math.sin(want.pose.spin), Math.sin(got.pose.spin)), `${idle} spin angle differs`);

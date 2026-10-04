@@ -302,7 +302,7 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
     const rec = (window.__draws = { live: null, frames: [] });
     const draw = (window.__drawCard = CardRenderer.prototype.drawCard);
     CardRenderer.prototype.drawCard = function (d, time) {
-      const pick = ({ cx, cy, w, h, rx, ry, rz, scale, tilt, light, flash, glint }) => ({ cx, cy, w, h, rx, ry, rz, scale, tilt: [...tilt], light: [...light], flash, glint: glint ?? -2 });
+      const pick = ({ cx, cy, w, h, rx, ry, rz, scale, tilt, light, flash, glint, beam, dim, star }) => ({ cx, cy, w, h, rx, ry, rz, scale, tilt: [...tilt], light: [...light], flash, glint: glint ?? -2, beam: beam ? [...beam] : [0, 0, 0, 0], dim: dim ?? 0, star: star ? [...star] : [0, 0, 0] });
       if (this.gl.canvas === live) {
         if (d.plate !== false) {
           const c = live.getBoundingClientRect();
@@ -333,7 +333,7 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
     ['lean', 'fixed', 1],
     ['gyre', 'pointer', 1.5],
   ];
-  const norm = (d, ox, oy) => ({ dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale, t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint });
+  const norm = (d, ox, oy) => ({ dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale, t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint, beam: d.beam[0] * d.beam[3], power: d.beam[3], dim: d.dim, star: d.star[2] });
   for (const [n, [idle, light, speed]] of cases.entries()) {
     await page.click(`#pane-light [data-key=light] [role=radio][data-value=${light}]`);
     await page.click(`#pane-light [data-key=idle] [role=radio][data-value=${idle}]`);
@@ -356,6 +356,7 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
     } else {
       frames = await page.evaluate(async () => {
         const { createScene } = await import('/src/exporter.ts');
+        const { idleCycle } = await import('/src/tune/model.ts');
         const { editionById } = await import('/src/editions.ts');
         const { drawBack } = await import('/src/card/back.ts');
         const { loopCycle } = await import('/src/tune/model.ts');

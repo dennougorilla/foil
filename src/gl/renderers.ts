@@ -85,6 +85,14 @@ export interface CardDraw {
   flash: number;
   /** A streak of light crossing the face, its place along the diagonal (about -0.2 to 1.6); none when absent. */
   glint?: number;
+  /** A light motion's band of light across the face: place, width, angle (radians), power; none when absent. */
+  beam?: [number, number, number, number];
+  /** A light motion's round spot of light on `light`: radius, power; none when absent. */
+  spot?: [number, number];
+  /** How far the face falls into shade away from the band or spot, 0..1; 0 when absent. */
+  dim?: number;
+  /** A pixel star twinkling on the face: x, y in card uv, power; none when absent. */
+  star?: [number, number, number];
   /** Offset of the hard drop shadow, or null for none. */
   shadow: [number, number] | null;
   /** Draw the nameplate text; off for thumbnail-sized cards. */
@@ -308,6 +316,13 @@ export class CardRenderer {
     gl.uniform1f(p.u.uAlpha, d.alpha);
     gl.uniform1f(p.u.uFlash, d.flash);
     gl.uniform1f(p.u.uGlint, d.glint ?? -2);
+    const beam = d.beam ?? [0, 0.1, 0, 0];
+    gl.uniform4f(p.u.uBeam, beam[0], beam[1], beam[2], beam[3]);
+    const spot = d.spot ?? [0.3, 0];
+    gl.uniform2f(p.u.uSpot, spot[0], spot[1]);
+    gl.uniform1f(p.u.uDim, d.dim ?? 0);
+    const star = d.star ?? [0, 0, 0];
+    gl.uniform3f(p.u.uStar, star[0], star[1], star[2]);
     gl.uniform1f(p.u.uFaceTexels, f?.texels ?? 1);
     const uv = d.uv ?? [0, 0, 1, 1];
     gl.uniform4f(p.u.uUvRect, uv[0], uv[1], uv[2], uv[3]);

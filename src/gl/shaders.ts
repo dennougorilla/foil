@@ -150,6 +150,10 @@ uniform float uShadow;     // 1 = draw as drop shadow
 uniform float uAlpha;
 uniform float uFlash;      // white flash on juice
 uniform float uGlint;      // a streak of light crossing the face: its place along the diagonal, below -1 when none
+uniform vec4 uBeam;        // a band of light across the face: place, width, angle, power (0 = none)
+uniform vec2 uSpot;        // a round spot of light on uLight: radius, power (0 = none)
+uniform float uDim;        // how far the face falls into shade away from the band or spot
+uniform vec3 uStar;        // a pixel star twinkling on the face: x, y, power (0 = none)
 uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
@@ -242,6 +246,17 @@ vec3 glitch(vec3 c, vec2 uv, vec2 t, float L, float lod) {
 }
 ${LETTERING_GLSL}
 ${pack?.glsl ?? ''}
+/** How much of a light motion's band or spot (see IdlePose in tune/model.ts) falls here, 0..1+. */
+float motionLit(vec2 uv) {
+  vec2 q = (uv - 0.5) * vec2(1.0, 1.4);
+  float d = dot(q, vec2(cos(uBeam.z), sin(uBeam.z))) - uBeam.x;
+  // A light bar: a flat core with soft edges, and a thin second bar trailing it.
+  float band = (smoothstep(uBeam.y, uBeam.y * 0.4, abs(d)) + 0.65 * smoothstep(uBeam.y * 0.35, 0.0, abs(d + uBeam.y * 2.2))) * uBeam.w;
+  // A stage spot: round, with a soft falloff and no rim.
+  float r = length((uv - uLight) * vec2(1.0, 1.4)) / uSpot.x;
+  float spot = (1.0 - smoothstep(0.35, 1.0, r)) * uSpot.y;
+  return max(band, spot);
+}
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
@@ -307,7 +322,17 @@ void main() {
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
   amt *= sel;
+  // A light motion's band or spot: the finish blazes where it falls and fades into the shade elsewhere.
+  // It falls on the art in full and on the paper border at half, so the border never flares white.
+  float lit = motionLit(uv) * mix(0.5, 1.0, m.r);
+  float shade = uDim * (1.0 - min(lit, 1.0));
+  amt *= 1.0 - shade;
   col = mix(c, col, amt);
+  col += (col - c) * lit * 0.6 * sel;
+  // The light falls on the whole card, its glossy surface showing a faint sheen where it is brightest.
+  // The shade is a cool night blue rather than grey.
+  col *= (1.0 + lit * 0.3) * mix(vec3(1.0), vec3(0.3, 0.33, 0.47), shade);
+  col += uTLight * lit * lit * 0.06;
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
@@ -316,7 +341,7 @@ void main() {
   } else if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     // Glow's room is dim, so only a faint glare reaches it.
-    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
+    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0)) * (1.0 - 0.6 * uSpot.y); // a spot lights the foil, not a glare
     if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
@@ -325,6 +350,8 @@ void main() {
   // Glare and glitter belong to the finish, so they stay inside the chosen Foil area.
   col += spec * uTLight * sel;
   if (e != 0) col += tuneGlitter(uv, uTilt) * uIntensity * tuneGlitterArea(e, m) * sel;
+  // Under a light motion's band or spot the brights roll off instead of clipping to flat white.
+  col -= max(col - 0.82, 0.0) * 0.55 * min(lit * 2.0, 1.0);
   // Tilting away darkens a touch; tilting towards brightens.
   col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
@@ -335,6 +362,17 @@ void main() {
     float d = g.x * 0.8 + g.y * 0.6 - uGlint;
     float streak = step(abs(d), 0.045) + step(abs(d + 0.11), 0.012) * 0.7;
     col = mix(col, vec3(1.0, 0.98, 0.9), streak * 0.6);
+  }
+  if (uStar.z > 0.0) {
+    // A four-point star on the same coarse pixels as the card back, its arms growing with its power.
+    vec2 q = ((floor(vUv * vec2(90.0, 126.0)) + 0.5) / vec2(90.0, 126.0) - uStar.xy) * vec2(1.0, 1.4);
+    float arm = 0.36 * uStar.z;
+    float rays = max(step(abs(q.x), 0.006) * smoothstep(arm, 0.0, abs(q.y)), step(abs(q.y), 0.006) * smoothstep(arm, 0.0, abs(q.x)));
+    // Short diagonal rays and a 3 × 3 core while it is bright.
+    rays = max(rays, step(abs(q.x - q.y), 0.008) * smoothstep(arm * 0.35, 0.0, abs(q.x)) + step(abs(q.x + q.y), 0.008) * smoothstep(arm * 0.35, 0.0, abs(q.x)));
+    float core = step(max(abs(q.x), abs(q.y)), 0.012 * step(0.4, uStar.z));
+    float halo = exp(-dot(q, q) / 0.004) * 0.45;
+    col = mix(col, vec3(1.0, 0.98, 0.9) * uTLight, clamp((max(rays, core) + halo) * uStar.z, 0.0, 1.0));
   }
   col = mix(col, vec3(1.0), uFlash);
   o = vec4(clamp(col, 0.0, 1.0) * base.a, base.a) * uAlpha;

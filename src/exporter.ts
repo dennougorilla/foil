@@ -204,7 +204,14 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
       );
       ctx.imageSmoothingEnabled = false;
       if (transparent) ctx.clearRect(0, 0, W, H);
-      else ctx.drawImage(bgCanvas, 0, 0, W, H);
+      else {
+        ctx.drawImage(bgCanvas, 0, 0, W, H);
+        // A light motion's dim room takes the backdrop down with the card.
+        if (pose.dim > 0) {
+          ctx.fillStyle = `rgba(6, 8, 20, ${Math.min(0.88, pose.dim * 1.15)})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
       ctx.drawImage(cardCanvas, 0, 0);
     },
     dispose() {
