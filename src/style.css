@@ -1339,8 +1339,14 @@ button {
   transition-duration: 0.05s;
 }
 
-.mini-slab:disabled {
+.mini-slab:disabled:not([data-busy]) {
   opacity: 0.5;
+}
+
+/* Making the GIF to share: Share counts up in place. */
+.mini-share[data-busy] {
+  --c: var(--slab-lo);
+  font-family: var(--display);
 }
 
 /*

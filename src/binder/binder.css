@@ -279,10 +279,10 @@
   text-align: center;
 }
 
-.bd-lost i {
-  font-family: var(--display);
-  font-size: 22px;
+.bd-lost em {
+  font-size: 11px;
   font-style: normal;
+  line-height: 1.3;
   color: var(--binder-hi);
 }
 
@@ -314,7 +314,7 @@
 
 .bd-card[aria-pressed='true'] {
   z-index: 1;
-  transform: translateY(-14px) scale(1.04);
+  transform: translateY(-10px);
   box-shadow: 0 0 0 3px var(--gold), 0 0 18px rgba(242, 193, 78, 0.55), 0 10px 0 3px #05080a;
 }
 
@@ -637,7 +637,7 @@
   }
 
   .bd-card[aria-pressed='true'] {
-    transform: translateY(-14px);
+    transform: translateY(-10px);
   }
 
   .bd.is-empty .bd-keep i,

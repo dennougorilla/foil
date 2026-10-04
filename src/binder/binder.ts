@@ -19,8 +19,8 @@ const TEXT = {
     pickedOne: '{card}・{date} にしまったカード',
     pickedMany: '{n} 枚を選択中・ステージに出せるのは 1 枚です',
     empty: 'まだ空です。カードができたら「しまう」で入れましょう',
-    full: 'いっぱいです。カードを捨てて空きを作ってください',
-    fullBytes: '容量がいっぱいです。カードを捨てて空きを作ってください',
+    full: '54 枚の上限です。捨てて空きを作ってください',
+    fullBytes: '60 MB の上限です。捨てて空きを作ってください',
     keepPocket: '今のカードをしまう',
     play: 'ステージに出す',
     playLabel: '選んだカードをステージに出す',
@@ -34,7 +34,7 @@ const TEXT = {
     close: '閉じる',
     count: '{n} / {max} 枚',
     bytes: '容量 {used} / {max}',
-    lost: 'サムネイルを読めません',
+    lost: 'プレビューなし・ステージには出せます',
     kept: 'バインダーにしまいました（{n} / {max}）',
     keepFailed: 'カードをしまえませんでした。もう一度お試しください。',
     playFailed: 'このカードは読み込めませんでした。',
@@ -48,8 +48,8 @@ const TEXT = {
     pickedOne: '{card}, kept {date}',
     pickedMany: '{n} picked · only one goes on the stage',
     empty: 'Empty for now. Finish a card, then press Keep.',
-    full: 'Full. Discard a card to make room.',
-    fullBytes: 'Out of space. Discard a card to make room.',
+    full: '54-card limit reached. Discard to make room.',
+    fullBytes: '60 MB limit reached. Discard to make room.',
     keepPocket: 'Keep the card on the stage',
     play: 'To stage',
     playLabel: 'Put the picked card on the stage',
@@ -63,7 +63,7 @@ const TEXT = {
     close: 'Close',
     count: '{n} / {max} cards',
     bytes: 'Space {used} / {max}',
-    lost: 'No thumbnail',
+    lost: 'No preview · can still go on stage',
     kept: 'Kept in the binder ({n} / {max})',
     keepFailed: "Couldn't keep the card. Please try again.",
     playFailed: "This card couldn't be read.",
@@ -352,9 +352,10 @@ export function mountBinder(host: BinderHost) {
               b.classList.add('is-lost');
               const lost = document.createElement('span');
               lost.className = 'bd-lost';
-              lost.innerHTML = '<i aria-hidden="true">?</i><b></b><small></small>';
+              lost.innerHTML = '<b></b><small></small><em></em>';
               lost.querySelector('b')!.textContent = m.name;
-              lost.querySelector('small')!.textContent = editions[m.edition] ?? t.lost;
+              lost.querySelector('small')!.textContent = editions[m.edition] ?? m.edition;
+              lost.querySelector('em')!.textContent = t.lost;
               b.append(lost);
             });
             b.addEventListener('click', () => {
@@ -400,12 +401,13 @@ export function mountBinder(host: BinderHost) {
       p.classList.toggle('bd-full', !!full);
       const [one] = picked;
       const m = one && metas.find((x) => x.id === one);
-      p.textContent = full === 'count' ? t.full
-        : full === 'bytes' ? t.fullBytes
-        : picked.size > 1 ? fill(t.pickedMany, { n: picked.size })
+      // Full, the reason leads and what is picked follows it.
+      const pick = picked.size > 1 ? fill(t.pickedMany, { n: picked.size })
         : m ? fill(t.pickedOne, { card: fill(t.card, { name: m.name, finish: host.dict().edition[m.edition] ?? m.edition }), date: new Date(m.at).toLocaleDateString(host.lang()) })
-        : metas.length ? (matchMedia('(pointer: coarse)').matches ? t.hintTouch : t.hint)
-        : t.empty;
+        : '';
+      const why = full === 'count' ? t.full : full === 'bytes' ? t.fullBytes : '';
+      p.textContent = why && pick ? `${why} ${pick}`
+        : why || pick || (metas.length ? (matchMedia('(pointer: coarse)').matches ? t.hintTouch : t.hint) : t.empty);
       if (!shake) return;
       // Asked to keep a card it had no room for: the note shakes.
       p.classList.remove('is-shake');

@@ -1232,7 +1232,20 @@ shareBtn.addEventListener('click', async () => {
   }
   if (saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
   sfx.tick();
-  const file = await busy(t.sharing, (progress) => makeFile('share', t.sharing, progress), t.errGif);
+  // The progress shows on Share as well as on the Save button.
+  const label = shareBtn.querySelector('span')!;
+  shareBtn.dataset.busy = 'true';
+  const file = await busy(
+    t.sharing,
+    (progress) =>
+      makeFile('share', t.sharing, (p) => {
+        label.textContent = `${Math.round(p * 100)}%`;
+        progress(p);
+      }),
+    t.errGif,
+  );
+  delete shareBtn.dataset.busy;
+  renderShare();
   if (file) await send(file, true);
 });
 

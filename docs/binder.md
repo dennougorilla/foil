@@ -39,7 +39,9 @@ setting that is out of range falls back to its default, the same way a saved set
 **Limits**: 54 cards (six pages of nine) and 60 MB in all. A card that would go past either is
 refused with a note saying which, and the binder opens so one can be discarded. Its head shows
 the count (11 / 54) and, as a bar, how much of the 60 MB is used; whichever ran out turns red.
-A thumbnail that can't be read shows as a card back with the card's name and finish.
+A thumbnail that can't be read shows as a card back with the card's name and finish, saying it
+can still go on the stage. When full, the note leads with the limit reached and still names
+what is picked.
 
 ## The binder
 
@@ -63,7 +65,7 @@ A thumbnail that can't be read shows as a card back with the card's name and fin
 - **Share** sits beside Keep and shows only where `navigator.canShare({ files })` accepts an image
   file (most phones; most desktop browsers have no such share sheet, and Save is the way out there).
 - It always sends a moving GIF, whatever format Save is set to: X plays a GIF, and most apps won't
-  play an APNG. The GIF is made on the press, with the progress on the Save button as Save shows
+  play an APNG. The GIF is made on the press, counting up on Share and on the Save button as Save shows
   it, and keeps the GIF options (backdrop, edge). It is smaller than a saved GIF, 360ﾃ・50 and at
   most 50 frames (a long animated loop keeps its length with longer frames), so even a noisy
   picture stays well under the 15 MB X takes: 50 frames of 360ﾃ・50 are 8.1 MB before compression.
