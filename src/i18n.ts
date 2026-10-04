@@ -300,7 +300,7 @@ const ja = {
     layoutName: { classic: 'いつもの', tcg: 'トレカ' } satisfies Record<CardLayout, string>,
     type: '種別',
     typeTag: '＋ 種別を入れる',
-    typeHint: '例: 誕生日カード',
+    typeHint: '例: レアカード — フォイル',
   },
   msg: {
     title: 'メッセージ',
@@ -617,7 +617,7 @@ const en: Dict = {
     layoutName: { classic: 'Classic', tcg: 'Trading card' },
     type: 'Type line',
     typeTag: '+ Add a type line',
-    typeHint: 'e.g. Birthday card',
+    typeHint: 'e.g. Rare Card — Foil',
   },
   msg: {
     title: 'Message',
