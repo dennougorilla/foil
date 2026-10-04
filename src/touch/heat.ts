@@ -1,6 +1,7 @@
-// Heat on the card for the Warmth finish: where it was touched, how warm it still is, and the
-// fingerprints left by a press. A small grid over the card face, simulated on the CPU (a few
-// thousand cells, so it costs next to nothing) and uploaded to the card shader as a texture.
+// Heat on the card for the Warmth finish (where it was touched, how warm it still is, and the
+// fingerprints left by a press), and the light stored by the Glow finish's ink. A small grid over
+// the card face, simulated on the CPU (a few thousand cells, so it costs next to nothing) and
+// uploaded to the card shader as a texture.
 //
 // No imports: the tests load this file directly with Node.
 
@@ -10,15 +11,33 @@ export const HEAT_H = 84;
 
 /** Most heat one spot holds: a finger left still for a while. */
 const MAX = 1.5;
-/** How fast heat spreads, in cells² per second: slow, so a cooling trail narrows along its line instead of smearing. */
-const SPREAD = 0.5;
-/** Newton cooling per second, plus a small steady loss so the tail really reaches zero. */
-const COOL = 0.42;
-const LOSS = 0.02;
 /** Below this everywhere, the card counts as cold and stops simulating. */
 const COLD = 0.002;
 /** Fingerprints kept at once; the oldest makes way. */
 const PRINTS = 3;
+
+/** The touch finishes: Warmth's heat, or the light Glow's ink stores. */
+export type TouchKind = 'warmth' | 'glow';
+
+interface Fade {
+  /** How fast it spreads, in cells² per second. */
+  spread: number;
+  /** Newton decay per second, plus a small steady loss so the tail really reaches zero. */
+  cool: number;
+  loss: number;
+  /** Decay that grows with the square of what is left: a bright spot dims fast, a faint one lingers. */
+  quench: number;
+  /** A press leaves a fingerprint; without, holding still just keeps adding. */
+  prints: boolean;
+}
+
+const FADES: Record<TouchKind, Fade> = {
+  // Heat spreads slowly, so a cooling trail narrows along its line instead of smearing; gone in about ten seconds.
+  warmth: { spread: 0.5, cool: 0.42, loss: 0.02, quench: 0, prints: true },
+  // Light stays where it was shone and dies away like a real afterglow: half gone in a couple of
+  // seconds, then a faint glow that hangs on for twenty or so.
+  glow: { spread: 0, cool: 0.02, loss: 0.0015, quench: 1, prints: false },
+};
 
 export interface Print {
   /** Centre, in card uv (y down). */
@@ -35,6 +54,8 @@ export interface HeatSource {
   readonly data: Float32Array;
   readonly version: number;
   readonly prints: readonly Print[];
+  /** Where the touch is right now (card uv) and how strongly: Glow draws its lamp there. */
+  readonly lamp: readonly [number, number, number];
 }
 
 export class HeatField implements HeatSource {
@@ -44,9 +65,17 @@ export class HeatField implements HeatSource {
   version = 0;
   private warm = false;
   private pressing: Print | null = null;
+  lamp: [number, number, number] = [0.5, 0.5, 0];
+  /** Touched since the last step: the lamp stays on. */
+  private lit = false;
+  private fade: Fade;
+
+  constructor(kind: TouchKind = 'warmth') {
+    this.fade = FADES[kind];
+  }
 
   get cold() {
-    return !this.warm && !this.prints.length;
+    return !this.warm && !this.prints.length && !this.lamp[2];
   }
 
   /**
@@ -83,11 +112,14 @@ export class HeatField implements HeatSource {
       }
     }
     this.warm = true;
+    this.lamp = [u1, v1, 1];
+    this.lit = true;
     this.version++;
   }
 
   /** A finger held at (u, v): its print forms over the first half second or so. */
   press(u: number, v: number, dt: number) {
+    if (!this.fade.prints) return this.touch(u, v, u, v, dt, true);
     let p = this.pressing;
     if (!p) {
       // Turned a little, the same way for the same spot, so every export comes out the same.
@@ -107,17 +139,21 @@ export class HeatField implements HeatSource {
 
   step(dt: number) {
     if (this.cold) return;
+    // The lamp goes out within a fifth of a second of the touch leaving.
+    if (!this.lit) this.lamp[2] = Math.max(0, this.lamp[2] - dt * 5);
+    this.lit = false;
     if (this.warm) {
       // Spread (explicit diffusion, split into stable sub-steps), then cool.
-      const k = SPREAD * dt;
+      const { spread, cool, quench } = this.fade;
+      const k = spread * dt;
       const n = Math.ceil(k / 0.2);
       for (let s = 0; s < n; s++) this.spread(k / n);
-      const keep = Math.exp(-COOL * dt);
-      const loss = LOSS * dt;
+      const keep = Math.exp(-cool * dt);
+      const loss = this.fade.loss * dt;
       let peak = 0;
       const d = this.data;
       for (let i = 0; i < d.length; i++) {
-        const v = Math.max(0, d[i] * keep - loss);
+        const v = Math.max(0, d[i] * (keep - quench * d[i] * dt) - loss);
         d[i] = v;
         if (v > peak) peak = v;
       }
@@ -126,7 +162,7 @@ export class HeatField implements HeatSource {
         this.warm = false;
       }
     }
-    for (const p of this.prints) if (p !== this.pressing) p.heat = p.heat * Math.exp(-COOL * dt) - LOSS * dt;
+    for (const p of this.prints) if (p !== this.pressing) p.heat = p.heat * Math.exp(-this.fade.cool * dt) - this.fade.loss * dt;
     this.prints = this.prints.filter((p) => p === this.pressing || p.heat > 0.01);
     this.version++;
   }
@@ -257,8 +293,11 @@ export class Swipe {
 
 /** Seconds of heat one loop covers, however long the clip plays it: enough to cool all but fully. */
 export const AUTO_LOOP = 10;
-/** Where in the loop a still picture (PNG, a held preview) is taken: the swipe still warm, the print just made. */
-export const AUTO_STILL = 0.3;
+/**
+ * Where in the loop a still picture (PNG, a held preview) is taken: for Warmth the swipe still warm
+ * and the print just made, for Glow just after the light has left, the trail glowing on its own.
+ */
+export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36 };
 /** Simulation ticks per loop: fixed, so every export of the same phase is identical. */
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */
@@ -272,13 +311,16 @@ const RUN_UP = 3;
  * first couple of loops the heat repeats exactly, so asking for phase 3 + p gives a seamless loop.
  */
 export class AutoTouch implements HeatSource {
-  private f = new HeatField();
+  private f: HeatField;
   private tick = 0;
   private swipe: Swipe | null = null;
+  private kind: TouchKind;
   private shape: SwipeShape;
 
-  constructor(shape: SwipeShape = SWIPES[0]) {
+  constructor(kind: TouchKind = 'warmth', shape: SwipeShape = SWIPES[0]) {
+    this.kind = kind;
     this.shape = shape;
+    this.f = new HeatField(kind);
   }
 
   get data() {
@@ -290,13 +332,16 @@ export class AutoTouch implements HeatSource {
   get prints() {
     return this.f.prints;
   }
+  get lamp() {
+    return this.f.lamp;
+  }
 
   at(phase: number) {
     const target = Math.max(0, Math.round(phase * TICKS));
     // Going back starts over; going far ahead (a preview first drawn late in a session) starts
     // three loops short, since the heat has repeated exactly long before then.
     if (target < this.tick || target - this.tick > RUN_UP * TICKS) {
-      this.f = new HeatField();
+      this.f = new HeatField(this.kind);
       this.swipe = null;
       this.tick = Math.max(0, target - RUN_UP * TICKS);
     }

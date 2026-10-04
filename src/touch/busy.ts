@@ -1,6 +1,6 @@
 // Where a picture is busiest: a coarse map of local contrast and colour over the card face, so an
 // exported swipe can go through what matters in the picture rather than the same place every time.
-import { AutoTouch, pickSwipe } from './heat';
+import { AutoTouch, pickSwipe, type TouchKind } from './heat';
 
 const W = 20;
 const H = 28;
@@ -31,4 +31,4 @@ function busyMap(face: HTMLCanvasElement): Float32Array {
 }
 
 /** The unseen finger for an export of this face. */
-export const autoTouchFor = (face: HTMLCanvasElement) => new AutoTouch(pickSwipe(busyMap(face), W, H));
+export const autoTouchFor = (face: HTMLCanvasElement, kind: TouchKind) => new AutoTouch(kind, pickSwipe(busyMap(face), W, H));

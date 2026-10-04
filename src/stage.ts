@@ -4,7 +4,7 @@ import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
-import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
+import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 
 class Spring {
   v = 0;
@@ -84,9 +84,9 @@ export class Stage {
   private shown: EditionId | null = null;
   /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
   private greet: Swipe | null = null;
-  /** Heat left on the main card by touch, and the stroke the hand's preview card draws itself. */
-  readonly heat = new HeatField();
-  private demo = new AutoTouch();
+  /** What touch left on the main card, and the strokes the hand's preview cards draw themselves. */
+  private heat = new HeatField();
+  private demos = new Map<TouchKind, AutoTouch>();
 
   private hand: HandCard[] = [];
   private hovered = -1;
@@ -421,6 +421,7 @@ export class Stage {
     if (ed.id !== this.shown) {
       this.shown = ed.id;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
+      if (ed.touch) this.heat = new HeatField(ed.touch);
       this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && !this.motion) {
@@ -658,7 +659,7 @@ export class Stage {
           flash: 0,
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],
           plate: false,
-          heat: e.touch ? this.demoAt(motion.fx) : undefined,
+          heat: e.touch ? this.demoAt(e.touch, motion.fx) : undefined,
         },
         motion.fx,
       );
@@ -666,9 +667,11 @@ export class Stage {
   }
 
   /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
-  private demoAt(time: number) {
-    this.demo.at(2 + AUTO_STILL + time / AUTO_LOOP);
-    return this.demo;
+  private demoAt(kind: TouchKind, time: number) {
+    let demo = this.demos.get(kind);
+    if (!demo) this.demos.set(kind, (demo = new AutoTouch(kind)));
+    demo.at(2 + AUTO_STILL[kind] + time / AUTO_LOOP);
+    return demo;
   }
 
   private stepParticles(dt: number) {

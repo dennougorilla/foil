@@ -1,5 +1,5 @@
 // Feeds a card's heat to the shader: one small float texture per heat source, re-uploaded only
-// when that source has changed, plus the fingerprints as uniforms.
+// when that source has changed, plus the fingerprints and the lamp as uniforms.
 import { createTexture, type Program } from '../gl/gl';
 import { HEAT_H, HEAT_W, type HeatSource } from './heat';
 
@@ -17,6 +17,7 @@ export class HeatLayer {
     const { gl } = this;
     gl.activeTexture(gl.TEXTURE0 + unit);
     this.prints.fill(0);
+    gl.uniform3fv(p.u.uLamp, src?.lamp ?? [0, 0, 0]);
     if (!src) gl.bindTexture(gl.TEXTURE_2D, this.none);
     else {
       let t = this.textures.get(src);
