@@ -1,5 +1,5 @@
 import './style.css';
-import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
+import { cardOf, CARD_KEYS, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { artAspect, clampCrop, cropRect, drawFace, drawFlip, type Crop } from './card/face';
@@ -9,7 +9,7 @@ import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
-import { exportGif, exportPng, GIF_H, GIF_W } from './exporter';
+import { download, exportGif, exportPng, GIF_SAVE, GIF_SHARE } from './exporter';
 import { forgetUserImage, loadUserImage, saveUserImage } from './imageStore';
 import { decodeGif, frameAt, type Anim } from './gifDecode';
 import { mountTune } from './tune/panel';
@@ -22,10 +22,11 @@ import { initRangeColors } from './features';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { addToHand, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
+import { addToHand, available, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
+import type { Kept } from './binder/db';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -51,6 +52,8 @@ const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSampl
 let userImage: Img | null = null;
 /** Set when the person's image is an animated GIF; userImage then holds its first frame. */
 let userAnim: Anim | null = null;
+/** The person's picture as it came (kept in the binder as is while it moves). */
+let userSource: Blob | null = null;
 let animFrame = 0;
 const currentImage = (): Img => {
   const s = store.get();
@@ -206,6 +209,9 @@ function applyText() {
   buildFormats();
   buildSaveOpts();
   renderSave();
+  renderShare();
+  renderKeep();
+  renderBinderChip();
   syncInputs();
   renderInfo();
   renderCaption(null);
@@ -596,6 +602,7 @@ async function loadFile(file: File) {
     const { still, anim } = await decodeImage(file);
     userImage = still;
     userAnim = anim;
+    userSource = file;
     animFrame = 0;
     void saveUserImage(anim ? file : still);
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
@@ -1027,7 +1034,7 @@ function renderSave() {
   saveBtn.querySelector('.btn-text b')!.textContent = t.save.replace('{f}', t.format[f]);
   // The card's own size for a PNG; the GIF's frame turns with the shape.
   const sh = shapeById(store.get().shape);
-  const gif = exportFrame(sh.h / sh.w, GIF_W, GIF_H);
+  const gif = exportFrame(sh.h / sh.w, GIF_SAVE.w, GIF_SAVE.h);
   const size = f === 'png' ? `${sh.w}×${sh.h}` : `${gif.W}×${gif.H}`;
   saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
   for (const el of saveBtn.querySelectorAll('.save-meta > *')) el.textContent = '';
@@ -1141,8 +1148,11 @@ rovingKeys($('exportMotionSeg'));
 rovingKeys($('gifBgSeg'));
 rovingKeys($('matteSeg'));
 
-/** While a job runs, the sub-label names the step and the title counts up; the button fills like a bar. */
-async function busy(label: string, job: (progress: (p: number) => void) => Promise<string>, fail = t.errDecode) {
+/**
+ * While a file is made, the sub-label names the step and the title counts up; the button fills like
+ * a bar. Answers with the file, or null when it could not be made (the person is told).
+ */
+async function busy(label: string, job: (progress: (p: number) => void) => Promise<File>, fail = t.errDecode): Promise<File | null> {
   const b = saveBtn.querySelector('.btn-text b')!;
   const small = saveBtn.querySelector('.btn-text small')!;
   // One export at a time: the button, the format choice and the APNG shortcut rest while this one works.
@@ -1156,12 +1166,9 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     b.textContent = `${Math.round(p * 100)}%`;
     saveBtn.style.setProperty('--p', p.toFixed(3));
   };
-  let saved = '';
+  let made: File | null = null;
   try {
-    const file = await job(progress);
-    sfx.coin();
-    announce(`${t.saved}: ${file}`);
-    saved = file;
+    made = await job(progress);
   } catch (err) {
     console.error(err);
     sfx.error();
@@ -1176,8 +1183,22 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     saveBtn.style.removeProperty('--p');
     // From the current dictionary, in case the language changed mid-export.
     renderSave();
-    if (saved) celebrate(saved);
   }
+  return made;
+}
+
+/** The card as a file, its progress shown on the Save button under `label`; a GIF to share is smaller. */
+function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
+  if (format === 'png') return exportPng(exportInput());
+  const small = saveBtn.querySelector('.btn-text small')!;
+  return exportGif(
+    exportInput(),
+    (p, encoding) => {
+      small.textContent = encoding ? t.encoding : label;
+      progress(p);
+    },
+    { clear: store.get().gifClear, matte: store.get().gifMatte, size: format === 'share' ? GIF_SHARE : undefined },
+  );
 }
 
 /**
@@ -1207,34 +1228,234 @@ function celebrate(file: string) {
  */
 function exportBusy(on: boolean) {
   stage?.holdQuality(on);
+  shareBtn.disabled = on;
   if (!on || !saveBtn.classList.contains('is-saved')) return;
   clearTimeout(celebrateTimer);
   saveBtn.classList.remove('is-saved');
 }
 
-saveBtn.addEventListener('click', () => {
+saveBtn.addEventListener('click', async () => {
   const f = store.get().exportFormat;
-  // One export at a time, and not while a picture is loading (APNG handles its own button, incl. stop).
-  if (f !== 'apng' && (saveBtn.hasAttribute('aria-busy') || store.get().loading)) return;
-  if (f === 'png') void busy(t.saving, () => exportPng(exportInput()), t.errPng);
-  else if (f === 'gif') {
-    const small = saveBtn.querySelector('.btn-text small')!;
-    void busy(
-      t.saving,
-      (progress) =>
-        exportGif(
-          exportInput(),
-          (p, encoding) => {
-            small.textContent = encoding ? t.encoding : t.saving;
-            progress(p);
-          },
-          { clear: store.get().gifClear, matte: store.get().gifMatte },
-        ),
-      t.errGif,
-    );
-  }
-  // APNG runs from its own module, which also handles stopping it.
+  // One export at a time, and not while a picture is loading. APNG runs from its own module,
+  // which also handles stopping it.
+  if (f === 'apng' || saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
+  const file = await busy(t.saving, (progress) => makeFile(f, t.saving, progress), f === 'png' ? t.errPng : t.errGif);
+  if (!file) return;
+  download(file);
+  sfx.coin();
+  announce(`${t.saved}: ${file.name}`);
+  celebrate(file.name);
 });
+
+// ---------- Share ----------
+
+const shareBtn = $<HTMLButtonElement>('shareBtn');
+// Only where the share sheet takes an image file; elsewhere Save is the way out.
+shareBtn.hidden = !(() => {
+  try {
+    return !!navigator.canShare?.({ files: [new File([''], 'card.png', { type: 'image/png' })] });
+  } catch {
+    return false;
+  }
+})();
+/** A file made for sharing that waits for one more tap: the browser stopped counting the first. */
+let shareReady: File | null = null;
+
+function renderShare() {
+  shareBtn.dataset.ready = String(!!shareReady);
+  shareBtn.querySelector('span')!.textContent = shareReady ? t.shareReady : t.share;
+  shareBtn.title = shareReady ? t.shareReadyHint : t.shareHint;
+}
+
+function readyToShare(file: File | null) {
+  shareReady = file;
+  renderShare();
+  if (file) toast(t.shareReadyHint);
+}
+
+/** Only the site's address goes along with the card; the card itself leaves the device only through the sheet. */
+const SITE = 'https://dennougorilla.github.io/foil/';
+/**
+ * A Mac (not an iPad, which also says Macintosh but has touch): its share sheet's Copy puts every
+ * shared item on the clipboard, and pasting that into X attached the GIF twice, so the GIF goes alone.
+ */
+const macDesktop = /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints < 2;
+/** A share sheet is open: another press waits for it rather than opening a second one. */
+let sending = false;
+
+/**
+ * Hands the GIF to the share sheet with a line and the site's address, or the GIF alone where the
+ * sheet can't take both (and on a Mac). On the first tap, a file made too late waits for a second one.
+ */
+async function send(file: File, firstTap: boolean) {
+  const withText = { files: [file], text: `${t.shareText} ${SITE}` };
+  sending = true;
+  try {
+    await navigator.share(!macDesktop && navigator.canShare(withText) ? withText : { files: [file] });
+  } catch (err) {
+    const name = (err as DOMException).name;
+    if (firstTap && name === 'NotAllowedError') return readyToShare(file);
+    // Closing the sheet without picking an app is not an error.
+    if (name === 'AbortError') return;
+    console.error(err);
+    sfx.error();
+    toast(t.errShare, true);
+  } finally {
+    sending = false;
+  }
+}
+
+shareBtn.addEventListener('click', async () => {
+  if (sending) return;
+  if (shareReady) {
+    const file = shareReady;
+    readyToShare(null);
+    return send(file, false);
+  }
+  if (saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
+  sfx.tick();
+  // The progress shows on Share as well as on the Save button.
+  const label = shareBtn.querySelector('span')!;
+  shareBtn.dataset.busy = 'true';
+  const file = await busy(
+    t.sharing,
+    (progress) =>
+      makeFile('share', t.sharing, (p) => {
+        label.textContent = `${Math.round(p * 100)}%`;
+        progress(p);
+      }),
+    t.errGif,
+  );
+  delete shareBtn.dataset.busy;
+  renderShare();
+  if (file) await send(file, true);
+});
+
+// ---------- Binder ----------
+
+const keepBtn = $<HTMLButtonElement>('keepBtn');
+const binderBtn = $<HTMLButtonElement>('binderBtn');
+/** The binder's count, kept here so the chip shows it before the binder's code loads. */
+const BINDER_COUNT = 'foil:binder';
+/** The binder card the stage shows as it is now (until it changes), and one just thrown away. */
+let keptId: string | null = null;
+let droppedId: string | null = null;
+const isKept = () => keptId !== null;
+
+function renderKeep() {
+  keepBtn.dataset.kept = String(isKept());
+  keepBtn.querySelector('span')!.textContent = isKept() ? t.kept : t.keep;
+  keepBtn.title = isKept() ? t.keptHint : t.keepHint;
+}
+
+function renderBinderChip() {
+  let n = 0;
+  try {
+    n = Math.max(0, parseInt(localStorage.getItem(BINDER_COUNT) ?? '0', 10) || 0);
+  } catch {
+    /* storage unavailable: no count */
+  }
+  binderBtn.querySelector('.binder-count')!.textContent = String(n);
+  binderBtn.dataset.empty = String(n === 0);
+  binderBtn.setAttribute('aria-label', t.binderLabel.replace('{n}', String(n)));
+  binderBtn.title = t.binderLabel.replace('{n}', String(n));
+}
+
+type Binder = ReturnType<typeof import('./binder/binder').mountBinder>;
+let binder: Promise<Binder> | null = null;
+/** The binder's code, styles and texts load the first time it is used (or pointed at). */
+function useBinder(): Promise<Binder> {
+  if (binder) return binder;
+  binder = import('./binder/binder').then((m) =>
+    m.mountBinder({
+      lang: () => store.get().lang,
+      dict: () => t,
+      chip: binderBtn,
+      cardRect: () => $('cardSlot').getBoundingClientRect(),
+      card: () => cardOf(store.get()),
+      input: exportInput,
+      picture: () => (store.get().sample >= 0 ? null : { still: userImage ?? samples[0], file: userAnim ? userSource : null }),
+      play: playCard,
+      pause: (on) => stage.pause(on),
+      toast: (msg, error) => toast(msg, error),
+      announce,
+      onCount: (n) => {
+        try {
+          localStorage.setItem(BINDER_COUNT, String(n));
+        } catch {
+          /* the chip shows the count from the next opening */
+        }
+        renderBinderChip();
+      },
+      onKept: (id) => setKept(id),
+      // Throwing the stage's card away makes it keepable again; Undo makes it kept again.
+      onGone: (ids) => {
+        if (keptId && ids.includes(keptId)) {
+          droppedId = keptId;
+          setKept(null);
+        }
+      },
+      onBack: (ids) => droppedId && ids.includes(droppedId) && setKept(droppedId),
+      sfx,
+    }),
+  );
+  binder.catch(() => (binder = null));
+  return binder;
+}
+
+/** Runs something in the binder, saying so if its code can't be fetched. */
+function withBinder(run: (b: Binder) => Promise<void> | void): Promise<void> {
+  return useBinder().then(run, () => toast(t.binderFailed, true));
+}
+
+for (const b of [keepBtn, binderBtn]) for (const ev of ['pointerenter', 'focus']) b.addEventListener(ev, () => void useBinder().catch(() => {}), { once: true });
+binderBtn.addEventListener('click', () => {
+  sfx.tick();
+  void withBinder((b) => b.open());
+});
+keepBtn.addEventListener('click', () => {
+  sfx.tick();
+  // Already kept: the button leads to the binder instead of keeping a second copy.
+  if (isKept()) return void withBinder((b) => b.open());
+  if (keepBtn.hasAttribute('aria-busy')) return;
+  keepBtn.setAttribute('aria-busy', 'true');
+  void withBinder((b) => b.keep()).finally(() => keepBtn.removeAttribute('aria-busy'));
+});
+
+/** Puts a card from the binder on the stage: its picture and every setting of the card. */
+function setKept(id: string | null) {
+  keptId = id;
+  renderKeep();
+}
+
+async function playCard(k: Kept, id: string) {
+  const card = cleanCard(k.card);
+  if (!available(card.edition!, packs.get())) card.edition = 'holo';
+  if (card.sample! >= SAMPLE_COUNT) card.sample = 0;
+  if (card.sample! < 0) {
+    const img = k.picture ? await decodeImage(k.picture).catch(() => null) : null;
+    if (img) {
+      userImage = img.still;
+      userAnim = img.anim;
+      userSource = k.picture;
+      animFrame = 0;
+      void saveUserImage(k.picture!);
+    } else {
+      card.sample = 0;
+      card.crop = { zoom: 1, x: 0.5, y: 0.5 };
+      toast(t.errDecode, true);
+    }
+  }
+  stage.flipTo(() => {
+    store.set(card);
+    redrawFace();
+    buildThumbs();
+    syncInputs();
+    renderInfo();
+    drawCropPreview();
+    setKept(id);
+  });
+}
 
 // Before the APNG export: its first refresh already reads the export input, which includes the range.
 const rangeColors = initRangeColors({
@@ -1581,6 +1802,12 @@ store.on((s, changed) => {
     buildSaveOpts();
     renderSave();
   }
+  // The card changed: it is no longer the one kept, and a file waiting to be shared is out of date.
+  if (CARD_KEYS.some((k) => changed.has(k))) {
+    droppedId = null;
+    if (isKept()) setKept(null);
+    if (shareReady) readyToShare(null);
+  }
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
@@ -1643,6 +1870,7 @@ if (store.get().sample < 0) {
     if (img) {
       userImage = img.still;
       userAnim = img.anim;
+      userSource = blob;
       buildThumbs();
       boot();
     } else {

@@ -13,6 +13,10 @@
   --red-lo: #b8362e;
   --green: #3fc28f;
   --gold: #f2c14e;
+  /* The binder's own colour: white text reaches 6:1 on it. */
+  --binder: #6c43c9;
+  --binder-lo: #35206a;
+  --binder-hi: #b79cff;
   --accent: #ff6b8b;
   --slider-fill: #aebec1;
   --radius: 10px;
@@ -331,6 +335,39 @@ button {
 
 .chip-heart[aria-expanded='true'] svg {
   animation: heart-beat 0.6s var(--ease-back);
+}
+
+/* The binder: a purple binder and how many cards it holds; kept cards fly into it. */
+.chip-binder {
+  margin-right: 6px;
+  color: var(--text);
+}
+
+.chip-binder svg,
+.chip-binder svg path:first-child {
+  fill: var(--binder-hi);
+  stroke: none;
+}
+
+.binder-count {
+  min-width: 22px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--edge);
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: center;
+}
+
+.chip-binder[data-empty='true'] .binder-count {
+  color: var(--text-dim);
+}
+
+.chip-binder.is-bump {
+  animation: deck-bump 0.45s var(--ease-back);
 }
 
 @keyframes heart-beat {
@@ -1216,6 +1253,104 @@ button {
   margin-left: auto;
   font-size: 14px;
   color: var(--text-dim);
+}
+
+/* Step 3's head: its label, then Keep (into the binder) and Share as two small slate slabs. */
+.export-head {
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+}
+
+.export-more {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mini-slab {
+  --c: var(--slab);
+  --lo: var(--slab-lo);
+  --lip: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c);
+  box-shadow: 0 var(--lip) 0 var(--lo), inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 14px;
+  text-shadow: var(--drop);
+  white-space: nowrap;
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
+}
+
+.mini-slab[hidden] {
+  display: none;
+}
+
+.mini-slab svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.mini-keep svg {
+  fill: var(--binder-hi);
+}
+
+.mini-keep .i-kept,
+.mini-keep[data-kept='true'] .i-keep {
+  display: none;
+}
+
+/* Kept: a green tick, the way a saved file is marked. */
+.mini-keep[data-kept='true'] .i-kept {
+  display: inline;
+  fill: var(--mark);
+}
+
+.mini-keep[aria-busy='true'] svg {
+  animation: keep-bob 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes keep-bob {
+  to { transform: translateY(-3px); }
+}
+
+/* A file made too late for the first tap waits on a bright slab for the second. */
+.mini-share[data-ready='true'] {
+  --c: var(--blue);
+  --lo: var(--blue-lo);
+  animation: share-call 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes share-call {
+  to { box-shadow: 0 var(--lip) 0 var(--lo), inset 0 2px 0 rgba(255, 255, 255, 0.2), 0 0 0 4px rgba(11, 120, 204, 0.45); }
+}
+
+.mini-slab:hover:not(:disabled) {
+  animation: slab-wobble 0.45s var(--ease-out) forwards;
+}
+
+.mini-slab:active:not(:disabled) {
+  animation: none;
+  transform: translateY(var(--lip));
+  box-shadow: 0 0 0 var(--lo), inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  transition-duration: 0.05s;
+}
+
+.mini-slab:disabled:not([data-busy]) {
+  opacity: 0.5;
+}
+
+/* Making the GIF to share: Share counts up in place. */
+.mini-share[data-busy] {
+  --c: var(--slab-lo);
+  font-family: var(--display);
 }
 
 /*
@@ -3134,6 +3269,10 @@ input[type='range']:disabled {
   .toasts {
     width: 304px;
   }
+  /* The binder keeps to its icon and count, so the chips stay clear of the panel. */
+  .chip-binder .binder-name {
+    display: none;
+  }
   .tab {
     padding: 4px 4px;
     font-size: 14px;
@@ -3252,7 +3391,7 @@ input[type='range']:disabled {
     background: var(--board);
     box-shadow: 0 0 0 3px var(--edge), 0 -8px 24px rgba(0, 0, 0, 0.45);
   }
-  .sec-export .sec-title {
+  .sec-export .export-head {
     grid-area: title;
   }
   .sec-export .seg-format {
@@ -3333,6 +3472,23 @@ input[type='range']:disabled {
   .chip[aria-pressed='false'] {
     opacity: 0.55;
   }
+  /* The binder keeps to its icon, its count a tag on the corner, so the row still fits. */
+  .chip-binder {
+    position: relative;
+    margin-right: 0;
+  }
+  .binder-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 20px;
+    padding: 0 4px;
+    line-height: 18px;
+    box-shadow: 0 0 0 2px var(--panel-hi);
+  }
+  .chip-binder[data-empty='true'] .binder-count {
+    display: none;
+  }
   .tile {
     width: 24px;
     height: 32px;
@@ -3362,5 +3518,14 @@ input[type='range']:disabled {
   }
   .toast {
     animation-duration: 0.01s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-slab:hover:not(:disabled),
+  .mini-share[data-ready='true'],
+  .mini-keep[aria-busy='true'] svg,
+  .chip-binder.is-bump {
+    animation: none;
   }
 }

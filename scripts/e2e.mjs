@@ -83,6 +83,17 @@ await step('nothing of a pack loads before one is opened', async () => {
   expect((await page.textContent('#deckBtn .deck-count')) === '0', 'the deck is not empty on a first visit');
 });
 
+await step('the binder loads nothing before it is used, and Share shows only where files can be shared', async () => {
+  const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+  const binder = names.filter((n) => /binder/i.test(n));
+  expect(binder.length === 0, `loaded early: ${binder.join(', ')}`);
+  expect(await page.isVisible('#keepBtn'), 'no Keep button in the Save box');
+  expect(await page.evaluate(() => !!document.getElementById('keepBtn').closest('.sec-export')), 'Keep is not in the Save box');
+  const files = await page.evaluate(() => !!navigator.canShare?.({ files: [new File([''], 'card.png', { type: 'image/png' })] }));
+  expect((await page.isVisible('#shareBtn')) === files, `Share is ${files ? 'hidden although' : 'shown although no'} share sheet takes files`);
+  expect((await page.textContent('#binderBtn .binder-count')) === '0', 'the binder chip does not count an empty binder');
+});
+
 await step('fine-tune opens with four tabs and is remembered', async () => {
   await page.click('#adjustToggle');
   expect((await page.locator('#panelTabs [role=tab]').count()) === 4, 'expected four tabs');
@@ -447,6 +458,302 @@ await step('shape: a wide card turns the slot, the hand and every export on thei
   const back = await page.locator('#cardSlot').boundingBox();
   expect(Math.abs(back.width / back.height - 5 / 7) < 0.02, 'the slot did not go back to 5:7');
   await page.click('#formatSeg [role=radio][data-format=png]');
+});
+
+// ---------- Binder ----------
+
+const binderCount = async () => +(await page.textContent('#binderBtn .binder-count'));
+const binderOpen = () => page.waitForSelector('.bd.is-in', { timeout: 15000 });
+const binderClosed = () => page.waitForSelector('.bd', { state: 'detached', timeout: 15000 });
+let kept = null;
+
+await step('keep a card: it goes into the binder as a still picture, and Keep rests until the card changes', async () => {
+  await page.fill('#nameInput', 'Kept meadow');
+  await page.keyboard.press('Escape');
+  await page.click('#keepBtn');
+  await page.waitForFunction(() => document.querySelector('#binderBtn .binder-count')?.textContent === '1', null, { timeout: 30000 });
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) === 'true', 'Keep does not say the card is kept');
+  kept = await state();
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await page.locator('.bd-card').count()) === 1, 'the binder does not show one card');
+  await page.waitForFunction(() => document.querySelector('.bd-card img')?.complete && document.querySelector('.bd-card img').naturalWidth > 0, null, { timeout: 10000 });
+  const pic = await page.evaluate(() => {
+    const img = document.querySelector('.bd-card img');
+    return { src: img.src.slice(0, 5), w: img.naturalWidth, h: img.naturalHeight, canvases: document.querySelectorAll('.bd canvas').length };
+  });
+  expect(pic.src === 'blob:' && pic.canvases === 0, `the binder draws its cards (${JSON.stringify(pic)})`);
+  expect(Math.abs(pic.w / pic.h - 5 / 7) < 0.02 && pic.w <= 260, `the thumbnail is not a small card (${pic.w}×${pic.h})`);
+  expect((await page.textContent('.bd-count')).includes('1 / 54'), 'the head does not count 1 / 54');
+  expect(await page.isVisible('.bd-keep'), 'no pocket to keep the card on the stage');
+  await page.click('.bd-x');
+  await binderClosed();
+});
+
+await step('play a card from the binder: its picture and settings come back, the app settings stay', async () => {
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press('1');
+  await page.fill('#nameInput', 'Something else');
+  await page.click('.pill-rarity .rpip >> nth=0');
+  await page.waitForTimeout(200);
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the card changed');
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect(await page.isDisabled('.bd-play'), 'Play is ready with nothing picked');
+  await page.click('.bd-card');
+  expect((await page.getAttribute('.bd-card', 'aria-pressed')) === 'true', 'the card is not picked');
+  await page.click('.bd-play');
+  await binderClosed();
+  await page.waitForFunction((n) => JSON.parse(localStorage.getItem('foil:v1')).name === n, kept.name, { timeout: 10000 });
+  const now = await state();
+  for (const k of ['edition', 'name', 'rarity', 'sample', 'crop', 'tune', 'text', 'rangeRegion', 'rangeLo', 'rangeHi'])
+    expect(JSON.stringify(now[k]) === JSON.stringify(kept[k]), `${k} did not come back (${JSON.stringify(now[k])} ≠ ${JSON.stringify(kept[k])})`);
+  expect(now.lang === kept.lang && now.exportFormat === kept.exportFormat, 'an app setting changed');
+  expect((await page.locator('#thumbs .thumb').count()) === 4, 'the kept picture is not the picture in step 1');
+});
+
+await step('a card is thrown away from its own corner at once, and Undo brings it back', async () => {
+  await page.click('#binderBtn');
+  await binderOpen();
+  await page.mouse.move(5, 5);
+  expect((await page.$eval('.bd-del', (e) => getComputedStyle(e).opacity)) === '0', 'the delete tag shows before the pointer is on the card');
+  await page.hover('.bd-card');
+  await page.waitForTimeout(250);
+  // Its layout size: the tag pops in with a scale, so a box read mid-pop is smaller.
+  const del = await page.$eval('.bd-del', (e) => [e.offsetWidth, e.offsetHeight]);
+  expect(del[0] >= 32 && del[1] >= 32, `the place to press the delete tag is too small (${del})`);
+  await page.click('.bd-del');
+  await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
+  expect((await binderCount()) === 0, 'the chip still counts the card');
+  expect(await page.isVisible('.bd-undo'), 'no undo bar after discarding');
+  await page.click('.bd-undo-btn');
+  await page.waitForFunction(() => document.querySelectorAll('.bd-card').length === 1, null, { timeout: 5000 });
+  expect((await binderCount()) === 1, 'Undo did not bring the card back');
+  await page.waitForFunction(() => document.querySelector('.bd-card img')?.naturalWidth > 0, null, { timeout: 5000 });
+  // Picked cards go from the foot at once too; this one stays gone.
+  await page.click('.bd-card');
+  await page.click('.bd-discard');
+  await page.waitForFunction(() => !document.querySelector('.bd-card'), null, { timeout: 5000 });
+  expect((await binderCount()) === 0, 'Discard from the foot left the card');
+  expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the stage card was thrown away');
+  await page.click('.bd-x');
+  await binderClosed();
+});
+
+await step('cards stay in the pocket they are dragged to: empty pockets kept, swaps, Undo, turning pages at the edge, a held finger', async () => {
+  const pocket = (slot) => page.locator(`[data-slot="${slot}"]`);
+  const at = (slot) => page.$eval(`[data-slot="${slot}"]`, (e) => e.querySelector('.bd-card')?.dataset.id ?? null).catch(() => null);
+  const centre = async (sel) => {
+    const b = await page.locator(sel).boundingBox();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  };
+  async function drag(from, to, hold = 0) {
+    const [x0, y0] = await centre(from);
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move(x0 + 12, y0 + 8, { steps: 3 });
+    const [x1, y1] = Array.isArray(to) ? to : await centre(to);
+    await page.mouse.move(x1, y1, { steps: 8 });
+    if (hold) await page.waitForTimeout(hold);
+    if (!Array.isArray(to) || !hold) {
+      await page.mouse.up();
+      return;
+    }
+  }
+  for (const key of ['2', '3']) {
+    await page.evaluate(() => document.activeElement.blur());
+    await page.keyboard.press(key);
+    await page.waitForTimeout(300);
+    const n = await binderCount();
+    await page.click('#keepBtn');
+    await page.waitForFunction((k) => document.querySelector('#binderBtn .binder-count')?.textContent === String(k), n + 1, { timeout: 30000 });
+  }
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await page.textContent('.bd-page')).includes('6'), 'the binder does not have six pages');
+  const first = await at(0);
+  expect(first && (await at(1)), 'the two cards are not in the first two pockets');
+  // A mouse drags the first card into an empty pocket further on; the gap it leaves stays.
+  await drag('[data-slot="0"] .bd-card', '[data-slot="5"]');
+  await page.waitForTimeout(300);
+  expect((await at(5)) === first && (await at(0)) === null, 'the card did not move into the empty pocket');
+  expect(await page.isVisible('.bd-undo'), 'no undo bar after moving a card');
+  await page.click('.bd-x');
+  await binderClosed();
+  await page.click('#binderBtn');
+  await binderOpen();
+  expect((await at(5)) === first, 'the pocket was not kept');
+  // Onto another card it swaps; Undo puts both back.
+  const second = await at(1);
+  await drag('[data-slot="5"] .bd-card', '[data-slot="1"]');
+  await page.waitForTimeout(300);
+  expect((await at(1)) === first && (await at(5)) === second, 'the cards did not swap');
+  await page.click('.bd-undo-btn');
+  await page.waitForFunction((id) => document.querySelector('[data-slot="5"] .bd-card')?.dataset.id === id, first, { timeout: 5000 });
+  // Held at the right edge, the page turns; the card lands on the new page.
+  const box = await page.locator('.bd-spread').boundingBox();
+  const label = await page.textContent('.bd-page');
+  await drag('[data-slot="5"] .bd-card', [box.x + box.width - 14, box.y + box.height / 2], 1100);
+  await page.waitForFunction((l) => document.querySelector('.bd-page').textContent !== l, label, { timeout: 5000 });
+  await page.waitForTimeout(600);
+  const [tx, ty] = await centre('.bd-sheet:not(.bd-copy) .bd-pocket >> nth=4');
+  await page.mouse.move(tx, ty, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const landed = await page.evaluate((id) => +document.querySelector(`.bd-card[data-id="${id}"]`)?.closest('[data-slot]')?.dataset.slot, first);
+  expect(landed >= 18, `the card did not go to a later page (pocket ${landed})`);
+  // A finger has to hold first: a quick swipe moves nothing, a held one lifts the card.
+  await page.click('.bd-prev');
+  await page.waitForTimeout(700);
+  const touch = (type, x, y, target = null) =>
+    page.evaluate(
+      ([type, x, y, sel]) => (sel ? document.querySelector(sel) : window).dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'touch', isPrimary: true, button: 0, clientX: x, clientY: y })),
+      [type, x, y, target],
+    );
+  const [sx, sy] = await centre('[data-slot="1"] .bd-card');
+  const [ex, ey] = await centre('[data-slot="7"]');
+  await touch('pointerdown', sx, sy, '[data-slot="1"] .bd-card');
+  await touch('pointermove', sx + 40, sy + 40);
+  await touch('pointerup', sx + 40, sy + 40);
+  expect((await at(1)) === second, 'a quick swipe moved the card');
+  await touch('pointerdown', sx, sy, '[data-slot="1"] .bd-card');
+  await page.waitForTimeout(550);
+  await touch('pointermove', (sx + ex) / 2, (sy + ey) / 2);
+  await touch('pointermove', ex, ey);
+  await touch('pointerup', ex, ey);
+  await page.waitForTimeout(300);
+  expect((await at(7)) === second, 'a held finger did not carry the card');
+  await page.click('.bd-x');
+  await binderClosed();
+  // Empty it again for the steps that follow.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction(['meta', 'thumbs', 'cards'], 'readwrite');
+          for (const s of ['meta', 'thumbs', 'cards']) tx.objectStore(s).clear();
+          tx.oncomplete = () => (req.result.close(), resolve());
+        };
+      }),
+  );
+});
+
+
+await step('a full binder takes no more cards and opens to make room', async () => {
+  // Fill the binder's index straight in IndexedDB: 54 small cards.
+  await page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('meta', 'readwrite');
+          for (let i = 0; i < 54; i++) tx.objectStore('meta').put({ id: `fill${i}`, at: i, name: `Fill ${i}`, edition: 'holo', bytes: 1000 });
+          tx.oncomplete = () => (req.result.close(), resolve());
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+  );
+  await page.fill('#nameInput', 'One too many');
+  await page.click('#keepBtn');
+  await binderOpen();
+  expect((await page.textContent('.bd-count')).includes('54 / 54'), 'the head does not say 54 / 54');
+  expect(await page.isVisible('.bd-full'), 'no note that the binder is full');
+  expect(!(await page.isVisible('.bd-keep')), 'a full binder still offers a pocket');
+  expect((await page.locator('.bd-card').count()) === 18 || (await page.locator('.bd-card').count()) === 9, 'more than the open pages are shown');
+  await page.click('.bd-next');
+  await page.waitForTimeout(200);
+  expect((await page.textContent('.bd-page')).trim().length > 0, 'no page number');
+  // Empty it again for the steps that follow.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('foil-binder');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('meta', 'readwrite');
+          tx.objectStore('meta').clear();
+          tx.oncomplete = () => (req.result.close(), resolve());
+        };
+      }),
+  );
+  await page.click('.bd-x');
+  await binderClosed();
+});
+
+// ---------- Share ----------
+
+await step('share: a small moving GIF goes to the share sheet with the site address, the GIF alone where both do not fit, and a late one waits for a second tap', async () => {
+  const sharer = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p = await sharer.newPage();
+  p.on('pageerror', (e) => errors.push(`share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__shared = [];
+    window.__late = 0;
+    window.__noText = false;
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File) && !(window.__noText && data.text);
+    navigator.share = async (data) => {
+      if (window.__late > 0) {
+        window.__late--;
+        throw new DOMException('no activation', 'NotAllowedError');
+      }
+      for (const f of data.files) {
+        const head = new DataView(await f.slice(0, 10).arrayBuffer());
+        window.__shared.push({ name: f.name, type: f.type, size: f.size, w: head.getUint16(6, true), h: head.getUint16(8, true), text: data.text ?? null });
+      }
+    };
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(1500);
+  expect(await p.isVisible('#shareBtn'), 'Share is hidden although files can be shared');
+  // PNG is the chosen format; Share still sends the moving card.
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__shared.length === 1, null, { timeout: 240000 });
+  const gif = await p.evaluate(() => window.__shared[0]);
+  expect(gif.type === 'image/gif' && gif.name.endsWith('.gif'), `not a GIF: ${JSON.stringify(gif)}`);
+  expect(gif.w === 360 && gif.h === 450 && gif.size < 15_000_000, `the shared GIF is not the small one: ${JSON.stringify(gif)}`);
+  expect(gif.text?.includes('https://dennougorilla.github.io/foil/'), `no site address with it: ${gif.text}`);
+  // The sheet takes no text with files here, and the tap has gone stale: the GIF alone waits for one more tap.
+  await p.evaluate(() => {
+    window.__noText = true;
+    window.__late = 1;
+  });
+  await p.click('#shareBtn');
+  await p.waitForSelector('#shareBtn[data-ready=true]', { timeout: 240000 });
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__shared.length === 2, null, { timeout: 10000 });
+  const alone = await p.evaluate(() => window.__shared[1]);
+  expect(alone.type === 'image/gif' && alone.text === null, `not the GIF alone: ${JSON.stringify(alone)}`);
+  expect((await p.getAttribute('#shareBtn', 'data-ready')) !== 'true', 'Share stays ready after sending');
+  await sharer.close();
+});
+
+await step('share on a Mac: one call, one GIF, no text (its Copy would put two items on the clipboard)', async () => {
+  const mac = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+  });
+  const p = await mac.newPage();
+  p.on('pageerror', (e) => errors.push(`mac share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__calls = [];
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File);
+    // The sheet stays open a moment, as a real one does: presses meanwhile must not share again.
+    navigator.share = (data) => {
+      window.__calls.push({ files: data.files.length, type: data.files[0]?.type, text: data.text ?? null, url: data.url ?? null });
+      return new Promise((resolve) => setTimeout(resolve, 1500));
+    };
+  });
+  await p.goto(`${URL}?lang=ja`);
+  await p.waitForTimeout(1500);
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__calls.length === 1, null, { timeout: 240000 });
+  await p.click('#shareBtn');
+  await p.waitForTimeout(2000);
+  const calls = await p.evaluate(() => window.__calls);
+  expect(calls.length === 1, `share was called ${calls.length} times`);
+  expect(calls[0].files === 1 && calls[0].type === 'image/gif' && calls[0].text === null && calls[0].url === null, `not one GIF alone: ${JSON.stringify(calls[0])}`);
+  await mac.close();
 });
 
 const handCount = () => page.locator('.hand-slot').count();

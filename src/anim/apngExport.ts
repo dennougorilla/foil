@@ -119,7 +119,7 @@ export async function exportApng(
     }
     send({ type: 'finish' });
     const bytes = await result;
-    const file = download(new Blob([bytes], { type: 'image/png' }), `${fileSafe(input.name)}-${input.edition.id}-anim.png`);
+    const file = download(new File([bytes], `${fileSafe(input.name)}-${input.edition.id}-anim.png`, { type: 'image/png' }));
     return { file, bytes: bytes.byteLength };
   } finally {
     scene?.dispose();
