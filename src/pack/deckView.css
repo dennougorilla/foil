@@ -74,7 +74,8 @@
 /* The hand: seven slots on a felt strip. */
 .db-hand {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 104px));
+  justify-content: center;
   gap: 10px;
   margin: 4px 22px 0;
   padding: 12px 14px;
@@ -383,7 +384,27 @@
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), 0 4px 0 #8a2414;
 }
 
+/* A low screen keeps the grid in view: smaller hand slots, tighter header. */
+@media (max-height: 760px) and (min-width: 601px) {
+  .db-hand {
+    grid-template-columns: repeat(7, minmax(0, 72px));
+    padding: 8px 12px;
+  }
+  .db-head {
+    padding-top: 10px;
+  }
+  .db-hint {
+    margin-top: 4px;
+  }
+  .db-tabs {
+    margin-top: 8px;
+  }
+}
+
 @media (max-width: 600px) {
+  .db-hand {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
   .dv {
     padding: 8px;
   }
