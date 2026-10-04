@@ -29,7 +29,7 @@ type Key = NumKey | ChoiceKey;
 const GROUPS: { id: Group; keys: Key[] }[] = [
   { id: 'pattern', keys: ['scale', 'angle', 'hue', 'sat', 'metal'] },
   { id: 'light', keys: ['glare', 'sharp', 'temp', 'sparkle', 'sparkleSize'] },
-  { id: 'motion', keys: ['light', 'lightAngle', 'speed', 'tiltMax', 'idle'] },
+  { id: 'motion', keys: ['light', 'lightAngle', 'speed', 'tiltMax', 'idle', 'idleAmp'] },
 ];
 
 
@@ -42,7 +42,7 @@ const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 /** Amounts read as a multiple of the finish's own look (×1.0); the notch under the track marks it. */
 const RELATIVE = new Set<NumKey>(['scale', 'sharp', 'sparkleSize', 'sat', 'glare']);
 
-function format(k: NumKey, v: number, t: Dict['tune']): string {
+export function format(k: NumKey, v: number, t: Dict['tune']): string {
   if (RELATIVE.has(k)) return `×${(v / (TUNE_DEFAULTS[k] || 1)).toFixed(1)}`;
   switch (k) {
     case 'scale':
@@ -63,7 +63,9 @@ function format(k: NumKey, v: number, t: Dict['tune']): string {
     case 'temp':
       return `${Math.round(v)}K`;
     case 'speed':
-      return v <= 0 ? t.stopped : `${Math.round(v * 100)}%`;
+      return v <= 0 ? t.stopped : `×${+v.toFixed(2)}`;
+    case 'idleAmp':
+      return `×${+v.toFixed(2)}`;
   }
 }
 
@@ -531,7 +533,8 @@ export function mountTune(store: Store, root: HTMLElement): void {
     if (k === 'sparkleSize' && tune.sparkle <= 0) return t.why.sparkle;
     if (k === 'sharp' && tune.glare <= 0) return t.why.glare;
     if (k === 'temp' && tune.glare <= 0 && (tune.sparkle <= 0 || s.edition === 'base')) return t.why.temp;
-    if (reduced.matches && (k === 'speed' || k === 'idle' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
+    if (reduced.matches && (k === 'speed' || k === 'idle' || k === 'idleAmp' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
+    if (k === 'idleAmp' && tune.idle === 'none') return t.why.noIdle;
     // Glitter twinkles on its own clock, so Speed matters whenever it shows.
     const glitter = tune.sparkle > 0 && s.edition !== 'base' && s.intensity > 0;
     if (k === 'speed' && tune.light !== 'orbit' && tune.idle === 'none' && !ANIMATED.has(s.edition) && !glitter) return t.why.still;

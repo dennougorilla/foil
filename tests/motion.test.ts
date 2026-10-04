@@ -135,3 +135,22 @@ test('frame plans add up to the loop exactly and stay within their budget', () =
     assert.ok(apng.length <= 60 && apng.every((d) => d >= 80), `apng plan for ${loopMs}`);
   }
 });
+
+test('the motion size scales every idle motion; zero holds the card still, a turn still turns', () => {
+  for (const idle of IDLE_MODES) {
+    const one = { ...TUNE_DEFAULTS, idle };
+    for (const s of [0.7, 2.2, 4.1]) {
+      const a = idlePose(one, s);
+      const b = idlePose({ ...one, idleAmp: 2 }, s);
+      const z = idlePose({ ...one, idleAmp: 0 }, s);
+      for (const k of ['dx', 'dy', 'rx', 'ry', 'rz'] as const) {
+        assert.ok(Math.abs(b[k] - 2 * a[k]) < 1e-12, `${idle}: ${k} not doubled`);
+        assert.ok(z[k] === 0, `${idle}: ${k} moves at size zero`);
+      }
+      assert.ok(Math.abs(b.scale - 1 - 2 * (a.scale - 1)) < 1e-12, `${idle}: scale not doubled`);
+      assert.equal(b.spin, a.spin, `${idle}: the size changed how far it turns`);
+    }
+  }
+  assert.equal(sanitizeTune({ idleAmp: 5 }).idleAmp, 2);
+  assert.equal(TUNE_DEFAULTS.idleAmp, 1);
+});

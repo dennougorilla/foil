@@ -199,16 +199,30 @@ await step('the motion button above the deck switches the idle motion in one tap
   expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
   expect((await page.getAttribute('.qm-opt[aria-checked=true]', 'data-value')) === (await state()).tune.idle, 'the tray does not mark the current motion');
   expect(await page.evaluate(() => document.activeElement?.classList.contains('qm-opt')), 'focus did not move into the tray');
-  // Keyboard: Sway → Float, picked with Enter; the tray closes and focus returns to the button.
+  // Keyboard: Sway → Float, picked with Enter; the tray stays open to tune it, Escape closes it.
   await page.keyboard.press('ArrowRight');
   expect((await page.textContent('.qm-help')).length > 10, 'the focused motion is not described');
   await page.keyboard.press('Enter');
   expect((await state()).tune.idle === 'float', `Enter picked ${(await state()).tune.idle}`);
-  expect(!(await page.isVisible('.qm-tray')) && (await page.evaluate(() => document.activeElement?.classList.contains('qm-btn'))), 'the tray stayed open or focus was lost');
   expect((await page.getAttribute(btn, 'data-value')) === 'float', 'the button does not show the new motion');
+  expect(await page.isVisible('.qm-tray'), 'a pick closed the tray');
+  // Speed and size: the sliders set the Shine tab's own values, and reset puts both back.
+  await page.locator('.qm-range[data-k=speed]').fill('1.5');
+  await page.locator('.qm-range[data-k=idleAmp]').fill('1.6');
+  const tuned = (await state()).tune;
+  expect(tuned.speed === 1.5 && tuned.idleAmp === 1.6, `the sliders set speed ${tuned.speed}, size ${tuned.idleAmp}`);
+  expect((await page.textContent('.qm-knob:has([data-k=idleAmp]) .qm-val')) === '×1.6' && (await page.textContent('.qm-knob:has([data-k=speed]) .qm-val')) === '×1.5', 'the values do not read ×1.5 and ×1.6');
+  await page.click('.qm-reset');
+  const back = (await state()).tune;
+  expect(back.speed === 1 && back.idleAmp === 1 && back.idle === 'float' && (await page.isDisabled('.qm-reset')), 'reset did not put speed and size back (and only them)');
+  await page.locator('.qm-range[data-k=speed]').fill('1.5');
+  await page.focus('.qm-opt[data-value=float]');
+  await page.keyboard.press('Escape');
+  expect(!(await page.isVisible('.qm-tray')) && (await page.evaluate(() => document.activeElement?.classList.contains('qm-btn'))), 'Escape left the tray open or lost focus');
   // The Shine tab shows the same choice, and a pick there shows on the button.
   await tab('light');
   expect((await page.getAttribute('#pane-light [data-key=idle] [aria-checked=true]', 'data-value')) === 'float', 'the Shine tab disagrees');
+  expect((await page.inputValue('#tune-speed')) === '1.5', 'the Shine tab does not show the speed set in the tray');
   await page.click('#pane-light [data-key=idle] [role=radio][data-value=bounce]');
   expect((await page.getAttribute(btn, 'data-value')) === 'bounce', 'a pick in the Shine tab did not reach the button');
   // Escape and a press elsewhere close it without changing anything.

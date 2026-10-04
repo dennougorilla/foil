@@ -34,6 +34,8 @@ export interface Tune {
   /** Largest tilt the card reaches while you point at it, degrees. */
   tiltMax: number;
   idle: IdleMode;
+  /** Size of the idle motion: 2 sways (bobs, swings…) twice as far, 0 holds the card still. */
+  idleAmp: number;
   metal: Metal;
 }
 
@@ -55,6 +57,7 @@ export const TUNE_DEFAULTS: Tune = {
   speed: 1,
   tiltMax: 18,
   idle: 'sway',
+  idleAmp: 1,
   metal: 'gold',
 };
 
@@ -79,6 +82,7 @@ export const RANGES: Record<NumKey, Range> = {
   lightAngle: { min: 0, max: 359, step: 1 },
   speed: { min: 0, max: 3, step: 0.05 },
   tiltMax: { min: 0, max: 40, step: 1 },
+  idleAmp: { min: 0, max: 2, step: 0.05 },
 };
 
 export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed'];
@@ -331,6 +335,18 @@ export function idlePose(t: Tune, s: number): IdlePose {
       p.sheen = [Math.sin(a + 1) * 0.15, b * 0.4];
       break;
     }
+  }
+  const k = t.idleAmp;
+  if (k !== 1) {
+    // How far it moves, not how long it takes: a turn still goes all the way round.
+    p.dx *= k;
+    p.dy *= k;
+    p.rx *= k;
+    p.ry *= k;
+    p.rz *= k;
+    p.scale = 1 + (p.scale - 1) * k;
+    p.sheen = [p.sheen[0] * k, p.sheen[1] * k];
+    p.flash *= k;
   }
   return p;
 }
