@@ -7,6 +7,7 @@ import { SHALLOWS_GLSL } from './shallows';
 import { PLATINUM_GLSL } from './platinum';
 import { COSMOHOLO_GLSL } from './cosmoholo';
 import { STAINED_GLASS_GLSL } from './stainedGlass';
+import { BLACKLIGHT_GLSL } from './blacklight';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { GLOW_GLSL } from '../touch/glow';
@@ -402,6 +403,7 @@ ${SHALLOWS_GLSL}
 ${PLATINUM_GLSL}
 ${COSMOHOLO_GLSL}
 ${STAINED_GLASS_GLSL}
+${BLACKLIGHT_GLSL}
 ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
@@ -466,13 +468,14 @@ void main() {
   else if (e == 24) col = platinum(c, uv, uTilt, L, m.r);
   else if (e == 26) col = stainedGlass(c, uv, uTilt, L, m.r);
   else if (e == 70) col = glow(c, uv, L, m.r);
+  else if (e == 72) col = blacklight(c, uv, L, lod, m);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
   if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26) amt = uIntensity; // these cover the frame in full
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
@@ -481,7 +484,9 @@ void main() {
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
-  if (e != 0) {
+  if (e == 72) {
+    // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
+  } else if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     // Glow's room is dim, so only a faint glare reaches it.
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
