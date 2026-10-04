@@ -3,8 +3,8 @@
 
 import { motion } from './tune/motion';
 
-/** How squarely the card face looks at us; copies hold their last face-on frame while a spin shows the back. */
-export const facing = () => Math.cos(motion.spinAngle);
+/** How squarely the card face looks at us; copies hold their last face-on frame while a spin or a flip shows the back. */
+export const facing = () => Math.cos(motion.spinAngle + motion.flip);
 
 /**
  * Copies the card into `view`, with `pad` of its width and height around it so tilts and bobs

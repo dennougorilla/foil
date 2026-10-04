@@ -973,6 +973,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   // One export at a time: the button, the format choice and the APNG shortcut rest while this one works.
   saveBtn.disabled = true;
   saveBtn.setAttribute('aria-busy', 'true');
+  stage?.holdQuality(true);
   $<HTMLButtonElement>('toApng').disabled = true;
   buildFormats();
   small.textContent = label;
@@ -991,6 +992,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     sfx.error();
     toast(fail, true);
   } finally {
+    stage?.holdQuality(false);
     saveBtn.removeAttribute('aria-busy');
     // A picture still loading keeps Save resting; the format buttons are rebuilt, not the old ones re-enabled.
     saveBtn.disabled = store.get().loading;

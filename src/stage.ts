@@ -135,6 +135,11 @@ export class Stage {
     document.addEventListener('visibilitychange', () => this.resume());
   }
 
+  /** Exports draw and read back on every frame; their frames say nothing about the stage's own speed. */
+  holdQuality(on: boolean) {
+    this.quality.hold(on);
+  }
+
   private resume() {
     if (this.running || document.hidden) return;
     this.running = true;
@@ -401,7 +406,7 @@ export class Stage {
   private handLayout(count: number) {
     const hr = this.o.hand.getBoundingClientRect();
     // A tall hand box (phones) deals two smaller fans so every card stays tappable; a short hand needs only one.
-    const rows = hr.height > 240 && count > 7 ? 2 : 1;
+    const rows = hr.height >= 200 && count > 7 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
     // Each row reserves room for lift above and the fan's arc below.
@@ -548,6 +553,7 @@ export class Stage {
       const ryIdle = pose.ry;
       const tk = motion.tiltScale(tune);
       const RX = this.rx.x * tk + rxIdle;
+      motion.flip = flipAngle;
       const RY = this.ry.x * tk + ryIdle + pose.spin + flipAngle;
       const RZ = this.rz.x * tk + rzIdle;
 

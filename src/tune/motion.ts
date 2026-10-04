@@ -30,6 +30,8 @@ class LiveMotion {
   private idleT = 0;
   private orbit = 0;
   private spin = 0;
+  /** The stage's flip to a new picture (radians, 0 when not flipping); set by the stage each frame. */
+  flip = 0;
   /** Current turntable angle of the spin idle (0 when not spinning). */
   get spinAngle() {
     return this.spin;
