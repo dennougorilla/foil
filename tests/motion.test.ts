@@ -157,6 +157,16 @@ test('Jelly overshoots each lean and wobbles before it settles', () => {
   assert.ok(turns >= 3, `it does not wobble (${turns} turns)`);
 });
 
+test('Jelly flicks wide and is moving for nearly all of its loop', () => {
+  const ps = sample('jelly');
+  const peak = Math.max(...ps.map((p) => Math.abs(p.ry)));
+  assert.ok(peak > (18 * Math.PI) / 180, `the flick is small (${((peak * 180) / Math.PI).toFixed(1)} degrees)`);
+  const dt = loopCycle({ ...TUNE_DEFAULTS, idle: 'jelly' }) / ps.length;
+  let still = 0;
+  for (let i = 1; i < ps.length; i++) if (Math.hypot(ps[i].ry - ps[i - 1].ry, ps[i].rx - ps[i - 1].rx, ps[i].rz - ps[i - 1].rz) / dt < 0.06) still++;
+  assert.ok(still / ps.length < 0.1, `it holds still for ${Math.round((still / ps.length) * 100)}% of the loop`);
+});
+
 test('Lean tilts deep and holds still at each side', () => {
   const ps = sample('lean');
   const deep = Math.max(...ps.map((p) => Math.abs(p.ry)));

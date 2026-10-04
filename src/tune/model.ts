@@ -343,26 +343,28 @@ export function idlePose(t: Tune, s: number): IdlePose {
       break;
     }
     case 'jelly': {
-      // Balatro's hand card, flicked from one lean to the other: it overshoots and wobbles like
-      // jelly (an underdamped spring), squashing as it goes, then settles and holds a beat so the
-      // picture reads, floating a little all the while.
+      // Balatro's hand card, flicked from one lean to the other: it overshoots and bounces like
+      // jelly (a loose underdamped spring), squashing as it goes, and the bounce has barely died
+      // down before the next flick. It sways a little all the while, so it never quite stops.
       const half = IDLE_PERIOD.jelly! / 2;
       const k = Math.floor(s / half);
       const v = s - k * half;
       const side = k % 2 ? -1 : 1;
-      const Z = 4.5;
-      const F = Math.PI * 2 * 1.6;
+      const Z = 2.4;
+      const F = Math.PI * 2 * 1.5;
       const spring = (v: number) => Math.exp(-Z * v) * (Math.cos(F * v) + (Z / F) * Math.sin(F * v));
-      // What is left of the wobble is taken out by the end, so each flick starts from rest.
+      // What is left of the bounce is taken out by the end, so each flick starts from rest.
       const fade = smooth(v / half);
       const rest = spring(v) - spring(half) * fade;
       const kick = Math.exp(-Z * v) * Math.sin(F * v) * (1 - fade);
       const f = (Math.PI * 2 * s) / IDLE_PERIOD.jelly!;
-      p.ry = side * 0.15 * (1 - 2 * rest);
-      p.rz = -side * kick * 0.06 + Math.sin(f) * 0.01;
-      p.rx = -kick * 0.06 + Math.cos(f) * 0.03;
-      p.dy = -kick * 0.015 + Math.sin(f) * 0.005;
-      p.scale = 1 + kick * 0.035;
+      p.ry = side * 0.17 * (1 - 2 * rest) + Math.sin(f + 0.8) * 0.02;
+      p.rz = -side * kick * 0.09 + Math.sin(f) * 0.015;
+      p.rx = -kick * 0.08 + Math.cos(f) * 0.05;
+      p.dy = -kick * kick * 0.05 + Math.sin(f) * 0.008;
+      p.scale = 1 + kick * 0.05;
+      // The light runs further than the card turns while it bounces.
+      p.sheen = [side * kick * 0.6, 0];
       break;
     }
     case 'lean': {
