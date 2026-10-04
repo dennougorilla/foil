@@ -45,6 +45,8 @@ export interface State extends RangeColorState {
   gifMatte: string;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
+  /** True once the card has been flicked to change the finish; the phone's flick hint stops then. */
+  flicked: boolean;
 }
 
 type Listener = (s: State, changed: Set<keyof State>) => void;
@@ -74,6 +76,7 @@ const PERSIST: (keyof State)[] = [
   'gifClear',
   'gifMatte',
   'text',
+  'flicked',
   ...RANGE_COLOR_PERSIST,
 ];
 
@@ -104,6 +107,7 @@ export function createStore() {
     gifClear: false,
     gifMatte: 'auto',
     text: { ...DEFAULT_LETTERING },
+    flicked: false,
     ...RANGE_COLOR_DEFAULTS,
   };
   try {
@@ -117,6 +121,7 @@ export function createStore() {
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;
     state.gifClear = state.gifClear === true;
+    state.flicked = state.flicked === true;
     if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
     Object.assign(state, sanitizeRangeColors(state));
   } catch {

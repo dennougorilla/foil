@@ -552,9 +552,10 @@ await step('phones: the live preview rides in the Save box, never over the contr
   await phone.close();
 });
 
-// ---------- Phone: the hand on the first screen, flicking the card, gyro, drawing quality ----------
+// ---------- Phone: the card filling the screen, the hand under it, flicking the card, gyro, drawing quality ----------
 
-const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+// A 3x screen, as most phones have: the stage still draws at 1.5x at most.
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
 const mob = await phone.newPage();
 mob.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
 mob.on('console', (m) => m.type() === 'error' && errors.push(`phone: ${m.text()}`));
@@ -563,13 +564,78 @@ await mob.goto(`${URL}?lang=en`);
 await mob.waitForTimeout(3000);
 const edition = () => mob.evaluate(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').edition);
 
-await step('phone: the card and the whole hand fit above the Save bar', async () => {
-  const bar = await mob.locator('.sec-export').boundingBox();
-  for (const sel of ['#cardSlot', '#hand', '#handCaption']) {
-    const b = await mob.locator(sel).boundingBox();
-    expect(b.y >= 0 && b.y + b.height <= bar.y + 1, `${sel} is not on the first screen above Save`);
+await step('phone: upright, the card runs nearly edge to edge with the hand, the deck and the packs above the slim Save bar', async () => {
+  for (const [w, h] of [[360, 780], [390, 844], [430, 932]]) {
+    await mob.setViewportSize({ width: w, height: h });
+    await mob.waitForTimeout(500);
+    const at = `${w}x${h}`;
+    const bar = await mob.locator('.sec-export').boundingBox();
+    const card = await mob.locator('#cardSlot').boundingBox();
+    expect(card.width >= w * 0.9, `${at}: the card is ${Math.round(card.width)}px wide`);
+    expect(card.height >= h * 0.58, `${at}: the card is ${Math.round(card.height)}px tall`);
+    expect(Math.abs(card.width * 7 - card.height * 5) < 8, `${at}: the card is ${Math.round(card.width)}x${Math.round(card.height)}, not 5:7`);
+    expect(bar.height <= 80, `${at}: the Save bar is ${Math.round(bar.height)}px tall`);
+    for (const sel of ['#cardSlot', '#hand', '#handCaption', '#handPrev', '#handNext', '#deckBtn .deck-cap', '#packsBtn .deck-cap']) {
+      const b = await mob.locator(sel).boundingBox();
+      expect(b && b.y >= 0 && b.y + b.height <= bar.y + 1, `${at}: ${sel} is not on the first screen above Save`);
+    }
+    const cap = await mob.locator('#deckBtn .deck-cap').boundingBox();
+    const packs = await mob.locator('#packsBtn').boundingBox();
+    expect(cap.y + cap.height <= packs.y + 1, `${at}: the pack button covers the deck's name`);
+    for (const sel of ['#pickBtnStage', '#saveBtn']) {
+      const b = await mob.locator(sel).boundingBox();
+      expect(b.y >= bar.y && b.y + b.height <= h && b.x >= 0 && b.x + b.width <= w, `${at}: ${sel} is not in the Save bar`);
+    }
+    expect((await mob.evaluate(() => document.documentElement.scrollWidth)) <= w, `${at}: the page scrolls sideways`);
   }
-  expect((await mob.evaluate(() => document.documentElement.scrollWidth)) <= 390, 'the page scrolls sideways');
+  await mob.setViewportSize({ width: 390, height: 844 });
+  await mob.waitForTimeout(300);
+});
+
+await step('phone: the drawn card lines up with its tap area at every size', async () => {
+  const still = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => localStorage.clear());
+  await p.goto(`${URL}?lang=en&quality=0`);
+  await p.waitForTimeout(2500);
+  for (const [w, h] of [[360, 780], [390, 844], [430, 932]]) {
+    await p.setViewportSize({ width: w, height: h });
+    await p.waitForTimeout(900);
+    const r = await p.locator('#cardSlot').boundingBox();
+    // Just inside each side, past the card's dark outline (about 5px), its light paper frame; just
+    // outside, the dark backdrop.
+    const points = [
+      ['left', r.x + 9, r.y + r.height / 2, r.x - 5, r.y + r.height / 2],
+      ['right', r.x + r.width - 9, r.y + r.height / 2, r.x + r.width + 5, r.y + r.height / 2],
+      ['top', r.x + r.width / 2, r.y + 9, r.x + r.width / 2, r.y - 5],
+    ];
+    const png = (await p.screenshot()).toString('base64');
+    const lum = await p.evaluate(
+      async ([src, pts]) => {
+        const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${src}`)).blob());
+        const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+        c.drawImage(img, 0, 0);
+        const at = (x, y) => {
+          const [r, g, b] = c.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+          return r * 0.299 + g * 0.587 + b * 0.114;
+        };
+        return pts.map(([side, ix, iy, ox, oy]) => [side, at(ix, iy), at(ox, oy), document.elementFromPoint(ix, iy)?.id]);
+      },
+      [png, points],
+    );
+    for (const [side, inside, outside, hit] of lum) {
+      expect(inside > 150 && outside < inside - 60, `${w}x${h}: the drawn card's ${side} edge is off its box (inside ${Math.round(inside)}, outside ${Math.round(outside)})`);
+      expect(hit === 'cardSlot', `${w}x${h}: a tap just inside the card's ${side} edge lands on ${hit}`);
+    }
+  }
+  await still.close();
+});
+
+await step('phone: until the first flick, a note on the card says a flick changes the finish', async () => {
+  expect(await mob.isVisible('#flickHint'), 'no flick note on a first visit');
+  const b = await mob.locator('#flickHint').boundingBox();
+  const card = await mob.locator('#cardSlot').boundingBox();
+  expect(b.x >= card.x && b.x + b.width <= card.x + card.width && b.y > card.y + card.height / 2, 'the flick note is not over the foot of the card');
 });
 
 await step('phone: flicking the card or tapping ‹ › steps through the hand; only a sideways flick does', async () => {
@@ -596,6 +662,31 @@ await step('phone: flicking the card or tapping ‹ › steps through the hand; 
   expect((await edition()) === hand[(at + 1) % hand.length], 'the › step did not deal the next card');
   await mob.click('#handPrev');
   expect((await edition()) === hand[at], 'the ‹ step did not go back');
+});
+
+await step('phone: after a flick the note is gone, and stays gone', async () => {
+  expect(!(await mob.isVisible('#flickHint')), 'the flick note stays after a flick');
+  expect((await mob.evaluate(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').flicked)) === true, 'the first flick is not remembered');
+});
+
+await step('phone: the stage draws at 1.5x at most on a 3x screen', async () => {
+  const ratio = await mob.evaluate(() => {
+    const c = document.getElementById('cards');
+    return c.width / c.getBoundingClientRect().width;
+  });
+  expect(ratio <= 1.51, `the card canvas draws at ${ratio.toFixed(2)}x`);
+});
+
+await step('phones on their side keep the full Save box and no flick note', async () => {
+  const side = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const p = await side.newPage();
+  await p.addInitScript(() => localStorage.clear());
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(2000);
+  expect(await p.isVisible('.sec-export .sec-title'), 'the Save box lost its title');
+  expect(!(await p.isVisible('#flickHint')), 'the flick note shows on a phone on its side');
+  expect((await p.$eval('#pickBtnStage', (el) => getComputedStyle(el).position)) !== 'fixed', 'the pick button left the stage');
+  await side.close();
 });
 
 await step('phone: tilting the device is taken without errors', async () => {

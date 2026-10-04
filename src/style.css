@@ -3241,7 +3241,8 @@ input[type='range']:disabled {
   }
 }
 
-@media (max-width: 420px) {
+/* Small phones, and any phone held upright, keep the header to its icons. */
+@media (max-width: 420px), (max-width: 599px) and (orientation: portrait) {
   .toggles .chip span {
     display: none;
   }

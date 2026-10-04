@@ -75,7 +75,10 @@ try {
     info: $('info'),
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
-    onFlick: (dir) => stepEdition(dir),
+    onFlick: (dir) => {
+      store.set({ flicked: true });
+      stepEdition(dir);
+    },
     handIds: hand,
     deckRect: () => document.getElementById('deckBtn')?.getBoundingClientRect() ?? null,
   });
@@ -726,6 +729,15 @@ function stepEdition(dir: 1 | -1) {
   const id = stepIn(hand(), store.get().edition, dir);
   if (id) selectEdition(id);
 }
+
+/** The phone's note that a flick changes the finish: until the first flick, and not on a finish a
+ *  finger strokes instead (see stage-phone.css). */
+function syncFlickHint() {
+  const s = store.get();
+  const ed = editionById(s.edition);
+  $('flickHint').hidden = s.flicked || !!ed.touch || !!ed.torch;
+}
+syncFlickHint();
 
 // Phones step through the hand from beside the finish's name too (see stage-phone.css).
 $('handPrev').addEventListener('click', () => stepEdition(-1));
@@ -1483,6 +1495,7 @@ store.on((s, changed) => {
     wakePacks();
     depth?.update(face, artKey());
   }
+  if (changed.has('edition') || changed.has('flicked')) syncFlickHint();
   if (changed.has('hand')) {
     wakePacks();
     stage.syncHand();

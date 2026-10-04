@@ -90,3 +90,229 @@
     margin-top: 4px;
   }
 }
+
+/* The note on flicking the card shows on upright phones only (below). */
+.flick-hint {
+  display: none;
+}
+
+/*
+ * Phones held upright: the card is the screen. It runs nearly edge to edge under a thin header;
+ * the finish's name with its steps and the hand keep to what is left under it, and Save folds into
+ * one slim bar along the bottom, the pick button at its left end. The panel waits below, a scroll
+ * away, as before. Phones on their side and tablets keep the layout above.
+ */
+@media (max-width: 599px) and (orientation: portrait) {
+  .top {
+    padding: 4px 8px 0;
+  }
+  .logo-word {
+    gap: 3px;
+    padding: 2px;
+  }
+  .tile {
+    width: 20px;
+    height: 26px;
+    font-size: 15px;
+  }
+  .toggles {
+    gap: 6px;
+  }
+  .stage {
+    /* What the screen holds above the slim Save bar (72px with its lip), less the header (44px).
+       Fixed, so the card keeps its size while the bar grows to carry the Shine preview. */
+    --room: calc(100svh - 72px - env(safe-area-inset-bottom) - 44px);
+    /* Edge to edge but for 8px, unless a short screen would push the hand under the Save bar:
+       the name's row, the gaps and the least hand that keeps the deck whole take 200px. */
+    --card-w: min(100vw - 16px, (var(--room) - 200px) * 5 / 7);
+    gap: 6px;
+    padding: 0 8px 8px;
+  }
+  /* The card's canvas reaches up under the header too, so a card lifted by a finger or a tap's
+     bounce is never cut along the stage's top edge. */
+  #cards {
+    top: -44px;
+    height: calc(100% + 44px);
+  }
+  .card-slot {
+    max-height: none;
+    margin-top: 6px;
+    width: calc(var(--card-w));
+  }
+  /* The hand takes whatever the card leaves above the Save bar. */
+  .hand {
+    height: clamp(136px, calc(var(--room) - var(--card-w) * 7 / 5 - 64px), 168px);
+  }
+  /* The name and its steps sit between the card and the hand. */
+  .hand-bar {
+    order: -1;
+  }
+  .hand-step {
+    height: 40px;
+  }
+  .hand-wrap {
+    gap: 2px;
+  }
+  /* The deck over the pack button, small enough to stand in the shortest hand. */
+  .deck-dock {
+    gap: 22px;
+    padding: 6px 2px 8px 0;
+  }
+  .deck {
+    width: 32px;
+    height: 45px;
+  }
+  .deck-pile i {
+    width: 28px;
+    height: 40px;
+  }
+  .deck-packs {
+    width: 40px;
+    height: 40px;
+  }
+  /* The idle-motion button (.qm, the motion switch) keeps the hand's left end, the mirror of the
+     deck at its right: just under the card, a thumb's reach from it. */
+  .hand-row {
+    position: relative;
+  }
+  .hand-row:has(.qm) {
+    padding-left: 56px;
+  }
+  .hand-row .deck-dock {
+    position: static;
+  }
+  .hand-row .qm {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+  }
+
+  /* Until the first flick, a note over the foot of the card says that a flick changes the finish. */
+  .flick-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 16%;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 7px;
+    translate: -50% 0;
+    border-radius: 999px;
+    background: rgba(13, 19, 21, 0.86);
+    box-shadow: 0 0 0 2px var(--edge);
+    color: var(--text);
+    font-size: 15px;
+    white-space: nowrap;
+    text-shadow: 0 2px 0 var(--edge);
+    pointer-events: none;
+    animation: flick-hint 7s 1.2s both;
+  }
+  .flick-hint svg {
+    width: 14px;
+    height: 14px;
+    fill: var(--gold);
+    animation: flick-nudge 1.4s 1.2s ease-in-out infinite;
+  }
+  .flick-hint svg:first-child {
+    --dx: -4px;
+  }
+  .flick-hint svg:last-child {
+    --dx: 4px;
+  }
+  .flick-hint[hidden],
+  .is-dragging .flick-hint {
+    display: none;
+  }
+
+  /* The pick button rides at the Save bar's left end. */
+  .btn.stage-pick {
+    position: fixed;
+    left: 8px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 31;
+    flex-direction: column;
+    gap: 2px;
+    width: 64px;
+    min-height: 48px;
+    margin: 0;
+    padding: 4px 2px;
+  }
+  .btn.stage-pick .btn-text b {
+    display: block;
+    font-size: 12px;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    text-align: center;
+  }
+  .btn.stage-pick svg {
+    width: 18px;
+    height: 18px;
+  }
+  /* While Shine is tuned, the bar carries the card's live view at its left instead. */
+  body:has(.tune-peek:not([hidden])) .btn.stage-pick {
+    display: none;
+  }
+  .sec-export:has(.tune-peek:not([hidden])) {
+    padding-left: 8px;
+  }
+
+  /* Save folds into one bar: the formats by name, then Save. */
+  .sec-export {
+    left: 0;
+    right: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'formats save';
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) 80px;
+    column-gap: 8px;
+    border-radius: 14px 14px 0 0;
+    border-inline: 0;
+  }
+  .sec-export .sec-title,
+  .sec-export .seg-format small,
+  #saveBtn .btn-text small,
+  #saveBtn .save-meta {
+    display: none;
+  }
+  .sec-export .seg-format {
+    gap: 4px;
+  }
+  .panel .sec-export .seg-format .seg-btn {
+    min-height: 48px;
+    padding-inline: 0;
+    font-size: 13px;
+  }
+  #saveBtn {
+    min-height: 48px;
+    gap: 6px;
+    padding: 4px 10px 4px 8px;
+    margin-bottom: 4px;
+  }
+  #saveBtn > svg {
+    width: 28px;
+    height: 28px;
+    padding: 4px;
+  }
+  #saveBtn .btn-text b {
+    font-size: 16px;
+    white-space: nowrap;
+  }
+}
+
+@keyframes flick-hint {
+  0% { opacity: 0; scale: 0.9; }
+  6%, 88% { opacity: 1; scale: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes flick-nudge {
+  50% { translate: var(--dx) 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flick-hint svg {
+    animation: none;
+  }
+}
