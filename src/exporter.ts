@@ -2,7 +2,7 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { exportLoop, fixedLight, framePlan, loopView, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { exportLoop, fixedLight, framePlan, loopCycle, loopView, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
@@ -148,6 +148,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   const animMask = input.faceAt ? document.createElement('canvas') : null;
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
   const kind = input.edition.touch;
+  const cycle = loopCycle(tune, !!input.edition.torch);
   const touch = kind ? autoTouchFor(input.face, kind) : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
@@ -159,7 +160,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
     ctx,
     draw(p, bgTime, loopSec, sourceMs) {
       // The card's motion, sheen and light are the stage's at the same moment of its idle cycle.
-      const { pose, tilt, light } = loopView(tune, p);
+      const { pose, tilt, light } = loopView(tune, p, cycle);
       const time = p * loopSec * tune.speed;
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
@@ -250,7 +251,7 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs);
+  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs, !!input.edition.torch);
   const delays = framePlan(loopMs, GIF_MIN_DELAY, GIF_MAX_FRAMES, 10);
   const frames = delays.length;
   const DUR = loopMs / 1000;

@@ -77,7 +77,7 @@ export function mountApngExport({ btn, active, loading, lang, input, toast, onSa
   const refresh = () => {
     if (job || hold || !active()) return;
     const t = TEXT[lang()];
-    const plan = apngPlan(input().tune ?? TUNE_DEFAULTS, input().loopMs);
+    const plan = apngPlan(input().tune ?? TUNE_DEFAULTS, input().loopMs, !!input().edition.torch);
     const size = fill(t.size, { n: formatBytes(plan.bytes) });
     const secs = plan.delays.reduce((a, d) => a + d, 0) / 1000;
     b.textContent = t.title;

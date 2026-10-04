@@ -343,6 +343,39 @@
   --act: tune-act-turn;
 }
 
+.tune-opt[data-value='jelly'] {
+  --act: tune-act-jelly;
+}
+
+.tune-opt[data-value='lean'] {
+  --act: tune-act-lean;
+}
+
+.tune-opt[data-value='gyre'] {
+  --act: tune-act-gyre;
+}
+
+@keyframes tune-act-jelly {
+  0%, 100% { transform: rotate(-8deg); }
+  12% { transform: rotate(12deg) scale(1.08, 0.92); }
+  24% { transform: rotate(5deg); }
+  36%, 50% { transform: rotate(8deg); }
+  62% { transform: rotate(-12deg) scale(1.08, 0.92); }
+  74% { transform: rotate(-5deg); }
+}
+
+@keyframes tune-act-lean {
+  0%, 15%, 100% { transform: perspective(40px) rotateY(-30deg); }
+  50%, 65% { transform: perspective(40px) rotateY(30deg); }
+}
+
+@keyframes tune-act-gyre {
+  0%, 100% { transform: perspective(40px) rotateY(28deg); }
+  25% { transform: perspective(40px) rotateX(-16deg); }
+  50% { transform: perspective(40px) rotateY(-28deg); }
+  75% { transform: perspective(40px) rotateX(16deg); }
+}
+
 @keyframes tune-act-float {
   50% { transform: translateY(-3px); }
 }
