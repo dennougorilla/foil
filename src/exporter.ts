@@ -5,7 +5,7 @@ import type { GifRequest, GifResponse } from './gifWorker';
 import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
-import { AUTO_STILL } from './touch/heat';
+import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
 import type { LayerMap } from './depth/layers';
 
@@ -73,8 +73,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: PIXEL_STEPS[input.pixel] ?? 0,
-      // A finish that reacts to touch shows a swipe made for this picture, caught while it is warm.
-      heat: input.edition.touch ? autoTouch(input.face, 3 + AUTO_STILL) : undefined,
+      // A finish that reacts to touch shows a swipe made for this picture, caught while it still shows.
+      heat: input.edition.touch ? autoTouch(input.face, input.edition.touch) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
       ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
       alpha: 1,
@@ -89,9 +89,9 @@ export async function exportPng(input: ExportInput): Promise<string> {
   return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
 }
 
-function autoTouch(face: HTMLCanvasElement, phase: number) {
-  const a = autoTouchFor(face);
-  a.at(phase);
+function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
+  const a = autoTouchFor(face, kind);
+  a.at(3 + AUTO_STILL[kind]);
   return a;
 }
 
@@ -129,7 +129,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
-  const touch = input.edition.touch ? autoTouchFor(input.face) : null;
+  const kind = input.edition.touch;
+  const touch = kind ? autoTouchFor(input.face, kind) : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
   const ch = 640 * k;
@@ -145,7 +146,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
       }
-      touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL : p));
+      if (kind) touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL[kind] : p));
       if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
       cards.begin();
       const { rx, ry } = pose;

@@ -298,7 +298,8 @@ void main() {
   float spec = 0.0;
   if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
-    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
+    // Glow's room is dim, so only a faint glare reaches it.
+    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0));
   } else {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.6, 4.0, 0.1);
