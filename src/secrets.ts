@@ -9,7 +9,7 @@ import type { EditionId } from './editions';
 export const OPEN_EDITIONS: readonly EditionId[] = ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'];
 
 /** Beta finishes, still being tried: never in the hand nor in the secret draw until promoted to a secret. */
-export const BETA_EDITIONS: readonly EditionId[] = ['lenticular'];
+export const BETA_EDITIONS: readonly EditionId[] = ['lenticularflip'];
 
 /** Every other finish of `all` (the hand order), the ones a support link can unlock. */
 export const secretEditions = (all: readonly EditionId[]): EditionId[] =>

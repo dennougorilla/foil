@@ -27,7 +27,7 @@ export interface ExportInput {
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture. */
   layers?: LayerMap;
-  /** Lenticular's other picture (card/face.ts drawFlip); the front one in pencil when absent. */
+  /** Flip Lenticular's other picture (card/face.ts drawFlip); the front one in pencil when absent. */
   flip?: HTMLCanvasElement;
 }
 
@@ -81,8 +81,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
       // A finish that reacts to touch shows a swipe made for this picture, caught while it is warm.
       heat: input.edition.touch ? autoTouch(input.face, 3 + AUTO_STILL) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
-      // except on Lenticular, where a nudge could land between its two pictures.
-      ...(input.edition.id === 'lenticular' ? { tilt, light } : stillPose(tilt, light)),
+      // except on Flip Lenticular, where a nudge could land between its two pictures.
+      ...(input.edition.id === 'lenticularflip' ? { tilt, light } : stillPose(tilt, light)),
       alpha: 1,
       flash: 0,
       shadow: [0, 0],

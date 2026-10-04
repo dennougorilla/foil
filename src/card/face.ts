@@ -117,7 +117,7 @@ function paintArt(ctx: CanvasRenderingContext2D, image: FaceSpec['image'], crop:
   ctx.restore();
 }
 
-/** Lenticular's other picture: centred and cropped to fill the art window, the rest left clear. */
+/** Flip Lenticular's other picture: centred and cropped to fill the art window, the rest left clear. */
 export function drawFlip(flip: HTMLCanvasElement, image: FaceSpec['image']): void {
   flip.width = FACE_W;
   flip.height = FACE_H;

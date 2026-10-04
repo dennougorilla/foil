@@ -121,7 +121,7 @@ export class CardRenderer {
   private layers: WebGLTexture;
   private plate: WebGLTexture;
   private layerCuts = 0;
-  /** Lenticular's other picture, laid out like the face; `hasFlip` is off until one is chosen. */
+  /** Flip Lenticular's other picture, laid out like the face; `hasFlip` is off until one is chosen. */
   private flip: WebGLTexture;
   private hasFlip = false;
   private layerPlate = 1;
@@ -203,7 +203,7 @@ export class CardRenderer {
     this.layerPlate = plate ? 1 : 0;
   }
 
-  /** Lenticular's other picture (see drawFlip), or null to draw the front one in pencil. */
+  /** Flip Lenticular's other picture (see drawFlip), or null to draw the front one in pencil. */
   setFlip(flip: HTMLCanvasElement | null): void {
     this.hasFlip = !!flip;
     if (flip) uploadTexture(this.gl, this.flip, flip, true);

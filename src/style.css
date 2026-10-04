@@ -1284,7 +1284,7 @@ button {
   fill: currentColor;
 }
 
-/* Lenticular's other picture: one quiet row under the finish, only while Lenticular is on. */
+/* Flip Lenticular's other picture: one quiet row under the finish, only while Flip Lenticular is on. */
 .flip-row {
   grid-column: 1 / -1;
   display: grid;

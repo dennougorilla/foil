@@ -53,21 +53,21 @@ test('a retired secret (Eclipse) saved by an earlier version is ignored and neve
   for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(secrets, [], Math.random), 'eclipse');
 });
 
-test('a beta finish (Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
-  assert.deepEqual(BETA_EDITIONS, ['lenticular']);
-  assert.ok(EDITIONS.some((e) => e.id === 'lenticular'));
-  assert.ok(!OPEN_EDITIONS.includes('lenticular'));
-  assert.ok(!SECRET_EDITIONS.includes('lenticular'));
-  assert.deepEqual(parseUnlocked('["lenticular","opal"]', SECRET_EDITIONS), ['opal']);
-  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticular');
+test('a beta finish (Flip Lenticular) is neither open nor a secret, so no unlock can draw it', () => {
+  assert.deepEqual(BETA_EDITIONS, ['lenticularflip']);
+  assert.ok(EDITIONS.some((e) => e.id === 'lenticularflip'));
+  assert.ok(!OPEN_EDITIONS.includes('lenticularflip'));
+  assert.ok(!SECRET_EDITIONS.includes('lenticularflip'));
+  assert.deepEqual(parseUnlocked('["lenticularflip","opal"]', SECRET_EDITIONS), ['opal']);
+  for (let i = 0; i < 200; i++) assert.notEqual(pickSecret(SECRET_EDITIONS, [], Math.random), 'lenticularflip');
 });
 
 test('every finish past the open ones that is not beta is a secret, in hand order', () => {
-  assert.deepEqual(secretEditions(['base', 'gold', 'lenticular', 'relief']), ['gold', 'relief']);
+  assert.deepEqual(secretEditions(['base', 'gold', 'lenticularflip', 'relief']), ['gold', 'relief']);
 });
 
-test('Lenticular draws with shader 76, which no other finish uses', () => {
+test('Flip Lenticular draws with shader 76, which no other finish uses', () => {
   const shaders = EDITIONS.map((e) => e.shader);
-  assert.equal(EDITIONS.find((e) => e.id === 'lenticular')?.shader, 76);
+  assert.equal(EDITIONS.find((e) => e.id === 'lenticularflip')?.shader, 76);
   assert.equal(new Set(shaders).size, shaders.length);
 });

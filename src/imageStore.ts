@@ -1,4 +1,4 @@
-// Keeps the person's uploaded images across reloads: the card's picture ('user') and Lenticular's
+// Keeps the person's uploaded images across reloads: the card's picture ('user') and Flip Lenticular's
 // other picture ('flip'). Failure is never fatal: we just fall back to a sample (or the pencil drawing).
 
 const DB = 'foil';

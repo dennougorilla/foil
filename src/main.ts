@@ -594,10 +594,10 @@ fileInput.addEventListener('change', () => {
   });
 }
 
-// ---------- Lenticular's other picture ----------
+// ---------- Flip Lenticular's other picture ----------
 
 const flip = document.createElement('canvas');
-/** The picture Lenticular flips to; null draws the front picture in pencil instead. */
+/** The picture Flip Lenticular flips to; null draws the front picture in pencil instead. */
 let flipImage: Img | null = null;
 
 function setFlip(img: Img | null) {
@@ -607,10 +607,10 @@ function setFlip(img: Img | null) {
   renderFlip();
 }
 
-/** One quiet row under the finish, shown only while Lenticular is on the card. */
+/** One quiet row under the finish, shown only while Flip Lenticular is on the card. */
 function renderFlip() {
   const s = store.get();
-  $('flipRow').hidden = s.edition !== 'lenticular';
+  $('flipRow').hidden = s.edition !== 'lenticularflip';
   const front = s.sample >= 0 ? samples[s.sample] : (userImage ?? samples[0]);
   const thumb = $('flipThumb');
   thumb.style.backgroundImage = `url(${thumbUrl(flipImage ?? front)})`;
