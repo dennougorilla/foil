@@ -47,7 +47,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'studio',
-    finishes: ['halftone', 'warmth', 'stainedglass', 'lenticular3d', 'shadowbox'],
+    finishes: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
     wrap: 'halftone',
     colors: ['#151518', '#d83a6a', '#ffd84a'],
     load: () => import('./gl/finishes/studio'),

@@ -1725,6 +1725,54 @@ button {
   fill: currentColor;
 }
 
+/* Flip Lenticular's other picture: one quiet row under the finish, only while Flip Lenticular is on. */
+.flip-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.flip-row[hidden] {
+  display: none;
+}
+
+.flip-thumb {
+  width: 22px;
+  height: 30px;
+  border-radius: 3px;
+  background: var(--panel-lo) center / cover no-repeat;
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px var(--paper);
+}
+
+/* No picture chosen: the front one as the pencil drawing it flips to. */
+.flip-thumb.is-auto {
+  filter: grayscale(1) contrast(1.6) brightness(1.25);
+}
+
+.flip-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.35;
+  font-size: 14px;
+}
+
+.flip-text b {
+  font-weight: 400;
+}
+
+.flip-text small {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.flip-text .link {
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+
 /* Fine-tune: one ruled line on the sheet that opens the detailed controls. */
 .sec-adjust {
   padding-top: 8px;

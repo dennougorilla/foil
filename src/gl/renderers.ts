@@ -130,6 +130,9 @@ export class CardRenderer {
   private layers: WebGLTexture;
   private plate: WebGLTexture;
   private layerCuts = 0;
+  /** Flip Lenticular's other picture, laid out like the face; `hasFlip` is off until one is chosen. */
+  private flip: WebGLTexture;
+  private hasFlip = false;
   private layerPlate = 1;
   /** 0..1: how far the Shadowbox sheets stand up, and how deep 3D Lenticular reads (both flatten while a new cut is made). */
   layersRise = 1;
@@ -179,6 +182,7 @@ export class CardRenderer {
     this.back = createTexture(gl, true);
     this.layers = createTexture(gl, true);
     this.plate = createTexture(gl, true);
+    this.flip = createTexture(gl, true);
     this.lettering = new LetteringGL(gl, opts.settled);
     this.range = new RangeLayer(gl);
   }
@@ -233,6 +237,12 @@ export class CardRenderer {
     }
     this.layerCuts = map.cuts;
     this.layerPlate = plate ? 1 : 0;
+  }
+
+  /** Flip Lenticular's other picture (see drawFlip), or null to draw the front one in pencil. */
+  setFlip(flip: HTMLCanvasElement | null): void {
+    this.hasFlip = !!flip;
+    if (flip) uploadTexture(this.gl, this.flip, flip, true);
   }
 
   setBack(back: TexImageSource): void {
@@ -312,6 +322,10 @@ export class CardRenderer {
     gl.uniform1f(p.u.uLayerCuts, this.layerCuts);
     gl.uniform1f(p.u.uLayerRise, this.layersRise);
     gl.uniform1f(p.u.uPlateMix, this.layerPlate);
+    gl.activeTexture(gl.TEXTURE9);
+    gl.bindTexture(gl.TEXTURE_2D, this.flip);
+    gl.uniform1i(p.u.uFlip, 9);
+    gl.uniform1f(p.u.uFlip2, this.hasFlip ? 1 : 0);
 
     // Hard pixel drop shadow first, then the card itself.
     if (d.shadow) {

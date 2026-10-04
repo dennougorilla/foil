@@ -5,6 +5,7 @@ import { HeatLayer } from '../../touch/layer';
 import { SHADOWBOX_GLSL } from '../shadowboxShader';
 import { LENTICULAR3D_GLSL } from '../lenticular3d';
 import { STAINED_GLASS_GLSL } from '../stainedGlass';
+import { LENTICULAR_FLIP_GLSL } from '../lenticularFlip';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -38,6 +39,7 @@ ${TOUCH_GLSL}
 ${SHADOWBOX_GLSL}
 ${LENTICULAR3D_GLSL}
 ${STAINED_GLASS_GLSL}
+${LENTICULAR_FLIP_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 12) col = halftone(c, uv, uTilt, L);
@@ -45,6 +47,7 @@ ${STAINED_GLASS_GLSL}
   else if (e == 74) col = lenticular3d(c, uv, uTilt, lod);
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 26) col = stainedGlass(c, uv, uTilt, L, m.r);
+  else if (e == 76) col = lenticularFlip(c, uv, uTilt, lod, m.r);
 `,
   layers: (gl) => {
     const heat = new HeatLayer(gl);

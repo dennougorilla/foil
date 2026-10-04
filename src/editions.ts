@@ -26,6 +26,7 @@ export type EditionId =
   | 'glow'
   | 'blacklight'
   | 'lenticular3d'
+  | 'lenticularflip'
   // Shaders in src/gl/finishes/supporter.ts
   | 'kintsugi'
   | 'opal'
@@ -82,6 +83,7 @@ export const EDITIONS: Edition[] = [
   { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
   // Shader in src/gl/lenticular3d.ts.
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
+  { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6 },
   // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

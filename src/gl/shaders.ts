@@ -284,7 +284,8 @@ void main() {
   ${pack?.dispatch ?? ''}
   tPattern = false;
   uv = artUv;
-  if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
+  // Warmth tunes its own ink (see touch/glsl.ts); Flip Lenticular shows two pictures, not a tint.
+  if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
