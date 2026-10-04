@@ -87,10 +87,15 @@ export const METALS: Metal[] = ['gold', 'silver'];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
-/** Fills gaps and drops nonsense from a saved tune, so older or hand-edited storage still loads. */
+/**
+ * Fills gaps and drops nonsense from a saved tune, so hand-edited storage still loads. A tune
+ * saved with a light mode that no longer exists (Gyro, before v0.10) is from an older shape and
+ * starts over from the defaults.
+ */
 export function sanitizeTune(raw: unknown): Tune {
   const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const out = { ...TUNE_DEFAULTS };
+  if (src.light !== undefined && !LIGHT_MODES.includes(src.light as LightMode)) return out;
   for (const k of Object.keys(RANGES) as NumKey[]) {
     const v = src[k];
     if (typeof v === 'number' && Number.isFinite(v)) out[k] = clamp(v, RANGES[k].min, RANGES[k].max);

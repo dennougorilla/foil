@@ -82,3 +82,14 @@ test('a pinned level never changes', () => {
   assert.equal(q.level, 2);
   assert.equal(new QualityGovernor(9).level, QUALITY_LEVELS.length - 1);
 });
+
+test('frames drawn while an export runs are not judged, and measuring starts over after it', () => {
+  const q = new QualityGovernor();
+  run(q, 16.7, 5000);
+  q.hold(true);
+  run(q, 60, 10_000);
+  assert.equal(q.level, 0);
+  q.hold(false);
+  run(q, 16.7, 10_000);
+  assert.equal(q.level, 0);
+});

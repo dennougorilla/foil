@@ -29,6 +29,8 @@ const GAIN = 0.9;
 export class QualityGovernor {
   level = 0;
   private pinned: boolean;
+  /** Not measuring at all, while something else (an export) takes the frames. */
+  private held = false;
   /** The lowest level still worth trying; a step that didn't help moves it up to stay. */
   private floor = QUALITY_LEVELS.length - 1;
   private wait = 3000;
@@ -54,9 +56,15 @@ export class QualityGovernor {
     this.count = 0;
   }
 
+  /** Stops judging while `on` (an export draws and reads back every frame); measures afresh after. */
+  hold(on: boolean) {
+    this.held = on;
+    this.rest();
+  }
+
   /** Records one frame's length (ms); true when the level changed. */
   frame(ms: number): boolean {
-    if (this.pinned) return false;
+    if (this.pinned || this.held) return false;
     if (ms > STALL) {
       this.rest(500);
       return false;

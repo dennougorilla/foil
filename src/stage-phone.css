@@ -19,7 +19,7 @@
      card and the hand, the header, the pick button, the caption and the gaps take about 200px. */
   .card-slot {
     margin-top: 12px;
-    width: clamp(96px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px));
+    width: clamp(64px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px));
   }
   .hand-wrap {
     order: 1;

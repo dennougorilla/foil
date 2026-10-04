@@ -1067,6 +1067,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   // One export at a time: the button, the format choice and the APNG shortcut rest while this one works.
   saveBtn.disabled = true;
   saveBtn.setAttribute('aria-busy', 'true');
+  exportBusy(true);
   $<HTMLButtonElement>('toApng').disabled = true;
   buildFormats();
   small.textContent = label;
@@ -1085,6 +1086,7 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
     sfx.error();
     toast(fail, true);
   } finally {
+    exportBusy(false);
     saveBtn.removeAttribute('aria-busy');
     // A picture still loading keeps Save resting; the format buttons are rebuilt, not the old ones re-enabled.
     saveBtn.disabled = store.get().loading;
@@ -1118,6 +1120,17 @@ function celebrate(file: string) {
     saveBtn.classList.remove('is-saved');
     renderSave();
   }, 2400);
+}
+
+/**
+ * An export starts (on) or ends: the stage's quality governor rests meanwhile (an export's frames
+ * say nothing about the stage's own speed), and a seal still showing from the last save comes off.
+ */
+function exportBusy(on: boolean) {
+  stage?.holdQuality(on);
+  if (!on || !saveBtn.classList.contains('is-saved')) return;
+  clearTimeout(celebrateTimer);
+  saveBtn.classList.remove('is-saved');
 }
 
 saveBtn.addEventListener('click', () => {
@@ -1166,6 +1179,7 @@ const apngExport = mountApngExport({
   input: exportInput,
   toast: (msg, error) => toast(msg, error),
   onSaved: (file) => celebrate(file),
+  busy: exportBusy,
   sfx,
 });
 

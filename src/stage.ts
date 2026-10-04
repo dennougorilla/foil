@@ -165,6 +165,11 @@ export class Stage {
     this.resume();
   }
 
+  /** Exports draw and read back on every frame; their frames say nothing about the stage's own speed. */
+  holdQuality(on: boolean) {
+    this.quality.hold(on);
+  }
+
   private resume() {
     if (this.running || document.hidden || this.paused) return;
     this.running = true;
@@ -606,6 +611,7 @@ export class Stage {
       const ryIdle = pose.ry;
       const tk = motion.tiltScale(tune);
       const RX = this.rx.x * tk + rxIdle;
+      motion.flip = flipAngle;
       const RY = this.ry.x * tk + ryIdle + pose.spin + flipAngle;
       const RZ = this.rz.x * tk + rzIdle;
 
