@@ -1,6 +1,7 @@
 // Metal & Gem pack: Relief, Gold and Crystal (the showpiece). See docs/packs.md.
 import { RELIEF_GLSL, ReliefGL } from '../../relief';
 import { PLATINUM_GLSL } from '../platinum';
+import { COSMOHOLO_GLSL } from '../cosmoholo';
 import type { FinishModule } from './types';
 
 /** Relief's shader index (see src/editions.ts). */
@@ -40,12 +41,14 @@ vec3 crystal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
 }
 ${RELIEF_GLSL}
 ${PLATINUM_GLSL}
+${COSMOHOLO_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 5) col = gold(c, uv, uTilt, L);
   else if (e == 13) col = crystal(c, uv, uTilt, L, lod);
   else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
   else if (e == 24) col = platinum(c, uv, uTilt, L, m.r);
+  else if (e == 18) col = cosmoholo(c, uv, uTilt, L);
 `,
   layers: (gl, live) => {
     const relief = new ReliefGL(gl, live);
