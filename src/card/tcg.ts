@@ -30,7 +30,7 @@ export interface TcgContent {
  */
 export function tcgFrame(W: number, H: number, c: TcgContent): TcgFrame {
   const S = Math.min(W, H) / 900;
-  const m = 40 * S;
+  const m = 52 * S;
   const gap = 14 * S;
   const inset = 10 * S;
   const nameH = 0.072 * H;

@@ -123,9 +123,9 @@ export function fitName(ctx: CanvasRenderingContext2D, text: string, max: number
 export const ART_R = RADIUS * 0.45;
 
 /** The picture cropped into the art window, under the frame's inner shade. */
-export function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop) {
+export function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop, rad = ART_R) {
   ctx.save();
-  roundRect(ctx, art.x, art.y, art.w, art.h, ART_R);
+  roundRect(ctx, art.x, art.y, art.w, art.h, rad);
   ctx.clip();
   const { sx, sy, sw, sh } = cropRect(image.width, image.height, crop, art.w / art.h);
   ctx.imageSmoothingEnabled = true;

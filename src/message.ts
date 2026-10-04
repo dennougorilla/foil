@@ -163,7 +163,7 @@ function wrap(line: string, max: number, width: (t: string) => number): string[]
 const EFFECT_LINE_H = 1.3;
 
 /**
- * Lays the effect text into its box: as large as fits (between a sixth and a
+ * Lays the effect text into its box: as large as fits (between a fifth and a
  * fourteenth of the box's height), wrapped to the box's width, every line
  * centred, as on a card made to be given.
  */
@@ -176,11 +176,11 @@ export function layoutEffect(lines: string[], box: Rect, measure: (text: string,
     if (w === undefined) widths.set(t, (w = measure(t, REF)));
     return (w * size) / REF;
   };
-  const padX = box.w * 0.07;
+  const padX = box.w * 0.06;
   const padY = box.h * 0.1;
   const inner = { x: box.x + padX, y: box.y + padY, w: box.w - padX * 2, h: box.h - padY * 2 };
   const min = Math.max(1, Math.floor(box.h * 0.07));
-  let size = Math.max(min, Math.floor(box.h * 0.16));
+  let size = Math.max(min, Math.floor(box.h * 0.19));
   let rows: string[] = [];
   for (; ; size--) {
     rows = lines.flatMap((l) => (l ? wrapEven(l, inner.w, (t) => at(t, size)) : ['']));
