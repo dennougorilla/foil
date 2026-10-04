@@ -312,7 +312,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uUvLamp, d.lamp ?? 1);
     applyTune(gl, p.u, this.tune);
     this.range.bind(p, 4, d.rangeView ?? 0, time);
-    for (const l of cp.layers) l.bind(p, d);
+    for (const l of cp.layers) l.bind?.(p, d);
     gl.activeTexture(gl.TEXTURE7);
     gl.bindTexture(gl.TEXTURE_2D, this.layers);
     gl.uniform1i(p.u.uLayers, 7);
@@ -336,6 +336,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uShadow, 0);
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    for (const l of cp.layers) l.after?.(this, d, time);
     return true;
   }
 

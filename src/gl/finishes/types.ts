@@ -1,11 +1,14 @@
 // What a pack's module hands the card renderer: its finishes' shader code and the textures they need.
 import type { Program } from '../gl';
 import type { CardDraw } from '../renderers';
+import type { GlobeView } from '../snowglobe';
 
-/** Per-renderer state a finish needs besides the face (Relief's map, Warmth's heat). */
+/** Per-renderer state a finish needs besides the face (Relief's map, Warmth's heat, Snow Globe's flakes). */
 export interface FinishLayer {
   setFace?(face: HTMLCanvasElement): void;
-  bind(p: Program, d: CardDraw): void;
+  bind?(p: Program, d: CardDraw): void;
+  /** Draws over the card once it is drawn (Snow Globe's flakes). */
+  after?(view: GlobeView, d: CardDraw, time: number): void;
 }
 
 export interface FinishModule {

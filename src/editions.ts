@@ -28,6 +28,7 @@ export type EditionId =
   | 'lenticular3d'
   | 'lenticularflip'
   | 'stardust'
+  | 'snowglobe'
   // Shaders in src/gl/finishes/supporter.ts
   | 'kintsugi'
   | 'opal'
@@ -88,6 +89,8 @@ export const EDITIONS: Edition[] = [
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
   { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6 },
   { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
+  // Glitter particles on the GPU, see src/gl/snowglobe.ts.
+  { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7 },
   // Shaders in src/gl/finishes/supporter.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

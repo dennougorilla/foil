@@ -49,7 +49,7 @@ const ICONS: Record<string, string> = {
 };
 
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
-const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'stardust', 'kintsugi', 'opal', 'confetti', 'fireworks']);
+const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'stardust', 'snowglobe', 'kintsugi', 'opal', 'confetti', 'fireworks']);
 
 const svg = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 

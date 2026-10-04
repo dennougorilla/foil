@@ -39,7 +39,7 @@ test('the four theme packs and the supporter pack, showpiece last', () => {
   assert.deepEqual(packs, {
     metal: ['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
     light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
-    nature: ['sakura', 'frost', 'stardust', 'magma'],
+    nature: ['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
     supporter: ['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],
   });

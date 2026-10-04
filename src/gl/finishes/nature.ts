@@ -1,5 +1,6 @@
 // Nature pack: Sakura, Frost and Magma (the showpiece). See docs/packs.md.
 import { STARDUST_GLSL } from '../stardust';
+import { SnowGlobe, SNOWGLOBE_GLSL, SNOWGLOBE_SHADER } from '../snowglobe';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -66,12 +67,25 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${STARDUST_GLSL}
+${SNOWGLOBE_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 10) col = frost(c, uv, uTilt, L);
   else if (e == 11) col = magma(c, uv, uTilt, L);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 22) col = stardust(c, uv, uTilt, L);
+  else if (e == 60) col = snowglobe(c, artUv, uTilt, L, lod, m.r);
 `,
+  // Snow Globe's flakes are GPU particles drawn over its card; one set per renderer, made on first use.
+  layers: (gl, live) => {
+    let globe: SnowGlobe | null = null;
+    return [
+      {
+        after: (view, d, time) => {
+          if (d.edition === SNOWGLOBE_SHADER) (globe ??= new SnowGlobe(gl, !live)).draw(view, d, time);
+        },
+      },
+    ];
+  },
 };
 export default finishes;
