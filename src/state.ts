@@ -77,48 +77,90 @@ const PERSIST: (keyof State)[] = [
   ...RANGE_COLOR_PERSIST,
 ];
 
+/** Saved settings that belong to the app, not to one card: a card kept in the binder leaves them out. */
+const APP_KEYS: (keyof State)[] = [
+  'lang',
+  'sound',
+  'crt',
+  'hand',
+  'adjustOpen',
+  'panelTab',
+  'exportFormat',
+  'saveOptsOpen',
+  'gifClear',
+  'gifMatte',
+  'rangeShow',
+  'brushMode',
+  'brushSize',
+  'brushSoft',
+  'frameSwatches',
+];
+/** Everything else saved is the card: its finish, picture, crop, words and looks (see docs/binder.md). */
+export const CARD_KEYS = PERSIST.filter((k) => !APP_KEYS.includes(k));
+export type Card = Partial<State>;
+
+/** The card's own settings, as kept in the binder. */
+export function cardOf(s: State): Card {
+  return Object.fromEntries(CARD_KEYS.map((k) => [k, structuredClone(s[k])]));
+}
+
+const defaults = (): State => ({
+  lang: 'en',
+  sound: true,
+  crt: true,
+  edition: 'holo',
+  hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
+  rarity: 'rare',
+  frame: 'paper',
+  intensity: 1,
+  pixel: 0,
+  name: '',
+  desc: '',
+  nameEdited: false,
+  descEdited: false,
+  sample: 0,
+  crop: { zoom: 1, x: 0.5, y: 0.5 },
+  loading: false,
+  tune: { ...TUNE_DEFAULTS },
+  adjustOpen: false,
+  panelTab: 'card',
+  exportFormat: 'png',
+  saveOptsOpen: false,
+  gifClear: false,
+  gifMatte: 'auto',
+  text: { ...DEFAULT_LETTERING },
+  ...RANGE_COLOR_DEFAULTS,
+});
+
+/** Saved values that no longer fit fall back to their defaults. */
+function sanitize(state: State) {
+  state.tune = sanitizeTune(state.tune);
+  state.adjustOpen = state.adjustOpen === true;
+  // A finish that no longer exists (a retired one) starts over on the default.
+  if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
+  if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
+  if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
+  state.saveOptsOpen = state.saveOptsOpen === true;
+  state.gifClear = state.gifClear === true;
+  if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
+  Object.assign(state, sanitizeRangeColors(state));
+}
+
+/** A kept card made whole again: every card setting it lacks or that no longer fits is the default. */
+export function cleanCard(saved: Card): Card {
+  const s = defaults();
+  for (const k of CARD_KEYS) if (k in saved) (s as unknown as Record<string, unknown>)[k] = saved[k];
+  sanitize(s);
+  return Object.fromEntries(CARD_KEYS.map((k) => [k, s[k]]));
+}
+
 
 export function createStore() {
-  const state: State = {
-    lang: 'en',
-    sound: true,
-    crt: true,
-    edition: 'holo',
-    hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
-    rarity: 'rare',
-    frame: 'paper',
-    intensity: 1,
-    pixel: 0,
-    name: '',
-    desc: '',
-    nameEdited: false,
-    descEdited: false,
-    sample: 0,
-    crop: { zoom: 1, x: 0.5, y: 0.5 },
-    loading: false,
-    tune: { ...TUNE_DEFAULTS },
-    adjustOpen: false,
-    panelTab: 'card',
-    exportFormat: 'png',
-    saveOptsOpen: false,
-    gifClear: false,
-    gifMatte: 'auto',
-    text: { ...DEFAULT_LETTERING },
-    ...RANGE_COLOR_DEFAULTS,
-  };
+  const state = defaults();
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
-    state.tune = sanitizeTune(state.tune);
-    state.adjustOpen = state.adjustOpen === true;
-    // A finish that no longer exists (a retired one) starts over on the default.
-    if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
-    if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
-    if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
-    state.saveOptsOpen = state.saveOptsOpen === true;
-    state.gifClear = state.gifClear === true;
-    if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
-    Object.assign(state, sanitizeRangeColors(state));
+    sanitize(state);
   } catch {
     /* storage unavailable: defaults are fine */
   }

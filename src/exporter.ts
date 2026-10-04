@@ -46,22 +46,26 @@ export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-'
 
 const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
 
-export function download(blob: Blob, name: string): string {
-  const url = URL.createObjectURL(blob);
+/** Saves a made file through the browser's download; answers with its name. */
+export function download(file: File): string {
+  const url = URL.createObjectURL(file);
   const a = document.createElement('a');
   a.href = url;
-  a.download = name;
+  a.download = file.name;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-  return name;
+  return file.name;
 }
 
-/** A flat, transparent PNG at the face texture's native resolution, with a sheen frozen mid-tilt. */
-export async function exportPng(input: ExportInput): Promise<string> {
+/** Clear margin round the still card, so its tilted edge and glow are not cut. */
+export const STILL_PAD = 24;
+
+/** The card drawn once at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
+export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement> {
   await packLoaded(input.edition);
-  const pad = 24;
+  const pad = STILL_PAD;
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
@@ -100,10 +104,21 @@ export async function exportPng(input: ExportInput): Promise<string> {
     },
     1.7,
   );
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+  // Copied out, so the GL context can go at once.
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  out.getContext('2d')!.drawImage(canvas, 0, 0);
   r.gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return out;
+}
+
+/** A flat, transparent PNG of the still card. */
+export async function exportPng(input: ExportInput): Promise<File> {
+  const canvas = await renderStill(input);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
   if (!blob) throw new Error('png');
-  return download(blob, `${fileSafe(input.name)}-${input.edition.id}.png`);
+  return new File([blob], `${fileSafe(input.name)}-${input.edition.id}.png`, { type: 'image/png' });
 }
 
 function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
@@ -215,10 +230,20 @@ export function animLoop(sourceMs: number | undefined, fallbackMs: number): { lo
   return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
 }
 
-const GIF_W = 480;
-const GIF_H = 600;
+/** A GIF's frame size, its time between frames (ms, a multiple of 10), and at most how many frames it holds. */
+export interface GifSize {
+  w: number;
+  h: number;
+  delay: number;
+  maxFrames: number;
+}
+const GIF_SAVE: GifSize = { w: 480, h: 600, delay: 50, maxFrames: Infinity };
+/**
+ * For the share sheet: smaller and at most 50 frames (a long loop gets longer frames instead), so
+ * even a noisy picture stays well under the 15 MB X takes (50 × 360 × 450 is 8.1 MB before compression).
+ */
+export const GIF_SHARE: GifSize = { w: 360, h: 450, delay: 60, maxFrames: 50 };
 const GIF_FRAMES = 48;
-const GIF_DELAY = 50;
 /** Share of the progress bar spent drawing frames; the worker's encode fills the rest. */
 const GIF_DRAW_SHARE = 0.35;
 
@@ -230,6 +255,8 @@ export interface GifOptions {
   clear: boolean;
   /** 'auto' keeps the card's own edge colour on solid edge pixels; a '#rrggbb' blends them into it. */
   matte: string;
+  /** The saved size when left out. */
+  size?: GifSize;
 }
 
 /**
@@ -240,7 +267,7 @@ export async function exportGif(
   input: ExportInput,
   onProgress?: (p: number, encoding: boolean) => void,
   opts: GifOptions = { clear: false, matte: 'auto' },
-): Promise<string> {
+): Promise<File> {
   await packLoaded(input.edition);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
@@ -256,7 +283,10 @@ export async function exportGif(
   // A worker failure mid-draw surfaces at the await below, not as an unhandled rejection.
   result.catch(() => {});
 
-  const { loopMs, sourceSpan } = animLoop(input.loopMs, GIF_FRAMES * GIF_DELAY);
+  const { w: GIF_W, h: GIF_H, maxFrames, ...size } = opts.size ?? GIF_SAVE;
+  const { loopMs, sourceSpan } = animLoop(input.loopMs, GIF_FRAMES * size.delay);
+  // Past the most frames it may hold, the loop keeps its length and each frame shows longer.
+  const GIF_DELAY = Math.max(size.delay, Math.ceil(loopMs / maxFrames / 10) * 10);
   const frames = Math.round(loopMs / GIF_DELAY);
   const DUR = (frames * GIF_DELAY) / 1000;
   let scene: Scene | undefined;
@@ -275,7 +305,7 @@ export async function exportGif(
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
     send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
     const bytes = await result;
-    return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
+    return new File([bytes], `${fileSafe(input.name)}-${input.edition.id}.gif`, { type: 'image/gif' });
   } finally {
     scene?.dispose();
     worker.terminate();
