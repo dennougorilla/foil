@@ -18,6 +18,7 @@ export type EditionId =
   | 'warmth'
   | 'shadowbox'
   | 'shallows'
+  | 'blacklight'
   // Shaders in src/gl/sponsorShaders.ts
   | 'kintsugi'
   | 'opal'
@@ -36,6 +37,11 @@ export interface Edition {
   dither?: boolean;
   /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a heat field. */
   touch?: boolean;
+  /**
+   * Its light is an ultraviolet lamp: it sits exactly under the pointer, drifts slowly by itself
+   * otherwise, and a drag on the card moves it instead of tossing the card.
+   */
+  torch?: boolean;
 }
 
 /** Hand order. Only the first seven are out from the start; the rest are secrets (src/secrets.ts, src/sponsor.ts). */
@@ -59,6 +65,8 @@ export const EDITIONS: Edition[] = [
   { id: 'warmth', shader: 20, color: '#ff8a5c', swirl: ['#081226', '#1d3f78', '#d9775c'], value: 6, touch: true },
   { id: 'shadowbox', shader: 16, color: '#f0d9a8', swirl: ['#0d0b10', '#3b2a3f', '#c99a62'], value: 6 },
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
+  // Shader in src/gl/blacklight.ts.
+  { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
   // Shaders in src/gl/sponsorShaders.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

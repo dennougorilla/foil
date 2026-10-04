@@ -5,6 +5,7 @@ import type { Store } from './state';
 import { motion } from './tune/motion';
 import { tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardUv, HeatField, Swipe, SWIPES } from './touch/heat';
+import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/blacklight';
 
 class Spring {
   v = 0;
@@ -75,8 +76,11 @@ export class Stage {
   // Pointer
   private pointer = { x: -1, y: -1, inside: false, nx: 0, ny: 0, overCard: false };
   private drag = { active: false, id: -1, sx: 0, sy: 0, lx: 0, ly: 0, lt: 0, vx: 0, vy: 0, moved: 0 };
-  /** A press on a finish that reacts to touch: it strokes the card instead of tossing it. */
+  /** A press on a finish that reacts to touch (or carries a lamp): it strokes the card instead of tossing it. */
   private rub = { active: false, id: -1 };
+  /** Where Blacklight's lamp shines on the main card (card uv); it glides to the pointer or its drift. */
+  private lamp: [number, number] = torchAt(0);
+  private lampPower = TORCH_IDLE;
   /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
   private lastTouch: [number, number] | null = null;
   private lastPointer: [number, number] = [0, 0];
@@ -253,7 +257,8 @@ export class Stage {
     });
     cardSlot.addEventListener('pointerdown', (e) => {
       cardSlot.setPointerCapture(e.pointerId);
-      if (editionById(this.o.store.get().edition).touch) {
+      const pressed = editionById(this.o.store.get().edition);
+      if (pressed.touch || pressed.torch) {
         // A finger lands without moving first, so take its position from the press itself.
         update(e);
         // The card gives a little under the finger and stays put to be stroked.
@@ -520,14 +525,16 @@ export class Stage {
         (this.ry.x + ryIdle) / 0.32 + pose.sheen[0] + orbit[0],
         (this.rx.x + rxIdle) / 0.28 + pose.sheen[1] + orbit[1],
       ];
+      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
+      const pointed = over && !this.drag.active && !this.hold;
       let light: [number, number];
-      if (over && !this.drag.active && !this.hold) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
+      if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);
+      else if (pointed) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
       else if (gyro) light = [clamp(gyro[0] * 0.5 + 0.5, 0, 1), clamp(gyro[1] * 0.5 + 0.5, 0, 1)];
       else light = [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
       light = motion.light(tune, light);
 
       const lift = (this.sc.x - 1) * 120 + (this.drag.active ? 14 : 0);
-      const cardPose = { cx: r.cx + this.ox.x, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
       this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
       this.cards.drawCard(
         {
@@ -542,6 +549,7 @@ export class Stage {
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
+          lamp: this.lampPower,
         },
         motion.fx,
       );
@@ -555,6 +563,17 @@ export class Stage {
     this.cards.drawParticles(this.particles);
     requestAnimationFrame(this.frame);
   };
+
+  /**
+   * Blacklight's lamp: right under the pointer at full power, gliding more slowly back to its
+   * drift when let go, where it glows dimmer, so taking hold of it is unmistakable.
+   */
+  private aimLamp(at: [number, number], pointed: boolean, dt: number): [number, number] {
+    this.lampPower += ((pointed ? 1 : TORCH_IDLE) - this.lampPower) * (1 - Math.exp(-dt * 8));
+    const k = 1 - Math.exp(-dt * (pointed ? 24 : 3));
+    this.lamp = [this.lamp[0] + (at[0] - this.lamp[0]) * k, this.lamp[1] + (at[1] - this.lamp[1]) * k];
+    return this.lamp;
+  }
 
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
   private warm(at: [number, number] | null, dt: number) {
@@ -653,7 +672,8 @@ export class Stage {
           intensity: state.intensity,
           pixel: PIXEL_STEPS[state.pixel] ? Math.max(18, PIXEL_STEPS[state.pixel] * 0.5) : 0,
           tilt: [card.tiltY.x / 0.35 + Math.sin(t * 0.5) * 0.5 * idle, card.tiltX.x / 0.3 + Math.cos(t * 0.4) * 0.5 * idle],
-          light: [0.5, 0.35],
+          // Blacklight's preview drifts its lamp round by itself.
+          light: e.torch ? torchAt(motion.fx / TORCH_DRIFT + i * 0.1) : [0.5, 0.35],
           alpha: 1 - clamp(card.deal.x, 0, 1) * 0.6,
           flash: 0,
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],

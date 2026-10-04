@@ -2,11 +2,12 @@ import { FACE_H, FACE_W } from './card/face';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { fixedLight, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { fixedLight, loopCycles, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
+import { TORCH_STILL, torchAt } from './gl/blacklight';
 import type { LayerMap } from './depth/layers';
 
 export interface ExportInput {
@@ -76,7 +77,8 @@ export async function exportPng(input: ExportInput): Promise<string> {
       // A finish that reacts to touch shows a swipe made for this picture, caught while it is warm.
       heat: input.edition.touch ? autoTouch(input.face, 3 + AUTO_STILL) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it.
-      ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : [0.32, 0.22]),
+      // Blacklight's lamp shines on the art.
+      ...stillPose([0.35, -0.25], tune.light === 'fixed' ? fixedLight(tune.lightAngle) : input.edition.torch ? TORCH_STILL : [0.32, 0.22]),
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
@@ -163,7 +165,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           intensity: input.intensity,
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
           tilt: pose.tilt,
-          light: pose.light,
+          // Blacklight's lamp sweeps slowly round the art instead (unless the tune fixes the light).
+          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(p * loopCycles(tune)) : pose.light,
           alpha: 1,
           flash: 0,
           shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,

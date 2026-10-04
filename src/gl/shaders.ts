@@ -4,6 +4,7 @@ import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
 import { SPONSOR_DISPATCH, SPONSOR_GLSL } from './sponsorShaders';
 import { SHALLOWS_GLSL } from './shallows';
+import { BLACKLIGHT_GLSL } from './blacklight';
 import { RELIEF_GLSL } from '../relief';
 import { TOUCH_GLSL } from '../touch/glsl';
 import { SHADOWBOX_GLSL } from './shadowboxShader';
@@ -395,6 +396,7 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${SHALLOWS_GLSL}
+${BLACKLIGHT_GLSL}
 ${LETTERING_GLSL}
 ${RELIEF_GLSL}
 
@@ -454,13 +456,14 @@ void main() {
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
+  else if (e == 72) col = blacklight(c, uv, L, lod, m);
   ${SPONSOR_DISPATCH}
   tPattern = false;
   uv = artUv;
   if (e != 0 && e != 20) col = tuneColor(col, c); // Warmth tunes its own ink (see touch/glsl.ts)
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12) amt = uIntensity;
+  if (e == 5 || e == 4 || e == 12 || e == 72) amt = uIntensity; // Blacklight's lamp lights the frame as fully as the art
   if (e == 13) amt *= m.r; // facets only cut the art, never the nameplate
   amt *= 1.0 - m.b; // the ink outline always stays ink
   float sel = foilRange(uv, L);
@@ -469,7 +472,9 @@ void main() {
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
-  if (e != 0) {
+  if (e == 72) {
+    // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
+  } else if (e != 0) {
     float d = length((uv - uLight) * vec2(1.0, 1.4));
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity);
   } else {
