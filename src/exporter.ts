@@ -150,14 +150,11 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   const animMask = input.faceAt ? document.createElement('canvas') : null;
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
   const kind = input.edition.touch;
-  const cycle = loopCycle(tune, !!input.edition.torch);
   const touch = kind ? autoTouchFor(input.face, kind) : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
   const ch = 640 * k;
   const cw = (ch * 5) / 7;
-  // Blacklight's lamp drifts once per idle cycle, so its loops cover the whole cycle.
-  const cycle = loopCycle(tune, !!input.edition.torch);
 
   return {
     out,
@@ -196,6 +193,10 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           alpha: 1,
           flash: pose.flash,
           glint: pose.glint,
+          beam: view.beam,
+          spot: view.spot,
+          dim: view.dim,
+          star: view.star,
           shadow: !shadow ? null : view.shadow ? [view.shadow[0] * k, view.shadow[1] * k] : [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u],
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
@@ -207,8 +208,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
       else {
         ctx.drawImage(bgCanvas, 0, 0, W, H);
         // A light motion's dim room takes the backdrop down with the card.
-        if (pose.dim > 0) {
-          ctx.fillStyle = `rgba(6, 8, 20, ${Math.min(0.88, pose.dim * 1.15)})`;
+        if (view.dim) {
+          ctx.fillStyle = `rgba(6, 8, 20, ${Math.min(0.88, view.dim * 1.15)})`;
           ctx.fillRect(0, 0, W, H);
         }
       }
