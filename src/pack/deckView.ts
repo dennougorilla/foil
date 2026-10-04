@@ -148,6 +148,8 @@ export function viewDeck(o: DeckViewOptions) {
     if (gap !== null && hand.length < HAND_SIZE) slots.splice(Math.min(gap, slots.length), 0, null);
     while (slots.length < HAND_SIZE) slots.push(null);
     const next = gap === null ? hand.length : Math.min(gap, hand.length);
+    // With the hand full, the card a grid tap will replace wears a "next out" tag.
+    const out = hand.length >= HAND_SIZE ? hand[hand.map((x) => x !== 'base').lastIndexOf(true)] : null;
     handEl.innerHTML = '';
     slots.forEach((id, i) => {
       const slot = document.createElement('div');
@@ -173,6 +175,10 @@ export function viewDeck(o: DeckViewOptions) {
           b.title = t.takeOut;
           b.setAttribute('aria-label', `${o.dict.edition[id]} — ${t.takeOut}`);
         }
+        if (id === out) {
+          b.classList.add('is-next-out');
+          b.insertAdjacentHTML('beforeend', `<span class="db-out">${t.nextOut}</span>`);
+        }
         b.addEventListener('click', () => !dragged && tapHand(id));
         b.addEventListener('pointerdown', (e) => startDrag(e, id, 'hand'));
         slot.append(b);
@@ -184,7 +190,11 @@ export function viewDeck(o: DeckViewOptions) {
       b.classList.toggle('is-in', inHand);
       b.setAttribute('aria-pressed', String(inHand));
       b.setAttribute('aria-label', `${o.dict.edition[id]} — ${inHand ? t.inHandTag : t.addIn}`);
-      if (id === 'base') b.disabled = true;
+      if (id === 'base' && !b.disabled) {
+        b.disabled = true;
+        b.title = t.deckBaseStays;
+        b.insertAdjacentHTML('beforeend', '<i class="db-lock" aria-hidden="true"></i>');
+      }
     }
     $('.db-count').textContent = t.handCount.replace('{n}', String(hand.length));
     $<HTMLButtonElement>('.db-undo').disabled = !history.length;
