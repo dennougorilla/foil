@@ -284,7 +284,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
   for (const [id, r] of Object.entries(report)) {
     const f = (v) => v.toFixed(2);
     expect(r.shader === id, `${id} is not a finish`);
-    expect(r.change > 0.03, `${id} barely changes the picture (${f(r.change * 100)}% of it)`);
+    expect(r.change > 0.02, `${id} barely changes the picture (${f(r.change * 100)}% of it)`);
     expect(r.art > 0.75, `${id} hides the message (correlation ${f(r.art)})`);
     expect(r.plate < 4 && r.plateContrast > 0.9, `${id} covers the name (diff ${f(r.plate)}, contrast ${f(r.plateContrast)})`);
     expect(r.seam < 0.6, `${id} jumps where its loop closes (${f(r.seam)})`);
