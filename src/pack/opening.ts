@@ -19,6 +19,7 @@ import { paintPack, PACK_H, PACK_W, TEAR_Y } from './packArt';
 import { buzz, packSfx } from './sounds';
 import { Pillow, type Print } from './pillow';
 import { PACK_EN } from '../packText';
+import { contain, fitArea } from '../card/shape';
 
 export interface OpeningOptions {
   /** The pack asked for: chosen in the shop at first, or opened straight away (a replay). */
@@ -200,6 +201,9 @@ export function openPack(o: OpeningOptions) {
   const swirl = new BackgroundRenderer($<HTMLCanvasElement>('.pk-swirl'));
   r.tune = tuneGl(o.tune);
   r.setFace(o.face, o.mask);
+  /** The card's shape (height / width), and its size at the area of a trading card one unit tall. */
+  const aspect = o.face.height / o.face.width;
+  const shapeK = fitArea(aspect, 1);
   /** Paints a wrapper into the renderer under its own name ('pack-metal'…). */
   const painted = new Set<PackId>();
   const paintWrapper = (p: Pack) => {
@@ -211,7 +215,8 @@ export function openPack(o: OpeningOptions) {
       line: t.inside.replace('{n}', String(p.finishes.length)),
       top: p.supporter ? 'THANK YOU' : undefined,
     });
-    r.setFace(face, mask, `pack-${p.id}`);
+    // The wrapper is printed as a trading card whatever the card's shape.
+    r.setFace(face, mask, `pack-${p.id}`, [1, 1.4]);
     painted.add(p.id);
   };
   // The pixel fonts may still be on their way the first time; repaint once they are in.
@@ -267,14 +272,15 @@ export function openPack(o: OpeningOptions) {
     // it fit between the header and the bottom; the pack (1.25 card heights) and its one line fit too.
     const forDeck = (vh - 12 - HEADER - 28 - reserve) / 1.18;
     const forPack = (vh - HEADER - 64) / 1.26;
-    cardH = Math.max(80, Math.min(vh * 0.54, (vw - 32) * 0.62 * 1.4, 540, forDeck, forPack));
-    cardW = (cardH * 5) / 7;
-    packW = cardW * 1.08;
+    // A trading card this tall sets the room; the card takes its area in its own shape (shape.ts fitArea).
+    const baseH = Math.max(80, Math.min(vh * 0.54, ((vw - 32) * 0.62) / Math.max(shapeK.w, 5 / 7), 540, forDeck, forPack));
+    ({ w: cardW, h: cardH } = fitArea(aspect, baseH));
+    packW = ((baseH * 5) / 7) * 1.08;
     packH = (packW * PACK_H) / PACK_W;
     cx = vw / 2;
     // Centre what is left over, never pushing the stack under the header.
-    const slack = Math.max(0, Math.min(forDeck - cardH, forPack - cardH)) * 1.18;
-    cy = HEADER + 0.63 * cardH + slack / 2;
+    const slack = Math.max(0, Math.min(forDeck - baseH, forPack - baseH)) * 1.18;
+    cy = HEADER + 0.63 * baseH + slack / 2;
     // The tray: one row on a wide screen, rows of three on a phone; packs at 2 : 3.
     const count = o.shop?.length ?? 0;
     if (count) {
@@ -670,8 +676,7 @@ export function openPack(o: OpeningOptions) {
     const room = vw - (narrow ? 44 : Math.max(44, vw * 0.1));
     const space = narrow ? 10 : Math.max(12, vw * 0.02);
     const fit = (room - (overlap ? 0 : space * (perRow - 1))) / (perRow - (perRow - 1) * overlap);
-    const h = Math.min(vh * (rows === 2 ? 0.25 : 0.44), fit * 1.4, 400);
-    const w = (h * 5) / 7;
+    const { w, h } = contain(aspect, fit, Math.min(vh * (rows === 2 ? 0.25 : 0.44), 400));
     const gap = overlap ? -w * overlap : space;
     // A second row sits under the first one's names (up to two lines).
     const rowH = h + 72;

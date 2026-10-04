@@ -9,6 +9,10 @@ import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
 import './stage-phone.css';
 import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
+import { cardK, contain, shapeById, type ShapeId } from './card/shape';
+
+/** The card's proportions in units of its short side, for a heat grid. */
+const kOf = (shape: ShapeId) => cardK(shapeById(shape).w, shapeById(shape).h);
 
 export class Spring {
   v = 0;
@@ -117,13 +121,13 @@ export class Stage {
   /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
   private lastTouch: [number, number] | null = null;
   private lastPointer: [number, number] = [0, 0];
-  /** The finish on the main card last frame, to greet a touch finish as it arrives. */
-  private shown: EditionId | null = null;
+  /** The finish (and shape) on the main card last frame, to greet a touch finish as it arrives. */
+  private shown: string | null = null;
   /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
   private greet: Swipe | null = null;
   /** What touch left on the main card, and the strokes the hand's preview cards draw themselves. */
   private heat = new HeatField();
-  private demos = new Map<TouchKind, AutoTouch>();
+  private demos = new Map<string, AutoTouch>();
 
   private hand: HandCard[] = [];
   private leaving: Leaving[] = [];
@@ -470,9 +474,11 @@ export class Stage {
     const rows = hr.height > 240 && count > 8 ? 2 : 1;
     const perRow = Math.ceil(count / rows);
     const rowH = hr.height / rows;
-    // Each row reserves room for lift above and the fan's arc below.
-    const h = Math.max(60, Math.min(rowH - 46, 124));
-    const w = h * (5 / 7);
+    // Each row reserves room for lift above and the fan's arc below. A card of another shape fits a
+    // box a little wider than the trading card, so a fan of wide cards stays as easy to tell apart.
+    const sh = shapeById(this.o.store.get().shape);
+    const h0 = Math.max(60, Math.min(rowH - 46, 124));
+    const { w, h } = contain(sh.h / sh.w, h0 * 0.86, h0);
     // Leave room for the fan's outer rotation so edge cards never clip.
     const spacing = Math.min(w * 0.98, (hr.width - w * 1.35) / (perRow - 1));
     const midRow = (perRow - 1) / 2;
@@ -519,10 +525,10 @@ export class Stage {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });
-    if (ed.id !== this.shown) {
-      this.shown = ed.id;
+    if (`${ed.id}|${state.shape}` !== this.shown) {
+      this.shown = `${ed.id}|${state.shape}`;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
-      if (ed.touch) this.heat = new HeatField(ed.touch);
+      if (ed.touch) this.heat = new HeatField(ed.touch, kOf(state.shape));
       this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && !this.motion) {
@@ -837,8 +843,9 @@ export class Stage {
 
   /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
   private demoAt(kind: TouchKind, time: number) {
-    let demo = this.demos.get(kind);
-    if (!demo) this.demos.set(kind, (demo = new AutoTouch(kind)));
+    const shape = this.o.store.get().shape;
+    let demo = this.demos.get(`${kind}|${shape}`);
+    if (!demo) this.demos.set(`${kind}|${shape}`, (demo = new AutoTouch(kind, SWIPES[0], kOf(shape))));
     demo.at(2 + AUTO_STILL[kind] + time / AUTO_LOOP);
     return demo;
   }

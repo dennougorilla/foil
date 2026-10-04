@@ -360,7 +360,7 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
         const back = document.createElement('canvas');
         face.width = back.width = 900;
         face.height = back.height = 1260;
-        drawBack(back);
+        drawBack(back, 'card');
         window.__draws.frames = [];
         const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
         const loop = 6 / store.tune.speed;
@@ -402,6 +402,51 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
     });
     await page.click('#pane-light .tune-reset-all');
   }
+});
+
+/** Width and height of a downloaded PNG (or APNG), from its header. */
+const pngSize = async (dl) => {
+  const b = readFileSync(await dl.path());
+  return [b.readUInt32BE(16), b.readUInt32BE(20)];
+};
+const save = async (format) => {
+  await page.click(`#formatSeg [role=radio][data-format=${format}]`);
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
+  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  return dl;
+};
+
+await step('shape: a wide card turns the slot, the hand and every export on their side; reset brings the trading card back', async () => {
+  await tab('card');
+  expect((await page.getAttribute('#shapeSeg [data-shape=card]', 'aria-checked')) === 'true', 'the trading card is not the starting shape');
+  await page.click('#shapeSeg [data-shape=wide]');
+  await page.waitForTimeout(400);
+  expect((await state()).shape === 'wide', 'the shape was not kept');
+  const slot = await page.locator('#cardSlot').boundingBox();
+  expect(Math.abs(slot.width / slot.height - 1.4) < 0.03, `the slot is ${slot.width}x${slot.height}, not 7:5`);
+  const card = await page.locator('.hand-slot').first().boundingBox();
+  expect(card.width > card.height, 'the hand still holds upright cards');
+  const [pw, ph] = await pngSize(await save('png'));
+  expect(pw === 1260 + 48 && ph === 900 + 48, `the PNG is ${pw}x${ph}`);
+  const gif = parseGIF(readFileSync(await (await save('gif')).path()));
+  expect(gif.lsd.width > gif.lsd.height, `the GIF is ${gif.lsd.width}x${gif.lsd.height}`);
+  const [aw, ah] = await pngSize(await save('apng'));
+  expect(aw > ah, `the APNG is ${aw}x${ah}`);
+  await page.click('#shapeSeg [data-shape=square]');
+  const [sw, sh] = await pngSize(await save('png'));
+  expect(sw === 948 && sh === 948, `the square PNG is ${sw}x${sh}`);
+  // The celebration frames, on a card of another shape.
+  for (const f of ['rim', 'ribbon']) {
+    await page.click(`#frameSeg [role=radio]:nth-child(${['paper', 'ink', 'gilt', 'rarity', 'rim', 'ribbon'].indexOf(f) + 1})`);
+    expect((await state()).frame === f, `the ${f} frame was not chosen`);
+  }
+  await page.click('#cardReset');
+  await page.waitForTimeout(400);
+  const r = await state();
+  expect(r.shape === 'card' && r.frame === 'paper', `reset left ${r.shape}/${r.frame}`);
+  const back = await page.locator('#cardSlot').boundingBox();
+  expect(Math.abs(back.width / back.height - 5 / 7) < 0.02, 'the slot did not go back to 5:7');
+  await page.click('#formatSeg [role=radio][data-format=png]');
 });
 
 const handCount = () => page.locator('.hand-slot').count();
@@ -538,6 +583,28 @@ await step('a replay from the shop can be skipped straight to the haul and close
   expect((await state()).edition === 'base', 'closing a replay changed the finish');
 });
 
+await step('a wide card is dealt in its own shape in the opening', async () => {
+  await tab('card');
+  await page.click('#shapeSeg [data-shape=wide]');
+  await page.click('#adjustToggle');
+  await page.click('#packsBtn');
+  await phase('shop');
+  await page.click('.pk-slot[data-pack=metal]', { force: true });
+  await page.click('.pk-buy');
+  await phase('pack');
+  await page.click('.pk-skip');
+  await phase('haul');
+  await page.waitForTimeout(1200);
+  // The glow behind the showpiece is sized to it.
+  const [w, h] = await page.evaluate(() => ['--w', '--h'].map((v) => parseFloat(getComputedStyle(document.querySelector('.pk-aura')).getPropertyValue(v))));
+  expect(Math.abs(w / h - 1.4) < 0.05, `the showpiece is ${w}x${h} in the haul`);
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  await tab('card');
+  await page.click('#shapeSeg [data-shape=card]');
+  await page.click('#adjustToggle');
+});
+
 await step('held still, the pack opens with a button and the haul fades in', async () => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.click('#packsBtn');
@@ -626,8 +693,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const back = document.createElement('canvas');
     face.width = mask.width = back.width = 900;
     face.height = mask.height = back.height = 1260;
-    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako' });
-    drawBack(back);
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', shape: 'card' });
+    drawBack(back, 'card');
     // A flat card (no idle motion) so the art and the nameplate land on known pixels.
     const W = 360;
     const H = 450;

@@ -1,10 +1,10 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AutoTouch, cardPoint, cardUv, HEAT_H, HEAT_W, HeatField, pickSwipe, Swipe, SWIPES, swipeAt } from '../src/touch/heat.ts';
+import { AutoTouch, cardPoint, cardUv, HeatField, pickSwipe, Swipe, SWIPES, swipeAt } from '../src/touch/heat.ts';
 
-const at = (f: { data: Float32Array }, u: number, v: number) =>
-  f.data[Math.min(HEAT_H - 1, Math.floor(v * HEAT_H)) * HEAT_W + Math.min(HEAT_W - 1, Math.floor(u * HEAT_W))];
+const at = (f: { data: Float32Array; w: number; h: number }, u: number, v: number) =>
+  f.data[Math.min(f.h - 1, Math.floor(v * f.h)) * f.w + Math.min(f.w - 1, Math.floor(u * f.w))];
 const total = (f: { data: Float32Array }) => f.data.reduce((a, b) => a + b, 0);
 
 test('a stroke warms the card along its path and nowhere else', () => {
@@ -13,6 +13,22 @@ test('a stroke warms the card along its path and nowhere else', () => {
   assert.ok(at(f, 0.5, 0.3) > 0.1);
   assert.ok(at(f, 0.2, 0.3) > 0.1);
   assert.equal(at(f, 0.5, 0.8), 0);
+});
+
+test('cells are square on every shape, so a fingertip warms a round spot', () => {
+  assert.deepEqual([new HeatField().w, new HeatField().h], [60, 84]);
+  const wide = new HeatField('warmth', [1.4, 1]);
+  assert.deepEqual([wide.w, wide.h], [84, 60]);
+  for (let i = 0; i < 30; i++) wide.touch(0.5, 0.5, 0.5, 0.5, 1 / 60, true);
+  // How far the warmth reaches across and down, in card widths of the short side.
+  const reach = (du: number, dv: number) => {
+    let n = 0;
+    while (at(wide, 0.5 + du * n, 0.5 + dv * n) > 0.05) n++;
+    return n;
+  };
+  const across = reach(1 / 84, 0);
+  const down = reach(0, 1 / 60);
+  assert.ok(across > 1 && Math.abs(across - down) <= 1, `${across} vs ${down}`);
 });
 
 test('holding still warms more than passing by, but never without limit', () => {

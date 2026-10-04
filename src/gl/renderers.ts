@@ -8,6 +8,7 @@ import type { LayerMap } from '../depth/layers';
 import type { PackId } from '../packs';
 import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
+import { artWindow, cardK, SHORT } from '../card/shape';
 
 export type RGB = [number, number, number];
 
@@ -132,7 +133,7 @@ export class CardRenderer {
   private partBuf: WebGLBuffer;
   private partData = new Float32Array(7 * 512);
   /** Faces by name: the card's own ('card') and any other drawn with the same shader (a pack's wrapper). */
-  private faces = new Map<string, { face: WebGLTexture; mask: WebGLTexture; texels: number }>();
+  private faces = new Map<string, { face: WebGLTexture; mask: WebGLTexture; texels: number; k: [number, number]; art: [number, number, number, number] }>();
   private cardFace: HTMLCanvasElement | null = null;
   private back: WebGLTexture;
   private lettering: LetteringGL;
@@ -219,16 +220,25 @@ export class CardRenderer {
     return !!cp && (!this.live || cp.pending.done());
   }
 
-  /** `key`: 'card' is the card's own face; other names hold extra faces drawn with the same shader. */
-  setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, key = 'card'): void {
+  /**
+   * `key`: 'card' is the card's own face; other names hold extra faces drawn with the same shader.
+   * `k`: the face's proportions in units of its short side (see shape.ts), its own unless given
+   * (a pack's wrapper is drawn as a trading card whatever its texture's size).
+   */
+  setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, key = 'card', k = cardK(face.width, face.height)): void {
     let f = this.faces.get(key);
     if (!f) {
-      f = { face: createTexture(this.gl, true), mask: createTexture(this.gl, false), texels: 1 };
+      f = { face: createTexture(this.gl, true), mask: createTexture(this.gl, false), texels: 1, k, art: [0, 0, 1, 1] };
       this.faces.set(key, f);
     }
     uploadTexture(this.gl, f.face, face, true);
     uploadTexture(this.gl, f.mask, mask, false);
     f.texels = face.width;
+    f.k = k;
+    const W = k[0] * SHORT;
+    const H = k[1] * SHORT;
+    const a = artWindow(W, H);
+    f.art = [a.x / W, a.y / H, (a.x + a.w) / W, (a.y + a.h) / H];
     if (key !== 'card') return;
     this.cardFace = face;
     for (const cp of this.programs.values()) for (const l of cp.layers) l.setFace?.(face);
@@ -324,6 +334,8 @@ export class CardRenderer {
     const star = d.star ?? [0, 0, 0];
     gl.uniform3f(p.u.uStar, star[0], star[1], star[2]);
     gl.uniform1f(p.u.uFaceTexels, f?.texels ?? 1);
+    gl.uniform2f(p.u.uCardK, f?.k[0] ?? 1, f?.k[1] ?? 1.4);
+    gl.uniform4fv(p.u.uArt, f?.art ?? [0, 0, 1, 1]);
     const uv = d.uv ?? [0, 0, 1, 1];
     gl.uniform4f(p.u.uUvRect, uv[0], uv[1], uv[2], uv[3]);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);

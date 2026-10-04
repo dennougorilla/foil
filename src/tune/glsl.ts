@@ -16,7 +16,7 @@ uniform float uTMetal;       // Relief's metal: 0 gold, 1 silver
 
 // True while a finish runs on pattern coordinates; face() then maps back to the art.
 bool tPattern = false;
-const vec2 T_ASPECT = vec2(1.0, 1.4);
+#define T_ASPECT uCardK
 
 vec2 tunePattern(vec2 uv) {
   float c = cos(uTAngle), s = sin(uTAngle);
@@ -67,7 +67,7 @@ float tuneGlitterArea(int e, vec3 m) {
 vec3 tuneGlitter(vec2 uv, vec2 t) {
   if (uTSparkle <= 0.0) return vec3(0.0);
   float n = 64.0 / uTSparkleSize;
-  vec2 g = uv * vec2(n, n * 1.4);
+  vec2 g = uv * uCardK * n;
   vec2 cell = floor(g);
   float h = hash12(cell + 71.3);
   if (h > uTSparkle * 0.45) return vec3(0.0);

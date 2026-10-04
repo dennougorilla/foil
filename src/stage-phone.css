@@ -16,10 +16,14 @@
     display: contents;
   }
   /* Short screens shrink the card rather than push the hand under the Save bar. Besides the
-     card and the hand, the header, the pick button, the caption and the gaps take about 200px. */
+     card and the hand, the header, the pick button, the caption and the gaps take about 200px.
+     That gives the width of a trading card; other shapes take its area (style.css :root). */
   .card-slot {
     margin-top: 12px;
-    width: clamp(64px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px));
+    width: min(
+      calc(clamp(64px, calc((100svh - var(--export-h, 130px) - var(--hand-h) - 200px) * 5 / 7), min(62vw, 300px)) * var(--card-kw) * 1.4),
+      88vw
+    );
   }
   .hand-wrap {
     order: 1;

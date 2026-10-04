@@ -6,6 +6,7 @@ import { editionById } from './editions';
 import type { RangeSnapshot } from './gl/range';
 import type { Dict } from './i18n';
 import type { Store } from './state';
+import { contain } from './card/shape';
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 const W = 84;
@@ -140,12 +141,15 @@ export class MiniPreview {
     r.begin();
     const ry = Math.sin(t * 0.8) * 0.12;
     const rx = Math.cos(t * 0.6) * 0.08;
+    // The card in its own shape, fitted to the view.
+    const f = this.face?.face;
+    const { w, h } = contain(f ? f.height / f.width : 1.4, W - 6, H - 6 * 1.4);
     r.drawCard(
       {
         cx: W / 2,
         cy: H / 2,
-        w: W - 6,
-        h: H - 6 * 1.4,
+        w,
+        h,
         rx,
         ry,
         rz: 0,

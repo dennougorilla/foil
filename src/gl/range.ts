@@ -9,7 +9,7 @@ uniform float uRangeView;  // 0..1: shade what is left out and trace the edge
 uniform float uRangeAnts;  // animation phase for the proof overlay (0 when motion is reduced)
 float foilRange(vec2 uv, float L) {
   // Thumbnail cards paint their nameplate plain, so read the range there from the plain frame too.
-  if (uPlate < 0.5 && uv.y > 0.885) uv = vec2(0.04, 0.5);
+  if (uPlate < 0.5 && (uv.y - uArt.w) * uCardK.y > 0.009) uv = vec2(0.04 / uCardK.x, 0.5);
   vec3 r = texture(uRange, uv).rgb;
   float s = uRangeKey.z;
   float k = (uRangeKey.x <= 0.001 ? 1.0 : smoothstep(uRangeKey.x - s, uRangeKey.x + s, L))
@@ -23,7 +23,7 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   if (uRangeView <= 0.0) return col;
   // A foil-stamping proof: left-out areas print as matte paper (pixel dither), the foil gets a
   // travelling sheen, and the edge is a gold die line with a glint running along it.
-  vec2 cell = floor(uv * vec2(110.0, 154.0));
+  vec2 cell = floor(uv * uCardK * 110.0);
   float checker = mod(cell.x + cell.y, 2.0);
   float grain = vnoise(uv * vec2(260.0, 30.0)) * 0.6 + vnoise(uv * vec2(40.0, 360.0)) * 0.4;
   // Cream stock with the picture printed faintly in ink: a blind proof, not a greyed-out mask.
@@ -31,7 +31,9 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   // Light ink, so anything left out (by area, brightness or the eraser) reads as the same cream stock.
   vec3 paper = mix(stock, stock * vec3(0.42, 0.44, 0.48), (1.0 - luma(col)) * 0.6);
   vec3 o = mix(col, paper, (1.0 - sel) * 0.92);
-  float diag = uv.x * 0.714 + uv.y;
+  // In trading-card heights, so the sheen keeps its size on every shape.
+  vec2 K = uCardK * (5.0 / 7.0);
+  float diag = dot(uv, K);
   float sweep = smoothstep(0.82, 1.0, 0.5 + 0.5 * sin(diag * 7.0 - uRangeAnts * 1.3));
   o += hsv2rgb(vec3(fract(diag * 0.8 + uRangeAnts * 0.05), 0.55, 1.0)) * sweep * 0.22 * sel;
   float w = max(fwidth(sel), 1e-4);
@@ -43,9 +45,9 @@ vec3 showRange(vec3 col, vec2 uv, float sel) {
   o = mix(o, vec3(0.07, 0.1, 0.11), keyline * 0.85);
   o = mix(o, die, edge);
   // Registration marks on the frame, where a printer puts them: middle of each side and top centre.
-  vec2 q = vec2(uv.x * 0.714, uv.y);
+  vec2 q = uv * K;
   for (int i = 0; i < 3; i++) {
-    vec2 c = i == 0 ? vec2(0.022, 0.5) : i == 1 ? vec2(0.714 - 0.022, 0.5) : vec2(0.357, 0.022);
+    vec2 c = i == 0 ? vec2(0.022, 0.5 * K.y) : i == 1 ? vec2(K.x - 0.022, 0.5 * K.y) : vec2(0.5 * K.x, 0.022);
     vec2 d = q - c;
     float r = length(d);
     float ring = 1.0 - smoothstep(0.0018, 0.0042, abs(r - 0.011));

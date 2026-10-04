@@ -17,6 +17,7 @@ const vec3 PL_RUNS = vec3(6.0, 3.2, 1.4);
 // far along itself the line catches it (steeper lines spread the light wider).
 // Rows finer than a pixel fade to their mean, so the lines never shimmer or moire.
 float plLines(vec2 uv, out float wobble, out float reach, out float flash) {
+  uv = asTrading(uv);
   float px = fwidth(uv.y);
   // Rows wander a little, so the lines are unevenly spaced and never line up into a grid.
   uv.y += (vnoise(vec2(uv.x * 0.8, uv.y * 37.0)) - 0.5) * 0.006;
@@ -44,8 +45,8 @@ vec3 platinum(vec3 c, vec2 uv, vec2 t, float L, float art) {
   vec2 lp = tunePattern(uLight);
   // The streak: a soft envelope under the light, filled with single lines that each catch it
   // over their own length, so it reads as a bundle of bright hairlines, not one smooth beam.
-  float s = (uv.x - lp.x + wobble * 0.012) / reach;
-  float dy = (uv.y - lp.y) * 1.4;
+  float s = ((uv.x - lp.x) * uCardK.x + wobble * 0.012) / reach;
+  float dy = (uv.y - lp.y) * uCardK.y;
   float along = 0.08 + 0.92 * exp(-dy * dy * 3.5);
   float core = exp(-s * s / 0.0006);
   float shoulder = exp(-s * s / 0.02);

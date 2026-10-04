@@ -49,12 +49,16 @@ export class RangeModel {
   private scratch = canvas2d(RANGE_W, RANGE_H);
   private blank = { face: document.createElement('canvas'), mask: document.createElement('canvas') };
 
+  /** Range-texture rows per column over the same distance on the card: 1 on the trading card. */
+  cellAspect = 1;
+
   /** Called after the live face is redrawn. Region masks are refreshed from it. */
   onFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): void {
     this.face = face;
     this.spec = spec;
-    // The mask is pure geometry; only look at it again when the frame could have changed.
-    const key = `${spec.frame}|${spec.frameColor ?? ''}`;
+    this.cellAspect = (RANGE_H / RANGE_W) * (face.width / face.height);
+    // The mask is pure geometry; only look at it again when the frame or the shape could have changed.
+    const key = `${spec.frame}|${spec.frameColor ?? ''}|${spec.shape}`;
     if (key === this.maskKey) return;
     this.maskKey = key;
     const m = sample(mask, this.scratch);
@@ -214,18 +218,23 @@ export class RangeModel {
     this.layers.erase.fill(0);
   }
 
-  /** One round dab at (x, y) in range-texture pixels. */
+  /**
+   * One dab at (x, y) in range-texture pixels, `radius` of them across. The texture spans the face
+   * whatever its shape, so its cells are square only on the trading card; the dab is stretched by
+   * `cellAspect` to stay round on the card.
+   */
   dab(x: number, y: number, radius: number, soft: number, mode: BrushMode): void {
     const into = mode === 'add' ? this.layers.add : this.layers.erase;
     const other = mode === 'add' ? this.layers.erase : this.layers.add;
     const inner = radius * (1 - soft);
+    const sy = this.cellAspect;
     const x0 = Math.max(0, Math.floor(x - radius));
     const x1 = Math.min(RANGE_W - 1, Math.ceil(x + radius));
-    const y0 = Math.max(0, Math.floor(y - radius));
-    const y1 = Math.min(RANGE_H - 1, Math.ceil(y + radius));
+    const y0 = Math.max(0, Math.floor(y - radius * sy));
+    const y1 = Math.min(RANGE_H - 1, Math.ceil(y + radius * sy));
     for (let py = y0; py <= y1; py++) {
       for (let px = x0; px <= x1; px++) {
-        const d = Math.hypot(px + 0.5 - x, py + 0.5 - y);
+        const d = Math.hypot(px + 0.5 - x, (py + 0.5 - y) / sy);
         if (d > radius) continue;
         const f = d <= inner ? 1 : 1 - smooth(inner, radius, d);
         const i = py * RANGE_W + px;

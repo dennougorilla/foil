@@ -1,11 +1,11 @@
-// The card back, painted as pixel art on a 90 × 126 grid and blown up with hard pixels, like the
-// packs' wrappers. Pixels flagged as foil are written with alpha 254 so the card shader can make
+// The card back, painted as pixel art (one pixel per 10 face px: 90 × 126 on the trading card, and
+// the card's own proportions on every other shape) and blown up with hard pixels, like the packs' wrappers. Pixels flagged as foil are written with alpha 254 so the card shader can make
 // them glint as the card turns (see the back branch in src/gl/shaders.ts).
 
-import { FACE_H, FACE_W } from './face';
+import { shapeById, type ShapeId } from './shape';
 
-const BACK_W = 90;
-const BACK_H = 126;
+/** Face px per back pixel. */
+const PX = 10;
 
 type RGB = [number, number, number];
 const rgb = (hex: string): RGB => {
@@ -47,10 +47,16 @@ const GLYPHS: Record<string, string[]> = {
 };
 
 class Grid {
-  px = new Uint8ClampedArray(BACK_W * BACK_H * 4);
+  px: Uint8ClampedArray<ArrayBuffer>;
+  constructor(
+    readonly w: number,
+    readonly h: number,
+  ) {
+    this.px = new Uint8ClampedArray(w * h * 4);
+  }
   set(x: number, y: number, c: RGB, foil = false) {
-    if (x < 0 || y < 0 || x >= BACK_W || y >= BACK_H) return;
-    const i = (y * BACK_W + x) * 4;
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+    const i = (y * this.w + x) * 4;
     this.px.set(c, i);
     this.px[i + 3] = foil ? 254 : 255;
   }
@@ -108,18 +114,19 @@ function pip(g: Grid, cx: number, cy: number, r: number) {
 }
 
 /** Inside the paper border: a dark inset frame with a gold hairline, like the face's art window. */
-const FIELD = { x: 9, y: 9, w: BACK_W - 18, h: BACK_H - 18, r: 3 };
+const fieldOf = (g: Grid) => ({ x: 9, y: 9, w: g.w - 18, h: g.h - 18, r: 3 });
 
 function shell(g: Grid) {
-  roundFill(g, 0, 0, BACK_W, BACK_H, 7, () => INK);
-  roundFill(g, 1, 1, BACK_W - 2, BACK_H - 2, 6, (x, y) => (y > BACK_H - 4 || x > BACK_W - 4 ? PAPER_LO : PAPER));
-  roundFill(g, FIELD.x - 4, FIELD.y - 4, FIELD.w + 8, FIELD.h + 8, FIELD.r + 4, () => FRAME);
-  roundFill(g, FIELD.x - 1, FIELD.y - 1, FIELD.w + 2, FIELD.h + 2, FIELD.r + 1, (x, y) => (x + y < BACK_W ? GOLD[2] : GOLD[1]), () => true);
+  const F = fieldOf(g);
+  roundFill(g, 0, 0, g.w, g.h, 7, () => INK);
+  roundFill(g, 1, 1, g.w - 2, g.h - 2, 6, (x, y) => (y > g.h - 4 || x > g.w - 4 ? PAPER_LO : PAPER));
+  roundFill(g, F.x - 4, F.y - 4, F.w + 8, F.h + 8, F.r + 4, () => FRAME);
+  roundFill(g, F.x - 1, F.y - 1, F.w + 2, F.h + 2, F.r + 1, (x, y) => (x + y < g.w ? GOLD[2] : GOLD[1]), () => true);
 }
 
 /** The red ground: an engraved lattice, embossed at every crossing, sunk under the frame's top and left. */
 function field(g: Grid) {
-  const { x: fx, y: fy, w: fw, h: fh, r } = FIELD;
+  const { x: fx, y: fy, w: fw, h: fh, r } = fieldOf(g);
   roundFill(g, fx, fy, fw, fh, r, (x, y) => {
     const u = x - fx + 4;
     const v = y - fy;
@@ -143,8 +150,8 @@ function field(g: Grid) {
 
 /** The mark: FOIL's four tiles on a dark cartouche with notched ends, ringed in gold foil and joined to two pips. */
 function emblem(g: Grid) {
-  const cx = Math.round(BACK_W / 2);
-  const cy = Math.round(BACK_H / 2);
+  const cx = Math.round(g.w / 2);
+  const cy = Math.round(g.h / 2);
   const TW = 11;
   const TH = 13;
   const gap = 2;
@@ -189,33 +196,30 @@ function emblem(g: Grid) {
   'FOIL'.split('').forEach((ch, i) => tile(g, tx0 + i * (TW + gap), ty0 + lifts[i], TW, TH, TILES[i], ch));
 }
 
-/** Paints the back's pixel grid (alpha 254 marks foil). */
-function paintBackGrid(): ImageData {
-  const g = new Grid();
+/** Paints the back's pixel grid for a face `w` × `h` (alpha 254 marks foil). */
+function grid(w: number, h: number): HTMLCanvasElement {
+  const g = new Grid(Math.round(w / PX), Math.round(h / PX));
   shell(g);
   field(g);
   emblem(g);
-  return new ImageData(g.px, BACK_W, BACK_H);
-}
-
-function grid(): HTMLCanvasElement {
   const small = document.createElement('canvas');
-  small.width = BACK_W;
-  small.height = BACK_H;
-  small.getContext('2d')!.putImageData(paintBackGrid(), 0, 0);
+  small.width = g.w;
+  small.height = g.h;
+  small.getContext('2d')!.putImageData(new ImageData(g.px, g.w, g.h), 0, 0);
   return small;
 }
 
-/** The back at its pixel size, as an image address for CSS. */
-export const backUrl = () => grid().toDataURL();
+/** The trading card's back at its pixel size, as an image address for CSS (the deck's pile). */
+export const backUrl = () => grid(900, 1260).toDataURL();
 
-/** The card back at the face texture's size, its pixels blown up hard. */
-export function drawBack(back: HTMLCanvasElement): void {
-  const small = grid();
-  back.width = FACE_W;
-  back.height = FACE_H;
+/** The card back at the face texture's size for the shape, its pixels blown up hard. */
+export function drawBack(back: HTMLCanvasElement, shape: ShapeId): void {
+  const { w, h } = shapeById(shape);
+  const small = grid(w, h);
+  back.width = w;
+  back.height = h;
   const ctx = back.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, FACE_W, FACE_H);
-  ctx.drawImage(small, 0, 0, FACE_W, FACE_H);
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(small, 0, 0, w, h);
 }

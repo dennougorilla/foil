@@ -368,7 +368,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
   float flare = k >= 1.0 ? 0.0 : exp(-pow((uv.x - sweepX) / 0.018, 2.0)) * (1.0 - k);
   vec3 N = normalize(vec3(-grad * sgn * relief, 1.0));
   // A point light at the hotspot, nudged to the upper left so relief always reads.
-  vec2 lp = (uLight - uv) * vec2(1.0, 1.4);
+  vec2 lp = (uLight - uv) * uCardK;
   vec3 Ldir = normalize(vec3(lp * 1.5 + vec2(-0.22, -0.3), 0.5));
   vec3 V = normalize(vec3(-t.x * 0.35, -t.y * 0.35, 1.0));
   vec3 Hv = normalize(Ldir + V);
@@ -415,8 +415,8 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // Hot-foil: a mirror-like metal with a fine grain, pressed slightly into the card.
     // Grain fades out as the card shrinks, so small cards don't turn to dither noise.
     float fine = 1.0 / (1.0 + 2.5 * letterLod);
-    float grain = (vnoise(uv * vec2(1100.0, 1540.0)) - 0.5) * fine;
-    float grain2 = (vnoise(uv * vec2(1540.0, 1100.0) + 7.0) - 0.5) * fine;
+    float grain = (vnoise(uv * uCardK * 1100.0) - 0.5) * fine;
+    float grain2 = (vnoise(asTrading(uv) * vec2(1540.0, 1100.0) + 7.0) - 0.5) * fine; // any shape: streaks as on the trading card
     vec3 Nf = normalize(N + vec3(grain, grain2, 0.0) * (0.04 + 0.08 * (1.0 - uTextGloss)));
     float nd = max(dot(Nf, Hv), 0.0);
     // Sweeping reflection band: the foil mirrors a bright room edge that slides as the card tilts.
@@ -456,7 +456,7 @@ vec3 lettering(vec3 col, vec2 uv, vec2 t) {
     // Spot UV: clear varnish exactly on the glyphs. Nearly invisible head-on,
     // a hard gloss when the angle is right.
     float glint = pow(ndh, mix(40.0, 260.0, uTextGloss));
-    float sweep = pow(0.5 + 0.5 * sin(dot(uv, vec2(5.0, 7.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 2.0);
+    float sweep = pow(0.5 + 0.5 * sin(dot(uv * uCardK, vec2(5.0)) - dot(t, vec2(3.4, 2.2)) * 1.3), 2.0);
     // Varnish deepens what's under it and leaves a faint gloss, so even clear varnish on bare stock reads.
     col = mix(col, col * 0.86, cover * 0.8);
     col += vec3(0.05) * cover;

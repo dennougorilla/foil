@@ -1,4 +1,5 @@
 import type { EditionId, FrameId, RarityId } from './editions';
+import type { ShapeId } from './card/shape';
 import type { FoilTone, LetterStyle } from './lettering';
 import type { ExportMotion, Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
@@ -121,6 +122,7 @@ const ja = {
   desc: '説明',
   rarity: 'レアリティ',
   frame: '枠',
+  shape: '形',
   intensity: '効果の強さ',
   pixel: 'ピクセル化',
   off: 'オフ',
@@ -226,7 +228,17 @@ const ja = {
     ink: 'インク',
     gilt: '真鍮',
     rarity: 'レア色',
+    rim: '金の縁',
+    ribbon: 'リボン',
   } satisfies Record<FrameId, string>,
+  shapeName: {
+    card: 'トレカ',
+    wide: '横長',
+    square: '正方形',
+    post: 'はがき縦',
+    postWide: 'はがき横',
+    meishi: '名刺',
+  } satisfies Record<ShapeId, string>,
   samplesName: ['夕焼けの峠', '月の潮', 'ハートのA'],
   samplesDesc: [
     'お気に入りの一枚を、とっておきのレアに。',
@@ -458,6 +470,7 @@ const en: Dict = {
   desc: 'Description',
   rarity: 'Rarity',
   frame: 'Frame',
+  shape: 'Shape',
   intensity: 'Finish strength',
   pixel: 'Pixelate',
   off: 'Off',
@@ -563,6 +576,16 @@ const en: Dict = {
     ink: 'Ink',
     gilt: 'Brass',
     rarity: 'By rarity',
+    rim: 'Gold rim',
+    ribbon: 'Ribbon',
+  },
+  shapeName: {
+    card: 'Card',
+    wide: 'Wide',
+    square: 'Square',
+    post: 'Postcard',
+    postWide: 'Post, wide',
+    meishi: 'Business',
   },
   samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts'],
   samplesDesc: [

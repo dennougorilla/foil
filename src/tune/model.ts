@@ -732,7 +732,7 @@ function lightShow(m: 'beam' | 'spotlight' | 'flare', p: number): ExportView {
     const power = smooth(clamp(p / 0.08, 0, 1)) * smooth(clamp((1 - p) / 0.08, 0, 1));
     v.beam = [pos, 0.2, Math.atan2(0.6, 0.8), power];
     v.dim = 0.7;
-    v.light = [0.95 + 0.8 * pos, 0.07 + (0.6 * pos) / 1.4];
+    v.light = [0.95 + 0.8 * pos, 0.07 + (0.6 * pos) / 1.4]; // any shape: the glare only has to ride near the band's upper end
     // The sheen and a slight lean follow the band, so the finish's colours flow under it.
     const k = Math.sin(Math.PI * 2 * p);
     pose.sheen = [k * 0.9, k * 0.4];

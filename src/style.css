@@ -482,12 +482,19 @@ button {
   min-height: 0;
 }
 
+/* The card's shape sets the slot: the trading card's area in its own proportions (card/shape.ts fitArea). */
+:root {
+  --card-ar: 900 / 1260;
+  --card-kw: 0.7143;
+  --card-kh: 1;
+}
+
 .card-slot {
   position: relative;
   z-index: 3;
-  height: min(100%, 520px);
+  height: calc(min(100%, 520px) * var(--card-kh));
   max-height: 520px;
-  aspect-ratio: 5 / 7;
+  aspect-ratio: var(--card-ar);
   padding: 0;
   border: 0;
   border-radius: 6%;
@@ -2641,6 +2648,11 @@ input[type='range']:disabled {
   opacity: 0.5;
 }
 
+/* Six frames sit three to a row. */
+.seg-frames {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .seg-frames .seg-btn {
   display: grid;
   justify-items: center;
@@ -2665,6 +2677,68 @@ input[type='range']:disabled {
   inset: 4px 4px 9px;
   border-radius: 2px;
   background: linear-gradient(160deg, #4f6e86, #24384a);
+}
+
+/* Gold rim: the art window edged in gold. Ribbon: a red band across the top-left corner. */
+.swatch[data-frame='rim'] {
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px #d9a441;
+}
+
+.swatch[data-frame='rim']::after {
+  box-shadow: 0 0 0 2px #d9a441;
+}
+
+.swatch[data-frame='ribbon'] {
+  overflow: hidden;
+}
+
+.swatch[data-frame='ribbon']::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: -7px;
+  width: 22px;
+  height: 5px;
+  background: #d23a45;
+  box-shadow: 0 0 0 1px var(--edge);
+  transform: rotate(-45deg);
+}
+
+/* Shapes: a quiet row of outlines with their names, the card's own shape first. */
+.seg-shapes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.seg-shapes .seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 4px 4px 3px;
+  font-size: 14px;
+  white-space: normal;
+  word-break: keep-all;
+  text-align: left;
+}
+
+.shape-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 22px;
+}
+
+.shape-ico::before {
+  content: '';
+  width: var(--w);
+  height: var(--h);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px currentColor;
+  opacity: 0.85;
 }
 
 /* Side notes on the board stay readable, at full strength on the colour slabs. */
@@ -3103,7 +3177,8 @@ input[type='range']:disabled {
   }
   .card-slot {
     height: auto;
-    width: min(62vw, 300px);
+    /* As wide as a trading card would be, scaled to the card's shape (see :root), never past the screen. */
+    width: min(calc(min(62vw, 300px) * var(--card-kw) * 1.4), 88vw);
   }
   /* On phones the panel is far below, so the first action also sits right under the card. */
   .btn.stage-pick {

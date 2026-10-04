@@ -3,6 +3,7 @@
 import { createScene, download, fileSafe, packLoaded, type ExportInput, type Scene } from '../exporter';
 import { exportLoop, framePlan, TUNE_DEFAULTS, type ExportMotion, type Tune } from '../tune/model';
 import type { ApngRequest, ApngResponse } from './apngWorker';
+import { exportFrame } from '../card/shape';
 
 const W = 320;
 const H = 400;
@@ -26,11 +27,15 @@ export interface ApngPlan {
   sourceSpan: number;
 }
 
-/** Frame timing and expected size: the loop of the export's motion, as for the GIF. */
-export function apngPlan(tune: Tune, loopMs?: number, motion: ExportMotion = 'stage'): ApngPlan {
+/**
+ * Frame timing, size and expected bytes for a card `aspect` tall (height / width): the loop of the
+ * export's motion, as for the GIF.
+ */
+export function apngPlan(tune: Tune, aspect: number, loopMs?: number, motion: ExportMotion = 'stage'): ApngPlan {
   const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs, motion);
   const delays = framePlan(ms, DELAY, MAX_FRAMES, 1);
-  return { width: W, height: H, delays, bytes: delays.length * BYTES_PER_FRAME, sourceSpan };
+  const f = exportFrame(aspect, W, H);
+  return { width: f.W, height: f.H, delays, bytes: Math.round(delays.length * BYTES_PER_FRAME * ((f.W * f.H) / (W * H))), sourceSpan };
 }
 
 const aborted = () => new DOMException('Export cancelled', 'AbortError');
@@ -67,7 +72,7 @@ export async function exportApng(
   if (signal.aborted) throw aborted();
   await packLoaded(input.edition);
   if (signal.aborted) throw aborted();
-  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.loopMs, input.motion);
+  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.face.height / input.face.width, input.loopMs, input.motion);
   const worker = new Worker(new URL('./apngWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: ApngRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   let drawn = 0;
@@ -101,7 +106,7 @@ export async function exportApng(
   let at = 0;
   let scene: Scene | undefined;
   try {
-    scene = createScene(input, plan.width, plan.height, true, true);
+    scene = createScene(input, W, H, true, true);
     send({ type: 'start', width: plan.width, height: plan.height });
     for (let i = 0; i < frames; i++) {
       await nextFrame(signal);

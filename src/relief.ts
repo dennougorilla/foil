@@ -11,25 +11,33 @@
 // What the shader can't see from one pixel (where the subject is, its levels, how busy each area
 // is, the picture's tonal range) comes from reliefMap.ts, run on the face whenever it changes.
 
-import { ART, FACE_H, FACE_W } from './card/face';
+import { artWindow } from './card/shape';
 import { createTexture, type Program } from './gl/gl';
 import { reliefMap } from './reliefMap';
 
 /** Face pixels per map cell. */
 const CELL = 4;
-const MAP_W = Math.round(FACE_W / CELL);
-const MAP_H = Math.round(FACE_H / CELL);
-/** The art window in cells, inset past its border and the shade along its top edge. */
-const ART_CELLS = {
-  x0: Math.ceil(ART.x / CELL) + 1,
-  y0: Math.ceil((ART.y + 30) / CELL),
-  x1: Math.floor((ART.x + ART.w) / CELL) - 1,
-  y1: Math.floor((ART.y + ART.h) / CELL) - 1,
-};
 
-function sameArt(a: Uint8ClampedArray, b: Uint8ClampedArray): boolean {
-  for (let y = ART_CELLS.y0; y < ART_CELLS.y1; y++)
-    for (let i = (y * MAP_W + ART_CELLS.x0) * 4, end = (y * MAP_W + ART_CELLS.x1) * 4; i < end; i++) if (a[i] !== b[i]) return false;
+/** The map of a face: its size in cells, and the art window in cells, inset past its border and the shade along its top edge. */
+function grid(face: HTMLCanvasElement) {
+  const art = artWindow(face.width, face.height);
+  return {
+    w: Math.round(face.width / CELL),
+    h: Math.round(face.height / CELL),
+    art: {
+      x0: Math.ceil(art.x / CELL) + 1,
+      y0: Math.ceil((art.y + 30) / CELL),
+      x1: Math.floor((art.x + art.w) / CELL) - 1,
+      y1: Math.floor((art.y + art.h) / CELL) - 1,
+    },
+  };
+}
+type Grid = ReturnType<typeof grid>;
+
+function sameArt(a: Uint8ClampedArray, b: Uint8ClampedArray, g: Grid): boolean {
+  if (a.length !== b.length) return false;
+  for (let y = g.art.y0; y < g.art.y1; y++)
+    for (let i = (y * g.w + g.art.x0) * 4, end = (y * g.w + g.art.x1) * 4; i < end; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
@@ -55,8 +63,6 @@ export class ReliefGL {
     private live: boolean,
   ) {
     this.tex = createTexture(gl, false);
-    this.cells.width = MAP_W;
-    this.cells.height = MAP_H;
     this.ctx = this.cells.getContext('2d', { willReadFrequently: true })!;
     this.ctx.imageSmoothingQuality = 'high';
   }
@@ -81,16 +87,24 @@ export class ReliefGL {
 
   private analyse(face: HTMLCanvasElement) {
     const { ctx, gl } = this;
-    ctx.clearRect(0, 0, MAP_W, MAP_H);
-    ctx.drawImage(face, 0, 0, MAP_W, MAP_H);
-    const px = ctx.getImageData(0, 0, MAP_W, MAP_H).data;
+    const g = grid(face);
+    if (this.cells.width !== g.w || this.cells.height !== g.h) {
+      // A new shape: the canvas resets with its size, and the last read no longer compares.
+      this.cells.width = g.w;
+      this.cells.height = g.h;
+      ctx.imageSmoothingQuality = 'high';
+      this.read = null;
+    }
+    ctx.clearRect(0, 0, g.w, g.h);
+    ctx.drawImage(face, 0, 0, g.w, g.h);
+    const px = ctx.getImageData(0, 0, g.w, g.h).data;
     const prev = this.read;
     this.read = px;
-    if (prev && sameArt(prev, px)) return;
-    const m = reliefMap(px, MAP_W, MAP_H, ART_CELLS);
+    if (prev && sameArt(prev, px, g)) return;
+    const m = reliefMap(px, g.w, g.h, g.art);
     this.range = [m.lo, m.hi];
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, MAP_W, MAP_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, m.data);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, g.w, g.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, m.data);
   }
 
   /** `relief`: the card being drawn is Relief, so its map must be current. */
@@ -201,7 +215,7 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   }
   // Blend subject and field, plus the step between them.
   vec3 H = (mix(fld, sub, S) + vec3(0.0, (sub.x - fld.x) * vec2(rx.r, ry.r))) * art;
-  vec2 slope = vec2(H.y, H.z / 1.4);  // per card width on both axes
+  vec2 slope = vec2(H.y, H.z) / uCardK;  // per card width on both axes
   vec3 N = normalize(vec3(-slope, 1.0));
 
   // ---- Frame: a fine stamped dot texture (follows the pattern size and angle) ----
@@ -209,7 +223,7 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   // The nameplate is a smooth matte plate so the name reads; the dots stamp the rest.
   float band = uPlate > 0.5 ? smoothstep(0.878, 0.886, p.y) : 0.0;
   {
-    vec2 q = uv * vec2(1.0, 1.4) * 70.0;
+    vec2 q = uv * uCardK * 70.0;
     q.x += 0.5 * mod(floor(q.y), 2.0);  // offset rows: a staggered grid
     vec2 f = fract(q) - 0.5;
     // Each dot is a low dome; it fades to flat once the dots get close to a pixel apart.
@@ -219,12 +233,12 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   }
 
   // ---- Light ----
-  vec2 at = p * vec2(1.0, 1.4);
+  vec2 at = p * uCardK;
   // A point light at the hotspot, nudged up and left so the relief always reads (as the lettering).
-  vec2 lp = (uLight - p) * vec2(1.0, 1.4);
+  vec2 lp = (uLight - p) * uCardK;
   vec3 Ld = normalize(vec3(lp * 1.3 + vec2(-0.24, -0.32), 0.42));
   // The eye sits a few card widths out, so reflections slide across the card as it tilts.
-  vec3 V = normalize(vec3(vec2(0.5, 0.7) - at - t * 1.25, 2.6));
+  vec3 V = normalize(vec3(uCardK * 0.5 - at - t * 1.25, 2.6));
   vec3 Hv = normalize(Ld + V);
   float lam = clamp(dot(N, Ld) * 1.15, 0.0, 1.0);
 
@@ -237,7 +251,7 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
     float occ = 0.0;
     for (int i = 1; i <= 2; i++) {
       float dist = 0.006 * float(i);
-      float hi = reliefHeightAt(p + dir * vec2(1.0, 1.0 / 1.4) * dist, k.z, gain);
+      float hi = reliefHeightAt(p + dir / uCardK * dist, k.z, gain);
       occ = max(occ, (hi - h0 - dist * tanE) / 0.0025);
     }
     shade = 1.0 - 0.4 * clamp(occ, 0.0, 1.0) * art;
@@ -297,7 +311,7 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   // The card shader then mixes every finish in at 70% on the frame and adds a soft glare spot.
   // The metal covers the frame fully and already mirrors that light, so undo both here.
   float frameMix = mix(0.7, 1.0, m.r);
-  float glare = tuneGlare(length((p - uLight) * vec2(1.0, 1.4)), 1.35, 3.0, 0.32);
+  float glare = tuneGlare(length((p - uLight) * uCardK), 1.35, 3.0, 0.32);
   return c + (col - c - glare * uTLight) / frameMix;
 }
 `;

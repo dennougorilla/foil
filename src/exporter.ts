@@ -1,4 +1,4 @@
-import { FACE_H, FACE_W } from './card/face';
+import { exportFrame } from './card/shape';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
@@ -73,17 +73,19 @@ export async function exportPng(input: ExportInput): Promise<string> {
   if (input.range) r.range.set(input.range);
   if (input.layers) r.setLayers(input.layers);
   r.setFlip(input.flip ?? null);
-  r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
+  const W = input.face.width;
+  const H = input.face.height;
+  r.resize(W + pad * 2, H + pad * 2, 1);
   r.begin();
   const tilt: [number, number] = [0.35, -0.25];
   // Blacklight's lamp shines on the art.
   const light: [number, number] = tune.light === 'fixed' ? fixedLight(tune.lightAngle) : input.edition.torch ? TORCH_STILL : [0.32, 0.22];
   r.drawCard(
     {
-      cx: FACE_W / 2 + pad,
-      cy: FACE_H / 2 + pad,
-      w: FACE_W,
-      h: FACE_H,
+      cx: W / 2 + pad,
+      cy: H / 2 + pad,
+      w: W,
+      h: H,
       rx: 0,
       ry: 0,
       rz: 0,
@@ -124,9 +126,12 @@ export interface Scene {
 
 /**
  * The shared stage for GIF and APNG: a pixel swirl upscaled nearest, with the card composited on top.
+ * `W0` × `H0` is the frame for the trading card; other shapes turn and resize it (shape.ts
+ * exportFrame), so `out` has the frame's real size.
  * `transparent` leaves the swirl out so only the card (and its shadow, unless `shadow` is off) is drawn.
  */
-export function createScene(input: ExportInput, W: number, H: number, readback = false, transparent = false, shadow = true): Scene {
+export function createScene(input: ExportInput, W0: number, H0: number, readback = false, transparent = false, shadow = true): Scene {
+  const { W, H, cw, ch } = exportFrame(input.face.height / input.face.width, W0, H0);
   const out = document.createElement('canvas');
   out.width = W;
   out.height = H;
@@ -151,10 +156,8 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
   const kind = input.edition.touch;
   const touch = kind ? autoTouchFor(input.face, kind) : null;
-  // Everything is laid out for a 900px-tall frame and scaled from there.
-  const k = H / 900;
-  const ch = 640 * k;
-  const cw = (ch * 5) / 7;
+  // Everything is laid out for a 900px-tall trading-card frame and scaled from there.
+  const k = H0 / 900;
 
   return {
     out,
@@ -222,8 +225,9 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   };
 }
 
-const GIF_W = 480;
-const GIF_H = 600;
+/** The GIF's frame for the trading card; other shapes turn it (shape.ts exportFrame). */
+export const GIF_W = 480;
+export const GIF_H = 600;
 /** Up to 20 fps, and at most this many frames: a slow loop plays at a lower frame rate rather than growing without end. */
 const GIF_MIN_DELAY = 50;
 const GIF_MAX_FRAMES = 90;
@@ -271,18 +275,19 @@ export async function exportGif(
   let scene: Scene | undefined;
   try {
     scene = createScene(input, GIF_W, GIF_H, true, opts.clear, !opts.clear);
+    const { width, height } = scene.out;
     for (let i = 0, at = 0; i < frames; at += delays[i++]) {
       await nextFrame();
       const p = at / loopMs;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
       scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, DUR, p * sourceSpan);
-      const { data } = scene.ctx.getImageData(0, 0, GIF_W, GIF_H);
+      const { data } = scene.ctx.getImageData(0, 0, width, height);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
+    send({ type: 'encode', width, height, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!input.edition.dither });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {

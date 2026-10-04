@@ -79,6 +79,10 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
    and one `dispatch` line), add the edition to `src/editions.ts`, its names to `src/i18n.ts`,
    and its id to the pack's `finishes` in `src/packs.ts` (before the showpiece, or as the new
    showpiece).
+   The card can be any shape (`src/card/shape.ts`), so the finish takes the card's proportions
+   from `uCardK` (the face in units of its short side; multiply a uv by it for round dots and
+   square cells) and the art window from `uArt`, never from literals such as `vec2(1.0, 1.4)`;
+   `tests/shape.test.ts` fails on those.
 2. A new pack is one more entry in `PACKS` (id, finishes, wrapper, colors, `load`) plus a module
    file and its two names in `src/i18n.ts`. Nothing else lists packs.
 3. Someone who already opened a pack finds a finish added to it later straight in the hand.
@@ -191,6 +195,11 @@ follows the sound toggle.
 | 6 | **Showpiece** | The last card comes face-down on the card back every card wears (src/card/back.ts), edges glowing, trembling, sparks rising off it. Press (or →/Enter): "Revealing…" — it charges 900 — scale 1 → 1.08, tremble 0 → 6 px, the room darkens — then flips (420, ease-out-back) with a punch 1.08 → 1.18 → 1. | Rays rotate in behind it, at the flip: flash 0.9, 70 particles in its colors and white, shake 360 at 16 px. The banner "★ name" lands with overshoot. Then, held a little larger, a light sweeps across it once (1.6 s) while the rays hold back to a third, so its own finish is the peak; then the rays come up and it keeps rocking slowly. | Rising charge (180 → 720 Hz), then a boom + a four-note chord + a sparkle arpeggio | 10 pulses quickening, then 40, 40, 80 |
 | 7 | **Haul** | All cards deal into a row from the stack (staggered 90, spring 170/13, a little fan), each live on the person's own picture, floating and leaning to the pointer. Names under them. | Rays settle to a slow glow behind the showpiece. | Deal clicks with rising pitch | — |
 | 8 | **Try it** | The title says what happened ("You have all 5 Nature finishes"), the line under it what to do ("Pick one to try on your picture"); once the showpiece is up, its hint says "See all 5". Primary: "Use Magma" (the showpiece by name) — closes, sends the other cards into the deck and swaps this one into the hand for its last card that is not Base, and onto the card (the card's own flip). Tapping any card in the haul picks that finish instead. Secondary: "To the deck". Back on the page, the new folder pops on the shelf and a toast says where it is and what picking it does. | — | Select chime (existing) | — |
+
+**The card's shape** — every card in the opening, the haul and the deck builder is drawn in the
+card's own shape (README): the stack at the trading card's area, the haul and the deck builder's
+mini cards fitted into the trading card's room, so a wide or square card never stretches; the pack
+and its wrapper stay as they are.
 
 **Under a card** (beats 5–6) the words stand in one column, never overlapping: progress and tag,
 the finish's name, its line (one line, cut with … when long), then the next-step button. The card
