@@ -162,7 +162,7 @@ export function mountPrintPop(o: { store: Store; dict: () => Dict; onPick: () =>
   }
 
   document.addEventListener('pointerdown', (e) => {
-    if (!pop.hidden && !pop.contains(e.target as Node) && !(e.target as HTMLElement).closest?.('.pp-chip, #cardSlot')) close(false);
+    if (!pop.hidden && !pop.contains(e.target as Node) && !(e.target as HTMLElement).closest?.('.pp-chip, #cardSlot, .ar-bar')) close(false);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !pop.hidden) close();

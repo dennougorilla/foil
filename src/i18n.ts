@@ -2,6 +2,7 @@ import type { EditionId, FrameId, RarityId } from './editions';
 import type { ShapeId } from './card/shape';
 import type { FoilTone, LetterStyle, TextField } from './lettering';
 import type { CardLayout } from './card/tcg';
+import type { Arrange, FreeField } from './arrange';
 import type { MessageFont, MessagePlace } from './message';
 import type { ExportMotion, Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
@@ -366,6 +367,26 @@ const ja = {
     own: '個別',
   },
   layoutLabel: 'レイアウト',
+  arrange: {
+    label: '配置',
+    name: { auto: 'おまかせ', free: '自由' } satisfies Record<Arrange, string>,
+    hint: 'カードの上の文字はドラッグで動き、角のつまみで大きさ、上のつまみで傾きが変わります (指 2 本でも)。短いタップで刷り方を選べます',
+    hintTcg: 'メッセージはカードの上でドラッグして動かせます (名前と種別はプレートのまま)。角のつまみで大きさ、上のつまみで傾きが変わります',
+    back: 'おまかせに戻す',
+    size: '大きさ (ドラッグ)',
+    turn: '傾き (ドラッグ)',
+    bar: '選んだ文字',
+    print: '刷り方',
+    level: 'まっすぐにする',
+    piece: { message: 'メッセージ', name: '名前' } satisfies Record<FreeField, string>,
+    done: '完了',
+    turnNow: '傾き {deg}°',
+    turnMax: '傾き 15° (最大)',
+    levelNow: 'まっすぐ',
+    sizeNow: '大きさ {pct}% (つかんだ時比)',
+    cardHint: 'カードの文字をドラッグで移動。短いクリックで刷り方',
+    cardHintTouch: 'カードの文字を指で移動。2 本指で大きさと傾き、短いタップで刷り方',
+  },
   tcg: {
     layoutName: { classic: 'いつもの', tcg: 'トレカ' } satisfies Record<CardLayout, string>,
     type: '種別',
@@ -752,6 +773,26 @@ const en: Dict = {
     own: 'own',
   },
   layoutLabel: 'Layout',
+  arrange: {
+    label: 'Placement',
+    name: { auto: 'Auto', free: 'Free' },
+    hint: 'Drag the words on the card to move them. The corner handle sizes them, the one above turns them (or use two fingers)',
+    hintTcg: 'Drag the message on the card to move it (the name and type line stay on their plates). The corner handle sizes it, the one above turns it',
+    back: 'Back to Auto',
+    size: 'Size (drag)',
+    turn: 'Turn (drag)',
+    bar: 'Selected words',
+    print: 'Print',
+    level: 'Straighten',
+    piece: { message: 'Message', name: 'Name' },
+    done: 'Done',
+    turnNow: 'Turn {deg}°',
+    turnMax: 'Turn 15° (max)',
+    levelNow: 'Level',
+    sizeNow: 'Size {pct}% of the start',
+    cardHint: 'Drag words on the card to move them; a short click opens their print menu',
+    cardHintTouch: 'Drag words on the card with a finger; two fingers size and turn them, and a short tap opens their print menu',
+  },
   tcg: {
     layoutName: { classic: 'Classic', tcg: 'Trading card' },
     type: 'Type line',

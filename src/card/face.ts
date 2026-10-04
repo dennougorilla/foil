@@ -1,8 +1,9 @@
 import { rarityById, type FrameId, type RarityId } from '../editions';
 import { paintLettering, type TextRun } from '../lettering';
-import { messageLines, type Message, type Rect } from '../message';
+import { messageFont, messageLines, type Message, type Rect } from '../message';
 import { customFrame } from '../palette';
-import { paintMessage } from './messageFace';
+import { paintFree, paintMessage } from './messageFace';
+import type { Arrange, FreeField, Placement, Placements } from '../arrange';
 import { artWindow, shapeById, SHORT, type ShapeId } from './shape';
 import { tcgFrame, type CardLayout } from './tcg';
 import { paintTcg } from './tcgFace';
@@ -34,6 +35,24 @@ export interface FaceSpec {
   layout: CardLayout;
   /** The trading card's type line (any short words). */
   cardType: string;
+  /** Words at their preset places, or where `placements` puts them. */
+  arrange: Arrange;
+  placements: Placements;
+}
+
+/** Where a piece is placed freely, if the card is in free placement and it has a place. */
+export function placed(s: Pick<FaceSpec, 'arrange' | 'placements' | 'layout'>, f: FreeField): Placement | undefined {
+  if (s.arrange !== 'free') return undefined;
+  // A trading card's name stays on its plate.
+  if (f === 'name' && s.layout === 'tcg') return undefined;
+  return s.placements[f];
+}
+
+/** Paints the freely placed message over the card, if it is placed freely. */
+export function paintFreeMessage(ctx: CanvasRenderingContext2D, spec: FaceSpec): TextRun[] {
+  const p = placed(spec, 'message');
+  const lines = messageLines(spec.message.text);
+  return p && lines.length ? paintFree(ctx, 'message', lines, (size) => messageFont(spec.message.font, size), p) : [];
 }
 
 export const OUTLINE = '#161c1f';
@@ -49,19 +68,23 @@ function sized(canvas: HTMLCanvasElement, shape: ShapeId) {
 }
 
 /** What a trading card holds, which decides its parts. */
-export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message'>) => ({ type: !!s.cardType.trim(), lines: messageLines(s.message.text).length });
+export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message' | 'arrange' | 'placements' | 'layout'>) => ({
+  type: !!s.cardType.trim(),
+  // A freely placed message leaves its box: the box goes.
+  lines: placed(s, 'message') ? 0 : messageLines(s.message.text).length,
+});
 
 /**
  * The art window of a card, in face pixels: the shape's classic one, or the trading card's for
  * what it holds (its parts take room from the art).
  */
-export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message'>): Rect {
+export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements'>): Rect {
   const { w, h } = shapeById(s.shape);
   return s.layout === 'tcg' ? tcgFrame(w, h, tcgContent(s)).art : artWindow(w, h);
 }
 
 /** Width / height of a card's art window: what a crop of the picture fills. */
-export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message'>): number {
+export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements'>): number {
   const a = faceArt(s);
   return a.w / a.h;
 }
@@ -329,7 +352,8 @@ function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: s
   roundRect(ctx, art.x - 4 * S, art.y - 4 * S, art.w + 8 * S, art.h + 8 * S, ART_R + 4 * S);
   ctx.fill();
   paintArt(ctx, art, spec.image, spec.crop);
-  const runs = paintMessage(ctx, spec.message, art);
+  const runs = placed(spec, 'message') ? [] : paintMessage(ctx, spec.message, art);
+  const freeName = placed(spec, 'name');
   if (frame === 'ribbon') paintRibbon(ctx);
 
   // Nameplate (left plain when it is turned off)
@@ -339,9 +363,14 @@ function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: s
   const name = spec.name.trim() || ' ';
   const size = fitName(ctx, name, art.w - pipsW - 24 * S, 40 * S);
   if (spec.plate) {
-    runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y: plateY + plateH / 2 + S, stock: plateY + plateH / 2 + S - 0.0588 * SHORT });
-    paintLettering(ctx, name, art.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+    // A freely placed name leaves the plate (the rarity stays) and is printed over the card.
+    if (freeName) runs.push(...paintFree(ctx, 'name', [name], (s) => `${s}px "DotGothic16", monospace`, freeName));
+    else {
+      runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y: plateY + plateH / 2 + S, stock: plateY + plateH / 2 + S - 0.0588 * SHORT });
+      paintLettering(ctx, name, art.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+    }
     paintPips(ctx, spec, art.x + art.w - 6 * S, plateY + plateH / 2);
   }
+  runs.push(...paintFreeMessage(ctx, spec));
   return runs;
 }

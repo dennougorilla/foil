@@ -7,6 +7,7 @@
 import './message.css';
 import { CARD_TYPE_MAX, type Store } from './state';
 import type { TextField } from './lettering';
+import { ARRANGES, type Arrange } from './arrange';
 import type { Dict } from './i18n';
 import { sfx } from './audio';
 import { stamp } from './lettering';
@@ -177,8 +178,20 @@ export function mountMessage(o: Options): void {
   detail.append(place.row, font.row);
 
   const plate = choice(['on', 'off'] as const, 'plate', (v) => store.set({ plate: v === 'on' }));
+  // Placement: the preset places, or free on the card itself (docs/arrange.md).
+  const arrange = choice(ARRANGES, 'arrange', (v) => store.set({ arrange: v }));
+  const freeNote = el('p', 'hint msg-free');
+  const freeText = el('span');
+  const back = el('button', 'link');
+  back.type = 'button';
+  back.addEventListener('click', () => {
+    sfx.tick();
+    store.set({ arrange: 'auto', placements: {} });
+  });
+  freeNote.append(freeText, back);
+  arrange.row.append(freeNote);
 
-  root.append(nameRow, typeRow, head, field, phrases, detail, plate.row);
+  root.append(nameRow, typeRow, head, field, phrases, arrange.row, detail, plate.row);
   o.host.prepend(root);
 
   function labels() {
@@ -209,6 +222,10 @@ export function mountMessage(o: Options): void {
     font.name.textContent = t.font;
     font.btns.forEach((b) => (b.textContent = t.fontName[b.dataset.v as Message['font']]));
     plate.name.textContent = t.plate;
+    const a = o.dict().arrange;
+    arrange.name.textContent = a.label;
+    arrange.btns.forEach((b) => (b.textContent = a.name[b.dataset.v as Arrange]));
+    back.textContent = a.back;
     plate.btns[0].textContent = t.plateOn;
     plate.btns[1].textContent = t.plateOff;
   }
@@ -228,8 +245,11 @@ export function mountMessage(o: Options): void {
     nameField.placeholder = o.namePlaceholder();
     // Off, the nameplate prints no name: the field steps back.
     nameRow.classList.toggle('is-off', !s.plate);
-    // A trading card's effect text has its own box: no place to choose.
-    place.row.hidden = tcg;
+    // A trading card's effect text has its own box, and free words have their own place: no preset to choose.
+    place.row.hidden = tcg || s.arrange === 'free';
+    arrange.btns.forEach((b) => radio(b, b.dataset.v === s.arrange));
+    freeNote.hidden = s.arrange !== 'free';
+    freeText.textContent = tcg ? o.dict().arrange.hintTcg : o.dict().arrange.hint;
     const has = m.text.trim().length > 0;
     count.hidden = !m.text;
     count.textContent = t.count.replace('{n}', String(m.text.split('\n').length));
@@ -255,6 +275,6 @@ export function mountMessage(o: Options): void {
   sync();
   store.on((_, changed) => {
     if (changed.has('lang')) labels();
-    if (['lang', 'message', 'plate', 'layout', 'cardType', 'name', 'sample'].some((k) => changed.has(k as keyof typeof _))) sync();
+    if (['lang', 'message', 'plate', 'layout', 'cardType', 'name', 'sample', 'arrange'].some((k) => changed.has(k as keyof typeof _))) sync();
   });
 }

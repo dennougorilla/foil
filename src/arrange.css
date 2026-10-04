@@ -1,0 +1,218 @@
+/* ---------- Free placement on the card (docs/arrange.md) ---------- */
+
+.ar {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100vw;
+  height: 100vh;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ar.is-on,
+.ar.is-idle {
+  opacity: 1;
+}
+
+/* Words that can be picked up, while nothing is: a faint dashed outline. */
+.ar-idle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+}
+
+/* Under the gold dash and the guides, a dark keyline, so they read on any picture. */
+.ar-box-under {
+  fill: rgba(242, 193, 78, 0.1);
+  stroke: rgba(11, 16, 18, 0.85);
+  stroke-width: 4;
+}
+
+.ar-guide-under {
+  stroke: rgba(11, 16, 18, 0.85);
+  stroke-width: 4;
+  opacity: 0;
+}
+
+.ar-guide-under.is-on {
+  opacity: 1;
+}
+
+/* The selected words: a dashed gold box, like the finish area's die line. */
+.ar-box {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.ar-guide {
+  stroke: #7fe0ff;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  opacity: 0;
+}
+
+.ar-guide.is-on {
+  opacity: 1;
+}
+
+/* Two handles: a square at the corner sizes, a round one on a stalk above turns. Big enough for a finger. */
+.ar-handle {
+  position: fixed;
+  z-index: 41;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
+  touch-action: none;
+}
+
+.ar-size {
+  cursor: nwse-resize;
+}
+
+.ar-handle svg {
+  position: absolute;
+  inset: 4px;
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 2.2;
+  stroke-linecap: square;
+}
+
+.ar-turn {
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.ar-stalk {
+  stroke: var(--gold);
+  stroke-width: 2;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+/* The size and turn while they change. */
+.ar-read {
+  position: fixed;
+  z-index: 42;
+  transform: translate(-50%, -48px);
+  padding: 3px 8px 4px;
+  border-radius: 6px;
+  background: var(--edge);
+  color: var(--gold);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ar-read.is-level {
+  color: #7fe0ff;
+}
+
+.ar-read[hidden] {
+  display: none;
+}
+
+/* The bar beside the selection: print, level, back to Auto, done. */
+.ar-bar {
+  position: fixed;
+  z-index: 42;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--edge), 0 6px 0 3px rgba(0, 0, 0, 0.45);
+}
+
+.ar-bar[hidden] {
+  display: none;
+}
+
+.ar-tool {
+  min-height: 34px;
+  padding: 2px 10px 4px;
+  margin-bottom: 3px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.ar-tool:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+/* The piece the bar holds, as a small label at its start. */
+.ar-which {
+  align-self: center;
+  padding: 0 6px 0 4px;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.ar-done {
+  background: var(--gold);
+  color: var(--edge);
+}
+
+.ar-handle[hidden] {
+  display: none;
+}
+
+.ar-handle::before {
+  /* A wider reach than the drawn handle, for a fingertip. */
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+
+/* While words are selected the card holds still: no grab cursor on it. */
+.is-arranging #cardSlot {
+  cursor: move;
+}
+
+.msg-free {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.msg-free[hidden] {
+  display: none;
+}
+
+/* The bar never runs past the screen: on a phone it wraps, with tighter buttons. */
+.ar-bar {
+  max-width: calc(100vw - 16px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (max-width: 520px) {
+  .ar-tool {
+    padding-inline: 8px;
+    font-size: 13px;
+  }
+
+  .ar-which {
+    flex-basis: 100%;
+    text-align: center;
+  }
+}

@@ -5,7 +5,7 @@
 import { rarityById } from '../editions';
 import { paintLettering, type TextRun } from '../lettering';
 import { layoutEffect, messageFont, messageLines, type Rect } from '../message';
-import { LINE, OUTLINE, RADIUS, S, fitName, paintArt, paintPips, roundRect, tcgContent, type FaceSpec } from './face';
+import { paintFreeMessage, LINE, OUTLINE, RADIUS, S, fitName, paintArt, paintPips, roundRect, tcgContent, type FaceSpec } from './face';
 import { tcgFrame } from './tcg';
 
 type Frame = { fill: string | CanvasGradient; ink: string; sub: string };
@@ -270,5 +270,7 @@ export function paintTcg(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: Frame
   ctx.fillText('No. 1/1', t.foot.x + t.foot.w - 8 * S, fmid);
   ctx.textAlign = 'left';
   ctx.globalAlpha = 1;
+  // A freely placed message lies over the card, last.
+  runs.push(...paintFreeMessage(ctx, spec));
   return runs;
 }

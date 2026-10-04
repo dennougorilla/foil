@@ -7,6 +7,8 @@ import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
 import { CARD_LAYOUTS } from './card/tcg';
 import { mountPrintPop } from './printPop';
+import { mountArrange } from './arrangeEdit';
+import type { TextRun } from './lettering';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
@@ -145,7 +147,7 @@ function artKey() {
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements };
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
@@ -155,10 +157,14 @@ const thumbKey = () => `${faceVersion}|${JSON.stringify(store.get().tune)}|${sto
 /** The message's typeface and words last asked for; the face is painted again once they can be drawn. */
 let fontAsked = '';
 
+/** The text the face last painted (Free placement starts each piece where it was). */
+let lastRuns: TextRun[] = [];
+
 function redrawFace() {
   faceVersion++;
   const spec = faceSpec(currentImage());
-  setTextRuns(face.width, face.height, drawFace(face, mask, spec));
+  lastRuns = drawFace(face, mask, spec);
+  setTextRuns(face.width, face.height, lastRuns);
   const { font, text } = spec.message;
   const ask = text.trim() ? `${font}|${text}` : '';
   if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
@@ -1832,7 +1838,7 @@ store.on((s, changed) => {
   if (changed.has('rarity') || changed.has('frame') || changed.has('shape')) buildSegments();
   if (changed.has('prints')) setFieldPrints(s.prints);
   if (changed.has('shape')) applyShape();
-  if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && (changed.has('cardType') || changed.has('message')))) {
+  if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
     // A new art window has its own proportions: keep the crop inside the picture, and redraw the flip picture for it.
     const img = currentImage();
     const crop = clampCrop(img.width, img.height, s.crop, artAspect());
@@ -1841,7 +1847,7 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
@@ -1871,6 +1877,15 @@ store.on((s, changed) => {
 setSound(store.get().sound);
 setFieldPrints(store.get().prints);
 const printPop = mountPrintPop({ store, dict: () => t, onPick: () => stage.juice(0.35) });
+mountArrange({
+  store,
+  stage,
+  slot: $('cardSlot'),
+  face,
+  dict: () => t,
+  runs: () => lastRuns,
+  openPrint: (f, at) => printPop.open(f, at),
+});
 mountMessage({
   store,
   host: $('pane-text'),
