@@ -1,4 +1,4 @@
-# FOIL v0.13.0 — release notes (draft)
+# FOIL v0.13.0 — release notes
 
 ## Highlights
 
@@ -21,7 +21,7 @@
 - **Export motions.** Under the GIF/APNG options the loop can take a motion made to show the foil
   off: Gyre, Jelly, Lean, Showcase (v0.12's export motion), Sweep, Figure 8, Moment, Reveal,
   Push in, Heartbeat, Light bar, Spotlight and Flare. As on screen stays the default.
-- **Phones held upright.** The card fills the screen, with a slim header and the Save bar below.
+- **Phones held upright.** The card fills the screen, with a slim header and one slim bar below for picking a picture, the format, Keep, Share and Save.
 - README rewritten in English and Japanese, new OG image.
 
 ## Known issues

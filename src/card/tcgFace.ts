@@ -143,30 +143,30 @@ function stock(ctx: CanvasRenderingContext2D): CanvasPattern | null {
 
 /** The frame's material: dithered printed stock, a band of deeper dither along the edge, and a stepped rule inside it. */
 function material(ctx: CanvasRenderingContext2D, f: Frame, light: boolean) {
-  const FACE_W = ctx.canvas.width;
-  const FACE_H = ctx.canvas.height;
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
   ctx.save();
-  roundRect(ctx, LINE, LINE, FACE_W - LINE * 2, FACE_H - LINE * 2, RADIUS - LINE);
+  roundRect(ctx, LINE, LINE, W - LINE * 2, H - LINE * 2, RADIUS - LINE);
   ctx.clip();
   if (light) {
     ctx.fillStyle = 'rgba(150,105,45,.16)';
-    ctx.fillRect(0, 0, FACE_W, FACE_H);
+    ctx.fillRect(0, 0, W, H);
   }
   const pat = stock(ctx);
   if (pat) {
     ctx.fillStyle = pat;
-    ctx.fillRect(0, 0, FACE_W, FACE_H);
+    ctx.fillRect(0, 0, W, H);
     // The edge band takes the dither twice: the stock darkens towards the card's edge.
     const band = 22 * S;
-    ctx.fillRect(0, 0, FACE_W, LINE + band);
-    ctx.fillRect(0, FACE_H - LINE - band, FACE_W, LINE + band);
-    ctx.fillRect(0, LINE + band, LINE + band, FACE_H - (LINE + band) * 2);
-    ctx.fillRect(FACE_W - LINE - band, LINE + band, LINE + band, FACE_H - (LINE + band) * 2);
+    ctx.fillRect(0, 0, W, LINE + band);
+    ctx.fillRect(0, H - LINE - band, W, LINE + band);
+    ctx.fillRect(0, LINE + band, LINE + band, H - (LINE + band) * 2);
+    ctx.fillRect(W - LINE - band, LINE + band, LINE + band, H - (LINE + band) * 2);
   }
   ctx.strokeStyle = f.sub;
   ctx.lineWidth = 2 * S;
   const inset = LINE + 6 * S;
-  shape(ctx, { x: inset, y: inset, w: FACE_W - inset * 2, h: FACE_H - inset * 2 }, 18 * S);
+  shape(ctx, { x: inset, y: inset, w: W - inset * 2, h: H - inset * 2 }, 18 * S);
   ctx.stroke();
   ctx.restore();
 }
