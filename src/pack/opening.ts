@@ -172,7 +172,7 @@ export function openPack(o: OpeningOptions) {
   skipBtn.querySelector('span')!.textContent = t.skip;
   $('.pk-x').setAttribute('aria-label', t.close);
   $('.pk-x').title = t.close;
-  openBtn.textContent = t.openBtn;
+  openBtn.textContent = t.tearBtn;
   hintEl.textContent = t.loading;
   $('.pk-close').textContent = t.close;
   document.body.appendChild(root);
@@ -202,9 +202,9 @@ export function openPack(o: OpeningOptions) {
     const face = document.createElement('canvas');
     const mask = document.createElement('canvas');
     paintPack(face, mask, p, {
-      big: p.supporter ? 'THANKS' : PACK_EN.name[p.id].toUpperCase(),
-      line: t.title.replace('{name}', t.name[p.id]),
-      top: p.supporter ? 'SUPPORTER' : undefined,
+      big: PACK_EN.name[p.id].toUpperCase(),
+      line: t.inside.replace('{n}', String(p.finishes.length)),
+      top: p.supporter ? 'LIMITED' : undefined,
     });
     r.setFace(face, mask, `pack-${p.id}`);
     painted.add(p.id);
@@ -257,12 +257,13 @@ export function openPack(o: OpeningOptions) {
     const count = o.shop?.length ?? 0;
     if (count) {
       const narrow = vw < 640;
-      const perRow = narrow ? Math.min(3, count) : count;
+      // Four packs make a square on a phone; five, three over two.
+      const perRow = narrow ? (count === 4 ? 2 : Math.min(3, count)) : count;
       const gap = narrow ? 14 : 26;
       const room = Math.min(vw - 24, 1120) - (narrow ? 28 : 56);
       let sw = (room - gap * (perRow - 1)) / perRow;
       let sh = sw * 1.5;
-      const maxH = narrow ? vh * 0.21 : vh * 0.36;
+      const maxH = narrow ? (perRow === 2 ? vh * 0.19 : vh * 0.2) : vh * 0.36;
       if (sh > maxH) {
         sh = maxH;
         sw = sh / 1.5;

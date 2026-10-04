@@ -750,16 +750,34 @@
   outline-offset: 8px;
 }
 
+/* The chosen pack stands in a pool of gold light on the tray (hover only lifts and leans). */
+.pk-slot::before {
+  content: '';
+  position: absolute;
+  left: -18%;
+  right: -18%;
+  bottom: -14%;
+  height: 40%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(242, 193, 78, 0.55), rgba(242, 193, 78, 0.15) 60%, transparent);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.pk-slot[aria-checked='true']::before {
+  opacity: 1;
+}
+
 /* A price-tag-like name under each pack. */
 .pk-price {
   position: absolute;
   left: 50%;
-  bottom: -30px;
+  bottom: -32px;
   padding: 1px 10px 2px;
   border-radius: 6px;
   background: #0b1012;
   color: var(--text);
-  font-size: 14px;
+  font-size: 16px;
   white-space: nowrap;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14);
   transform: translateX(-50%);
@@ -773,7 +791,7 @@
 
 /* The chosen pack's panel: a band in its color with its name, then what is inside. */
 .pk-panel {
-  width: min(540px, calc(100vw - 24px));
+  width: min(620px, calc(100vw - 24px));
   border-radius: 18px;
   overflow: hidden;
   background: #11171b;
@@ -793,7 +811,7 @@
 
 .pk-band b {
   font-weight: 400;
-  font-size: 24px;
+  font-size: 28px;
   color: #fff;
 }
 
@@ -819,7 +837,7 @@
 
 .pk-desc {
   margin: 0;
-  font-size: 18px;
+  font-size: 21px;
 }
 
 .pk-desc em {
@@ -829,7 +847,7 @@
 
 .pk-note {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   color: rgba(245, 242, 234, 0.75);
 }
 
@@ -842,8 +860,8 @@
 
 .pk-minis i {
   position: relative;
-  width: 22px;
-  height: 31px;
+  width: 28px;
+  height: 40px;
   border-radius: 4px;
   background: repeating-linear-gradient(135deg, var(--b) 0 4px, var(--a) 4px 8px);
   box-shadow: 0 0 0 2px #f3eee2, 0 0 0 4px #0b1012, 0 4px 0 2px #0b1012;
@@ -921,7 +939,8 @@
     padding: 64px 8px 16px;
   }
   .pk-tray {
-    padding: 18px 14px 40px;
+    padding: 14px 14px 38px;
+    row-gap: 46px;
   }
   .pk-band b {
     font-size: 20px;
@@ -933,4 +952,9 @@
     font-size: 13px;
     bottom: -27px;
   }
+}
+
+/* The moment a pack is taken, its panel goes; the tray sinks away behind it. */
+.pk.is-leaving .pk-panel {
+  visibility: hidden;
 }

@@ -293,7 +293,12 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   }
   // The perforation: a dotted line just under the top seal.
   const ty = Math.round(TEAR_Y * GRID_H);
-  for (let x = 8; x < GRID_W - 8; x++) if (x % 4 < 2) g.set(x, ty, rgb(top ? '#ffffff' : PAPER));
+  // The perforation, plain to see: white dashes on an ink line, the line to trace.
+  for (let x = 6; x < GRID_W - 6; x++) {
+    g.set(x, ty - 1, ink);
+    g.set(x, ty + 1, ink);
+    g.set(x, ty, x % 5 < 3 ? rgb('#ffffff') : ink);
+  }
 
   // The illustration, inked.
   const art = new Layer();
@@ -314,7 +319,7 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
 
   // The top tier's wavy word above the art.
   if (words.top) {
-    const w = textLayer(words.top, '700 16px Silkscreen', 64, 30, (x, y) => mix(rgb('#fff0b0'), rgb('#f2c14e'), ((x + y) % 7) / 7), 0, 2);
+    const w = textLayer(words.top, words.top.length > 7 ? '700 12px Silkscreen' : '700 16px Silkscreen', 64, 30, (x, y) => mix(rgb('#fff0b0'), rgb('#f2c14e'), ((x + y) % 7) / 7), 0, 2);
     w.stamp(g, 1, 2);
   }
 
@@ -322,10 +327,10 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
   const bubble = new Layer();
   bubble.poly([12, 132, 22, 120, 64, 116, 106, 120, 116, 132, 112, 166, 64, 171, 16, 166], (_x, y) => (y < 128 ? md : dk));
   bubble.stamp(g, 1);
-  const size = words.big.length > 5 ? 20 : 24;
+  const size = words.big.length > 7 ? 13 : words.big.length > 5 ? 19 : 24;
   const title = textLayer(words.big, `700 ${size}px Silkscreen`, 64, 138, (_x, y) => (y < 136 ? rgb('#ffffff') : rgb(top ? '#ffe9a8' : PAPER)), 5);
   title.stamp(g, 2, 2);
-  const line = textLayer(words.line, /[^\x00-\x7f]/.test(words.line) ? '16px DotGothic16' : '16px Silkscreen', 64, 160, () => (top ? rgb('#ffe9a8') : lt), 0);
+  const line = textLayer(words.line, /[^\x00-\x7f]/.test(words.line) ? '16px DotGothic16' : '12px Silkscreen', 64, 160, () => (top ? rgb('#ffe9a8') : lt), 0);
   line.stamp(g, 1, 2);
 
   // The bag's own outline, two pixels of ink.

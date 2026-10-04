@@ -44,7 +44,9 @@ vec3 rot(vec3 p) {
 void main() {
   vec2 uv = vec2(aGrid.x, mix(uV.x, uV.y, aGrid.y));
   float h = height(uv) * (1.0 - uFlat);
-  vec3 p = vec3((uv - 0.5) * uSize * uScale, h * uBulge * uScale);
+  // Filled, the bag swells: its sides bow out a little where it is fullest.
+  vec2 bow = vec2(1.0 + 0.035 * h, 1.0 + 0.01 * h);
+  vec3 p = vec3((uv - 0.5) * uSize * bow * uScale, h * uBulge * uScale);
   // The surface's slope, for its normal.
   float e = 0.01;
   float hx = (height(uv + vec2(e, 0.0)) - height(uv - vec2(e, 0.0))) * uBulge / (2.0 * e * uSize.x);
@@ -85,8 +87,11 @@ float crumple(vec2 g) {
   float r = 1.0 - abs(vnoise(g * vec2(0.055, 0.028)) * 2.0 - 1.0);
   r = r * r * r * 0.8 + (1.0 - abs(vnoise(g * 0.12 + 7.0) * 2.0 - 1.0)) * 0.2;
   vec2 uv = g / uGrid;
-  float pinch = smoothstep(0.25, 0.0, min(uv.y - uSeal, 1.0 - uSeal - uv.y)) + smoothstep(0.2, 0.0, min(uv.x, 1.0 - uv.x)) * 0.6;
-  return r * (0.35 + pinch);
+  float toSeal = min(uv.y - uSeal, 1.0 - uSeal - uv.y);
+  float pinch = smoothstep(0.25, 0.0, toSeal) + smoothstep(0.2, 0.0, min(uv.x, 1.0 - uv.x)) * 0.6;
+  // Gathered creases running from the seals into the body, where the foil is pulled in.
+  float gather = (0.5 + 0.5 * sin(g.x * 0.75 + vnoise(g * 0.2) * 3.0)) * smoothstep(0.09, 0.0, toSeal);
+  return r * (0.35 + pinch) + gather * 0.9;
 }
 
 void main() {
@@ -114,6 +119,7 @@ void main() {
   diff = floor(diff * 6.0 + 0.5) / 6.0;
   float sh = max(dot(n, H), 0.0);
   float spec = step(0.993, sh) * 0.8 + pow(sh, 36.0) * 0.45;
+  spec *= 1.0 - vRim * 0.85;
   spec = floor(spec * 4.0 + 0.5) / 4.0;
   if (seal) spec *= 1.4;
   vec3 col = base.rgb * diff + uSpec * spec * base.a;
