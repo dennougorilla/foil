@@ -3,7 +3,7 @@
 // "More" drawer closed changes nothing.
 
 export type LightMode = 'pointer' | 'orbit' | 'fixed';
-export type IdleMode = 'none' | 'sway' | 'float' | 'pendulum' | 'wobble' | 'bounce' | 'glint' | 'spin' | 'turn' | 'breathe';
+export type IdleMode = 'none' | 'sway' | 'float' | 'pendulum' | 'wobble' | 'bounce' | 'glint' | 'spin' | 'turn' | 'breathe' | 'jelly' | 'lean' | 'gyre';
 /** The metal the Relief finish is struck in; other finishes ignore it. */
 export type Metal = 'gold' | 'silver';
 
@@ -86,7 +86,7 @@ export const RANGES: Record<NumKey, Range> = {
 };
 
 export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed'];
-export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe'];
+export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe', 'jelly', 'lean', 'gyre'];
 export const METALS: Metal[] = ['gold', 'silver'];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -212,6 +212,17 @@ export function applyTune(gl: WebGL2RenderingContext, u: Uniforms, g: TuneGl): v
 export const IDLE_CYCLE = 6;
 const W = (Math.PI * 2) / IDLE_CYCLE;
 
+/** Motions that repeat sooner than the idle cycle, in idle seconds (each divides IDLE_CYCLE). */
+const IDLE_PERIOD: Partial<Record<IdleMode, number>> = { jelly: 3, lean: 3, gyre: 3 };
+
+/**
+ * Idle seconds an exported loop covers: one repeat of the motion, or the whole idle cycle when an
+ * orbiting light or Blacklight's drifting lamp (`torch`) has to come round too.
+ */
+export function loopCycle(t: Tune, torch = false): number {
+  return t.light === 'orbit' || torch ? IDLE_CYCLE : (IDLE_PERIOD[t.idle] ?? IDLE_CYCLE);
+}
+
 /** The card's automatic motion at one moment: offsets in card heights, angles in radians. */
 export interface IdlePose {
   dx: number;
@@ -235,7 +246,7 @@ const REST_POSE: IdlePose = { dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1, spin:
 const smooth = (u: number) => u * u * (3 - 2 * u);
 const frac = (v: number) => v - Math.floor(v);
 
-/** The idle motion `s` idle seconds in. Periodic in IDLE_CYCLE (spin and turn add whole turns). */
+/** The idle motion `s` idle seconds in. Periodic in loopCycle (spin and turn add whole turns). */
 export function idlePose(t: Tune, s: number): IdlePose {
   const a = W * s;
   const p: IdlePose = { ...REST_POSE, sheen: [0, 0] };
@@ -335,6 +346,58 @@ export function idlePose(t: Tune, s: number): IdlePose {
       p.sheen = [Math.sin(a + 1) * 0.15, b * 0.4];
       break;
     }
+    case 'jelly': {
+      // Balatro's hand card, flicked from one lean to the other: it overshoots and bounces like
+      // jelly (a loose underdamped spring), squashing as it goes, and the bounce has barely died
+      // down before the next flick. It sways a little all the while, so it never quite stops.
+      const half = IDLE_PERIOD.jelly! / 2;
+      const k = Math.floor(s / half);
+      const v = s - k * half;
+      const side = k % 2 ? -1 : 1;
+      const Z = 2.4;
+      const F = Math.PI * 2 * 1.5;
+      const spring = (v: number) => Math.exp(-Z * v) * (Math.cos(F * v) + (Z / F) * Math.sin(F * v));
+      // What is left of the bounce is taken out by the end, so each flick starts from rest.
+      const fade = smooth(v / half);
+      const rest = spring(v) - spring(half) * fade;
+      const kick = Math.exp(-Z * v) * Math.sin(F * v) * (1 - fade);
+      const f = (Math.PI * 2 * s) / IDLE_PERIOD.jelly!;
+      p.ry = side * 0.17 * (1 - 2 * rest) + Math.sin(f + 0.8) * 0.02;
+      p.rz = -side * kick * 0.09 + Math.sin(f) * 0.015;
+      p.rx = -kick * 0.08 + Math.cos(f) * 0.05;
+      p.dy = -kick * kick * 0.05 + Math.sin(f) * 0.008;
+      p.scale = 1 + kick * 0.05;
+      // The light runs further than the card turns while it bounces.
+      p.sheen = [side * kick * 0.6, 0];
+      break;
+    }
+    case 'lean': {
+      // A slow, deep tilt to one side that comes to rest and holds, then to the other: the light
+      // sweeps the whole face and stops on each side.
+      const half = IDLE_PERIOD.lean! / 2;
+      const k = Math.floor(s / half);
+      // A second's swing, then a held half second.
+      const q = Math.min(s - k * half, 1);
+      const side = k % 2 ? -1 : 1;
+      const e = 2 * q * q * q * (q * (q * 6 - 15) + 10) - 1;
+      p.ry = side * e * 0.36;
+      p.rx = -Math.sin(Math.PI * q) * 0.07;
+      p.dy = -Math.sin(Math.PI * q) * 0.01;
+      p.sheen = [side * e * 0.5, 0];
+      break;
+    }
+    case 'gyre': {
+      // The face circles a wide ellipse (one way round, never through flat), so the glare travels
+      // round the face, edge to edge; the card's middle drifts against it like a plate settling on a table.
+      const g = (Math.PI * 2 * s) / IDLE_PERIOD.gyre!;
+      p.ry = Math.cos(g) * 0.26;
+      p.rx = Math.sin(g) * 0.17;
+      p.rz = Math.sin(g) * 0.02;
+      p.dx = -Math.cos(g) * 0.01;
+      p.dy = -Math.sin(g) * 0.008;
+      p.sheen = [Math.cos(g) * 0.4, Math.sin(g) * 0.7];
+      break;
+    }
   }
   const k = t.idleAmp;
   if (k !== 1) {
@@ -388,9 +451,9 @@ export interface LoopView {
   light: [number, number];
 }
 
-/** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, one idle cycle long. */
-export function loopView(t: Tune, p: number): LoopView {
-  const s = p * IDLE_CYCLE;
+/** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, `cycle` idle seconds long. */
+export function loopView(t: Tune, p: number, cycle = loopCycle(t)): LoopView {
+  const s = p * cycle;
   const pose = idlePose(t, s);
   const tilt = cardTilt(t, s, pose, pose.rx, pose.ry);
   return { pose, tilt, light: tunedLight(t, s, restLight(tilt)) };
@@ -564,7 +627,7 @@ export function framePlan(loopMs: number, minDelay: number, maxFrames: number, u
 
 /**
  * The idle clock of the live stage, in idle seconds: what `idlePose` and an exported loop are timed
- * by, so the stage left alone shows exactly the exported loop at `idleTime / IDLE_CYCLE`.
+ * by, so the stage left alone shows exactly the exported loop at `idleTime / loopCycle`.
  */
 export class IdleClock {
   idleTime = 0;

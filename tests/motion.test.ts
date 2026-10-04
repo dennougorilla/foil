@@ -2,7 +2,7 @@
 // APNG moves exactly as the card did on screen. Run with `npm test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { exportLoop, framePlan, IDLE_CYCLE, IDLE_MODES, IdleClock, idlePose, LIGHT_MODES, loopView, restLight, sanitizeTune, TUNE_DEFAULTS, type Tune } from '../src/tune/model.ts';
+import { exportLoop, framePlan, IDLE_CYCLE, IDLE_MODES, IdleClock, idlePose, LIGHT_MODES, loopCycle, loopView, restLight, sanitizeTune, TUNE_DEFAULTS, type Tune } from '../src/tune/model.ts';
 
 const close = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) <= eps;
 const poseClose = (a: Record<string, unknown>, b: Record<string, unknown>, eps = 1e-6) => {
@@ -17,7 +17,7 @@ const poseClose = (a: Record<string, unknown>, b: Record<string, unknown>, eps =
 };
 
 test('the idle motions on offer, the ones asked for among them', () => {
-  for (const m of ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe']) {
+  for (const m of ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe', 'jelly', 'lean', 'gyre']) {
     assert.ok(IDLE_MODES.includes(m as Tune['idle']), `${m} missing`);
     assert.equal(sanitizeTune({ idle: m }).idle, m);
   }
@@ -70,7 +70,7 @@ test('the stage left alone moves exactly as the exported loop at the same moment
           live.step(dt, t, false, false);
           secs += dt;
         }
-        const p = ((secs * speed) / IDLE_CYCLE) % 1;
+        const p = ((secs * speed) / loopCycle(t)) % 1;
         const want = loopView(t, p);
         const pose = live.pose(t);
         const tilt = live.tilt(t, pose, pose.rx, pose.ry);
@@ -123,6 +123,72 @@ test('an exported loop is one idle cycle long at the set speed', () => {
   // At speed zero nothing moves on its own: the picture's timing sets the loop.
   assert.deepEqual(exportLoop({ ...TUNE_DEFAULTS, speed: 0 }, 900), { loopMs: 1800, sourceSpan: 1800 });
   assert.equal(exportLoop({ ...TUNE_DEFAULTS, speed: 0 }).loopMs, 2400);
+});
+
+test('Jelly, Lean and Gyre loop in three seconds, unless the light needs the whole cycle', () => {
+  const at = (idle: Tune['idle'], light: Tune['light'] = 'pointer') => ({ ...TUNE_DEFAULTS, idle, light });
+  assert.equal(loopCycle(at('jelly')), 3);
+  assert.equal(loopCycle(at('lean')), 3);
+  assert.equal(loopCycle(at('gyre')), 3);
+  assert.equal(loopCycle(at('sway')), IDLE_CYCLE);
+  // Each still divides the idle cycle, so the stage stays in step with an orbiting light.
+  for (const idle of IDLE_MODES) assert.equal(IDLE_CYCLE % loopCycle(at(idle)), 0);
+  assert.equal(loopCycle(at('lean', 'orbit')), IDLE_CYCLE);
+  assert.equal(loopCycle(at('lean'), true), IDLE_CYCLE, "Blacklight's lamp drifts once a whole cycle");
+  assert.equal(exportLoop(at('jelly')).loopMs, 3000);
+  assert.equal(exportLoop({ ...at('lean'), speed: 2 }).loopMs, 1500);
+  assert.equal(exportLoop(at('gyre'), undefined, true).loopMs, IDLE_CYCLE * 1000);
+});
+
+const sample = (idle: Tune['idle'], n = 600) => {
+  const t = { ...TUNE_DEFAULTS, idle };
+  return Array.from({ length: n }, (_, i) => idlePose(t, (i / n) * loopCycle(t)));
+};
+
+test('Jelly overshoots each lean and wobbles before it settles', () => {
+  const ps = sample('jelly');
+  const peak = Math.max(...ps.map((p) => Math.abs(p.ry)));
+  // The lean it settles on is where each half ends.
+  const rest = Math.abs(ps[ps.length / 2 - 1].ry);
+  assert.ok(rest > 0.12, `the lean is too shallow (${rest})`);
+  assert.ok(peak > rest * 1.2, `no overshoot (${peak} vs ${rest})`);
+  let turns = 0;
+  for (let i = 2; i < ps.length / 2; i++) if (Math.sign(ps[i].ry - ps[i - 1].ry) !== Math.sign(ps[i - 1].ry - ps[i - 2].ry)) turns++;
+  assert.ok(turns >= 3, `it does not wobble (${turns} turns)`);
+});
+
+test('Jelly flicks wide and is moving for nearly all of its loop', () => {
+  const ps = sample('jelly');
+  const peak = Math.max(...ps.map((p) => Math.abs(p.ry)));
+  assert.ok(peak > (18 * Math.PI) / 180, `the flick is small (${((peak * 180) / Math.PI).toFixed(1)} degrees)`);
+  const dt = loopCycle({ ...TUNE_DEFAULTS, idle: 'jelly' }) / ps.length;
+  let still = 0;
+  for (let i = 1; i < ps.length; i++) if (Math.hypot(ps[i].ry - ps[i - 1].ry, ps[i].rx - ps[i - 1].rx, ps[i].rz - ps[i - 1].rz) / dt < 0.06) still++;
+  assert.ok(still / ps.length < 0.1, `it holds still for ${Math.round((still / ps.length) * 100)}% of the loop`);
+});
+
+test('Lean tilts deep and holds still at each side', () => {
+  const ps = sample('lean');
+  const deep = Math.max(...ps.map((p) => Math.abs(p.ry)));
+  assert.ok(deep > 0.3, `the lean is not deep (${deep})`);
+  const held = ps.filter((p) => Math.abs(Math.abs(p.ry) - deep) < 0.01).length / ps.length;
+  assert.ok(held > 0.2, `it does not hold its lean (${held})`);
+});
+
+test("Gyre's face circles an ellipse, never passing through flat", () => {
+  const ps = sample('gyre');
+  const r = ps.map((p) => Math.hypot(p.rx, p.ry));
+  assert.ok(Math.min(...r) > 0.08, `it passes through flat (${Math.min(...r)})`);
+  const wide = Math.max(...ps.map((p) => Math.abs(p.ry)));
+  const tall = Math.max(...ps.map((p) => Math.abs(p.rx)));
+  assert.ok(wide > tall * 1.4, `not an ellipse (${wide} by ${tall})`);
+  // One way round: the angle of the lean only ever moves forward.
+  let back = 0;
+  for (let i = 1; i < ps.length; i++) {
+    const d = Math.atan2(ps[i].rx, ps[i].ry) - Math.atan2(ps[i - 1].rx, ps[i - 1].ry);
+    if (Math.sin(d) < 0) back++;
+  }
+  assert.equal(back, 0, 'it reverses');
 });
 
 test('frame plans add up to the loop exactly and stay within their budget', () => {

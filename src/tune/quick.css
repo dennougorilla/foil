@@ -232,6 +232,9 @@
 .qm-opt[data-value='spin'] { --act: tune-act-spin; }
 .qm-opt[data-value='turn'] { --act: tune-act-turn; }
 .qm-opt[data-value='breathe'] { --act: tune-act-breathe; }
+.qm-opt[data-value='jelly'] { --act: tune-act-jelly; }
+.qm-opt[data-value='lean'] { --act: tune-act-lean; }
+.qm-opt[data-value='gyre'] { --act: tune-act-gyre; }
 
 /* Two lines are kept for the description, so the tray never changes height under the pointer. */
 .qm-help {

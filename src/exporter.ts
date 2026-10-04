@@ -150,6 +150,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   const animMask = input.faceAt ? document.createElement('canvas') : null;
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
   const kind = input.edition.touch;
+  const cycle = loopCycle(tune, !!input.edition.torch);
   const touch = kind ? autoTouchFor(input.face, kind) : null;
   // Everything is laid out for a 900px-tall frame and scaled from there.
   const k = H / 900;
