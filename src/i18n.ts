@@ -1,5 +1,6 @@
 import type { EditionId, FrameId, RarityId } from './editions';
-import type { FoilTone, LetterStyle } from './lettering';
+import type { FoilTone, LetterStyle, TextField } from './lettering';
+import type { CardLayout } from './card/tcg';
 import type { MessageFont, MessagePlace } from './message';
 import type { Metal } from './tune/model';
 import type { ExportFormat, PanelTab } from './state';
@@ -35,8 +36,8 @@ const ja = {
   prevFinish: '前の加工',
   nextFinish: '次の加工',
   applied: '加工を「{name}」に切り替えました',
-  cardHint: '名前・メッセージ・◆はクリックで変更。カードは投げて遊べます',
-  cardHintTouch: '名前・メッセージ・◆はタップで変更。カードを左右にはじくと加工が切り替わります',
+  cardHint: '名前・メッセージ・◆はクリックで変更。カードの文字を押すと、その文字だけの刷り方を選べます',
+  cardHintTouch: '名前・メッセージ・◆はタップで変更。カードの文字をタップすると刷り方を選べます。左右にはじくと加工が切り替わります',
   secImage: '画像を選ぶ',
   secFinish: '加工を選ぶ',
   secExport: '書き出す',
@@ -259,7 +260,7 @@ const ja = {
   },
   lt: {
     title: '文字の加工',
-    styles: '刷り方 (名前とメッセージ)',
+    styles: '刷り方 (カードの文字すべて)',
     style: { ink: '印刷', deboss: '型押し', emboss: '浮き出し', foil: '箔押し', spot: 'スポット​UV' } satisfies Record<LetterStyle, string>,
     help: {
       ink: '平らに刷った、いつもの文字。',
@@ -288,11 +289,27 @@ const ja = {
     jump: '文字の加工: {style} — クリックで変更',
     reset: '初期値に戻す',
   },
+  print: {
+    title: { name: '名前の刷り方', type: '種別の刷り方', message: 'メッセージの刷り方' } satisfies Record<TextField, string>,
+    effect: '効果文の刷り方',
+    shared: 'カードに合わせる',
+    own: '個別',
+  },
+  layoutLabel: 'レイアウト',
+  tcg: {
+    layoutName: { classic: 'いつもの', tcg: 'トレカ' } satisfies Record<CardLayout, string>,
+    type: '種別',
+    typeTag: '＋ 種別を入れる',
+    typeHint: '例: 誕生日カード',
+  },
   msg: {
     title: 'メッセージ',
-    label: 'メッセージ (3行まで)',
+    label: 'メッセージ',
+    effectField: '効果文の欄に入る言葉 (4行まで)',
+    count: '{n}/4行',
+    effectTag: '＋ 効果文を入れる',
     tag: '＋ メッセージを入れる',
-    field: 'カードに入れる言葉',
+    field: 'カードに入れる言葉 (4行まで)',
     phrasesLabel: 'ワンタップで入れる',
     clear: '消す',
     place: '位置',
@@ -336,8 +353,8 @@ const en: Dict = {
   prevFinish: 'Previous finish',
   nextFinish: 'Next finish',
   applied: 'Finish changed to {name}',
-  cardHint: 'Click the name, message or ◆ to change them. Toss the card around',
-  cardHintTouch: 'Tap the name, message or ◆ to change them. Flick the card sideways to switch finishes',
+  cardHint: 'Click the name, message or ◆ to change them. Click words on the card to give them their own print',
+  cardHintTouch: 'Tap the name, message or ◆ to change them. Tap words on the card for their own print; flick it sideways to switch finishes',
   secImage: 'Choose a picture',
   secFinish: 'Choose a finish',
   secExport: 'Export',
@@ -560,7 +577,7 @@ const en: Dict = {
   },
   lt: {
     title: 'Lettering',
-    styles: 'Printing (name and message)',
+    styles: "Printing (all the card's text)",
     style: { ink: 'Print', deboss: 'Deboss', emboss: 'Emboss', foil: 'Hot foil', spot: 'Spot UV' },
     help: {
       ink: 'Flat printed type, as usual.',
@@ -589,11 +606,27 @@ const en: Dict = {
     jump: 'Lettering: {style} — click to change',
     reset: 'Reset to default',
   },
+  print: {
+    title: { name: 'Name print', type: 'Type line print', message: 'Message print' },
+    effect: 'Effect text print',
+    shared: 'Follow card',
+    own: 'own',
+  },
+  layoutLabel: 'Layout',
+  tcg: {
+    layoutName: { classic: 'Classic', tcg: 'Trading card' },
+    type: 'Type line',
+    typeTag: '+ Add a type line',
+    typeHint: 'e.g. Birthday card',
+  },
   msg: {
     title: 'Message',
-    label: 'Message (up to 3 lines)',
+    label: 'Message',
+    effectField: 'Card text, in its box (up to 4 lines)',
+    count: '{n}/4 lines',
+    effectTag: '+ Add effect text',
     tag: '+ Add a message',
-    field: 'Words for the card',
+    field: 'Words for the card (up to 4 lines)',
     phrasesLabel: 'One tap',
     clear: 'Clear',
     place: 'Position',

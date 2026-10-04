@@ -10,7 +10,7 @@
 // differently by each pane, and broken up by the glass's rippled, uneven thickness, which is
 // seen through a different part of each sheet as the card tilts.
 // Nothing here reads the clock, so it holds still under reduced motion and loops in exports.
-import { ART, FACE_H, FACE_W } from '../card/face';
+import { FACE_H, FACE_W } from '../card/face';
 
 const f = (v: number) => v.toFixed(2);
 
@@ -19,7 +19,7 @@ export const STAINED_GLASS_GLSL = /* glsl */ `
 const vec2 SG_GRID = vec2(8.5, 8.5 * 1.4);
 const float SG_LEAD = 0.12; // half the lead's width, in pane units
 const vec2 SG_FACE = vec2(${f(FACE_W)}, ${f(FACE_H)});
-const vec4 SG_ART = vec4(${f(ART.x)}, ${f(ART.y)}, ${f(ART.x + ART.w)}, ${f(ART.y + ART.h)});
+#define SG_ART (uArt * SG_FACE.xyxy)
 
 vec2 sgSeed(vec2 cell) { return 0.15 + 0.7 * hash22(cell * 1.37 + 11.0); }
 
@@ -62,7 +62,8 @@ float sgBorder(vec2 fp, out vec2 cell) {
               : side == 2 ? (fp.x - SG_ART.x) / (SG_ART.z - SG_ART.x) * 3.0 : 0.5;
   float span = side < 2 ? (SG_ART.w - SG_ART.y) / 5.0 : (SG_ART.z - SG_ART.x) / 3.0;
   float k = floor(clamp(along, 0.0, side < 2 ? 4.999 : 2.999));
-  float divider = side == 3 ? 1e3 : abs(fract(along + 0.5) - 0.5) * span;
+  // A trading card's name bar is on top: it stays whole too.
+  float divider = side == 3 || (side == 2 && uArt.y > 0.06) ? 1e3 : abs(fract(along + 0.5) - 0.5) * span;
   if (along < 0.5 || along > (side < 2 ? 4.5 : 2.5)) divider = 1e3; // no divider at the mitre
   // The lead that runs around the window itself.
   float win = max(max(out4.x, out4.y), max(out4.z, out4.w));
@@ -141,6 +142,7 @@ vec3 stainedGlass(vec3 c, vec2 uv, vec2 t, float L, float art) {
   vec2 ripple = vec2(hx - h0, hy - h0) / 0.08;
   // The frame's pale glass is calmer, and calmest behind the name, so the lettering reads.
   float plate = smoothstep(SG_ART.w, SG_ART.w + 20.0, ruv.y * SG_FACE.y);
+  if (uArt.y > 0.06) plate = max(plate, 1.0 - smoothstep(SG_ART.y - 20.0, SG_ART.y, ruv.y * SG_FACE.y));
   float rough = art > 0.5 ? 1.0 : 0.55 - 0.3 * plate;
   ripple *= rough;
   float thick = mix(0.5, smoothstep(0.2, 0.8, h0), rough);

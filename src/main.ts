@@ -1,8 +1,10 @@
 import './style.css';
-import { createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
+import { CARD_TYPE_MAX, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { DICTS, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
+import { artWindow, clampCrop, cropRect, drawBack, drawFace, drawFlip, type Crop } from './card/face';
+import { CARD_LAYOUTS } from './card/tcg';
+import { mountPrintPop } from './printPop';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
@@ -17,7 +19,7 @@ import { mountLettering } from './letteringPanel';
 import { bindMessageField, mountMessage } from './messagePanel';
 import { loadMessageFont } from './card/messageFace';
 import { changedKeys } from './tune/model';
-import { DEFAULT_LETTERING, setTextRuns } from './lettering';
+import { DEFAULT_LETTERING, fieldAt, setFieldPrints, setTextRuns } from './lettering';
 import { initRangeColors } from './features';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
@@ -78,6 +80,11 @@ try {
     onSelect: (id) => selectEdition(id),
     onHover: (id) => renderCaption(id),
     onFlick: (dir) => stepEdition(dir),
+    // Tapping words on the card opens their own print.
+    onTapCard: (uv, x, y) => {
+      const field = fieldAt(uv);
+      if (field) printPop.open(field, { x, y });
+    },
     handIds: hand,
     deckRect: () => document.getElementById('deckBtn')?.getBoundingClientRect() ?? null,
   });
@@ -118,17 +125,18 @@ function wakePacks() {
 }
 const artIds = new WeakMap<object, number>();
 let artCount = 0;
-/** Names the art in the window (picture and crop), so depth is read once per art. */
+/** Names the art in the window (picture, layout and crop), so depth is read once per art. */
 function artKey() {
   const s = store.get();
   const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
   if (!artIds.has(src)) artIds.set(src, ++artCount);
-  return `${artIds.get(src)}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
+  const a = artWindow(s);
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
 }
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, message: s.message, plate: s.plate };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType };
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
@@ -324,6 +332,25 @@ function buildSegments() {
     fs.appendChild(b);
   }
   rangeColors.decorateFrames(fs);
+  const ls = $('layoutSeg');
+  ls.textContent = '';
+  for (const id of CARD_LAYOUTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = id;
+    b.setAttribute('role', 'radio');
+    // A tiny card drawn in each layout's parts.
+    b.innerHTML = '<i class="layout-icon" aria-hidden="true"><i></i><i></i><i></i></i><span></span>';
+    b.lastElementChild!.textContent = t.tcg.layoutName[id];
+    radio(b, s.layout === id);
+    b.onclick = () => {
+      if (store.get().layout === id) return;
+      sfx.tick();
+      stage.flipTo(() => store.set({ layout: id }));
+    };
+    ls.appendChild(b);
+  }
 }
 
 function buildThumbs() {
@@ -385,11 +412,18 @@ function syncInputs() {
   if (document.activeElement !== name) name.value = s.name;
   syncMessageInput();
   name.placeholder = fallback().name;
-  msg.placeholder = t.msg.tag;
+  const tcg = s.layout === 'tcg';
+  msg.placeholder = tcg ? t.msg.effectTag : t.msg.tag;
+  const type = $<HTMLInputElement>('typeInput');
+  type.hidden = !tcg;
+  if (document.activeElement !== type) type.value = s.cardType;
+  type.placeholder = t.tcg.typeTag;
+  type.setAttribute('aria-label', t.tcg.type);
   name.setAttribute('aria-label', t.name);
   // Off, the name stays in the tag but is not printed: it steps back.
   name.classList.toggle('is-off', !s.plate);
   msg.setAttribute('aria-label', t.msg.title);
+  $('info').classList.toggle('is-tcg', tcg);
   const inten = $<HTMLInputElement>('intensity');
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
@@ -440,7 +474,7 @@ function positionCropWindow() {
   const ch = parseFloat(cropCanvas.style.height) || 1;
   const left = (box.width - cw) / 2;
   const top = (box.height - ch) / 2;
-  const r = cropRect(img.width, img.height, store.get().crop);
+  const r = cropRect(img.width, img.height, store.get().crop, artAspect());
   const k = cw / img.width;
   Object.assign(cropWin.style, {
     left: `${left + r.sx * k}px`,
@@ -452,9 +486,15 @@ function positionCropWindow() {
   });
 }
 
+/** Width / height of the art window the crop fills (the layout's). */
+function artAspect() {
+  const a = artWindow(store.get());
+  return a.w / a.h;
+}
+
 function setCrop(c: Crop) {
   const img = currentImage();
-  store.set({ crop: clampCrop(img.width, img.height, c) });
+  store.set({ crop: clampCrop(img.width, img.height, c, artAspect()) });
 }
 
 {
@@ -661,7 +701,7 @@ let flipChosen = false;
 
 function setFlip(img: Img | null) {
   flipImage = img;
-  if (img) drawFlip(flip, img);
+  if (img) drawFlip(flip, img, artWindow(store.get()));
   stage.cards.setFlip(img ? flip : null);
   renderFlip();
 }
@@ -772,6 +812,8 @@ $<HTMLInputElement>('nameInput').addEventListener('input', (e) => {
   store.set({ name: v, nameEdited: v.length > 0 });
 });
 const syncMessageInput = bindMessageField($<HTMLTextAreaElement>('messageInput'), store);
+$<HTMLInputElement>('typeInput').maxLength = CARD_TYPE_MAX;
+$<HTMLInputElement>('typeInput').addEventListener('input', (e) => store.set({ cardType: (e.target as HTMLInputElement).value }));
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
@@ -820,9 +862,10 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor;
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.layout !== 'classic';
   if (id === 'light') return changedKeys(s.tune).length > 0;
-  if (id === 'text') return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate;
+  if (id === 'text')
+    return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
   return rangeChanged;
 }
 
@@ -905,7 +948,7 @@ function syncAdjust() {
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '' });
+  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', layout: 'classic' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1493,12 +1536,21 @@ store.on((s, changed) => {
     deck.render();
   }
   if (changed.has('rarity') || changed.has('frame')) buildSegments();
-  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if (changed.has('prints')) setFieldPrints(s.prints);
+  if (changed.has('layout') || (s.layout === 'tcg' && (changed.has('cardType') || changed.has('message')))) {
+    // A new art window has its own proportions: keep the crop inside the picture, and redraw the flip picture for it.
+    const img = currentImage();
+    store.set({ crop: clampCrop(img.width, img.height, s.crop, artAspect()) });
+    if (flipImage) setFlip(flipImage);
+    buildSegments();
+    drawCropPreview();
+  }
+  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
-  if (['sample', 'message', 'plate'].some((k) => changed.has(k as keyof State))) syncInputs();
+  if (['sample', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
   if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) {
@@ -1515,11 +1567,15 @@ store.on((s, changed) => {
 // ---------- Boot ----------
 
 setSound(store.get().sound);
+setFieldPrints(store.get().prints);
+const printPop = mountPrintPop({ store, dict: () => t, onPick: () => stage.juice(0.35) });
 mountMessage({
   store,
   host: $('pane-text'),
   dict: () => t,
   onPick: () => stage.juice(0.35),
+  chip: (f) => printPop.chip(f),
+  namePlaceholder: () => fallback().name,
 });
 mountLettering({
   store,
@@ -1555,8 +1611,8 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font, so wait for it before painting the face.
-document.fonts.load('40px "DotGothic16"').then(boot, boot);
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before painting the face.
+Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]).then(boot, boot);
 boot();
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;

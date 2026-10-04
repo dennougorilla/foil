@@ -207,7 +207,9 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   // ---- Frame: a fine stamped dot texture (follows the pattern size and angle) ----
   float frame = (1.0 - m.r) * (1.0 - m.b);
   // The nameplate is a smooth matte plate so the name reads; the dots stamp the rest.
-  float band = uPlate > 0.5 ? smoothstep(0.878, 0.886, p.y) : 0.0;
+  // A trading card's bars and boxes all carry words, so everything off its art is plate.
+  vec2 offArt = max(uArt.xy - p, p - uArt.zw);
+  float band = uPlate < 0.5 ? 0.0 : uArt.y < 0.06 ? smoothstep(0.878, 0.886, p.y) : smoothstep(0.0, 0.006, max(offArt.x, offArt.y));
   {
     vec2 q = uv * vec2(1.0, 1.4) * 70.0;
     q.x += 0.5 * mod(floor(q.y), 2.0);  // offset rows: a staggered grid
@@ -271,9 +273,11 @@ vec3 relief(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   float grain = (hash12(floor(p / texel)) - 0.5) * 0.12 * (1.0 - smoothstep(0.3, 1.2, px));
   col *= (1.0 - 0.45 * band * frame) * (1.0 + grain * band * frame);
   col = reliefShoulder(col);
+  // A trading card's panels stay printed paper and ink under a warm sheen, so their words read.
+  if (uArt.y >= 0.06) col = mix(col, c * vec3(1.0, 0.95, 0.84), band * 0.8);
 
   // ---- Name: mirror foil pressed into the plate ----
-  if (uPlate > 0.5 && p.y > 0.86) {
+  if (uPlate > 0.5 && uArt.y < 0.06 && p.y > 0.86) {
     vec2 tx = 1.0 / vec2(textureSize(uTextMap, 0));
     vec2 e = max(tx, fw);
     float cover = textureLod(uTextMap, p, 0.0).r;

@@ -150,6 +150,7 @@ uniform float uShadow;     // 1 = draw as drop shadow
 uniform float uAlpha;
 uniform float uFlash;      // white flash on juice
 uniform float uFaceTexels; // face texture width in px
+uniform vec4 uArt;         // the art window in face uv: x0, y0, x1, y1 (it moves with the layout)
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
 out vec4 o;
@@ -264,8 +265,9 @@ void main() {
   if (base.a < 0.002) discard;
   vec3 c = base.rgb / max(base.a, 1e-4);
   vec3 m = texture(uMask, uv).rgb;
-  if (uPlate < 0.5 && uv.y > 0.885 && m.b < 0.5 && m.r < 0.5) {
+  if (uPlate < 0.5 && uArt.y < 0.06 && uv.y > 0.885 && m.b < 0.5 && m.r < 0.5) {
     // At thumbnail size the name is unreadable noise; paint plain frame instead.
+    // (A trading card keeps its bars and boxes: they are what makes it one.)
     vec4 f = face(vec2(0.04, 0.5), 0.0);
     c = f.rgb / max(f.a, 1e-4);
   }

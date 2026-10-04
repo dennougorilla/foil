@@ -1,10 +1,6 @@
 // Shadowbox: the picture stands in a lit box behind the art window as paper sheets, cut by depth
 // (src/depth). Spliced into CARD_FS after the shared helpers, the tune and the range code; reads
 // uFace, uMask, uLight and uIntensity besides its own sheets.
-import { ART, FACE_H, FACE_W } from '../card/face';
-
-const n = (v: number) => v.toFixed(5);
-
 export const SHADOWBOX_GLSL = /* glsl */ `
 uniform sampler2D uLayers; // over the art window: r, g, b = the cut sheets from the front, a = depth (1 = near)
 uniform float uLayerCuts;  // cut sheets in front of the back one, 0..3
@@ -13,7 +9,7 @@ uniform sampler2D uPlateBack; // the art with the cut-out subjects painted out
 uniform float uPlateMix;      // 1 = use it; 0 = animated picture, keep the current frame
 
 // Art window in uv (x0, y0, x1, y1), from the face layout.
-const vec4 SB_ART = vec4(${n(ART.x / FACE_W)}, ${n(ART.y / FACE_H)}, ${n((ART.x + ART.w) / FACE_W)}, ${n((ART.y + ART.h) / FACE_H)});
+#define SB_ART uArt
 // uv to square card units, so depth and light behave the same along both axes.
 const vec2 SB_K = vec2(1.0, 1.4);
 // A virtual eye a little closer than the real camera, so the box reads deep even face on.

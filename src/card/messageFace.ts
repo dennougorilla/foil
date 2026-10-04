@@ -1,7 +1,7 @@
 // Prints the card's message on the picture, and fetches its typefaces.
 
 import { hexToRgb } from '../gl/gl';
-import { getLettering, letterFill, type TextRun } from '../lettering';
+import { letterFill, letteringOf, type TextRun } from '../lettering';
 import { MESSAGE_FACES, layoutMessage, messageFont, messageLines, type Message, type MessageFont, type Rect } from '../message';
 
 const OUTLINE = '#161c1f';
@@ -29,7 +29,7 @@ export function paintMessage(ctx: CanvasRenderingContext2D, message: Message, ar
   const { size } = layout;
   const font = messageFont(message.font, size);
   const lines = layout.lines.filter((l) => l.text);
-  const fill = letterFill(getLettering(), PAPER);
+  const fill = letterFill(letteringOf('message'), PAPER);
   if (fill) {
     ctx.save();
     ctx.font = font;

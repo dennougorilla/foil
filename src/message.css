@@ -9,9 +9,22 @@
 
 .msg-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
+}
+
+.msg-head > .field-label {
+  margin-right: auto;
+}
+
+.msg-count {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.msg-count[hidden] {
+  display: none;
 }
 
 .msg-field {
@@ -148,4 +161,18 @@
 
 .msg-field:not(:placeholder-shown) {
   font-size: 18px;
+}
+
+.msg .field[hidden],
+.msg-type[hidden] {
+  display: none;
+}
+
+.msg-type {
+  display: grid;
+  gap: 8px;
+}
+
+.msg-type.is-off .msg-type-field {
+  opacity: 0.45;
 }

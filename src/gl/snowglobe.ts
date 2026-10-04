@@ -7,7 +7,7 @@
 // Shaking comes from the card itself (tossing, flicking the tilt, a click's wobble), a pointer
 // sweeping across the art, and on phones the motion sensor. Exports and reduced motion never
 // take input: the flakes only move while the shader clock moves.
-import { ART, FACE_H, FACE_W } from '../card/face';
+import { ART, artOf, FACE_H, FACE_W } from '../card/face';
 import type { CardDraw } from './renderers';
 
 /** Card shader index of the finish. Kept clear of the regular and sponsor ranges. */
@@ -49,9 +49,9 @@ vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
 }
 `;
 
-const ART_UV = [ART.x / FACE_W, ART.y / FACE_H, ART.w / FACE_W, ART.h / FACE_H] as const;
-/** Height of the art window in widths; the sim runs in these square units. */
-const ASPECT = (ART.h / ART.w).toFixed(4);
+/** The art window in face uv (x, y, w, h); the flakes live inside it. */
+type ArtUv = [number, number, number, number];
+const CLASSIC: ArtUv = [ART.x / FACE_W, ART.y / FACE_H, ART.w / FACE_W, ART.h / FACE_H];
 
 const COARSE = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4;
 const COUNT = COARSE ? 3072 : 8192;
@@ -77,7 +77,8 @@ uniform float uStir;     // turbulence, 0 calm .. ~1.5 shaken hard
 uniform vec2 uGrav;      // card-local down
 uniform vec4 uPoke;      // a pointer sweeping through: position (art uv), velocity
 out vec4 vState;
-const float A = ${ASPECT};
+uniform float uArtA;     // height of the art window in widths; the sim runs in these square units
+#define A uArtA
 ${HASH}
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -161,7 +162,8 @@ uniform float uShow;     // share of the flakes drawn
 uniform vec2 uTilt;
 uniform vec2 uLight;
 uniform sampler2D uMask;
-const vec4 ART_UV = vec4(${ART_UV.map((v) => v.toFixed(5)).join(', ')});
+uniform vec4 uArtUv;     // the art window in face uv: x, y, w, h
+#define ART_UV uArtUv
 out vec3 vCol;
 out float vGlint;
 out vec2 vAxis;          // flake orientation (cos, sin)
@@ -333,6 +335,9 @@ export class SnowGlobe {
   private stir = 0;
   private grav: [number, number] = [0, 1];
   private poke: [number, number, number, number] = [0, 0, 0, 0];
+  private art: ArtUv = CLASSIC;
+  private faceW = FACE_W;
+  private faceH = FACE_H;
   // The main card's last pose, to feel how it is being moved.
   private prev: { t: number; x: number; y: number; rx: number; ry: number; rz: number; vx: number; vy: number; wx: number; wy: number; wz: number } | null = null;
 
@@ -343,9 +348,9 @@ export class SnowGlobe {
   ) {
     this.sim = compile(gl, SIM_VS, SIM_FS, ['vState']);
     this.draw_ = compile(gl, DRAW_VS, DRAW_FS);
-    this.su = uniforms(gl, this.sim, ['uDt', 'uTime', 'uKick', 'uSpin', 'uStir', 'uGrav', 'uPoke']);
+    this.su = uniforms(gl, this.sim, ['uDt', 'uTime', 'uKick', 'uSpin', 'uStir', 'uGrav', 'uPoke', 'uArtA']);
     this.du = uniforms(gl, this.draw_, [
-      'uRes', 'uCenter', 'uSize', 'uRot', 'uScale', 'uDpr', 'uTime', 'uShow', 'uTilt', 'uLight', 'uMask', 'uAlpha',
+      'uRes', 'uCenter', 'uSize', 'uRot', 'uScale', 'uDpr', 'uTime', 'uShow', 'uTilt', 'uLight', 'uMask', 'uAlpha', 'uArtUv',
     ]);
     // Start mid-drift: most flakes hang in the liquid, a bed of them lies on the floor.
     const data = new Float32Array(COUNT * 4);
@@ -375,6 +380,14 @@ export class SnowGlobe {
     if (!settled) listen();
   }
 
+  /** The face the flakes are drawn over: they fill its art window, wherever the layout puts it. */
+  setFace(face: HTMLCanvasElement): void {
+    const a = artOf(face);
+    this.art = [a.x / face.width, a.y / face.height, a.w / face.width, a.h / face.height];
+    this.faceW = face.width;
+    this.faceH = face.height;
+  }
+
   /** Draws the flakes over a card that was just drawn; the mask must still be bound to unit 1. */
   draw(view: GlobeView, d: CardDraw, time: number): void {
     const { gl } = this;
@@ -402,6 +415,7 @@ export class SnowGlobe {
     gl.uniform2f(u.uLight, d.light[0], d.light[1]);
     gl.uniform1i(u.uMask, 1);
     gl.uniform1f(u.uAlpha, d.alpha);
+    gl.uniform4f(u.uArtUv, ...this.art);
     gl.drawArrays(gl.POINTS, 0, COUNT);
   }
 
@@ -431,6 +445,8 @@ export class SnowGlobe {
     gl.uniform1f(u.uStir, this.stir);
     gl.uniform2f(u.uGrav, this.grav[0], this.grav[1]);
     gl.uniform4f(u.uPoke, ...this.poke);
+    // In square units: the art's height over its width, on the face's own pixels.
+    gl.uniform1f(u.uArtA, (this.art[3] * this.faceH) / (this.art[2] * this.faceW));
     this.poke = [0, 0, 0, 0];
     gl.bindVertexArray(this.simVao[src]);
     // The buffer written to may not stay bound anywhere else.
@@ -494,10 +510,10 @@ export class SnowGlobe {
     const ch = d.h * d.scale;
     const u = (input.x - rect.left - (d.cx - cw / 2)) / cw;
     const v = (input.y - rect.top - (d.cy - ch / 2)) / ch;
-    const ax2 = (u - ART_UV[0]) / ART_UV[2];
-    const ay2 = (v - ART_UV[1]) / ART_UV[3];
+    const ax2 = (u - this.art[0]) / this.art[2];
+    const ay2 = (v - this.art[1]) / this.art[3];
     if (ax2 < -0.1 || ax2 > 1.1 || ay2 < -0.1 || ay2 > 1.1) return;
-    const k = 1 / (cw * ART_UV[2]);
+    const k = 1 / (cw * this.art[2]);
     const pvx = clamp(input.vx * k, -4, 4);
     const pvy = clamp(input.vy * k, -4, 4);
     this.poke = [ax2, ay2, pvx, pvy];

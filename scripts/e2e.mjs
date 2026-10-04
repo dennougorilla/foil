@@ -248,9 +248,9 @@ await step('a ready phrase puts a message on the card and in every export; the n
   const [msg, top] = await pngDiff(bare, said, [MSG, TOP]);
   expect(msg > 12 && top < 1, `the message did not land at the bottom of the art (bottom ${msg.toFixed(1)}, top ${top.toFixed(1)})`);
 
-  // Typing in the tag edits the same message, three lines at most.
-  await page.fill('#messageInput', 'a\nb\nc\nd');
-  expect((await state()).message.text === 'a\nb\nc d', 'a fourth line was kept');
+  // Typing in the tag edits the same message, four lines at most.
+  await page.fill('#messageInput', 'a\nb\nc\nd\ne');
+  expect((await state()).message.text === 'a\nb\nc\nd e', 'a fifth line was kept');
   await page.click('.msg-phrase >> nth=0');
 
   // Message only: the nameplate leaves the band plain.
@@ -266,6 +266,47 @@ await step('a ready phrase puts a message on the card and in every export; the n
   const [metal] = await pngDiff(only, foil, [MSG]);
   expect(metal > 6, `the foil did not reach the message (${metal.toFixed(1)})`);
   await page.click('.msg-plate [data-v=on]');
+});
+
+await step('the trading-card layout: the message fills the effect box, and each piece of text can take its own print', async () => {
+  await tab('card');
+  await page.click('#layoutSeg [data-v=tcg]');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).layout === 'tcg', null, { timeout: 5000 });
+  await page.waitForTimeout(800);
+  expect(await page.isVisible('#typeInput'), 'no type line field in the tag');
+  await page.fill('#typeInput', 'Birthday card');
+  expect((await state()).cardType === 'Birthday card', 'type line not saved');
+  // The effect box holds the message; without one the box goes and the picture runs down to the footer.
+  const EFFECT = [0.25, 0.74, 0.75, 0.9];
+  const said = await savePng();
+  const keep = (await state()).message.text;
+  await page.fill('#messageInput', '');
+  const blank = await savePng();
+  const [box] = await pngDiff(said, blank, [EFFECT]);
+  expect(box > 1, `the effect box did not change with the message (${box.toFixed(1)})`);
+  await page.fill('#messageInput', keep);
+
+  // The name's chip in the Lettering tab opens its own print; the card's lettering stays as it is.
+  const before = (await state()).text.style;
+  await tab('text');
+  await page.click('#pane-text .pp-chip[data-field=name]');
+  expect(await page.isVisible('.pp'), 'the print popover did not open');
+  await page.click('.pp-style[data-style=emboss]');
+  let s = await state();
+  expect(s.prints.name?.style === 'emboss' && s.text.style === before, `prints ${JSON.stringify(s.prints)}, card ${s.text.style}`);
+  expect(await page.locator('#pane-text .pp-chip[data-field=name].is-own').count(), 'the name chip has no mark for its own print');
+  await page.click('.pp-follow');
+  s = await state();
+  expect(!s.prints.name, "Following the card's lettering left the name with its own print");
+  await page.keyboard.press('Escape');
+
+  // Tapping the words on the card opens the same popover for them.
+  const b = await page.locator('#cardSlot').boundingBox();
+  await page.mouse.click(b.x + b.width * 0.3, b.y + b.height * 0.07);
+  await page.waitForTimeout(200);
+  const title = await page.textContent('.pp-title');
+  expect(await page.isVisible('.pp') && /Name/.test(title), `a tap on the name opened ${title}`);
+  await page.keyboard.press('Escape');
 });
 
 await step('finish area tab and brush', async () => {
@@ -536,7 +577,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const back = document.createElement('canvas');
     face.width = mask.width = back.width = 900;
     face.height = mask.height = back.height = 1260;
-    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', message: { text: '', place: 'top', font: 'pop' }, plate: true });
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Hanako', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '' });
     drawBack(back);
     // A flat card (no idle motion) so the art and the nameplate land on known pixels.
     const W = 360;

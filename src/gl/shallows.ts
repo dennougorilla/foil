@@ -7,7 +7,7 @@
 // gathered at a point is 1 / |det J| of that bending (J = I + depth x curvature): where the
 // surface folds the light, the floor lights up in sharp lines. Red, green and blue bend by
 // slightly different amounts, which shows as spectrum where the light gathers hardest.
-import { ART, FACE_H, FACE_W } from '../card/face';
+import { FACE_H, FACE_W } from '../card/face';
 
 /** Phones and low-core machines share one refocusing step across the three colours. */
 const lite =
@@ -21,8 +21,8 @@ const bool SH_LITE = ${lite};
 const int SH_WAVES = 7;
 // The art window in face pixels (card/face.ts); its corner matches the drawn window.
 const vec2 SH_FACE = vec2(${f(FACE_W)}, ${f(FACE_H)});
-const vec2 SH_ART_C = vec2(${f(ART.x + ART.w / 2)}, ${f(ART.y + ART.h / 2)});
-const vec2 SH_ART_H = vec2(${f(ART.w / 2)}, ${f(ART.h / 2)});
+#define SH_ART_C ((uArt.xy + uArt.zw) * 0.5 * SH_FACE)
+#define SH_ART_H ((uArt.zw - uArt.xy) * 0.5 * SH_FACE)
 const float SH_ART_R = ${f(FACE_W * 0.075 * 0.45)};
 
 // Signed distance to the art window's edge in card widths, negative inside. ruv is face uv.

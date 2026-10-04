@@ -9,7 +9,7 @@ uniform float uRangeView;  // 0..1: shade what is left out and trace the edge
 uniform float uRangeAnts;  // animation phase for the proof overlay (0 when motion is reduced)
 float foilRange(vec2 uv, float L) {
   // Thumbnail cards paint their nameplate plain, so read the range there from the plain frame too.
-  if (uPlate < 0.5 && uv.y > 0.885) uv = vec2(0.04, 0.5);
+  if (uPlate < 0.5 && uArt.y < 0.06 && uv.y > 0.885) uv = vec2(0.04, 0.5);
   vec3 r = texture(uRange, uv).rgb;
   float s = uRangeKey.z;
   float k = (uRangeKey.x <= 0.001 ? 1.0 : smoothstep(uRangeKey.x - s, uRangeKey.x + s, L))

@@ -84,6 +84,7 @@
           <aside class="info" id="info">
             <div class="info-box">
               <input class="info-name" id="nameInput" type="text" maxlength="24" autocomplete="off" spellcheck="false" />
+              <input class="info-type" id="typeInput" type="text" autocomplete="off" spellcheck="false" hidden />
               <div class="info-desc">
                 <textarea class="is-hint" id="messageInput" rows="2" spellcheck="false"></textarea>
               </div>
@@ -204,6 +205,10 @@
               <div class="field">
                 <span class="field-label" id="frameLabel" data-t="frame"></span>
                 <div class="seg seg-frames" id="frameSeg" role="radiogroup" aria-labelledby="frameLabel"></div>
+              </div>
+              <div class="field">
+                <span class="field-label" id="layoutLabel" data-t="layoutLabel"></span>
+                <div class="seg seg-layouts" id="layoutSeg" role="radiogroup" aria-labelledby="layoutLabel"></div>
               </div>
               <div class="row">
                 <label class="field-label" for="pixel" data-t="pixel"></label>

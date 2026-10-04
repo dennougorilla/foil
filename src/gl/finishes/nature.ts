@@ -79,10 +79,21 @@ ${SNOWGLOBE_GLSL}
   // Snow Globe's flakes are GPU particles drawn over its card; one set per renderer, made on first use.
   layers: (gl, live) => {
     let globe: SnowGlobe | null = null;
+    let face: HTMLCanvasElement | null = null;
     return [
       {
+        // The flakes fill the card's art window, which moves with the layout.
+        setFace: (f) => {
+          face = f;
+          globe?.setFace(f);
+        },
         after: (view, d, time) => {
-          if (d.edition === SNOWGLOBE_SHADER) (globe ??= new SnowGlobe(gl, !live)).draw(view, d, time);
+          if (d.edition !== SNOWGLOBE_SHADER) return;
+          if (!globe) {
+            globe = new SnowGlobe(gl, !live);
+            if (face) globe.setFace(face);
+          }
+          globe.draw(view, d, time);
         },
       },
     ];

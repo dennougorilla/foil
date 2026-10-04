@@ -1,12 +1,13 @@
-// The card's message: one to three short lines printed on the picture, at a
-// preset place and in one of a few typefaces. Plain data and layout only; the
-// face painter draws it and the lettering finish prints it.
+// The card's message: up to four short lines, printed on the picture at a
+// preset place (the classic card) or as the effect text in its box (the
+// trading-card layout), in one of a few typefaces. Plain data and layout only;
+// the face painter draws it and the lettering finish prints it.
 
 export type MessagePlace = 'top' | 'middle' | 'bottom';
 export type MessageFont = 'dot' | 'hand' | 'serif' | 'pop';
 
 export interface Message {
-  /** Up to three lines, separated by '\n'. Empty = no message. */
+  /** Up to four lines, separated by '\n'. Empty = no message. */
   text: string;
   place: MessagePlace;
   font: MessageFont;
@@ -14,8 +15,8 @@ export interface Message {
 
 export const MESSAGE_PLACES: MessagePlace[] = ['top', 'middle', 'bottom'];
 export const MESSAGE_FONTS: MessageFont[] = ['dot', 'hand', 'serif', 'pop'];
-export const MESSAGE_MAX_LINES = 3;
-export const MESSAGE_MAX_CHARS = 60;
+export const MESSAGE_MAX_LINES = 4;
+export const MESSAGE_MAX_CHARS = 80;
 
 /** Ready phrases, one tap each, in the panel's language. Mostly for any occasion. */
 export const MESSAGE_PHRASES: Record<'ja' | 'en', string[]> = {
@@ -23,7 +24,7 @@ export const MESSAGE_PHRASES: Record<'ja' | 'en', string[]> = {
   en: ['Happy\nBirthday', 'Thank you', 'Congratulations', 'With love', 'Best wishes'],
 };
 
-export const DEFAULT_MESSAGE: Message = { text: '', place: 'top', font: 'pop' };
+export const DEFAULT_MESSAGE: Message = { text: '', place: 'top', font: 'dot' };
 
 /** Canvas / CSS font of each typeface. All but the pixel face come from Google Fonts (SIL OFL). */
 export const MESSAGE_FACES: Record<MessageFont, { family: string; weight: number; fallback: string }> = {
@@ -38,7 +39,7 @@ export const messageFont = (font: MessageFont, size: number) => {
   return `${f.weight} ${size}px "${f.family}", ${f.fallback}`;
 };
 
-/** Keeps at most three lines (later ones join the third) and the length limit. */
+/** Keeps at most four lines (later ones join the last) and the length limit. */
 export function cleanMessageText(text: string): string {
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   const kept = lines.slice(0, MESSAGE_MAX_LINES - 1);
@@ -83,7 +84,7 @@ export interface MessageLayout {
 }
 
 /** Biggest size per line count, as a share of the art window's short side. */
-const MAX_SIZE = [0.15, 0.125, 0.105];
+const MAX_SIZE = [0.15, 0.125, 0.105, 0.09];
 const LINE_H = 1.18;
 /** Margins inside the art window: room for the outline and the drop. */
 const SIDE = 0.07;
@@ -119,4 +120,78 @@ export function layoutMessage(
   });
   const bw = Math.max(...out.map((l) => l.w));
   return { size, lines: out, box: { x: cx - bw / 2, y: top, w: bw, h } };
+}
+
+/** Characters that never start a line (they hang on the line before). */
+const NO_START = /^[、。，．,.!?！？」』）)ーっゃゅょッャュョ…]/;
+
+/** Breaks one line to a width, then narrows the width as far as the line count allows, so the lines come out even (no word left alone on the last). */
+function wrapEven(line: string, max: number, width: (t: string) => number): string[] {
+  const rows = wrap(line, max, width);
+  if (rows.length < 2) return rows;
+  let lo = max * 0.4;
+  let hi = max;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (wrap(line, mid, width).length > rows.length) lo = mid;
+    else hi = mid;
+  }
+  return wrap(line, hi, width);
+}
+
+/** Breaks one line to a width: at spaces where there are any, else between characters. */
+function wrap(line: string, max: number, width: (t: string) => number): string[] {
+  if (width(line) <= max) return [line];
+  const out: string[] = [];
+  let cur = '';
+  for (const ch of Array.from(line)) {
+    if (cur && width(cur + ch) > max && !NO_START.test(ch)) {
+      const space = cur.lastIndexOf(' ');
+      if (ch !== ' ' && space > 0) {
+        out.push(cur.slice(0, space));
+        cur = cur.slice(space + 1) + ch;
+      } else {
+        out.push(cur.trimEnd());
+        cur = ch === ' ' ? '' : ch;
+      }
+    } else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+const EFFECT_LINE_H = 1.3;
+
+/**
+ * Lays the effect text into its box: as large as fits (between a sixth and a
+ * fourteenth of the box's height), wrapped to the box's width, every line
+ * centred, as on a card made to be given.
+ */
+export function layoutEffect(lines: string[], box: Rect, measure: (text: string, size: number) => number): MessageLayout | null {
+  if (!lines.length) return null;
+  const REF = 100;
+  const widths = new Map<string, number>();
+  const at = (t: string, size: number) => {
+    let w = widths.get(t);
+    if (w === undefined) widths.set(t, (w = measure(t, REF)));
+    return (w * size) / REF;
+  };
+  const padX = box.w * 0.07;
+  const padY = box.h * 0.1;
+  const inner = { x: box.x + padX, y: box.y + padY, w: box.w - padX * 2, h: box.h - padY * 2 };
+  const min = Math.max(1, Math.floor(box.h * 0.07));
+  let size = Math.max(min, Math.floor(box.h * 0.16));
+  let rows: string[] = [];
+  for (; ; size--) {
+    rows = lines.flatMap((l) => (l ? wrapEven(l, inner.w, (t) => at(t, size)) : ['']));
+    if (size <= min || size * (1 + (rows.length - 1) * EFFECT_LINE_H) <= inner.h) break;
+  }
+  const h = size * (1 + (rows.length - 1) * EFFECT_LINE_H);
+  const top = inner.y + Math.max(0, (inner.h - h) / 2);
+  const out = rows.map((text, i) => {
+    const w = at(text, size);
+    return { text, x: inner.x + (inner.w - w) / 2, y: top + size / 2 + i * size * EFFECT_LINE_H, w };
+  });
+  const bw = Math.max(...out.map((l) => l.w));
+  return { size, lines: out, box: { x: inner.x + (inner.w - bw) / 2, y: top, w: bw, h } };
 }

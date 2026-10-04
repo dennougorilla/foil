@@ -2,6 +2,7 @@ import { BG_FS, cardFs, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './sha
 import { createProgram, createTexture, hexToRgb, quadBuffer, startProgram, uploadTexture, type PendingProgram, type Program } from './gl';
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
+import { artOf } from '../card/face';
 import { RangeLayer } from './range';
 import type { HeatSource } from '../touch/heat';
 import type { LayerMap } from '../depth/layers';
@@ -122,7 +123,7 @@ export class CardRenderer {
   private partBuf: WebGLBuffer;
   private partData = new Float32Array(7 * 512);
   /** Faces by name: the card's own ('card') and any other drawn with the same shader (a pack's wrapper). */
-  private faces = new Map<string, { face: WebGLTexture; mask: WebGLTexture; texels: number }>();
+  private faces = new Map<string, { face: WebGLTexture; mask: WebGLTexture; texels: number; art: [number, number, number, number] }>();
   private cardFace: HTMLCanvasElement | null = null;
   private back: WebGLTexture;
   private lettering: LetteringGL;
@@ -213,12 +214,15 @@ export class CardRenderer {
   setFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, key = 'card'): void {
     let f = this.faces.get(key);
     if (!f) {
-      f = { face: createTexture(this.gl, true), mask: createTexture(this.gl, false), texels: 1 };
+      f = { face: createTexture(this.gl, true), mask: createTexture(this.gl, false), texels: 1, art: [0, 0, 1, 1] };
       this.faces.set(key, f);
     }
     uploadTexture(this.gl, f.face, face, true);
     uploadTexture(this.gl, f.mask, mask, false);
     f.texels = face.width;
+    // The art window this face was painted with (the layout's), in face uv.
+    const a = artOf(face);
+    f.art = [a.x / face.width, a.y / face.height, (a.x + a.w) / face.width, (a.y + a.h) / face.height];
     if (key !== 'card') return;
     this.cardFace = face;
     for (const cp of this.programs.values()) for (const l of cp.layers) l.setFace?.(face);
@@ -306,6 +310,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uAlpha, d.alpha);
     gl.uniform1f(p.u.uFlash, d.flash);
     gl.uniform1f(p.u.uFaceTexels, f?.texels ?? 1);
+    gl.uniform4fv(p.u.uArt, f?.art ?? [0, 0, 1, 1]);
     const uv = d.uv ?? [0, 0, 1, 1];
     gl.uniform4f(p.u.uUvRect, uv[0], uv[1], uv[2], uv[3]);
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
