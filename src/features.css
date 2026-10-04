@@ -137,105 +137,323 @@
   min-height: 1.5em;
 }
 
-/* Outside the area: a second finish wherever the area leaves the card's own out (docs/layering.md). */
-.outside-tag {
-  padding: 0 7px;
-  border-radius: 4px;
-  background: var(--orange);
-  color: var(--orange-ink);
-  font-size: 12px;
-  line-height: 20px;
-  box-shadow: 0 0 0 2px var(--edge);
-}
+/* ---------- Layers (docs/layering.md) ---------- */
 
-.outside-tag.is-hidden {
-  background: var(--panel-hi);
-  color: var(--gold);
-}
-
-.outside-tag[hidden] {
-  display: none;
-}
-
-.outside-now {
+/* Layer 2 over layer 1, like sheets in a paint program: each a slot with a pixel card lit where it lands. */
+.layers {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
   gap: 10px;
-  padding: 8px 8px 8px 12px;
-  border-radius: 8px;
+  margin-bottom: 18px;
+}
+
+.layer-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.layer-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'map no fin x' 'map no place x';
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 10px 8px 8px;
+  border-radius: 10px;
   background: var(--pocket);
   box-shadow: inset 0 2px 0 #000;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease-back), box-shadow 0.12s, background 0.12s;
 }
 
-/* A tiny card in the finish's colour; a blank stock card while nothing is layered. */
-.outside-sw {
+/* Two layers: the upper sheet casts onto the one beneath, which sits a step back. */
+.layer-stack.is-two .layer-row[data-n='1']:not(.is-on) {
+  margin: 0 6px;
+}
+
+.layer-row.is-on {
+  background: var(--panel-hi);
+  box-shadow: 0 3px 0 var(--edge), 0 0 0 2px var(--orange), 0 5px 0 2px var(--orange-lo);
+}
+
+.layer-stack.is-two .layer-row:not(.is-on):hover {
+  background: color-mix(in srgb, var(--pocket) 70%, var(--panel-hi));
+}
+
+.layer-row:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.layer-map {
+  grid-area: map;
+  width: 30px;
+  height: 42px;
+  border-radius: 4px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px var(--edge), 0 3px 0 2px var(--edge);
+}
+
+.layer-no {
+  grid-area: no;
+  align-self: start;
+  display: grid;
+  place-items: center;
   width: 20px;
-  height: 28px;
-  border-radius: 3px;
-  background: repeating-conic-gradient(#8f8d86 0 25%, #77756f 0 50%) 0 0 / 4px 4px;
-  box-shadow: 0 0 0 2px var(--edge);
-  rotate: -6deg;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 5px;
+  background: var(--edge);
+  color: var(--text-dim);
+  font-family: var(--display);
+  font-size: 12px;
+  font-style: normal;
 }
 
-.outside-field.is-on .outside-sw,
-.outside-chip i {
+.layer-row.is-on .layer-no {
+  background: var(--orange);
+  color: var(--orange-ink);
+}
+
+/* The finish: a slab in its own colours, opening the list of finishes. */
+.layer-finish {
+  grid-area: fin;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--slab, var(--panel-hi));
+  box-shadow: 0 3px 0 var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 16px;
+  text-shadow: var(--drop);
+  transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
+}
+
+.layer-row.is-on .layer-finish {
+  background: var(--pocket);
+}
+
+.layer-finish:hover {
+  transform: translateY(-1px);
+}
+
+.layer-finish:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+.layer-finish i,
+.layer-chip i {
+  flex: none;
+  width: 12px;
+  height: 17px;
+  border-radius: 2px;
   background: linear-gradient(160deg, var(--c3) 0 18%, var(--c) 34% 52%, var(--c2) 72%, var(--c1));
+  box-shadow: 0 0 0 1.5px var(--edge);
 }
 
-.outside-name {
+.layer-finish i {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 40%, #fff) 0 18%, var(--c) 34% 60%, color-mix(in srgb, var(--c) 55%, #000));
+}
+
+.layer-finish b {
   min-width: 0;
   overflow: hidden;
   font-weight: 400;
-  font-size: 18px;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--text-dim);
-  text-shadow: var(--drop);
 }
 
-.outside-field.is-on .outside-name {
+.layer-finish svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: var(--text-dim);
+}
+
+.layer-finish[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+
+/* Where it goes, in words; it leads to the area controls below. */
+.layer-place {
+  grid-area: place;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 1px 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.layer-place svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.layer-place span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.layer-row.is-on .layer-place {
   color: color-mix(in srgb, var(--orange) 70%, #fff);
 }
 
-.outside-pick {
-  min-height: 34px;
+.layer-place.is-waiting span {
+  animation: layer-wait 1s steps(2) infinite;
+}
+
+@keyframes layer-wait {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer-place.is-waiting span {
+    animation: none;
+  }
+}
+
+.layer-place:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.layer-x {
+  grid-area: x;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.layer-x:hover {
+  background: var(--edge);
+  color: #fff;
+}
+
+.layer-x svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+/* Adding layer 2: a dashed empty slot above layer 1, waiting for a sheet. */
+.layer-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
   padding: 0 12px;
+  border: 2px dashed color-mix(in srgb, var(--orange) 55%, var(--panel-hi));
+  border-radius: 10px;
+  background: transparent;
+  color: color-mix(in srgb, var(--orange) 75%, #fff);
+  font-size: 15px;
+  order: -1;
+  transition: transform 0.25s var(--ease-back), background 0.12s;
 }
 
-.outside-hint {
-  margin-top: 6px;
+.layer-add b {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--orange);
+  color: var(--orange-ink);
+  font-weight: 400;
 }
 
-.outside-list {
+.layer-add:hover {
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.layer-add[hidden],
+.layer-blend[hidden],
+.layer-pick[hidden],
+.layer-solo[hidden] {
+  display: none;
+}
+
+.layer-blend {
+  display: grid;
+  gap: 8px;
+  order: 1;
+}
+
+.layer-blend.is-apart :is(.seg-blend, .row) {
+  opacity: 0.45;
+}
+
+.blend-ico {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+/* Light only: a four-point glint. Laid over: one sheet over another. */
+.blend-ico.is-light {
+  background: currentColor;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+.blend-ico.is-over {
+  background: linear-gradient(currentColor 0 0) 0 0 / 9px 9px no-repeat, linear-gradient(currentColor 0 0) 5px 5px / 9px 9px no-repeat;
+  opacity: 0.9;
+}
+
+/* The finish list: owned finishes as chips, grouped like the deck, scrolling in its own pocket. */
+.layer-pick {
+  display: grid;
+  gap: 8px;
+  order: 0;
+}
+
+.layer-chips {
   position: relative;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px 6px;
   max-height: 252px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--panel-hi) transparent;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 8px 6px;
-  margin-top: 10px;
   padding: 10px;
   border-radius: 8px;
   background: var(--pocket);
   box-shadow: inset 0 2px 0 #000;
 }
 
-.outside-list[hidden] {
-  display: none;
-}
-
-.outside-group {
+.layer-group {
   grid-column: 1 / -1;
   margin: 4px 0 -2px;
   font-size: 12px;
   color: var(--text-dim);
 }
 
-.outside-chip {
+.layer-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -252,53 +470,34 @@
   transition: transform 0.25s var(--ease-back), box-shadow 0.08s;
 }
 
-.outside-chip span {
+.layer-chip span {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.outside-chip i {
-  flex: none;
-  width: 14px;
-  height: 20px;
-  border-radius: 2px;
-  box-shadow: 0 0 0 1.5px var(--edge);
-}
-
-/* Plain: a blank stock card, like the swatch while nothing is layered. */
-.outside-chip[data-v=''] i {
-  background: repeating-conic-gradient(#8f8d86 0 25%, #77756f 0 50%) 0 0 / 4px 4px;
-}
-
-.outside-hint.is-warn > span {
-  color: var(--gold);
-}
-
-.outside-chip:hover {
+.layer-chip:hover {
   transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 4px 0 var(--slab-lo, var(--edge)), inset 0 2px 0 rgba(255, 255, 255, 0.1);
 }
 
-.outside-chip:active {
+.layer-chip:active {
   transform: translateY(3px);
   box-shadow: none;
   transition-duration: 0.05s;
 }
 
 /* The chosen one carries a tick, so it never reads like the focus ring. */
-.outside-chip[aria-checked='true']::after {
-  content: '✓';
-  margin-left: auto;
-  padding-left: 4px;
-  font-size: 13px;
-}
-
-.outside-chip[aria-checked='true'] {
+.layer-chip[aria-checked='true'] {
   background: var(--paper);
   color: var(--paper-ink);
   text-shadow: none;
   box-shadow: 0 3px 0 #8f8a7e, 0 3px 0 2px var(--edge), 0 0 0 2px var(--edge);
+}
+
+.layer-chip[aria-checked='true']::after {
+  content: '✓';
+  margin-left: auto;
+  padding-left: 4px;
 }
 
 /* Two handles over one track: the window is the band of tones that keeps the finish.
@@ -677,9 +876,6 @@
   background: repeating-conic-gradient(#8f8d86 0 25%, #77756f 0 50%) 0 0 / 4px 4px;
 }
 
-.lg-paper.is-outside {
-  background: linear-gradient(135deg, var(--c) 0 35%, color-mix(in srgb, var(--c) 35%, #fff) 50%, var(--c) 65%);
-}
 
 /* ---------- Brush mode ---------- */
 

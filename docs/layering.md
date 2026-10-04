@@ -54,73 +54,101 @@ legible, and the result is hard to predict from the two names.
 | UI | "art: A, frame: B" | "outside the area: B" next to the area controls | a blend amount nobody can predict |
 | Brush / brightness / invert | would need its own mask | the Finish area already is the mask | would need its own mask |
 
-**Chosen: (b), with the Finish area as the split.** It is the only option that adds no shader
-combinations and leaves the pack loading as it is, its cost is bounded by the size of the second
-area, and it reuses the tool people already have for "where": choose the area for the main
-finish, and pick a finish for what it leaves out. "Art: Sakura, frame: Kintsugi" is region *Art*
-plus Kintsugi outside; the brush, a brightness band (highlights in Gold, shadows in Holographic)
-or invert make any other split.
+**Chosen: (b), as layers.** It is the only option that adds no shader combinations and leaves
+the pack loading as it is, and its cost is bounded by the size of the second area.
+
+The first version used the Finish area as the split: layer 2 went wherever layer 1's area left
+out. People found that hard to read ("so whole card + whole card can't be layered?"): it asked
+them to think of one finish's place as the leftover of the other's. Now each layer has its own
+finish **and** its own area, as layers in a photo app:
+
+- Where only one layer's area reaches, that finish shows alone, as before (art Sakura + frame
+  Kintsugi is layer 1 on Art, layer 2 on Frame).
+- Where both reach (whole card + whole card, Art + highlights), layer 2 lies on top of layer 1 in
+  one of two ways, with one strength slider:
+  - **Add its light** (default): only what layer 2's finish adds to the plain picture (its
+    sheen, sparkle, gold seams) is added on top of layer 1. Both finishes stay readable: Holo with
+    Kintsugi's seams, Sakura's petals under Gold's sheen, Poly with Stardust's grains.
+  - **Lay it over**: layer 2 covers layer 1, at its strength. This is the one for finishes that
+    mostly darken or recolour (Raden, Negative, Magma), whose light alone is faint.
+  Compared side by side on five pairs, "add its light" was the natural reading of "layering" in
+  four; laid over at full strength, layer 1 simply disappears where they overlap.
 
 ## How it works
 
-- **State**: `outside` in the saved settings: an edition id, or `null` (the default, and what a
-  value that no longer fits becomes). It is cleared when its pack is sealed again (site data
-  cleared), like the card's own finish.
-- **Which finishes**: any owned finish (hand or deck) except Base (that is "none") and the ones
-  that need the card to themselves (`layerable` in `src/editions.ts`: touch, a lamp, depth, Flip
-  Lenticular, Snow Globe). The card's own finish is not offered (it would change nothing).
-- **Drawing** (`CardRenderer.drawCard`): the card is drawn as before; when `outside` is set and
-  its program is ready, the quad is drawn again with that finish and `uOuter = 1`. In that pass
-  the shader reads the Finish area first, discards pixels the main finish fully covers, applies
-  the finish in full (no area, no softening by the area) and writes its alpha scaled by
-  `1 − area`, so the two passes add up to `mix(main, outside, 1 − area)`. With `uOuter = 0` the
-  main pass is unchanged, pixel for pixel (checked by `scripts/layering-check.mjs`). Glare and
-  glitter belong to each finish, so each side gets its own.
-- **Where it draws**: the card on the stage, the phone brush preview and every export (PNG, GIF,
-  APNG; the GIF is dithered if either finish asks for it). The hand and View deck show single
-  finishes, as before.
-- **Loading**: choosing an outside finish (or starting with one saved) fetches its pack with the
-  hand's; until its program is ready the card shows the main finish alone, so the frame never
-  stalls. Exports wait for both packs.
-- **The overlay** (Finish area shown on the card): the die line still traces the edge, but what
-  the main finish leaves out shows the outside finish as itself instead of paper, so the split is
-  seen as it will be; the legend's second swatch takes the outside finish's name and colour.
-- **Kintsugi** is the one finish that knows it is outside: its seams skip bright parts so they
-  never cut across the subject, which left nothing on the pale paper frame. In the outside pass,
-  on the frame (outside the art window), its seams cross bright parts too and are a little bolder
-  and deeper in colour. On its own it is unchanged.
-- **UI**: in Fine-tune → Finish area, under the area controls, "Second finish, outside the area"
-  (範囲の外に重ねる加工) shows the current one (or "None") in a pocket with a Change slab that
-  opens the owned finishes as chips grouped like the deck (starters, then each pack), each with a
-  swatch in that finish's colours and a tick on the chosen one; the list scrolls in its own
-  pocket and the slab reads Done while it is open. The line under it says where the second finish
-  lands ("the frame and name band" for Art). Picking one while the area is the whole card switches
-  the area to Art, so the frame gets it at once. If the area later covers the whole card again,
-  the tag says it is hidden and the line offers to keep the card's finish to the art. Reset area
-  clears it. A green gem on the tab marks it, like any other change there.
+- **State**: layer 1 is the card's finish (`edition`) with the area fields it always had
+  (`rangeRegion`, `rangeLo`, `rangeHi`, `rangeInvert`, brush strokes under `rangeBrush`), so
+  saved settings from before keep their look. Layer 2 is `layer2`: `{ edition, region, lo, hi,
+  invert, blend: 'light' | 'over', strength }` or `null` (the default), its brush strokes under
+  `rangeBrush2`. A value that no longer fits is dropped; layer 2 is also dropped when its pack is
+  sealed again (site data cleared). A second finish saved by the first version (`outside`)
+  becomes layer 2 on the same area inverted, laid over, so such a card looks the same.
+- **Which finishes**: layer 1 is any owned finish (it is the card's finish; picking it here is
+  the same as picking it in the hand). Layer 2 is any owned finish except Base and the ones that
+  need the card to themselves (`layerable` in `src/editions.ts`: touch, a lamp, depth, Flip
+  Lenticular, Snow Globe); its list says so in one line.
+- **Drawing** (`CardRenderer.drawCard`): layer 1 is drawn exactly as a single finish. Layer 2 is a
+  second pass of the same quad with its own program (`uLayer = 1`), its area in `range2` and layer
+  1's area bound beside it (`uRangeUnder`). The pass discards where its own area (times its
+  strength) is empty, so it costs only where it shows. Each pixel writes premultiplied
+  `mix(finish·α, light, under)`, alpha `mix(α, 0, under)`, where `under` is layer 1's area when
+  the blend is "add its light" (and 0 when layer 1 is Base): with the usual
+  `ONE, ONE_MINUS_SRC_ALPHA` blending that lays layer 2 over where layer 1 is absent and adds only
+  its light where layer 1 lies beneath, in one pass. Layer 2 applies in full on the frame (no
+  frame softening), with its own glare and glitter.
+- **Where it draws**: the card on the stage, the phone preview and every export (PNG, GIF, APNG;
+  the GIF is dithered if either finish asks for it). The hand and View deck show single finishes.
+- **Loading**: layer 2's pack is fetched with the hand's; until its program is compiled the card
+  shows layer 1 alone, so the frame never stalls. Exports wait for both packs.
+- **Kintsugi** is the one finish that knows it is layer 2: its seams skip bright parts so they
+  never cut across the subject, which left nothing on the pale paper frame. As layer 2, on the
+  frame, its seams cross bright parts too and are a little bolder and deeper in colour. On its
+  own it is unchanged.
+- **UI** (Fine-tune → Layers): see the next section.
+
+## The Layers tab
+
+Where each finish goes is shown, not described:
+
+- A two-row list, layer 2 over layer 1 as in a paint program. Each row: a pixel card lit in the
+  finish's colours exactly where that layer lands (drawn from the same area data the shader
+  reads, brightness and brush included), the layer's number, its finish as a slab (opens the
+  owned finishes as chips, grouped like the deck, the chosen one ticked), and where it goes in
+  words ("Frame", "Highlights", "All but Art", "Art + brush"). Layer 2 has × to remove it.
+- "+ Layer a finish" is a dashed empty slot above layer 1; it opens the finish list, and the
+  finish chosen becomes layer 2 on the whole card, adding its light.
+- Choosing a row hands the area controls below (region, brightness, invert, brush) to that
+  layer; their heading names the finish they place ("Where Kintsugi goes"). While those controls
+  are in use, the card shows that layer alone in its area with the proof overlay, so what is being
+  changed is exactly what is marked; in the layer list the card shows both layers as they are.
+- With two layers: "Where they overlap" (Add its light / Lay it over, one line saying what that
+  does with the two names) and Strength.
+- Reset area resets the chosen layer's area. A green gem on the tab marks any change there.
 
 ## Measured
 
 `node scripts/layering-check.mjs --measure` (headless Chromium on a desktop RTX GPU through ANGLE
-D3D11, and on SwiftShader, which rasterises on the CPU and stands in for a weak phone GPU). The
-card's own finish on the art, the outside finish on the rest (region Art); the GPU is waited on
-every frame, best of three, interleaved.
+D3D11, and on SwiftShader, which rasterises on the CPU and stands in for a weak phone GPU); the
+GPU is waited on every frame, best of three, interleaved.
 
-| Pair (art + outside) | GPU, 720 × 1008 | SwiftShader, 360 × 504 |
+| Layers | GPU, 720 × 1008 | SwiftShader, 360 × 504 |
 |---|---|---|
-| Sakura + Kintsugi | 0.56 → 0.66 ms (+17 %) | 32.9 → 78.5 ms (+139 %) |
-| Confetti + Gold | 0.79 → 0.92 ms (+17 %) | 91.2 → 108.3 ms (+19 %) |
-| Holographic + Negative | 0.61 → 0.59 ms (±0) | 16.2 → 27.7 ms (+71 %) |
-| Fireworks + Platinum | 0.88 → 1.02 ms (+15 %) | 91.2 → 119.3 ms (+31 %) |
+| Sakura (art) + Kintsugi (frame) | 0.45 → 0.59 ms (+30 %) | 31.5 → 77.2 ms (+145 %) |
+| Confetti (art) + Gold (frame) | 0.68 → 0.73 ms (+7 %) | 100.1 → 125.5 ms (+25 %) |
+| Holographic + Kintsugi, both whole, light | 0.42 → 0.61 ms (+43 %) | 19.4 → 71.8 ms (+271 %) |
+| Fireworks + Platinum, both whole, light | 0.71 → 0.92 ms (+28 %) | 94.5 → 126.7 ms (+34 %) |
 
-- The second pass costs what its finish costs over its own area plus a fixed part (the face,
-  mask and area lookups over the whole card before the discard). A heavy outside finish next to a
-  light one (Kintsugi's two cell noises next to Sakura's petals) is the worst case.
-- GIF export (48 frames at 480 × 600, then the worker's encode): 1.56 → 1.49 s and
-  1.47 → 1.48 s — no measurable change; encoding dominates.
+- Layer 2 costs what its finish costs over its own area, plus the face, mask and both areas'
+  lookups before the discard. A heavy finish over the whole card next to a light one (Kintsugi's
+  two cell noises over Holographic) is the worst case: two full finishes per pixel.
+- GIF export (48 frames at 480 × 600, then the worker's encode): 1.33 → 1.37 s, 1.45 → 1.48 s,
+  2.02 → 2.10 s — encoding dominates.
 - On a device that can't keep up, the stage's quality governor (`src/quality.ts`) steps the
   drawing resolution down as it does for any heavy finish; exports are always at full quality.
-  Nothing is dropped to save time: both finishes always show.
+  Nothing is dropped to save time: both layers always show.
+- Compiling: each pack's program compiles in the background the first time it is needed (on this
+  machine Metal 2.1 s, Light 4.0 s, Nature 2.2 s, Studio 4.7 s, Supporter 12.1 s). Until layer 2's
+  is ready its row says "Getting ready…" and the card shows layer 1 alone.
 
 `node scripts/layering-check.mjs --ref <v0.12.0 server>`: all 33 single finishes draw pixel for
 pixel as in v0.12.0 (SwiftShader), except the two that already differ from one run to the next on

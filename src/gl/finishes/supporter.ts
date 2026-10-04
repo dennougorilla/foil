@@ -18,8 +18,8 @@ vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
   vec4 v2 = voronoi(w * 8.0 + 3.1);
   float d1 = v1.y - v1.x;
   float d2 = v2.y - v2.x;
-  // Laid outside the area (docs/layering.md) it mends the frame: no subject to spare there, and bolder seams.
-  float rimOnly = uOuter > 0.5 ? 1.0 - texture(uMask, uv).r : 0.0;
+  // As layer 2 on the frame (docs/layering.md) it mends it: no subject to spare there, and bolder seams.
+  float rimOnly = uLayer > 0.5 ? 1.0 - texture(uMask, uv).r : 0.0;
   float wide = (0.014 + 0.018 * vnoise(uv * 24.0)) * (1.0 + 0.9 * rimOnly);
   float seam = (1.0 - smoothstep(wide * 0.3, wide, d1));
   float hair = (1.0 - smoothstep(0.004, 0.014, d2)) * step(0.65, hash12(v2.zw)) * (1.0 - smoothstep(0.0, 0.25, d1));

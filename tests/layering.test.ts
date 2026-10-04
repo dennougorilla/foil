@@ -1,18 +1,19 @@
-// Run with `npm test`. The second finish outside the Finish area: see docs/layering.md.
+// Run with `npm test`. Two layers of finish, each with its own area: see docs/layering.md.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EDITIONS, layerable, outsideChoices, sanitizeOutside } from '../src/editions.ts';
+import { EDITIONS, layerable, layerChoices, layerFromOutside, sanitizeLayer2 } from '../src/editions.ts';
 import { owned, type Opened } from '../src/packs.ts';
 
 const ALL: Opened = { opened: ['metal', 'light', 'nature', 'studio', 'supporter'], supporter: true };
-const choices = (o: Opened, main: Parameters<typeof outsideChoices>[1]) => outsideChoices(owned(o), main);
+const choices = (o: Opened, main: Parameters<typeof layerChoices>[1]) => layerChoices(owned(o), main);
+const ART = { region: 'art', lo: 0, hi: 1, invert: false } as const;
 
-test('a finish that needs the card to itself is never the outside finish', () => {
+test('a finish that needs the card to itself is never layer 2', () => {
   const solo = EDITIONS.filter((e) => !layerable(e.id)).map((e) => e.id);
   assert.deepEqual(solo.sort(), ['base', 'blacklight', 'glow', 'lenticular3d', 'lenticularflip', 'shadowbox', 'snowglobe', 'warmth']);
 });
 
-test('the choices are the owned finishes, in hand-then-pack order, without the card’s own', () => {
+test('layer 2 offers the owned finishes, in hand-then-pack order, without the card’s own', () => {
   assert.deepEqual(choices({ opened: [], supporter: false }, 'holo'), ['foil', 'poly', 'negative', 'prism', 'glitch']);
   const all = choices(ALL, 'sakura');
   assert.ok(all.includes('kintsugi') && all.includes('gold') && all.includes('confetti'));
@@ -25,7 +26,19 @@ test('a sealed pack’s finish is not offered', () => {
   assert.ok(choices({ opened: ['metal'], supporter: false }, 'holo').includes('gold'));
 });
 
-test('a saved outside finish that no longer fits is dropped', () => {
-  assert.equal(sanitizeOutside('kintsugi'), 'kintsugi');
-  for (const v of [null, undefined, 'nope', 'warmth', 'base', 3, {}]) assert.equal(sanitizeOutside(v), null, String(v));
+test('a saved layer 2 keeps what fits and drops what does not', () => {
+  assert.deepEqual(sanitizeLayer2({ edition: 'kintsugi', region: 'frame', lo: 0.6, hi: 1, invert: false, blend: 'over', strength: 0.5 }), {
+    edition: 'kintsugi', region: 'frame', lo: 0.6, hi: 1, invert: false, blend: 'over', strength: 0.5,
+  });
+  // Unknown parts fall back: the whole card, every tone, only the light added, full strength.
+  assert.deepEqual(sanitizeLayer2({ edition: 'gold', region: 'moon', lo: 0.9, hi: 0.2, blend: 'mix', strength: 7 }), {
+    edition: 'gold', region: 'all', lo: 0, hi: 1, invert: false, blend: 'light', strength: 1,
+  });
+  for (const v of [null, undefined, 'gold', { edition: 'warmth' }, { edition: 'base' }, { edition: 'nope' }]) assert.equal(sanitizeLayer2(v), null, JSON.stringify(v));
+});
+
+test('the first design’s “outside the area” finish becomes layer 2 on the rest of the card, laid over', () => {
+  assert.deepEqual(layerFromOutside('kintsugi', ART), { edition: 'kintsugi', region: 'art', lo: 0, hi: 1, invert: true, blend: 'over', strength: 1 });
+  assert.equal(layerFromOutside(null, ART), null);
+  assert.equal(layerFromOutside('warmth', ART), null);
 });

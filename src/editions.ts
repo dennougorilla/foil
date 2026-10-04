@@ -1,4 +1,5 @@
 import type { TouchKind } from './touch/heat';
+import type { RangeRegion } from './featureState';
 
 export type EditionId =
   | 'base'
@@ -104,19 +105,60 @@ export const EDITIONS: Edition[] = [
 export const editionById = (id: EditionId): Edition => EDITIONS.find((e) => e.id === id) ?? EDITIONS[0];
 
 /**
- * Can be the second finish, drawn where the Finish area leaves the card's own out (docs/layering.md):
- * anything but Base (that is "none") and the finishes that need the card to themselves.
+ * Can be layer 2, the finish laid over the card's own in an area of its own (docs/layering.md):
+ * anything but Base (that is "no layer") and the finishes that need the card to themselves.
  */
 export function layerable(id: EditionId): boolean {
   const e = EDITIONS.find((x) => x.id === id);
   return !!e && e.id !== 'base' && !e.touch && !e.torch && !e.depth && !e.solo;
 }
 
-/** What can go outside the Finish area: the owned finishes that layer, but the card's own. */
-export const outsideChoices = (owned: readonly EditionId[], main: EditionId): EditionId[] => owned.filter((id) => id !== main && layerable(id));
+/** What layer 2 can be: the owned finishes that layer, but the card's own. */
+export const layerChoices = (owned: readonly EditionId[], main: EditionId): EditionId[] => owned.filter((id) => id !== main && layerable(id));
 
-/** A saved outside finish, or null when it is missing or no longer fits. */
-export const sanitizeOutside = (v: unknown): EditionId | null => (typeof v === 'string' && layerable(v as EditionId) ? (v as EditionId) : null);
+/** Where a layer goes: a region of the card, a band of brightness, inverted (the brush is kept beside it). */
+export interface Area {
+  region: RangeRegion;
+  lo: number;
+  hi: number;
+  invert: boolean;
+}
+
+/** Where layer 2 overlaps the card's own finish: only its light is added, or it is laid over. */
+export type Blend = 'light' | 'over';
+
+/** Layer 2: a finish, its area, how it meets layer 1 where they overlap, and how strongly it shows (0..1). */
+export interface Layer2 extends Area {
+  edition: EditionId;
+  blend: Blend;
+  strength: number;
+}
+
+const REGIONS: RangeRegion[] = ['all', 'art', 'frame', 'text', 'none'];
+const unit = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
+
+/** A saved layer 2, or null when it is missing or no longer fits. */
+export function sanitizeLayer2(v: unknown): Layer2 | null {
+  const l = v as Partial<Layer2> | null;
+  if (!l || typeof l !== 'object' || typeof l.edition !== 'string' || !layerable(l.edition)) return null;
+  const band = unit(l.lo) && unit(l.hi) && l.hi - l.lo >= 0.08 - 1e-6;
+  return {
+    edition: l.edition,
+    region: REGIONS.includes(l.region as RangeRegion) ? (l.region as RangeRegion) : 'all',
+    lo: band ? l.lo! : 0,
+    hi: band ? l.hi! : 1,
+    invert: l.invert === true,
+    blend: l.blend === 'over' ? 'over' : 'light',
+    strength: unit(l.strength) ? l.strength : 1,
+  };
+}
+
+/**
+ * The second finish of the first layering design (laid wherever the card's own area left out) as
+ * layer 2: the same area inverted, laid over at full strength, so the card looks as it did.
+ */
+export const layerFromOutside = (outside: unknown, area: Area): Layer2 | null =>
+  sanitizeLayer2({ edition: outside, region: area.region, lo: area.lo, hi: area.hi, invert: !area.invert, blend: 'over', strength: 1 });
 
 export type RarityId = 'common' | 'uncommon' | 'rare' | 'legendary';
 

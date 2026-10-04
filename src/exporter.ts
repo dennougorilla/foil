@@ -1,5 +1,5 @@
 import { FACE_H, FACE_W } from './card/face';
-import { BackgroundRenderer, CardRenderer, hexToRgb, type RGB } from './gl/renderers';
+import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
 import { fixedLight, loopCycles, loopPose, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
@@ -18,16 +18,16 @@ async function packLoaded(edition: Edition): Promise<void> {
   if (pack) await loadPack(pack.id);
 }
 
-/** Both finishes of an export, the card's own and the outside one, have arrived. */
-export const packsLoaded = (input: ExportInput) => Promise.all([input.edition, input.outside].map((e) => e && packLoaded(e)));
+/** Both layers' finishes have arrived. */
+export const packsLoaded = (input: ExportInput) => Promise.all([input.edition, input.layer?.edition].map((e) => e && packLoaded(e)));
 
 export interface ExportInput {
   face: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   back: HTMLCanvasElement;
   edition: Edition;
-  /** A second finish where the range leaves `edition` out (docs/layering.md). */
-  outside?: Edition;
+  /** Layer 2 (docs/layering.md): its finish, how it is drawn, and its area. */
+  layer?: { edition: Edition; draw: LayerDraw; range: RangeSnapshot };
   intensity: number;
   pixel: number;
   name: string;
@@ -74,6 +74,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
+  if (input.layer) r.range2.set(input.layer.range);
   if (input.layers) r.setLayers(input.layers);
   r.setFlip(input.flip ?? null);
   r.resize(FACE_W + pad * 2, FACE_H + pad * 2, 1);
@@ -102,7 +103,7 @@ export async function exportPng(input: ExportInput): Promise<string> {
       alpha: 1,
       flash: 0,
       shadow: [0, 0],
-      outside: input.outside?.shader,
+      layer: input.layer?.draw,
     },
     1.7,
   );
@@ -145,6 +146,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
+  if (input.layer) cards.range2.set(input.layer.range);
   if (input.layers) cards.setLayers(input.layers, !input.faceAt);
   cards.setFlip(input.flip ?? null);
   cards.resize(W, H, 1);
@@ -195,7 +197,7 @@ export function createScene(input: ExportInput, W: number, H: number, readback =
           shadow: shadow ? [(12 - (tune.idle === 'spin' ? Math.sin(ry) : ry) * 18) * k, (18 + rx * 10) * k] : null,
           loop: loopSec * tune.speed,
           heat: touch ?? undefined,
-          outside: input.outside?.shader,
+          layer: input.layer?.draw,
         },
         p * loopSec * tune.speed,
       );
@@ -280,7 +282,7 @@ export async function exportGif(
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
     const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.outside?.dither) });
+    send({ type: 'encode', width: GIF_W, height: GIF_H, delay: GIF_DELAY, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.layer?.edition.dither) });
     const bytes = await result;
     return download(new Blob([bytes], { type: 'image/gif' }), `${fileSafe(input.name)}-${input.edition.id}.gif`);
   } finally {

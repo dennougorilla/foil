@@ -152,7 +152,10 @@ uniform float uFlash;      // white flash on juice
 uniform float uFaceTexels; // face texture width in px
 uniform float uPlate;      // 0 = blank the nameplate (tiny hand cards)
 uniform float uLoop;       // length of an exported loop in shader seconds; 0 on the live stage
-uniform float uOuter;      // 1 = the outside pass: this finish goes where the Finish area leaves the card's own out
+uniform float uLayer;      // 1 = layer 2's pass, drawn over the card in its own area (docs/layering.md)
+uniform float uLayerK;     // layer 2's strength
+uniform float uBlend;      // where layer 1 lies under it: 1 = add only layer 2's light, 0 = lay it over
+uniform float uUnderOn;    // 0 when layer 1 is Base, so layer 2 is laid over everywhere
 out vec4 o;
 ${COMMON}
 ${TUNE_GLSL}
@@ -271,14 +274,17 @@ void main() {
     c = f.rgb / max(f.a, 1e-4);
   }
   float L = luma(c);
-  // The outside pass (docs/layering.md) covers what the area leaves out, in full, and skips the rest.
+  // Layer 2's pass (docs/layering.md) draws only in its own area, at its strength; under is where
+  // layer 1 lies beneath and only layer 2's light is to be added there.
   float range = foilRange(uv, L);
   float cover = 1.0;
-  if (uOuter > 0.5) {
-    cover = 1.0 - range;
-    if (cover < 0.002) discard; // outside pass
+  float under = 0.0;
+  if (uLayer > 0.5) {
+    cover = range * uLayerK;
+    if (cover < 0.002) discard; // layer 2's pass
+    under = uUnderOn * uBlend * areaOf(uRangeUnder, uRangeKeyUnder, uv, L);
   }
-  float sel = uOuter > 0.5 ? 1.0 : range;
+  float sel = uLayer > 0.5 ? 1.0 : range;
   vec3 col = c;
   int e = uEdition;
   // Finishes draw their pattern in tuned coordinates (zoom, rotation); the real uv comes back after.
@@ -299,11 +305,13 @@ void main() {
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
   if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
-  if (uOuter > 0.5) amt = uIntensity; // laid outside the area, mostly on the frame: in full there too
+  if (uLayer > 0.5) amt = uIntensity; // layer 2 often lies on the frame: in full there too
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
   amt *= sel;
   col = mix(c, col, amt);
+  // Layer 2's light: what its finish adds to the plain picture (the lettering is layer 1's to draw).
+  vec3 lit = max(col - c, 0.0);
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
@@ -320,13 +328,18 @@ void main() {
   }
   // Glare and glitter belong to the finish, so they stay inside the chosen Foil area.
   col += spec * uTLight * sel;
-  if (e != 0) col += tuneGlitter(uv, uTilt) * uIntensity * tuneGlitterArea(e, m) * sel;
+  vec3 glitter = e != 0 ? tuneGlitter(uv, uTilt) * uIntensity * tuneGlitterArea(e, m) * sel : vec3(0.0);
+  col += glitter;
+  lit += glitter;
   // Tilting away darkens a touch; tilting towards brightens.
-  col *= 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
+  float shade = 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
+  col *= shade;
+  lit *= shade;
   if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
   col = showRange(col, uv, range);
   col = mix(col, vec3(1.0), uFlash);
-  o = vec4(clamp(col, 0.0, 1.0) * base.a, base.a) * uAlpha * cover;
+  // Laid over: the finish with its alpha. Light only: added to what is beneath, which keeps its alpha.
+  o = vec4(mix(clamp(col, 0.0, 1.0) * base.a, lit * base.a, under), mix(base.a, 0.0, under)) * uAlpha * cover;
 }
 `;
 

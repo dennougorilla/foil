@@ -1,4 +1,4 @@
-import { EDITIONS, sanitizeOutside, type EditionId, type FrameId, type RarityId } from './editions';
+import { EDITIONS, layerFromOutside, sanitizeLayer2, type EditionId, type FrameId, type Layer2, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import type { Lang } from './i18n';
 import { sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
@@ -16,8 +16,10 @@ export interface State extends RangeColorState {
   sound: boolean;
   crt: boolean;
   edition: EditionId;
-  /** A second finish where the Finish area leaves `edition` out, or null (docs/layering.md). */
-  outside: EditionId | null;
+  /** Layer 2: a finish laid over the card's own in an area of its own, or null (docs/layering.md). Layer 1 is `edition` with the range fields. */
+  layer2: Layer2 | null;
+  /** Which layer the Finish area tab is editing. */
+  areaLayer: 1 | 2;
   /** The seven finishes in the hand, in order (made valid against the opened packs in main.ts). */
   hand: EditionId[];
   rarity: RarityId;
@@ -57,7 +59,7 @@ const PERSIST: (keyof State)[] = [
   'sound',
   'crt',
   'edition',
-  'outside',
+  'layer2',
   'hand',
   'rarity',
   'frame',
@@ -87,7 +89,8 @@ export function createStore() {
     sound: true,
     crt: true,
     edition: 'holo',
-    outside: null,
+    layer2: null,
+    areaLayer: 1,
     hand: ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
     rarity: 'rare',
     frame: 'paper',
@@ -117,13 +120,15 @@ export function createStore() {
     state.adjustOpen = state.adjustOpen === true;
     // A finish that no longer exists (a retired one) starts over on the default.
     if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
-    state.outside = sanitizeOutside(state.outside);
     if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
     if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
     state.saveOptsOpen = state.saveOptsOpen === true;
     state.gifClear = state.gifClear === true;
     if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
     Object.assign(state, sanitizeRangeColors(state));
+    // A second finish saved by the first layering design ("outside the area") becomes layer 2.
+    const outside = (saved as { outside?: unknown }).outside;
+    state.layer2 = sanitizeLayer2(state.layer2) ?? layerFromOutside(outside, { region: state.rangeRegion, lo: state.rangeLo, hi: state.rangeHi, invert: state.rangeInvert });
   } catch {
     /* storage unavailable: defaults are fine */
   }

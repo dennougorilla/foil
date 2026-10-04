@@ -79,8 +79,8 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
    and one `dispatch` line), add the edition to `src/editions.ts`, its names to `src/i18n.ts`,
    and its id to the pack's `finishes` in `src/packs.ts` (before the showpiece, or as the new
    showpiece). A finish that needs the card to itself beyond touch, a lamp or depth (a second
-   picture, particles drawn over the art) gets `solo`, so it is never offered outside the Finish
-   area (`docs/layering.md`).
+   picture, particles drawn over the art) gets `solo`, so it is never offered as layer 2
+   (`docs/layering.md`).
 2. A new pack is one more entry in `PACKS` (id, finishes, wrapper, colors, `load`) plus a module
    file and its two names in `src/i18n.ts`. Nothing else lists packs.
 3. Someone who already opened a pack finds a finish added to it later straight in the hand.
@@ -100,7 +100,7 @@ elements in Nature; a 和 pack can be split off once it has three finishes.
 ## Loading (weight budget)
 
 Nothing of a pack loads before the shop or View deck is opened, or a pack finish is in the hand
-(or layered outside the Finish area, `docs/layering.md`):
+(or layer 2 on the card, `docs/layering.md`):
 
 - `src/packs.ts` is plain data (ids, order, colors, a `load()` that dynamic-imports the module).
 - Each pack module (`src/gl/finishes/<pack>.ts`) carries its finishes' GLSL and their helpers
