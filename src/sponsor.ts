@@ -13,7 +13,7 @@
 // or a store schema change can never take an unlock back.
 
 import { EDITIONS, type EditionId } from './editions';
-import { BETA_EDITIONS, mergeUnlocked, parseUnlocked, pickSecret, secretEditions } from './secrets';
+import { mergeUnlocked, parseUnlocked, pickSecret, secretEditions } from './secrets';
 import type { Stage } from './stage';
 import type { Store } from './state';
 
@@ -42,7 +42,8 @@ const save = (list: EditionId[]) => {
 };
 
 /** Left out of the hand: a secret still locked, or a beta finish. */
-export const isLocked = (id: EditionId) => BETA_EDITIONS.includes(id) || (SECRETS.includes(id) && !unlocked.includes(id));
+// PREVIEW ONLY (dennougorilla/foil-preview-all): every finish, secret or beta, is in the hand. Never merge.
+export const isLocked = (_id: EditionId) => false;
 
 /** Run before anything reads the edition: a locked finish restored from a past visit falls back quietly. */
 export function releaseLockedEdition(store: Store) {
