@@ -46,7 +46,7 @@ void main() {
   vec2 uv = vec2(aGrid.x, mix(uV.x, uV.y, aGrid.y));
   float h = height(uv) * (1.0 - uFlat) - uDepth / max(uBulge, 1.0);
   // Filled, the bag swells: its sides bow out a little where it is fullest.
-  vec2 bow = vec2(1.0 + 0.035 * h, 1.0 + 0.01 * h);
+  vec2 bow = vec2(1.0 + 0.075 * h, 1.0 + 0.012 * h);
   vec3 p = vec3((uv - 0.5) * uSize * bow * uScale, h * uBulge * uScale);
   // The surface's slope, for its normal.
   float e = 0.01;
@@ -93,7 +93,7 @@ float crumple(vec2 g) {
   float pinch = smoothstep(0.25, 0.0, toSeal) + smoothstep(0.2, 0.0, min(uv.x, 1.0 - uv.x)) * 0.6;
   // Gathered creases running from the seals into the body, where the foil is pulled in.
   float gather = (0.5 + 0.5 * sin(g.x * 0.75 + vnoise(g * 0.2) * 3.0)) * smoothstep(0.09, 0.0, toSeal);
-  return r * (0.35 + pinch) + gather * 0.9;
+  return r * (0.18 + pinch * 0.8) + gather * 0.9;
 }
 
 void main() {
@@ -227,7 +227,7 @@ export class Pillow {
     r.cssW = PRINT_W;
     r.cssH = PRINT_H;
     r.drawCard(
-      { cx: PRINT_W / 2, cy: PRINT_H / 2, w: PRINT_W, h: PRINT_H, rx: 0, ry: 0, rz: 0, scale: 1, edition, intensity: 0.7, pixel: 0, tilt, light, alpha: 1, flash: 0, shadow: null, plate: false, face },
+      { cx: PRINT_W / 2, cy: PRINT_H / 2, w: PRINT_W, h: PRINT_H, rx: 0, ry: 0, rz: 0, scale: 1, edition, intensity: 0.55, pixel: 0, tilt, light, alpha: 1, flash: 0, shadow: null, plate: false, face },
       time,
     );
     r.cssW = w;

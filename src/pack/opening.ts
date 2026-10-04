@@ -265,7 +265,7 @@ export function openPack(o: OpeningOptions) {
       const room = Math.min(vw - 24, 1120) - (narrow ? 40 : 84);
       let sw = (room - gap * (perRow - 1)) / perRow;
       let sh = sw * 1.5;
-      const maxH = narrow ? (perRow === 2 ? vh * 0.19 : vh * 0.2) : vh * 0.36;
+      const maxH = narrow ? (perRow === 2 ? vh * 0.19 : vh * 0.2) : vh * 0.42;
       if (sh > maxH) {
         sh = maxH;
         sw = sh / 1.5;
@@ -318,7 +318,8 @@ export function openPack(o: OpeningOptions) {
     colors = p.colors.map(hexToRgb) as [RGB, RGB, RGB];
     style = STYLES[p.id];
     themed = style.palette.map(hexToRgb);
-    room = [colors[0], colors[1], colors[1].map((v, i) => v * 0.6 + colors[2][i] * 0.2)] as [RGB, RGB, RGB];
+    // The room in the pack's own tones, its light one a little held back so the packs stay brightest.
+    room = [colors[0].map((v) => v * 0.8) as RGB, colors[1], colors[2].map((v, i) => v * 0.75 + colors[1][i] * 0.1) as RGB];
     roomNow ??= room.map((c) => [...c]) as [RGB, RGB, RGB];
     sheen = colors[2].map((v) => 0.55 + v * 0.45) as RGB;
     replay = o.isOpened(p.id);
@@ -937,6 +938,8 @@ export function openPack(o: OpeningOptions) {
       root.classList.add('is-opening');
       hint(t.trace, 'Enter');
       openBtn.hidden = false;
+      // The words and button come in once the pack has landed, not while it flies.
+      setTimeout(() => root.classList.add('is-settled'), reduced ? 0 : 520);
       if (!reduced) {
         pk.rz.v = 7;
         packSfx.whoosh();

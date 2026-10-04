@@ -44,7 +44,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 50% 46%, rgba(3, 5, 6, 0.1) 20%, rgba(3, 5, 6, 0.8) 90%);
+    radial-gradient(ellipse at 50% 46%, transparent 35%, rgba(3, 5, 6, 0.55) 100%);
 }
 
 /* The room holds its breath while the showpiece gathers itself. */
@@ -1119,4 +1119,79 @@
 /* The moment a pack is taken, its panel goes; the tray sinks away behind it. */
 .pk.is-leaving .pk-panel {
   visibility: hidden;
+}
+
+/* Until the pack has landed, the tear's words and button wait. */
+.pk[data-phase='pack']:not(.is-settled) .pk-hint,
+.pk[data-phase='pack']:not(.is-settled) .pk-open,
+.pk[data-phase='pack']:not(.is-settled) .pk-guide {
+  opacity: 0;
+}
+
+.pk[data-phase='pack'] .pk-open,
+.pk[data-phase='pack'] .pk-hint {
+  transition: opacity 0.25s;
+}
+
+/* The perforation glows: one unmistakable line to trace. */
+.pk-guide {
+  height: 4px;
+  margin-top: -2px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.95) 0 8px, transparent 8px 13px);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--c) 70%, transparent);
+  animation: pk-seam 1.4s ease-in-out infinite;
+}
+
+@keyframes pk-seam {
+  50% { box-shadow: 0 0 18px 5px color-mix(in srgb, var(--c) 85%, transparent); }
+}
+
+.pk.is-still .pk-guide {
+  animation: none;
+}
+
+/* One shop object: the panel is the tray's lower deck, under a single outline. */
+.pk-unit {
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 50% 0%, #26323a, #141b20 60%);
+  box-shadow: inset 0 0 0 6px #3a4a53, 0 0 0 4px #05080a, 0 14px 0 4px #05080a, 0 26px 40px rgba(0, 0, 0, 0.55);
+}
+
+.pk-unit .pk-tray {
+  max-width: none;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.pk-unit .pk-panel {
+  margin: 0 6px 6px;
+  border-radius: 0 0 16px 16px;
+  background: #0d1316;
+  box-shadow: inset 0 4px 0 #05080a;
+}
+
+.pk-unit .pk-band {
+  margin: 0;
+  border-radius: 0;
+}
+
+/* Close: light on dark, easy to find. */
+.pk-x {
+  background: #f3eee2 !important;
+  color: #0b1012 !important;
+}
+
+/* Bigger controls on a wide screen: the tear screen's words and buttons, the shop's labels. */
+@media (min-width: 900px) {
+  .pk-title b { font-size: 30px; }
+  .pk-title small { font-size: 18px; }
+  .pk-skip, .pk-x { min-height: 52px; font-size: 19px; }
+  .pk-x { width: 52px; }
+  .pk-hint { font-size: 21px; }
+  .pk-open { font-size: 23px; min-height: 58px; }
+  .pk-price { font-size: 19px; }
+  .pk-band b { font-size: 32px; }
+  .pk-desc { font-size: 25px; }
+  .pk-note { font-size: 20px; }
 }

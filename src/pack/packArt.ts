@@ -285,8 +285,10 @@ export function paintPack(face: HTMLCanvasElement, mask: HTMLCanvasElement, pack
         c = mix(mix(md, lt, shade > dither(x, y) ? 1 : 0.4), rain, 0.35);
         if (side < 0.1) c = mix(c, dk, (0.1 - side) * 6);
       } else {
+        // Flat bands of the three tones; only a narrow seam between two bands is dithered.
         const t = shade * 2;
-        c = t > 1 ? mix(md, lt, (t - 1) > dither(x, y) ? 1 : 0) : mix(dk, md, t > dither(x, y) ? 1 : 0);
+        const seam = (v: number) => (Math.abs(v - 0.5) < 0.12 ? (v > dither(x, y) ? 1 : 0) : v > 0.5 ? 1 : 0);
+        c = t > 1 ? mix(md, lt, seam(Math.min(1, t - 1))) : mix(dk, md, seam(Math.max(0, t)));
       }
       g.set(x, y, c);
     }
