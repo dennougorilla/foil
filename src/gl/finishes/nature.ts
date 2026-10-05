@@ -1,5 +1,8 @@
-// Nature pack: Sakura, Frost, Stardust, Snow Globe and Magma (the showpiece). See docs/packs.md.
+// Nature pack: Sakura, Frost, Stardust, Snow Globe, Rainy Window and Magma (the showpiece). See docs/packs.md.
 import { STARDUST_GLSL } from '../stardust';
+import { RAIN_GLSL } from '../rain';
+import { TOUCH_GLSL } from '../../touch/glsl';
+import { HeatLayer } from '../../touch/layer';
 import { SnowGlobe, SNOWGLOBE_GLSL, SNOWGLOBE_SHADER } from '../snowglobe';
 import type { FinishModule } from './types';
 
@@ -70,6 +73,8 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
 }
 ${STARDUST_GLSL}
 ${SNOWGLOBE_GLSL}
+${TOUCH_GLSL}
+${RAIN_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 10) col = frost(c, uv, uTilt, L);
@@ -77,12 +82,16 @@ ${SNOWGLOBE_GLSL}
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 22) col = stardust(c, uv, uTilt, L);
   else if (e == 60) col = snowglobe(c, artUv, uTilt, L, lod, m.r);
+  else if (e == 94) col = rain(c, uv, uTilt, L, lod, m.r);
 `,
   // Snow Globe's flakes are GPU particles drawn over its card; one set per renderer, made on first use.
+  // Rainy Window keeps where its glass was wiped in a touch field, like Warmth's heat (see touch/).
   layers: (gl, live) => {
     let globe: SnowGlobe | null = null;
     let face: HTMLCanvasElement | null = null;
+    const wiped = new HeatLayer(gl);
     return [
+      { bind: (p, d) => wiped.bind(p, 6, d.heat) },
       {
         // The flakes fill the card's art window, which moves with the layout.
         setFace: (f) => {
