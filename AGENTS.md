@@ -6,7 +6,7 @@ A new finish always goes into a pack (its shader in that pack's module, never th
 
 ## Slow devices
 
-Nothing new needs a light version of its own. The drawing levels in `src/quality.ts` lower the card canvases' resolution, still the backdrop and the page's endless CSS loops, cut the sparks and drop the CRT lines for the whole page (`docs/performance.md`); draw backdrops through `BackgroundRenderer.draw` and put loading indicators under `[aria-busy]` or `.is-waiting` (they keep moving). After adding a finish, a backdrop or anything drawn on every frame, run `npm run perf` (with the dev server running) and look only at what it lists as over budget.
+Nothing new needs a light version of its own. The drawing levels in `src/quality.ts` lower the card canvases' resolution, still the backdrop and the page's endless CSS loops, cut the sparks and drop the CRT filter for the whole page (`docs/performance.md`); draw backdrops through `BackgroundRenderer.draw` and put loading indicators under `[aria-busy]` or `.is-waiting` (they keep moving). After adding a finish, a backdrop or anything drawn on every frame, run `npm run perf` (with the dev server running) and look only at what it lists as over budget.
 
 Interface texts (Japanese and English) use the names and writing rules in `docs/glossary.md`: one name for each thing, in both languages.
 

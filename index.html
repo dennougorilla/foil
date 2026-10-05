@@ -84,7 +84,7 @@
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" /><path class="wave" d="M11 5.5c1 .8 1 4.2 0 5M12.5 4c2 1.6 2 6.4 0 8" /></svg>
             <span data-t="sound"></span>
           </button>
-          <button class="chip" id="crtBtn" type="button" aria-pressed="true">
+          <button class="chip" id="crtBtn" type="button" aria-pressed="false">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="9" rx="2" /><path d="M5 14h6" /></svg>
             <span data-t="crt"></span>
           </button>
@@ -331,7 +331,12 @@
       </aside>
     </div>
 
-    <div class="crt" id="crt" aria-hidden="true"></div>
+    <div class="crt is-off" id="crt" aria-hidden="true">
+      <i class="crt-glow"></i>
+      <i class="crt-mask"></i>
+      <i class="crt-noise"></i>
+      <i class="crt-glass"></i>
+    </div>
     <div class="drop" id="drop" hidden>
       <div class="drop-box">
         <b data-t="dropHere"></b>
