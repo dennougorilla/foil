@@ -68,14 +68,14 @@ them now loads later: the tag's (`tag.css`) and the print chips' look with the L
 
 Measured on 2026-10-05 for this change (v0.13.0 → this branch), production builds served by `vite
 preview`. Sizes come from the build (gzip of each file, as served); the first load is the entry and
-everything it imports plus the language chunk.
+everything it imports plus the language chunk (bytes after the review fixes; times measured just before them).
 
 ### Bytes on the first load (kB, gzip)
 
 | | v0.9.3 | v0.12.0 | v0.13.0 | now |
 | --- | ---: | ---: | ---: | ---: |
-| JavaScript, English page | 97.6 | 84.6 | 118.4 | **74.6** |
-| JavaScript, Japanese page | 97.6 | 84.6 | 118.4 | **76.1** |
+| JavaScript, English page | 97.6 | 84.6 | 118.4 | **75.0** |
+| JavaScript, Japanese page | 97.6 | 84.6 | 118.4 | **76.5** |
 | CSS | 16.0 | 19.2 | 25.2 | **14.6** |
 | HTML | 3.9 | 4.2 | 4.7 | 5.1 |
 | Scripts requested | 1 | 2 | 3 | 2 |
