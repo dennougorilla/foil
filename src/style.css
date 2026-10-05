@@ -3201,20 +3201,116 @@ input[type='range']:disabled {
 /* ---------- Overlays ---------- */
 
 .crt {
+  display: contents;
+}
+
+/* The CRT filter (off unless turned on in the header): four layers over the page, under the drop
+   overlay and over the pack opening. The wrapper takes no box of its own, so each layer blends with
+   the page itself rather than with a group of its own. Plain CSS over the DOM: nothing is redrawn,
+   the compositor blends the layers each frame, and exports never see it. */
+.crt > * {
   position: fixed;
   inset: 0;
   z-index: 50;
   pointer-events: none;
-  /* Only black, so plain blending darkens exactly as multiply would, without the compositor
-     blending the whole screen under it in a pass of its own. */
-  background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 0 1px, transparent 1px 4px),
-    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
   transition: opacity 0.3s;
 }
 
-.crt.is-off {
+.crt.is-off > * {
   opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0s 0.3s;
+}
+
+/* Phosphor glow: a blurred copy of the screen, its dark parts pushed to black, screened back on, so
+   only what is bright bleeds into its surroundings (and over the dark gaps between scanlines). */
+.crt-glow {
+  -webkit-backdrop-filter: blur(6px) contrast(2.4) brightness(0.8);
+  backdrop-filter: blur(6px) contrast(2.4) brightness(0.8);
+  mix-blend-mode: screen;
+  opacity: 0.3;
+}
+
+/* Scanlines and the aperture grille, blended as overlay: mid-gray leaves the page as it is, lighter
+   lifts it, darker lowers it, channel by channel. Each 3 px line is brighter at its center and darker
+   at its edge; red, green and blue stripes 1 px wide each favour their own channel. Pure black and
+   pure white stay as they are, so small text keeps its edges. A faint red fringe on the left and blue
+   on the right stand for the beams converging less well toward the sides. */
+.crt-mask {
+  mix-blend-mode: overlay;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.14) 1px,
+      rgba(255, 255, 255, 0) 2px,
+      rgba(0, 0, 0, 0.32) 2.6px,
+      rgba(0, 0, 0, 0) 3px
+    ),
+    linear-gradient(to right, rgba(255, 30, 60, 0.4), rgba(255, 30, 60, 0) 6%, rgba(40, 110, 255, 0) 94%, rgba(40, 110, 255, 0.4)),
+    repeating-linear-gradient(to right, rgb(162, 112, 112) 0 1px, rgb(112, 160, 112) 1px 2px, rgb(112, 114, 166) 2px 3px);
+}
+
+/* Grain, flicker and a slow band rolling down the screen. */
+.crt-noise {
+  overflow: hidden;
+}
+
+.crt-noise::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: crt-grain 0.5s steps(3) infinite;
+}
+
+.crt-noise::after {
+  content: '';
+  position: absolute;
+  inset: -40vh 0 auto;
+  height: 40vh;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.025) 50%, rgba(255, 255, 255, 0));
+  animation:
+    crt-roll 9s linear infinite,
+    crt-flicker 3.2s steps(1) infinite;
+}
+
+@keyframes crt-grain {
+  33% { transform: translate(-3%, 2%); }
+  66% { transform: translate(2%, -3%); }
+}
+
+@keyframes crt-roll {
+  to { transform: translateY(180vh); }
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 0.4; }
+  43% { opacity: 1; }
+  77% { opacity: 0.6; }
+  78% { opacity: 1; }
+}
+
+/* The glass: rounded dark corners, edges shading off and a faint reflection, as if the screen bulged a
+   little; and the dark gaps between scanlines, so even white shows its lines. */
+.crt-glass {
+  border-radius: clamp(14px, 3.2vmin, 34px);
+  box-shadow:
+    0 0 0 60px #000,
+    inset 0 0 2px 1px rgba(0, 0, 0, 0.7),
+    inset 0 0 clamp(28px, 7vmin, 90px) rgba(0, 0, 0, 0.5);
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.13) 2px 3px),
+    radial-gradient(70% 45% at 28% 8%, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.34) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-noise {
+    display: none;
+  }
 }
 
 .drop {
@@ -3781,7 +3877,12 @@ input[type='range']:disabled {
   animation-iteration-count: 1 !important;
 }
 
-/* ...and the lowest levels go without the CRT lines (one more layer blended over the whole screen). */
+/* ...without the CRT filter's glow (the screen blurred again on every frame)... */
+[data-still] .crt-glow {
+  display: none;
+}
+
+/* ...and the lowest levels go without the CRT filter (layers blended over the whole screen). */
 [data-no-crt] .crt {
   display: none;
 }

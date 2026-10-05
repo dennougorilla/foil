@@ -83,6 +83,12 @@ name below.
 | 変える | Change | Open the choice again (a step's recap, the motion). |
 | 完了 / 閉じる | Done / Close | Finish a mode / close a panel or menu. |
 
+## Page settings
+
+| ja | en | Meaning |
+| --- | --- | --- |
+| CRT フィルター | CRT filter | The screen filter that makes the page look like an old CRT (rounded glass, scanlines, an RGB grille, glow). Off by default; its header button says only CRT. Never in exports. |
+
 ## Writing rules
 
 - Short and concrete; a button says what happens when pressed.

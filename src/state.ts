@@ -19,7 +19,8 @@ export const EXPORT_FORMATS: ExportFormat[] = ['gif', 'apng', 'mp4'];
 export interface State extends RangeColorState {
   lang: Lang;
   sound: boolean;
-  crt: boolean;
+  /** The CRT screen filter over the page (off unless turned on; never in exports). */
+  crtFilter: boolean;
   edition: EditionId;
   /** Layer 2: a finish laid over the card's own in an area of its own, or null (docs/layering.md). Layer 1 is `edition` with the range fields. */
   layer2: Layer2 | null;
@@ -87,7 +88,7 @@ const KEY = 'foil:v1';
 const PERSIST: (keyof State)[] = [
   'lang',
   'sound',
-  'crt',
+  'crtFilter',
   'edition',
   'layer2',
   'hand',
@@ -125,7 +126,7 @@ const PERSIST: (keyof State)[] = [
 const APP_KEYS: (keyof State)[] = [
   'lang',
   'sound',
-  'crt',
+  'crtFilter',
   'hand',
   'adjustOpen',
   'panelTab',
@@ -151,7 +152,7 @@ export function cardOf(s: State): Card {
 const defaults = (): State => ({
   lang: 'en',
   sound: true,
-  crt: true,
+  crtFilter: false,
   edition: 'holo',
   layer2: null,
   areaLayer: 1,
@@ -210,6 +211,7 @@ function sanitize(state: State) {
   state.backdrop = sanitizeBackdrop(state.backdrop);
   state.backdropColor = sanitizeBackdropColor(state.backdropColor);
   state.flicked = state.flicked === true;
+  state.crtFilter = state.crtFilter === true;
   if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
   Object.assign(state, sanitizeRangeColors(state));
   state.layer2 = sanitizeLayer2(state.layer2);
