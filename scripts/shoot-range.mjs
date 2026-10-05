@@ -27,7 +27,7 @@ const shots = [
   { name: 'paint-en', w: 1440, h: 900, lang: 'en', act: 'paint' },
   { name: 'paint-erase', w: 1440, h: 900, lang: 'ja', act: 'paintErase' },
   { name: 'paint-reduced', w: 1440, h: 900, lang: 'ja', act: 'paint', reduced: true },
-  { name: 'export-range', w: 1440, h: 900, lang: 'ja', state: { rangeRegion: 'art', rangeLo: 0, rangeHi: 0.4 }, act: 'exportPng' },
+  { name: 'export-range', w: 1440, h: 900, lang: 'ja', state: { rangeRegion: 'art', rangeLo: 0, rangeHi: 0.4 }, act: 'exportApng' },
   { name: 'tablet-1024', w: 1024, h: 768, lang: 'ja', state: saved, act: 'scrollPanel' },
   { name: 'tablet-paint', w: 1024, h: 768, lang: 'en', act: 'paint' },
   { name: 'scale-125', w: 1152, h: 720, lang: 'ja', dpr: 1.25, state: saved, act: 'scrollPanel' },
@@ -120,14 +120,16 @@ for (const s of shots) {
     await page.waitForTimeout(300);
     await page.locator('.sw-strip-frame .sw-del').nth(1).click();
     await page.waitForTimeout(500);
-  } else if (s.act === 'exportPng') {
+  } else if (s.act === 'exportApng') {
+    // An APNG: its first frame is the still a viewer shows.
+    await page.click('#formatSeg [data-format=apng]');
     const dl = page.waitForEvent('download');
     await page.locator('#saveBtn').click();
     const d = await dl;
     await d.saveAs(`${out}/export-range.png`);
     await page.waitForTimeout(300);
   }
-  if (s.act !== 'exportPng' && s.act !== 'paintMid') await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
+  if (s.act !== 'exportApng' && s.act !== 'paintMid') await page.screenshot({ path: `${out}/${s.name}.png`, fullPage: !!s.full });
   await ctx.close();
 }
 await browser.close();

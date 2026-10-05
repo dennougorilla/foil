@@ -80,3 +80,36 @@ test('a thumbnail is cut to the card itself, whatever its shape, and fits the po
   assert.deepEqual(fitIn(1000, 1000, 250, 350), { w: 250, h: 250 });
   assert.deepEqual(fitIn(100, 140, 250, 350), { w: 100, h: 140 });
 });
+
+test('brush strokes are kept deflated, small, and come back exactly; a card with none keeps none', async () => {
+  const { packBrush, unpackBrush } = await import('../src/binder/brush.ts');
+  // The finish area's grid (gl/range.ts), two layers of painted-in and painted-out cells.
+  const n = 450 * 630;
+  const empty = () => ({ add: new Uint8Array(n), erase: new Uint8Array(n) });
+  assert.equal(await packBrush([empty(), empty()]), null);
+  const one = empty();
+  const two = empty();
+  // A soft stroke across layer 1, a dab rubbed out of it, and a dab on layer 2.
+  for (let x = 40; x < 400; x++) for (let y = 300; y < 340; y++) one.add[y * 450 + x] = 255 - Math.abs(y - 320) * 6;
+  for (let x = 100; x < 130; x++) for (let y = 310; y < 330; y++) one.erase[y * 450 + x] = 200;
+  for (let x = 200; x < 260; x++) for (let y = 50; y < 110; y++) two.add[y * 450 + x] = 255;
+  const packed = await packBrush([one, two]);
+  assert.ok(packed instanceof Blob);
+  assert.ok(packed.size < 20_000, `kept strokes take ${packed.size} bytes`);
+  const back = await unpackBrush(packed, n);
+  assert.ok(back);
+  assert.deepEqual(back[0].add, one.add);
+  assert.deepEqual(back[0].erase, one.erase);
+  assert.deepEqual(back[1].add, two.add);
+  assert.deepEqual(back[1].erase, two.erase);
+});
+
+test('strokes that no longer fit the grid, or cannot be read, are dropped', async () => {
+  const { packBrush, unpackBrush } = await import('../src/binder/brush.ts');
+  const n = 450 * 630;
+  const small = { add: new Uint8Array(100).fill(9), erase: new Uint8Array(100) };
+  assert.equal(await unpackBrush(await packBrush([small, small]), n), null);
+  assert.equal(await unpackBrush(new Blob([new Uint8Array([1, 2, 3, 4])]), n), null);
+  assert.equal(await unpackBrush(undefined, n), null);
+  assert.equal(await unpackBrush(null, n), null);
+});

@@ -1,15 +1,18 @@
 // Renders the share images from the running app: node scripts/og.mjs (needs `npm run dev`).
 //   public/og.png               1200×630 Open Graph / Twitter card
-//   public/apple-touch-icon.png 180×180 home-screen icon (the pixel card favicon)
+//   public/apple-touch-icon.png 180×180 home-screen icon for iOS (the pixel card favicon)
+//   public/icon-*.png           the manifest's icons, 192 and 512, rounded and maskable (docs/pwa.md)
+// node scripts/og.mjs --icons renders only the manifest's icons, without the dev server.
 import { chromium } from 'playwright';
 
 const URL = process.env.URL ?? 'http://localhost:5173/';
+const onlyIcons = process.argv.includes('--icons');
 // The real GPU when there is one (sharper, and the stage runs at full speed); SwiftShader otherwise.
 const browser = await chromium.launch({ args: process.env.SWIFTSHADER ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 
 // ---------- og.png ----------
 
-{
+if (!onlyIcons) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1, ignoreHTTPSErrors: true });
   // Every pack opened, a hand of the showiest finishes, and a message on the card.
   await page.addInitScript(() => {
@@ -67,25 +70,38 @@ const browser = await chromium.launch({ args: process.env.SWIFTSHADER ? ['--use-
   await page.close();
 }
 
-// ---------- apple-touch-icon.png ----------
+// ---------- home-screen icons ----------
 
-{
-  const page = await browser.newPage({ viewport: { width: 180, height: 180 }, deviceScaleFactor: 1 });
-  // Same pixels as the favicon (a 10×14 card), centred on the app's ink with a soft glow.
+/**
+ * The favicon's pixel card (10×14) on the app's ink with a soft glow, `unit` px per pixel. iOS's icon is
+ * square (iOS rounds it); the manifest's `any` icons are rounded here, and the `maskable` ones run edge
+ * to edge with the card inside the middle 80 % that every Android shape keeps.
+ */
+async function icon(file, size, unit, round) {
+  const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
+  const k = size / 180;
   await page.setContent(`
-    <body style="margin:0;width:180px;height:180px;display:grid;place-items:center;
+    <body style="margin:0;width:${size}px;height:${size}px;background:transparent">
+    <div style="width:${size}px;height:${size}px;display:grid;place-items:center;border-radius:${round ? Math.round(size * 0.22) : 0}px;
       background:radial-gradient(circle at 50% 38%, #3d5058, #1a2328 78%)">
-      <svg width="100" height="140" viewBox="0 0 10 14" shape-rendering="crispEdges"
-        style="filter:drop-shadow(0 6px 0 #0b1012)">
+      <svg width="${unit * 10}" height="${unit * 14}" viewBox="0 0 10 14" shape-rendering="crispEdges"
+        style="filter:drop-shadow(0 ${Math.round(6 * k)}px 0 #0b1012)">
         <rect width="10" height="14" fill="#161c1f"/>
         <rect x="1" y="1" width="8" height="12" fill="#f3eee2"/>
         <rect x="2" y="2" width="6" height="7" fill="#ff5a4f"/>
         <rect x="2" y="5" width="6" height="4" fill="#1a9cff"/>
       </svg>
+    </div>
     </body>`);
-  await page.screenshot({ path: 'public/apple-touch-icon.png' });
+  await page.screenshot({ path: `public/${file}`, omitBackground: true });
   await page.close();
 }
 
+if (!onlyIcons) await icon('apple-touch-icon.png', 180, 10, false);
+await icon('icon-192.png', 192, 10, true);
+await icon('icon-512.png', 512, 28, true);
+await icon('icon-maskable-192.png', 192, 8, false);
+await icon('icon-maskable-512.png', 512, 22, false);
+
 await browser.close();
-console.log('ok: public/og.png, public/apple-touch-icon.png');
+console.log(onlyIcons ? 'ok: public/icon-*.png' : 'ok: public/og.png, public/apple-touch-icon.png, public/icon-*.png');

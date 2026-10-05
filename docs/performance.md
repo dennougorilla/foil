@@ -27,25 +27,29 @@ shows and what a first tap needs at once:
 
 Each of these is its own chunk (with its styles), fetched the first time it is used. Most are also
 fetched ahead: once the page has loaded and is idle (not under a data saver), and the moment the
-pointer or focus reaches the control that opens them, so opening one does not wait.
+pointer or focus reaches the control that opens them, so opening one does not wait. (The page's
+script waits for its texts before it gets there, so it checks whether the page has loaded already;
+in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 
 | Chunk | Fetched when | Ahead |
 | --- | --- | --- |
 | Fine-tune's tabs: Shine, Lettering (message, nameplate, print), Layers (area, brush, layer 2, mini preview), the frame's own colors (`adjust.ts`) | Fine-tune is opened, or the Lettering shortcut is pressed (at once if Fine-tune was left open) | idle, pointing at Fine-tune |
 | The print menu of one piece of text (`printPop.ts`) | a word on the card is tapped, or Fine-tune loads | idle |
 | Free placement on the card (`arrangeEdit.ts`) | a piece is set to Free (at once if it was left so) | — |
-| The trading-card layout's painter (`card/tcgFace.ts`) | the card is set to the trading-card layout (at once if it was left so) | idle, pointing at Layout |
+| The trading-card layout's painter (`card/tcgFace.ts`) and the layout of its card text (`card/effect.ts`) | the card is set to the trading-card layout (at once if it was left so) | idle, pointing at Layout |
 | The motion tray above the deck (`tune/quickTray.ts`) | the motion button is pressed | idle, pointing at the button |
-| Making a file: PNG and GIF (`exporter.ts`), APNG (`anim/apngExport.ts`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
+| Making a file: GIF (`exporter.ts`), APNG (`anim/apngExport.ts`), MP4 and its muxer (`anim/mp4Export.ts`, `mp4-muxer`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
 | The binder, the pack shop and its opening, View deck, a pack's finishes, Shadowbox's depth model | as before (see `binder.md`, `packs.md`) | as before |
+| Registering the service worker, the Update chip, a picture shared to FOIL (`pwa.ts`, see `pwa.md`) | the page has loaded and is idle (also under a data saver), or at once when a picture was shared to it | — |
 
 Fine-tune opens only once its tabs are there, so a tab never opens empty; a language switch waits for
 its texts, then changes everything at once. A trading card's face is painted once its painter is there.
-A chunk that can't be fetched (offline) is tried again on the next use; Fine-tune, the print menu, free
-placement, the trading card and the language say so in a toast, Save and Share as a failed file.
+Once the service worker holds the app (`pwa.md`), every chunk is there offline too. A chunk that
+can't be fetched (offline before that) is tried again on the next use; Fine-tune, the print menu,
+free placement, the trading card and the language say so in a toast, Save and Share as a failed file.
 
 Styles that the first view uses stay in the first stylesheet even when the module that used to carry
 them now loads later: the tag's (`tag.css`) and the print chips' look with the Lettering shortcut
@@ -133,3 +137,11 @@ When the stage's motions and the export motions became one list (docs/motion.md)
 stayed under the numbers above: 74.8 kB for an English page and 76.3 kB for a Japanese one. Only
 Sway (the default) and None are in it; the other nineteen motions (2.1 kB) and their pixel icons
 come in their own chunks.
+
+With the home-screen app (`pwa.md`, measured 2026-10-05 against v0.13.1, gzip -9 of the built files):
+the first load grew by the few lines that fetch `pwa.ts` (and check whether the page has loaded),
+126 bytes for either language (75 265 → 75 391 bytes English, 76 796 → 76 922 Japanese); the CSS and
+the rest of the page are unchanged, and the page shows exactly the same pixels (every finish, a
+phone and a tablet, time held still). `pwa.ts` and its styles are about 1.2 kB on their own. Once the page
+is idle, the service worker keeps 50 files (about 1.2 MB, about 510 kB as sent); a new version copies
+the files whose names carry an unchanged hash from the old one instead of downloading them again.
