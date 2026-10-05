@@ -70,7 +70,7 @@ export const PACKS: readonly Pack[] = [
   {
     // Provisional, for review: the finishes added after v0.14, until the owner places each one.
     id: 'lab',
-    finishes: ['chameleon', 'neon', 'rain', 'plasma', 'liquidmetal', 'kaleidoscope', 'marble', 'mirrorball'],
+    finishes: ['chameleon', 'neon', 'rain', 'plasma', 'liquidmetal', 'kaleidoscope', 'marble', 'mirrorball', 'engraving'],
     wrap: 'holo',
     colors: ['#0c1418', '#2f8a8a', '#c8f4e8'],
     load: () => import('./gl/finishes/lab'),

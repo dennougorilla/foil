@@ -11,6 +11,7 @@ import { KALEIDOSCOPE_GLSL } from '../kaleidoscope';
 import { MARBLE_GLSL } from '../marble';
 import { MIRRORBALL_GLSL, MIRRORBALL_SHADER } from '../mirrorball';
 import { MirrorRoom } from '../mirrorRoom';
+import { ENGRAVING_GLSL } from '../engraving';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -24,6 +25,7 @@ ${LIQUID_METAL_GLSL}
 ${KALEIDOSCOPE_GLSL}
 ${MARBLE_GLSL}
 ${MIRRORBALL_GLSL}
+${ENGRAVING_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 90) col = chameleon(c, uv, uTilt, L, m.r);
@@ -34,6 +36,7 @@ ${MIRRORBALL_GLSL}
   else if (e == 100) col = kaleidoscope(c, uv, uTilt, lod, m.r);
   else if (e == 102) col = marble(c, uv, uTilt, L, m.r);
   else if (e == 104) col = mirrorball(c, uv, artUv, uTilt, lod, m.r);
+  else if (e == 106) col = engraving(c, uv, uTilt, L, lod, m);
 `,
   // The touch finishes here (Rainy Window, …) keep their field like Warmth's heat (see touch/).
   // Liquid Metal's ripples and Marble's flow are fields of their own, on units 10 and 11 (unit 6 is
