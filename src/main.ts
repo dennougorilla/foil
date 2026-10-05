@@ -2126,8 +2126,9 @@ void loadUserImage('flip').then(async (blob) => {
   // A picture chosen (or removed) meanwhile wins over last visit's.
   if (img && !flipChosen) setFlip(img.still);
 });
-if (store.get().sample < 0) {
-  // Bring back the image from last visit; if it's gone, fall back to the first sample.
+/** Brings back the image from last visit; if it's gone, falls back to the first sample. */
+function restoreUserImage() {
+  if (store.get().sample >= 0) return;
   void loadUserImage().then(async (blob) => {
     const img = blob ? await decodeImage(blob).catch(() => null) : null;
     if (img) {
@@ -2145,6 +2146,9 @@ if (store.get().sample < 0) {
     }
   });
 }
+// A picture another app shared to FOIL (docs/pwa.md) comes before last visit's.
+if (location.search.includes('shared')) void import('./pwa').then((m) => m.openShared(loadFile, restoreUserImage), restoreUserImage);
+else restoreUserImage();
 window.addEventListener('resize', () => drawCropPreview());
 
 // ---------- Fetching ahead ----------
@@ -2157,10 +2161,15 @@ addEventListener('dragenter', prefetchDecoders, { once: true });
 if (store.get().sample < 0) prefetchDecoders();
 
 // Once the page has settled, what the next taps want is fetched while nothing else happens (not
-// on a data saver): Fine-tune's tabs, the print menu, the exporters, the motion tray.
-addEventListener('load', () => {
-  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+// on a data saver): Fine-tune's tabs, the print menu, the exporters, the motion tray. The service
+// worker (docs/pwa.md) is registered then too, data saver or not: it is what opens FOIL offline.
+// This script waited for its texts above, so the page may have loaded already (always, from the
+// worker's cache).
+const settled = (run: () => void) => (document.readyState === 'complete' ? run() : addEventListener('load', run));
+settled(() => {
   const idle = window.requestIdleCallback ?? ((run: () => void) => setTimeout(run, 300));
+  if (import.meta.env.PROD) idle(() => void import('./pwa').then((m) => m.registerWorker()));
+  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
   idle(() => {
     void useAdjust().catch(() => {});
     void useExporter().catch(() => {});

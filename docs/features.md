@@ -163,6 +163,14 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 - Flicking the card left or right with a finger, or tapping ‹ ›, steps to the next or previous card in the hand, whichever cards the hand holds at the moment, wrapping around at the ends (on Warmth a finger strokes the card instead of flicking it); until the first flick, a note over the foot of the card says so. Phones on their side and tablets keep the hand right under the card and the full Save box, with the card shrinking on short screens.
 - On phones and tablets the card also tilts as you tilt the device, and its shine moves with it; the rest pose slowly follows how you hold it, so any grip feels level. Android starts right away. iOS asks for motion access, and only when you tap the card or the hand (once per visit); if it is refused, the card simply keeps to touch. Browsers only give the sensor to secure (https) pages. Reduced motion turns this off.
 
+## Home screen and offline
+
+- FOIL can be installed from the browser (Chrome's install button, Android's menu, Safari's Add to Home Screen) and then opens in its own window like an app, with its own icon. The page itself shows no install banner.
+- Once it has been opened online, it opens and works offline: the page, every finish and pack, Fine-tune, the binder, every export and both languages are kept by a service worker, with the typefaces the page has used. Shadowbox and 3D Lenticular still need the network the first time, for their depth model.
+- When a new version is out, a small green **Update** chip appears in the header (on narrower screens just its icon, in the GitHub link's place); pressing it switches to the new version at once. Left alone, the new version starts the next time FOIL is opened after every FOIL window was closed.
+- On Android and in desktop Chrome, an installed FOIL appears in the share menu of photo apps; a picture sent to it opens on the card, as if it had been picked. iOS has no such menu for web apps.
+- When a card is first kept in the binder, FOIL asks the browser to keep its storage from being cleared (Firefox asks you once; Chrome decides by itself). The design is in [`pwa.md`](pwa.md).
+
 ## Performance
 
 - Slow devices keep moving smoothly: the stage measures how long its frames take, and when it keeps missing frames it lowers the drawing resolution step by step, then the backdrop's resolution and the number of sparks. A step that doesn't help (the device is capped, say by a battery saver, rather than busy drawing) is undone and not tried again. Fast devices never leave full quality, and exports are always made at full quality. Add `?quality=0`…`3` to the address to pin a level (0 is full).

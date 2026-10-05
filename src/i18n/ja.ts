@@ -67,6 +67,7 @@ const ja = {
   sharing: '共有する GIF を作成中…',
   errShare: '共有できませんでした。もう一度お試しください。',
   binder: 'バインダー',
+  update: '更新',
   binderLabel: 'バインダーを開く（{n} 枚）',
   binderFailed: 'バインダーを開けませんでした。通信を確かめて、もう一度お試しください。',
   loadFailed: '読み込めませんでした。通信を確かめて、もう一度お試しください。',

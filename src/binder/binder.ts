@@ -10,7 +10,7 @@ import type { Dict, Lang } from '../i18n';
 import { renderStill, type ExportInput } from '../exporter';
 import { fitIn, opaqueBounds } from './fit';
 import { formatBytes } from '../anim/apngUi';
-import { discard, fillOf, kept, list, place, put, restore, stored, thumb, type Kept, type Meta, type Stored } from './db';
+import { discard, fillOf, kept, list, persist, place, put, restore, stored, thumb, type Kept, type Meta, type Stored } from './db';
 import { arrange, firstFree, layout, MAX_BYTES, MAX_CARDS, PAGES, PER_PAGE, pocketsOn, refusal, swap, type Layout } from './limits';
 
 type Placed = Meta & { slot: number };
@@ -223,6 +223,8 @@ export function mountBinder(host: BinderHost) {
       const slot = at !== undefined && lay[at] === null ? at : firstFree(lay);
       const meta: Meta = { id: newId(), at: Date.now(), name: input.name, edition: input.edition.id, bytes, slot };
       await put(meta, thumb, { card, picture });
+      // Now there is something worth keeping, and the person has just asked to keep it.
+      void persist().catch(() => {});
       const n = metas.length + 1;
       host.onCount(n);
       host.onKept(meta.id);

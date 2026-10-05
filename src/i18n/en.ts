@@ -58,6 +58,7 @@ const en: Dict = {
   sharing: 'Making the GIF to share…',
   errShare: "Couldn't share it. Please try again.",
   binder: 'Binder',
+  update: 'Update',
   binderLabel: 'Open the binder ({n} cards)',
   binderFailed: "Couldn't open the binder. Check the connection and try again.",
   loadFailed: "Couldn't load it. Check the connection and try again.",

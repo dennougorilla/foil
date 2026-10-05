@@ -69,6 +69,15 @@ export const thumb = (id: string) => tx<Blob | undefined>(['thumbs'], 'readonly'
 
 export const kept = (id: string) => tx<Kept | undefined>(['cards'], 'readonly', (t) => t.objectStore('cards').get(id));
 
+/**
+ * Asks the browser not to clear this site's storage when space runs short (docs/pwa.md), while it is
+ * not persistent yet. Chrome answers by itself, Firefox asks the person once; FOIL says nothing either way.
+ */
+export async function persist(): Promise<void> {
+  const s = navigator.storage;
+  if (s?.persist && !(await s.persisted())) await s.persist();
+}
+
 export async function put(meta: Meta, thumbnail: Blob, card: Kept): Promise<void> {
   await tx(['meta', 'thumbs', 'cards'], 'readwrite', (t) => {
     t.objectStore('meta').put(meta);
