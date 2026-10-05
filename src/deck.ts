@@ -5,7 +5,7 @@
 import { sfx } from './audio';
 import type { Dict } from './i18n';
 import type { EditionId } from './editions';
-import { deckOf, shelf } from './packs';
+import { deckOf, sealed } from './packs';
 import { packs } from './packStore';
 
 export interface DeckOptions {
@@ -39,12 +39,12 @@ export function mountDeck(o: DeckOptions) {
   for (const ev of ['pointerenter', 'focus']) packsBtn.addEventListener(ev, () => o.onPrefetch(), { once: true });
 
   /** How many finishes the deck holds. */
-  const count = () => deckOf(o.hand(), packs.get()).reduce((n, g) => n + g.finishes.length, 0);
+  const count = () => deckOf(o.hand(), packs.get()).length;
 
   const render = () => {
     const t = o.dict().pack;
     const n = count();
-    const sealed = shelf(packs.get()).filter((p) => !packs.isOpened(p.id)).length;
+    const shut = sealed(packs.get()).length;
     const pile = deckBtn.querySelector('.deck-pile')!;
     pile.innerHTML = Array.from({ length: Math.max(1, Math.min(MAX_LAYERS, n)) }, (_, i) => `<i style="--i:${i}"></i>`).join('');
     deckBtn.dataset.empty = String(n === 0);
@@ -53,9 +53,9 @@ export function mountDeck(o: DeckOptions) {
     packsBtn.querySelector('.deck-cap')!.textContent = t.packsShort;
     deckBtn.setAttribute('aria-label', t.deckLabel.replace('{n}', String(n)));
     deckBtn.title = t.deckLabel.replace('{n}', String(n));
-    packsBtn.dataset.sealed = String(sealed);
-    packsBtn.querySelector('small')!.textContent = sealed ? String(sealed) : '';
-    const label = sealed ? t.packsBtn.replace('{n}', String(sealed)) : t.packsBtnAll;
+    packsBtn.dataset.sealed = String(shut);
+    packsBtn.querySelector('small')!.textContent = shut ? String(shut) : '';
+    const label = shut ? t.packsBtn.replace('{n}', String(shut)) : t.packsBtnAll;
     packsBtn.setAttribute('aria-label', label);
     packsBtn.title = label;
   };

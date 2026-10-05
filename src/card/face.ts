@@ -5,7 +5,7 @@ import { customFrame } from '../palette';
 import { paintFree, paintMessage } from './messageFace';
 import type { Arrange, FreeField, Placement, Placements } from '../arrange';
 import { artWindow, shapeById, SHORT, type ShapeId } from './shape';
-import { tcgFrame, type CardLayout } from './tcg';
+import { tcgFrame, type CardLayout, type TcgContent } from './tcg';
 
 /** Pixel literals below were tuned at 600px across the short side. */
 export const S = SHORT / 600;
@@ -37,6 +37,8 @@ export interface FaceSpec {
   /** Words at their preset places, or where `placements` puts them. */
   arrange: Arrange;
   placements: Placements;
+  /** The parts a trading card makes room for; read from its words when absent (range.ts blanks the words but keeps the parts). */
+  tcg?: TcgContent;
 }
 
 /** Where a piece is placed freely, if the card is in free placement and it has a place. */
@@ -67,23 +69,24 @@ function sized(canvas: HTMLCanvasElement, shape: ShapeId) {
 }
 
 /** What a trading card holds, which decides its parts. */
-export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message' | 'arrange' | 'placements' | 'layout'>) => ({
-  type: !!s.cardType.trim(),
-  // A freely placed message leaves its box: the box goes.
-  lines: placed(s, 'message') ? 0 : messageLines(s.message.text).length,
-});
+export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message' | 'arrange' | 'placements' | 'layout' | 'tcg'>): TcgContent =>
+  s.tcg ?? {
+    type: !!s.cardType.trim(),
+    // A freely placed message leaves its box: the box goes.
+    lines: placed(s, 'message') ? 0 : messageLines(s.message.text).length,
+  };
 
 /**
  * The art window of a card, in face pixels: the shape's classic one, or the trading card's for
  * what it holds (its parts take room from the art).
  */
-export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements'>): Rect {
+export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements' | 'tcg'>): Rect {
   const { w, h } = shapeById(s.shape);
   return s.layout === 'tcg' ? tcgFrame(w, h, tcgContent(s)).art : artWindow(w, h);
 }
 
 /** Width / height of a card's art window: what a crop of the picture fills. */
-export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements'>): number {
+export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements' | 'tcg'>): number {
   const a = faceArt(s);
   return a.w / a.h;
 }

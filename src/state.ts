@@ -13,8 +13,8 @@ import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type Ra
 /** Tabs of the Fine-tune area in the side panel. */
 export type PanelTab = 'card' | 'light' | 'text' | 'range';
 export const PANEL_TABS: PanelTab[] = ['card', 'light', 'text', 'range'];
-export type ExportFormat = 'png' | 'gif' | 'apng';
-export const EXPORT_FORMATS: ExportFormat[] = ['png', 'gif', 'apng'];
+export type ExportFormat = 'gif' | 'apng' | 'mp4';
+export const EXPORT_FORMATS: ExportFormat[] = ['gif', 'apng', 'mp4'];
 
 export interface State extends RangeColorState {
   lang: Lang;
@@ -170,7 +170,7 @@ const defaults = (): State => ({
   tune: { ...TUNE_DEFAULTS },
   adjustOpen: false,
   panelTab: 'card',
-  exportFormat: 'png',
+  exportFormat: 'gif',
   saveOptsOpen: false,
   gifClear: false,
   gifMatte: 'auto',
@@ -196,7 +196,7 @@ function sanitize(state: State) {
   // A finish that no longer exists (a retired one) starts over on the default.
   if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
   if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
-  if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
+  if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'gif';
   state.saveOptsOpen = state.saveOptsOpen === true;
   state.gifClear = state.gifClear === true;
   state.flicked = state.flicked === true;
