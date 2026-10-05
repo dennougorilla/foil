@@ -9,27 +9,35 @@ New finish **Neon / ネオン**, shader **92**, `id: 'neon'`, in the **Light** p
 showpiece (Galaxy → Aurora → Glow → Blacklight → Neon → **Shallows**). The pack placement is
 provisional: foil-openall is reorganising packs, so `src/packs.ts` was changed by one id only.
 
-The picture's outlines become colored neon glass tubes in a dark room:
+The picture's main shapes become a neon sign in a dark room (as of polish round 3):
 
-- Outlines are found at two mip scales (`neonEdge` in `src/gl/neon.ts`) as a signed distance in face
-  pixels, (value − local mean) / |gradient|, so the tubes have an even thickness. The fine scale
-  (lod 2.6) draws tubes; the coarse one (lod 3.9) keeps only big outlines (no texture or small marks)
-  and casts the glow. The tone traced is half luma and half max channel, so saturated shapes on dark
-  ground get outlines too.
-- The gas is the color of the shape it outlines (sampled 18 px towards the bright side), snapped to
-  8 neon colors; grey shapes and the paper frame take the whole card's color (pink if grey too).
-- Tube: gas column with a white-hot core, a faint glass wall with darker shoulders, a reflection
-  streak that slides across the tube and a glass-edge highlight on the side facing the light.
-  Tubes are offset by tilt (34 face px at full tilt) as parallax against the wall.
-- Room: the picture dimmed and cooled (×0.44, frame ×0.62 of that), light spill near tubes (exp
-  falloff), a wide glow (`neonSpread`, lod 5.2), less spill on the frame. No tubes along the card's
-  own outer edge; the name and pips are lit as thin neon lettering.
-- Flicker (`neonFlicker`): period ≈ 2.4 s fitted to `uLoop` (a whole number per exported loop),
-  75 % of cycles pick a point; the tubes of that point's gas within ~0.4 card of it stutter
-  (off / on / off / dim). With the clock held still (reduced motion) it is lit.
+- The sign is laid out on the CPU from each new face (`src/gl/neonMap.ts`, pure and unit-tested in
+  `tests/neonMap.test.ts`; GPU side in `src/gl/neonGL.ts`, a layer of the Lab pack (units 12 and 13) like Relief's
+  map in the Metal pack). The blurred picture (brightness and two color-opponent channels) is split
+  into 5 k-means color regions; each region's outline is traced by marching squares, kept inside
+  the art window, smoothed heavily, cut where it bends tighter than 1.5 tube widths, and the
+  strongest runs taken greedily (score length^1.5 × contrast² × 2.2 if closed; at most 6, each at
+  least 0.18 of the long side). A small strong spot (an eye) gets a ring first. Anything within 2.5
+  tube widths of a tube already taken, or doubling back along itself, is cut away; broken pieces of
+  one gas are joined; corner/edge stubs and lone short tubes are dropped. Closed outlines open with a
+  short gap at their lowest point. One gas per tube from its brighter, more colorful side. A border
+  tube runs round the art window in the frame with one break near the top right, in a color that
+  differs from the art tubes.
+- Two float maps go to the shader: the tube map (3 face px cells: distance to the nearest centre
+  line, arc length along it, tube index; reach 110 px) and the wall map (10 px cells: the colored
+  light the tubes pool on the wall, a line of lamps at two heights, and the tube lighting it most).
+  Uniforms `uNeonGas[8]`, `uNeonLen[8]`, `uNeonPost[40]` (post positions), `uNeonInfo`; texture
+  units 5 and 11.
+- The shader draws each tube (0.025 S wide) as a cream core (~15 % of the width) in a thick body of
+  saturated glass with a softer rim and one sharp highlight on the lit side, a tight and a wide
+  halo; electrode sleeves at the ends; posts as small clear discs with a contact shadow. The wall is
+  the picture at ~4–6 % plus the pooled light; the border tube burns at 62 %. Tubes are offset by
+  tilt (16 face px at full tilt) against the wall, posts and pools.
+- Flicker (`neonFlicker`): one tube per cycle (period ≈ 2.4 s fitted to `uLoop`); its pool dims too.
 - Core shader touched only by index: e == 92 covers the frame in full and gets Glow's faint glare.
-- No uniforms of its own (the prefix test in `tests/neon.test.ts` guards any added later).
 - The low-end "lite" version was dropped by the owner's call (the common quality mechanism covers it).
+- Analysis cost: about 50–90 ms per new face on the Mac (throttled to one per 160 ms on the stage;
+  typing the name does not re-run it).
 
 Docs updated: README (en/ja), docs/features.md (row, paragraph, dither list), docs/packs.md (table,
 placement note), docs/layering.md (frame list). i18n: en/ja names and lines.
@@ -85,3 +93,55 @@ frame tube. The scores plateaued; what the judge kept asking for:
 - The first page load after a shader edit on the dev server sometimes came up unstyled; reload.
 - e2e imports `/src/...` directly, so restart the dev server before e2e and don't edit sources while
   it runs (HMR reloads the page).
+
+## Polish round 1 (2026-10-06, Mac)
+
+Owner's feedback: "完成度上げればかなり良さそう" (good direction, raise the finish). Real neon, as
+aimed for: even glass tubes in smooth bends (no stair-steps), a white-hot core in saturated glass,
+a tight saturated bloom, colored light pooling on a dark wall behind, electrodes where the gas
+stops and standoffs holding the tube off the wall, and a dark board round it.
+
+- Tubes are traced at lod 4 / 5 (was 2.6 / 3.9) through `neonPath`, so pixel-art steps and fine
+  texture (stars, feathers) no longer become tubes.
+- The room is much darker (picture ×0.12–0.32 with a soft room light on `uLight`, slight contrast
+  curve), the frame a darker board; the wide haze is halved and the light pools on the wall line
+  behind each tube (from the tube's own distance field), lighting the picture's colors there.
+- Parallax 44 face px: the tube slides off its pool and off its standoff posts as the card tilts.
+- Electrode caps at tube ends; standoffs (post + clip) from a 120 px hashed grid, projected onto the
+  nearest tube.
+- Still open: short tube fragments along the art window's sides on the moon sample; overlapping
+  tubes in the moon's water read busy.
+
+## Polish round 2 (2026-10-06, Mac)
+
+Judge after round 1: tubes still read as edge detection (varying width, blobs, rainbow color along one
+outline), glass looks like smeared light, electrodes/standoffs look like glitches, wall murky,
+border tube a flat UI glow, tilt too subtle. Rebuilt the tube layout on the CPU as stroke paths (see
+above) instead of a per-pixel band of the gradient: constant width, round ends, one gas per tube,
+at most 6 + border. Three-layer glass, clear electrode sleeves, posts as rods with shadowed feet,
+near-black wall lit by inverse-square pools, a border tube with a break and a falloff along it,
+stronger parallax. The faint horizontal scanlines in earlier screenshots are the app's CRT overlay
+(the CRT toggle), not the finish; the round 2 shots turn it off.
+
+## Polish round 3 (2026-10-06, Mac)
+
+Judge after round 2: tubes read as thin vector lines (mostly white core, color only in the halo),
+the wall light covered too much, clips every 80–120 px and grey "thorn" posts when tilted, a double
+pink border that tore off the card edge (54 px slide), and tubes placed where outlines happen to be
+(meaningless loops, stray stubs, a partial bar over the sun, a broken hill, a scribble on the moon's
+water). Changes:
+
+- Layout (`neonMap.ts`): outlines of k-means color regions (5) instead of iso-lines of the shading;
+  closed outlines count double and score by length^1.5 x contrast^2; a ring round a small strong spot
+  (an eye) laid first; a minimum bend radius of 1.5 tube widths cuts curls; short straight bars,
+  corner/edge stubs and lone short tubes dropped; one-gas pieces whose ends face each other across
+  a short gap joined (never across another tube); minimum length 0.18 of the long side.
+- Look (`neon.ts`): tube 0.025 S wide (was 0.015), cream core ~15 %, saturated body, softer rim,
+  one sharp highlight on the lit side; tight + wide halos; wall ~4–6 % far from tubes; border tube
+  at 62 %; slide 16 px (was 54); posts as small clear discs with contact shadow, no clips; one post
+  per ~420 px (border 620), none under 300 px; the art window's edge no longer lit as lettering.
+- Tests: posts, curl/horizon join, corner stub, eye ring, shader reach constant.
+- Screens: production build in headless Chromium (Metal), sunset/moon/parrot/poppy, front and two
+  tilts, plus a GIF export. Still open: the moon sample keeps only the moon ring (the water no longer
+  becomes a scribble, but nothing replaces it); a short neck tube on the parrot.
+
