@@ -3,7 +3,7 @@ import './tag.css';
 import { cardOf, CARD_KEYS, CARD_TYPE_MAX, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { dictOf, loadDict, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop } from './card/face';
+import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop, type FaceSpec } from './card/face';
 import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, setFit, shapeById, SHAPES } from './card/shape';
 import { isPixelArt, PIXEL_ART_MAX } from './card/pixelArt';
@@ -39,6 +39,7 @@ import { mountQuickMotion } from './tune/quick';
 import { BACKDROPS } from './backdrop';
 import { loadBackdrops } from './gl/renderers';
 import type { Kept } from './binder/db';
+import { artBlock, DOT_COLORS, DOT_PRESETS, DOT_SCOPES, DOT_SIZES, dotGrid, dotKey, dotScopeOf, presetOf, type Dot } from './dot/model';
 import type { Layers } from './range';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -121,6 +122,8 @@ const currentImage = (): Img => {
 
 // Animated pictures: advance the card face whenever the next frame is due, for as long as there is one.
 let framesPlaying = false;
+/** True while the face is repainted only for a moving picture's next frame. */
+let framing = false;
 function playFrames() {
   if (framesPlaying || !userAnim) return;
   framesPlaying = true;
@@ -131,7 +134,10 @@ function playFrames() {
       const i = frameAt(userAnim, now);
       if (i !== animFrame) {
         animFrame = i;
+        // The next frame of the same picture keeps pixel art's palette.
+        framing = true;
         redrawFace();
+        framing = false;
       }
     }
     requestAnimationFrame(tick);
@@ -183,7 +189,7 @@ function artKey() {
   const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
   if (!artIds.has(src)) artIds.set(src, ++artCount);
   const a = faceArt(s);
-  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}`;
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? `${dotKey(s.dot)}/${s.pixel}/${dotScopeOf(s)}` : ''}`;
 }
 
 function faceSpec(image: Img) {
@@ -236,15 +242,77 @@ function redrawFace() {
       .finally(() => (paintWaiting = false));
   }
   faceVersion++;
-  lastRuns = drawFace(face, mask, spec);
+  // A moving picture's next frame keeps the palette the face was last given.
+  if (!framing) facePalette = `face${++paletteRun}`;
+  lastRuns = paintFace(face, mask, spec, facePalette);
   setTextRuns(face.width, face.height, lastRuns);
-  const { font, text } = spec.message;
+  // Under pixel art every word is printed in the pixel typeface.
+  const font = wordsOnGrid() ? 'dot' : spec.message.font;
+  const { text } = spec.message;
   const ask = text.trim() ? `${font}|${text}` : '';
   if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
   fontAsked = ask;
   stage.cards.setFace(face, mask);
   areas.onFace(face, mask, spec);
   depth?.update(face, artKey());
+}
+
+// ---------- Pixel art ----------
+
+type DotModule = typeof import('./dot/dot');
+/** Pixel art's conversion (docs/features.md, Card → Pixel art), here once it is first wanted. */
+let dot: DotModule | null = null;
+let dotLoading: Promise<DotModule> | null = null;
+function useDot(): Promise<DotModule> {
+  dotLoading ??= import('./dot/dot').then(
+    (m) => (dot = m),
+    (err) => {
+      dotLoading = null;
+      throw err;
+    },
+  );
+  return dotLoading;
+}
+
+/** Each painting of the card picks its own palette; a moving picture's frames share theirs. */
+let paletteRun = 0;
+let facePalette = '';
+/**
+ * Draws a just-painted face (or Flip Lenticular's picture) as pixel art when it is on. Calls with the
+ * same `keep` share one palette (empty: a palette of its own). The face stays plain until the code is here.
+ * With the face's `artMask`: on the whole card Pixelate (when it is on too) runs first on the art window;
+ * on the frame only the picture in it is kept. Without it the canvas is a picture, left as it is on the frame only.
+ */
+function pixelArt(canvas: HTMLCanvasElement, keep: string, artMask?: HTMLCanvasElement) {
+  const s = store.get();
+  const d = s.dot;
+  const scope = dotScopeOf(s);
+  if (!d || (scope === 'frame' && !artMask)) return;
+  if (!dot)
+    return void useDot().then(
+      () => {
+        redrawFace();
+        if (flipImage) setFlip(flipImage);
+      },
+      () => toast(t.loadFailed, true),
+    );
+  dot.dotFace(canvas, d, keep || `own${++paletteRun}`, artMask && { mask: artMask, block: artBlock(d, s.pixel), frameOnly: scope === 'frame' });
+}
+
+/** Whether the face's words are printed on the pixel art's grid: pixel art is on and its code is here. */
+const wordsOnGrid = () => !!(store.get().dot && dot);
+
+/**
+ * Paints a face and its mask, as pixel art when that is on: the face is converted without its words,
+ * which are then printed crisp on its grid (docs/features.md, Card → Pixel art). Returns the text for
+ * the lettering map.
+ */
+function paintFace(f: HTMLCanvasElement, m: HTMLCanvasElement, spec: FaceSpec, keep: string): TextRun[] {
+  const d = store.get().dot;
+  const hold = wordsOnGrid();
+  const { runs, words } = drawFace(f, m, { ...spec, holdWords: hold });
+  pixelArt(f, keep, m);
+  return hold && d && dot ? dot.printWords(f, words, d.size) : runs;
 }
 
 // ---------- Text ----------
@@ -476,8 +544,72 @@ function buildSegments() {
     };
     ls.appendChild(b);
   }
+  buildDot();
 }
 
+/** Whether pixel art's four choices are open under its presets (closed on every visit). */
+let dotOpen = false;
+
+/** Pixel art: Off and three presets, and under Adjust its coarseness, colours, outline and dither. */
+function buildDot() {
+  const s = store.get();
+  const d = s.dot;
+  const preset = presetOf(d);
+  const seg = <V,>(id: string, label: string, items: readonly V[], name: (v: V) => string, on: (v: V) => boolean, pick: (v: V) => void) => {
+    const host = $(id);
+    host.textContent = '';
+    host.setAttribute('aria-label', label);
+    for (const v of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'seg-btn';
+      b.setAttribute('role', 'radio');
+      b.textContent = name(v);
+      radio(b, on(v));
+      b.onclick = () => {
+        if (on(v)) return;
+        sfx.tick();
+        pick(v);
+        stage.juice(0.4);
+      };
+      host.appendChild(b);
+    }
+  };
+  const td = t.dot;
+  // A card used as the whole card has no frame: the area steps aside and pixel art covers all of it.
+  const scope = dotScopeOf(s) ?? s.dotScope;
+  $('dotLabel').textContent = td.label;
+  $('dotHint').textContent = scope === 'frame' ? td.hintFrame : td.hint;
+  $('dotNow').textContent = preset === null ? td.custom : '';
+  const presets = ['off', 'chunky', 'retro', 'fine'] as const;
+  seg('dotSeg', td.label, presets, (p) => td.preset[p], (p) => preset === p, (p) => store.set({ dot: p === 'off' ? null : { ...DOT_PRESETS[p] } }));
+  $('dotScopeRow').hidden = !d || s.frameless;
+  $('dotScopeLabel').textContent = td.scope;
+  seg('dotScopeSeg', td.scope, DOT_SCOPES, (v) => td.scopeName[v], (v) => s.dotScope === v, (dotScope) => store.set({ dotScope }));
+  const more = $('dotMore');
+  more.hidden = !d;
+  more.textContent = dotOpen ? td.less : td.more;
+  more.setAttribute('aria-expanded', String(dotOpen && !!d));
+  $('dotBody').hidden = !dotOpen || !d;
+  if (!d) return;
+  const set = (patch: Partial<Dot>) => store.set({ dot: { ...d, ...patch } });
+  $('dotSizeLabel').textContent = td.size;
+  seg('dotSizeSeg', td.size, DOT_SIZES, (v) => String(v), (v) => d.size === v, (size) => set({ size }));
+  $('dotColorsLabel').textContent = td.colors;
+  seg('dotColorsSeg', td.colors, DOT_COLORS, (v) => (v === 'foil' ? td.foil : String(v)), (v) => d.colors === v, (colors) => set({ colors }));
+  $('dotOutlineLabel').textContent = td.outline;
+  seg('dotOutlineSeg', td.outline, [false, true], (v) => td.outlineName[+v], (v) => d.outline === v, (outline) => set({ outline }));
+  $('dotDitherLabel').textContent = td.dither;
+  seg('dotDitherSeg', td.dither, [false, true], (v) => td.ditherName[+v], (v) => d.dither === v, (dither) => set({ dither }));
+}
+
+$('dotMore').addEventListener('click', () => {
+  sfx.tick();
+  dotOpen = !dotOpen;
+  buildDot();
+});
+// The conversion is fetched the moment its choices are pointed at.
+for (const ev of ['pointerenter', 'focusin']) $('dotSeg').addEventListener(ev, () => void useDot().catch(() => {}), { once: true });
 /**
  * The backdrop tiles (docs/backdrops.md): a small picture of each and its name, the swirl and the
  * bokeh in the finish's own colors, Plain in its color, which a button under the tiles changes.
@@ -931,7 +1063,10 @@ let flipChosen = false;
 
 function setFlip(img: Img | null) {
   flipImage = img;
-  if (img) drawFlip(flip, img, store.get().shape, faceArt(store.get()));
+  if (img) {
+    drawFlip(flip, img, store.get().shape, faceArt(store.get()));
+    pixelArt(flip, '');
+  }
   stage.cards.setFlip(img ? flip : null);
   renderFlip();
 }
@@ -1084,6 +1219,7 @@ rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
 rovingKeys($('layoutSeg'));
+for (const id of ['dotSeg', 'dotScopeSeg', 'dotSizeSeg', 'dotColorsSeg', 'dotOutlineSeg', 'dotDitherSeg']) rovingKeys($(id));
 rovingKeys($('backdropSeg'));
 $('backdropSeg').addEventListener('pointerenter', () => void loadBackdrops().catch(() => {}), { once: true });
 $('backdropColorBtn').addEventListener('click', () => {
@@ -1123,7 +1259,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1220,7 +1356,7 @@ const tabNow = (s = store.get()): PanelTab => (tabsShown(s).includes(s.panelTab)
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
+  store.set({ intensity: 1, pixel: 0, dot: null, dotScope: 'card', frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1298,6 +1434,8 @@ function exportInput() {
     edition: editionById(s.edition),
     intensity: s.intensity,
     pixel: s.pixel,
+    dot: dotGrid(s.dot),
+    dotFrame: dotScopeOf(s) === 'frame',
     tune: s.tune,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
@@ -1320,10 +1458,11 @@ function animatedExport(anim: Anim) {
   // Settings are fixed when the export starts, so edits made meanwhile don't change it midway.
   const spec = faceSpec(anim.frames[0]);
   const crop = { ...spec.crop };
+  // One palette for the whole file, as on the stage.
+  const keep = `file${++paletteRun}`;
   return {
     loopMs: anim.duration,
-    faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) =>
-      drawFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] }),
+    faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) => void paintFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] }, keep),
   };
 }
 
@@ -1526,7 +1665,10 @@ for (const b of [saveBtn, $('shareBtn'), $('formatSeg')]) for (const ev of ['poi
 
 /** The face painted for the card as it is now (a trading card's painter may still be on its way). */
 async function faceReady() {
-  if (canPaint(faceSpec(currentImage()))) return;
+  // A file is drawn as the stage shows it: pixel art's code and the trading card's painter come first.
+  const dotWait = !!store.get().dot && !dot;
+  if (dotWait) await useDot();
+  if (canPaint(faceSpec(currentImage()))) return void (dotWait && redrawFace());
   await loadTcgFace();
   redrawFace();
 }
@@ -2199,8 +2341,9 @@ store.on((s, changed) => {
   }
   // The Picture shape changing size is a new shape.
   const reshaped = changed.has('shape') || (changed.has('fit') && s.shape === 'fit');
-  if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit'].some((k) => changed.has(k as keyof State))) buildSegments();
+  if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State))) buildSegments();
   if (['backdrop', 'backdropColor', 'edition'].some((k) => changed.has(k as keyof State))) buildBackdrops();
+  if ((changed.has('dot') || changed.has('dotScope')) && flipImage) setFlip(flipImage);
   if (changed.has('arrange')) {
     renderCardHint();
     if (s.arrange === 'free') useArrange();
@@ -2216,7 +2359,7 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless'].some((k) => changed.has(k as keyof State))) && !changed.has('sample')) {
+  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && dotScopeOf(s) === 'card')) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
@@ -2354,6 +2497,7 @@ settled(() => {
     void useExporter().catch(() => {});
     void import('./tune/quickTray').catch(() => {});
     void loadTcgFace().catch(() => {});
+    void useDot().catch(() => {});
   });
 });
 

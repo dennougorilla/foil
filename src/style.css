@@ -3809,3 +3809,57 @@ input[type='range']:disabled {
     animation: none;
   }
 }
+
+/* Pixelate and Pixel art sit together, each with one line saying what it touches. */
+.row-hint {
+  grid-template-areas:
+    'label out'
+    'hint hint'
+    'input input';
+}
+
+.row-hint > .hint {
+  grid-area: hint;
+  margin-top: -4px;
+}
+
+.dot-hint {
+  margin-top: -6px;
+}
+
+/* Pixel art: its presets in one row, its four choices folded under Adjust. */
+.dot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dot-now {
+  color: var(--gold);
+  font-size: 14px;
+}
+
+.dot-more {
+  margin-left: auto;
+}
+
+.dot-more[hidden],
+.dot-scope[hidden],
+.dot-body[hidden] {
+  display: none;
+}
+
+.dot-body {
+  display: grid;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--panel-lo);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.dot-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
