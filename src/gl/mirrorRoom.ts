@@ -2,7 +2,7 @@
 import { quadBuffer, startProgram, type PendingProgram } from './gl';
 import type { CardDraw } from './renderers';
 import type { GlobeView } from './snowglobe';
-import { ROOM_FS, ROOM_VS, roomSpin, twinkle } from './mirrorball';
+import { ROOM_FS, ROOM_VS, roomLap, SPIN, twinkle } from './mirrorball';
 
 /** The spots one renderer throws; made on first use. */
 export class MirrorRoom {
@@ -38,8 +38,11 @@ export class MirrorRoom {
     gl.uniform2f(p.u.uMbCenter, d.cx, d.cy);
     gl.uniform1f(p.u.uMbSize, d.h * d.scale);
     gl.uniform2f(p.u.uMbTilt, d.tilt[0], d.tilt[1]);
-    gl.uniform1f(p.u.uMbTime, time);
-    gl.uniform1f(p.u.uMbSpin, roomSpin(loop));
+    const [at, fade] = roomLap(time, loop);
+    gl.uniform1f(p.u.uMbTime, at);
+    gl.uniform1f(p.u.uMbLoop, loop);
+    gl.uniform1f(p.u.uMbFade, fade);
+    gl.uniform1f(p.u.uMbSpin, SPIN);
     gl.uniform1f(p.u.uMbTwinkle, twinkle(loop));
     gl.uniform1f(p.u.uMbPower, Math.min(1, d.intensity) * d.alpha);
     gl.blendFuncSeparate(gl.ONE_MINUS_DST_ALPHA, gl.ONE, gl.ONE_MINUS_DST_ALPHA, gl.ONE);
