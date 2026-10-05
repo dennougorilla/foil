@@ -8,7 +8,8 @@
 import './opening.css';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type CardDraw, type Particle, type RGB } from '../gl/renderers';
 import { editionById, type EditionId } from '../editions';
-import { PACKS, tierOf, type Pack } from '../packs';
+import { packById, PACKS, type Pack } from '../packs';
+import { tierOf } from './rules';
 import type { Dict } from '../i18n';
 import type { PackId } from '../packs';
 import { tuneGl, type Tune } from '../tune/model';
@@ -27,8 +28,11 @@ export interface OpeningOptions {
   shop?: Pack[];
   /** The shelf chip the pack flies out of when there is no shop. */
   from: DOMRect;
-  /** Whether a pack was opened before (it is watched again). */
-  isOpened: (id: PackId) => boolean;
+  /**
+   * Whether a finish is owned: a pack is opened (watched again) once all of it is, and a pack
+   * sealed again after it gained a finish holds some owned already.
+   */
+  owns: (id: EditionId) => boolean;
   /** Where the deck sits on the page: the haul's cards fly into it at the end. */
   deckRect?: () => DOMRect;
   dict: Dict;
@@ -39,13 +43,16 @@ export interface OpeningOptions {
   intensity: number;
   /** Stops the stage underneath from drawing while the overlay is up. */
   pause: (on: boolean) => void;
-  /** The pack counts as opened from the tear (or a skip) on. */
-  onOpened: (id: PackId) => void;
-  /** Closed; `opened` is the pack that was opened or watched (none if closed in the shop), `pick` the finish chosen to try. */
-  onClose: (opened: Pack | null, pick: EditionId | null) => void;
+  /** A pack counts as opened from the tear (or a skip) on; Open all opens several at once. */
+  onOpened: (ids: PackId[]) => void;
+  /**
+   * Closed; `next` is the finish chosen to try, or 'deck' for the deck builder; `added`, the
+   * finishes that came into the deck now and the line that says so (none if nothing new came in).
+   */
+  onClose: (next: EditionId | 'deck' | null, added: { n: number; note: string } | null) => void;
 }
 
-type Phase = 'shop' | 'load' | 'pack' | 'rip' | 'draw' | 'deck' | 'haul' | 'closing';
+type Phase = 'shop' | 'load' | 'pack' | 'rip' | 'draw' | 'deck' | 'haul' | 'all' | 'closing';
 
 interface CardSim {
   id: EditionId;
@@ -76,19 +83,23 @@ const easeOutBack = (p: number) => 1 + 2.2 * Math.pow(p - 1, 3) + 1.2 * Math.pow
 const band = (d: number, k = 520) => (d * 0.9) / (1 + Math.abs(d) / k);
 const WHITE: RGB = [1, 1, 1];
 
-/** What each theme's sparks are made of: hot metal sparks, rising star motes, drifting petals, print dots, gold leaf. */
+/** What each theme's sparks are made of: hot metal sparks, gem glints, rising star motes, drifting petals, print dots, confetti. */
 const STYLES: Record<PackId, { palette: string[]; g: number; drag: number; sway: number; size: [number, number] }> = {
   metal: { palette: ['#fff6d8', '#f2c14e', '#d18a2c'], g: 1200, drag: 1.2, sway: 0, size: [3, 7] },
+  jewel: { palette: ['#ffffff', '#f3e2c4', '#ff9ad0', '#8fe6ff'], g: 500, drag: 1.8, sway: 0, size: [4, 7] },
   light: { palette: ['#ffffff', '#c8f4ff', '#a99bff'], g: -50, drag: 2.6, sway: 0, size: [3, 6] },
   nature: { palette: ['#ffe0ea', '#ffa8c8', '#ff7aa8'], g: 120, drag: 3.2, sway: 120, size: [6, 9] },
   studio: { palette: ['#00b7eb', '#ff2e88', '#ffe600', '#f3eee2'], g: 800, drag: 1.4, sway: 0, size: [6, 9] },
-  supporter: { palette: ['#f2c14e', '#ffe7a8', '#ffffff'], g: 900, drag: 1.5, sway: 40, size: [4, 8] },
+  supporter: { palette: ['#f2c14e', '#ffe7a8', '#ff5a8a', '#5ad0ff', '#ffffff'], g: 900, drag: 1.5, sway: 60, size: [4, 8] },
 };
 const GOLD: RGB = hexToRgb('#f2c14e');
 
 export function openPack(o: OpeningOptions) {
   const { dict } = o;
   const t = dict.pack;
+  /** What was owned as the shop opened: only the rest counts as new. */
+  const had = new Set(PACKS.flatMap((p) => p.finishes).filter(o.owns));
+  const isOpened = (id: PackId) => packById(id).finishes.every(o.owns);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const coarse = matchMedia('(pointer: coarse)').matches;
   // The pack being opened and what follows from it; set by setPack (in the shop, when one is chosen).
@@ -143,7 +154,7 @@ export function openPack(o: OpeningOptions) {
       <section class="pk-panel">
         <header class="pk-band"><b></b><span class="pk-tier"></span></header>
         <div class="pk-body"><p class="pk-desc"></p><p class="pk-note"></p></div>
-        <div class="pk-buy-row"><button class="pk-buy" type="button"></button></div>
+        <div class="pk-buy-row"><button class="pk-buy" type="button"></button><button class="pk-all" type="button"><span></span><small></small></button></div>
       </section>
       </div>
     </div>
@@ -156,6 +167,14 @@ export function openPack(o: OpeningOptions) {
       <div class="pk-actions">
         <button class="btn btn-quiet pk-close" type="button"></button>
         <button class="btn btn-primary pk-try" type="button"></button>
+      </div>
+    </div>
+    <div class="pk-list">
+      <p class="pk-list-title"><b></b><small></small></p>
+      <div class="pk-rows"></div>
+      <div class="pk-list-actions">
+        <button class="btn btn-quiet pk-list-close" type="button"></button>
+        <button class="btn btn-primary pk-list-deck" type="button"></button>
       </div>
     </div>
     <p class="sr-only pk-live" aria-live="polite"></p>`;
@@ -179,6 +198,8 @@ export function openPack(o: OpeningOptions) {
   openBtn.textContent = t.trace;
   hintEl.textContent = t.loading;
   $('.pk-close').textContent = t.close;
+  $('.pk-list-close').textContent = t.close2;
+  $('.pk-list-deck').textContent = t.editDeck;
   document.body.appendChild(root);
   root.focus({ preventScroll: true });
   requestAnimationFrame(() => root.classList.add('is-in'));
@@ -334,12 +355,8 @@ export function openPack(o: OpeningOptions) {
   let cards: CardSim[] = [];
   let showpiece: CardSim;
 
-  /** Makes `p` the pack being opened: its colors, words, wrapper, cards. */
-  function setPack(p: Pack) {
-    pack = p;
-    rich = !!p.supporter;
-    name = t.name[p.id];
-    n = p.finishes.length;
+  /** The room, the pillow's light and the words' accents take a pack's colors. */
+  function tint(p: Pack) {
     colors = p.colors.map(hexToRgb) as [RGB, RGB, RGB];
     style = STYLES[p.id];
     themed = style.palette.map(hexToRgb);
@@ -347,16 +364,25 @@ export function openPack(o: OpeningOptions) {
     room = [colors[0].map((v) => v * 0.8) as RGB, colors[1], colors[2].map((v, i) => v * 0.75 + colors[1][i] * 0.1) as RGB];
     roomNow ??= room.map((c) => [...c]) as [RGB, RGB, RGB];
     sheen = colors[2].map((v) => 0.55 + v * 0.45) as RGB;
-    replay = o.isOpened(p.id);
+    root.style.setProperty('--a', p.colors[0]);
+    root.style.setProperty('--b', p.colors[1]);
+    root.style.setProperty('--c', p.colors[2]);
+  }
+
+  /** Makes `p` the pack being opened: its colors, words, wrapper, cards. */
+  function setPack(p: Pack) {
+    pack = p;
+    rich = !!p.supporter;
+    name = t.name[p.id];
+    n = p.finishes.length;
+    tint(p);
+    replay = isOpened(p.id);
     wrap = editionById(p.wrap).shader;
     packKey = `pack-${p.id}`;
     if (!painted.has(p.id)) paintWrapper(p);
     print = printOf(p);
     root.classList.toggle('is-supporter', rich);
     root.setAttribute('aria-label', t.dialog.replace('{name}', name));
-    root.style.setProperty('--a', p.colors[0]);
-    root.style.setProperty('--b', p.colors[1]);
-    root.style.setProperty('--c', p.colors[2]);
     $('.pk-title b').textContent = t.title.replace('{name}', name);
     $('.pk-title small').textContent = rich ? t.thanks : t.count.replace('{n}', String(n));
     $('.pk-haul-title b').textContent = (replay ? t.haulReplay : t.haul).replace('{name}', name).replace('{n}', String(n));
@@ -416,8 +442,8 @@ export function openPack(o: OpeningOptions) {
     b.className = 'pk-slot';
     b.setAttribute('role', 'radio');
     b.dataset.pack = sl.p.id;
-    b.innerHTML = `<i class="pk-pick" aria-hidden="true"></i><span class="pk-price">${t.name[sl.p.id]}${o.isOpened(sl.p.id) ? ` <small>✓ ${t.tagOpened}</small>` : ''}</span>`;
-    b.setAttribute('aria-label', `${t.title.replace('{name}', t.name[sl.p.id])}${o.isOpened(sl.p.id) ? ` (${t.tagOpened})` : ''}`);
+    b.innerHTML = `<i class="pk-pick" aria-hidden="true"></i><span class="pk-price">${t.name[sl.p.id]}${isOpened(sl.p.id) ? ` <small>✓ ${t.tagOpened}</small>` : ''}</span>`;
+    b.setAttribute('aria-label', `${t.title.replace('{name}', t.name[sl.p.id])}${isOpened(sl.p.id) ? ` (${t.tagOpened})` : ''}`);
     b.addEventListener('pointerenter', () => {
       sl.hot = true;
       if (!reduced) sl.rz.v += (Math.random() < 0.5 ? -1 : 1) * 5;
@@ -442,14 +468,196 @@ export function openPack(o: OpeningOptions) {
     }
     packSfx.pop(i);
     slots.forEach((x, k) => x.el.setAttribute('aria-checked', String(k === i)));
-    const opened = o.isOpened(sl.p.id);
+    const opened = isOpened(sl.p.id);
+    const mine = sl.p.finishes.filter(o.owns).length;
     $('.pk-band b').textContent = t.title.replace('{name}', name);
     $('.pk-tier').textContent = rich ? t.thanksShort : '';
     const em = (s: string) => s.replace(/\{(\w+)\}/g, (_, k) => `<em>${k === 'name' ? name : n}</em>`);
     $('.pk-desc').innerHTML = em(t.shopDesc);
-    $('.pk-note').textContent = opened ? t.shopOpened.replace('{list}', sl.p.finishes.map((id) => dict.edition[id]).join(' · ')) : t.shopNote.replace('{name}', name);
+    $('.pk-note').textContent = opened
+      ? t.shopOpened.replace('{list}', sl.p.finishes.map((id) => dict.edition[id]).join(' · '))
+      : mine
+        ? t.shopPartial.replace('{k}', String(mine)).replace('{m}', String(n - mine))
+        : t.shopNote.replace('{name}', name);
     $('.pk-buy').textContent = opened ? t.shopReplay : t.openBtn;
     $('.pk-buy').classList.toggle('is-replay', opened);
+    arm(false);
+  }
+
+  // ---------- Open all ----------
+
+  const allBtn = $<HTMLButtonElement>('.pk-all');
+  /** The packs on the tray still sealed: what Open all opens. */
+  const sealedNow = () => shopPacks.filter((p) => !isOpened(p.id));
+  const packsText = (k: number) => (k === 1 ? t.onePack : t.packsN.replace('{n}', String(k)));
+  /** Cards a phone's line holds: a pack of six goes three over three, so names keep their room. */
+  const lineOf = (k: number) => (vw < 640 && k > 5 ? Math.ceil(k / 2) : k);
+  let armed = false;
+  let armTimer = 0;
+  /** The first tap arms Open all for a few seconds; only a second tap opens. */
+  function arm(on: boolean) {
+    armed = on;
+    clearTimeout(armTimer);
+    const k = sealedNow().length;
+    allBtn.hidden = !k;
+    allBtn.classList.toggle('is-armed', on);
+    allBtn.querySelector('span')!.textContent = on ? t.openAllArmed : t.openAll;
+    allBtn.querySelector('small')!.textContent = t.noIntros.replace('{packs}', packsText(k));
+    allBtn.setAttribute('aria-label', `${on ? t.openAllArmed : t.openAll} (${t.noIntros.replace('{packs}', packsText(k))})`);
+    if (on) armTimer = window.setTimeout(() => arm(false), 3000);
+  }
+  allBtn.addEventListener('click', () => {
+    if (phase !== 'shop') return;
+    if (!armed) {
+      arm(true);
+      sfx.tick();
+      buzz(8);
+      say(t.openAllArmed);
+      return;
+    }
+    openAll();
+  });
+
+  /** The packs Open all opened, listed pack by pack. */
+  let listed: Pack[] = [];
+  /** Every sealed pack on the tray opens at once, without its opening; the list shows what came in. */
+  function openAll() {
+    listed = sealedNow();
+    arm(false);
+    o.onOpened(listed.map((p) => p.id));
+    root.classList.add('is-leaving', 'is-list');
+    packSfx.whoosh();
+    buzz([12, 30, 12]);
+    setPhase('all');
+    showList();
+  }
+
+  /** A small picture of a canvas (the card's face, its back), for the list's cards. */
+  const snapshot = (src: HTMLCanvasElement, h: number) => {
+    const c = document.createElement('canvas');
+    c.height = h;
+    c.width = Math.round((h * src.width) / src.height);
+    c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height);
+    return c.toDataURL();
+  };
+
+  const relist = () => phase === 'all' && listLayout();
+  /** Fits the list's cards: one or two columns of rows, whichever shows every row, then whichever lets the cards be bigger. */
+  function listLayout() {
+    const narrow = vw < 640;
+    const per = Math.max(...listed.map((p) => lineOf(p.finishes.length)));
+    const lines = listed.reduce((k, p) => k + Math.ceil(p.finishes.length / lineOf(p.finishes.length)), 0);
+    const gap = narrow ? 6 : 14;
+    // Each row's tag, names (two lines at most) and the gap to the next row, around its cards.
+    const extra = narrow ? 80 : 104;
+    const room = Math.min(vw - (narrow ? 44 : 32), 1360);
+    const tall = vh - (narrow ? 200 : 240);
+    let best = { cols: 1, w: 0, h: 0, all: false };
+    for (const cols of narrow || listed.length < 2 ? [1] : [1, 2]) {
+      const rows = cols === 1 ? lines : Math.ceil(listed.length / cols);
+      const w = (room - (cols - 1) * 40) / cols;
+      // Below a size worth seeing, the list scrolls instead.
+      const fit = contain(aspect, (w - gap * (per - 1)) / per, Math.max(narrow ? 60 : 72, tall / rows - extra));
+      const all = rows * (fit.h + extra) <= tall + 1;
+      if (all > best.all || (all === best.all && fit.h > best.h)) best = { cols, ...fit, all };
+    }
+    const cap = contain(aspect, 150, 210);
+    root.style.setProperty('--sw', `${Math.floor(Math.min(best.w, cap.w))}px`);
+    root.style.setProperty('--sh', `${Math.floor(Math.min(best.h, cap.h))}px`);
+    root.style.setProperty('--sgap', `${gap}px`);
+    root.style.setProperty('--cols', String(best.cols));
+    // Small cards wear the showpiece's star alone.
+    root.classList.toggle('is-tight', Math.min(best.w, cap.w) < 96);
+    requestAnimationFrame(fadeMore);
+  }
+
+  /** The list fades at its bottom edge while more of it is below. */
+  const fadeMore = () => {
+    const el = $('.pk-rows');
+    el.classList.toggle('is-more', el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  };
+  $('.pk-rows').addEventListener('scroll', fadeMore, { passive: true });
+
+  /** The list: one row per pack, laid out like its haul (the showpiece in the middle), dealt in quickly. */
+  function showList() {
+    const total = listed.reduce((k, p) => k + p.finishes.filter((id) => !had.has(id)).length, 0);
+    const done = t.allDone.replace('{packs}', packsText(listed.length)).replace('{n}', String(total));
+    $('.pk-list-title b').textContent = done;
+    $('.pk-list-title small').textContent = t.allHint;
+    const face = snapshot(o.face, 280);
+    const back = snapshot(o.back, 280);
+    const rowsEl = $('.pk-rows');
+    rowsEl.innerHTML = '';
+    const ROW = reduced ? 0.12 : 0.22;
+    const CARD = reduced ? 0 : 0.04;
+    listed.forEach((p, r) => {
+      const row = document.createElement('section');
+      row.className = 'pk-row';
+      row.dataset.pack = p.id;
+      row.style.setProperty('--a', p.colors[0]);
+      row.style.setProperty('--b', p.colors[1]);
+      row.style.setProperty('--c', p.colors[2]);
+      row.style.setProperty('--d', `${(r * ROW).toFixed(2)}s`);
+      row.innerHTML = `<h3 class="pk-row-tag"><b></b><small></small></h3><ol class="pk-swatches"></ol>`;
+      row.querySelector('b')!.textContent = t.title.replace('{name}', t.name[p.id]);
+      row.querySelector('small')!.textContent = t.newN.replace('{n}', String(p.finishes.filter((id) => !had.has(id)).length));
+      const list = row.querySelector('ol')!;
+      // As in the haul, the showpiece takes the middle (of the top line, when a phone breaks the row in two).
+      const line = lineOf(p.finishes.length);
+      list.style.setProperty('--line', String(line));
+      const show = p.finishes[p.finishes.length - 1];
+      const order = p.finishes.slice(0, -1);
+      order.splice(Math.floor(line / 2), 0, show);
+      order.forEach((id, j) => {
+        const e = editionById(id);
+        const li = document.createElement('li');
+        li.className = 'pk-swatch';
+        if (id === show) li.classList.add('is-showpiece');
+        // Owned before: shown in its place, quieter, tagged.
+        if (had.has(id)) li.classList.add('is-had');
+        li.style.setProperty('--d', `${(r * ROW + j * CARD).toFixed(2)}s`);
+        li.style.setProperty('--s0', e.swirl[0]);
+        li.style.setProperty('--s1', e.swirl[1]);
+        li.style.setProperty('--s2', e.color);
+        li.style.setProperty('--ang', `${100 + ((e.shader * 47) % 90)}deg`);
+        const tag = id === show ? `<em>★<span> ${t.showpiece}</span></em>` : had.has(id) ? `<em class="is-had">${t.hadTag}</em>` : '';
+        li.innerHTML = `<i class="pk-card"><img class="pk-face" alt="" src="${face}"><span class="pk-wash"></span><img class="pk-back" alt="" src="${back}"></i>${tag}<b></b>`;
+        li.querySelector('b')!.textContent = dict.edition[id];
+        li.title = dict.look[id];
+        list.appendChild(li);
+      });
+      rowsEl.appendChild(row);
+      // As each row lands: a click pitched up along the rows, and the room takes its pack's colors.
+      setTimeout(() => {
+        if (closed) return;
+        tint(p);
+        packSfx.deal(r * 2 + 3);
+        if (r === listed.length - 1) setTimeout(() => !closed && packSfx.chime(), 260);
+      }, (r * ROW + 0.2) * 1000);
+    });
+    listLayout();
+    say(done);
+    if (keyboard) $<HTMLButtonElement>('.pk-list-deck').focus({ preventScroll: true });
+    else root.focus({ preventScroll: true });
+  }
+
+  /** Closing the list: its cards fly into the deck, one after another. */
+  function flyList(deck: DOMRect) {
+    // Out of the scrolling box first, so they can fly over the page.
+    const rowsEl = $('.pk-rows');
+    rowsEl.style.overflow = 'visible';
+    rowsEl.style.maxHeight = 'none';
+    const tx = deck.left + deck.width / 2;
+    const ty = deck.top + deck.height / 2;
+    root.querySelectorAll<HTMLElement>('.pk-swatch .pk-card').forEach((el, i) => {
+      const rc = el.getBoundingClientRect();
+      const s = (deck.height / rc.height) * 0.6;
+      el.animate(
+        [{ transform: 'none', opacity: 1 }, { transform: `translate(${tx - rc.left - rc.width / 2}px, ${ty - rc.top - rc.height / 2}px) scale(${s}) rotate(8deg)`, opacity: 0.2 }],
+        { duration: 480, delay: Math.min(i * 16, 380), easing: 'cubic-bezier(0.55, 0, 0.8, 0.3)', fill: 'forwards' },
+      );
+    });
+    [0, 1, 2, 3].forEach((k) => setTimeout(() => packSfx.deal(9 - k * 2), 160 + k * 120));
   }
 
   /** The chosen pack leaves the tray for the middle, and the opening begins. */
@@ -551,7 +759,7 @@ export function openPack(o: OpeningOptions) {
   const markOpened = () => {
     if (opened) return;
     opened = true;
-    o.onOpened(pack.id);
+    o.onOpened([pack.id]);
   };
 
   /** The trace is complete: the strip tears off and light pours out. */
@@ -759,7 +967,7 @@ export function openPack(o: OpeningOptions) {
   /** Skip was asked for while the pack was still loading: go straight to the haul once it can be drawn. */
   let skipOnLoad = false;
   function skip() {
-    if (phase === 'haul' || phase === 'closing') return;
+    if (phase === 'haul' || phase === 'all' || phase === 'closing') return;
     if (phase === 'shop') return close(null);
     // While loading, Skip goes to the haul once it can be drawn; a pack that failed to arrive just closes.
     if (phase === 'load') {
@@ -771,17 +979,29 @@ export function openPack(o: OpeningOptions) {
   }
 
   let closed = false;
-  function close(pick: EditionId | null) {
+  function close(next: EditionId | 'deck' | null) {
     if (closed) return;
     closed = true;
-    // The pack opened or watched now, if any (closing in the shop, or before the tear, leaves none).
-    const result = phase !== 'shop' && (opened || (replay && phase !== 'load')) ? pack : null;
+    clearTimeout(armTimer);
+    // What was opened or watched now: the listed packs, or this one (closing in the shop, or before the tear, leaves none).
+    const result = phase === 'all' ? listed : opened ? [pack] : [];
+    // Only what was not owned as the shop opened counts (a pack sealed again may hold some already).
+    const fresh = result.filter((p) => p.finishes.some((id) => !had.has(id)));
+    const added = fresh.reduce((k, p) => k + p.finishes.filter((id) => !had.has(id)).length, 0);
+    const note =
+      fresh.length === 1
+        ? t.intoDeck.replace('{name}', t.name[fresh[0].id]).replace('{n}', String(added))
+        : t.allDone.replace('{packs}', packsText(fresh.length)).replace('{n}', String(added));
     const fromHaul = phase === 'haul';
+    const fromList = phase === 'all';
     setPhase('closing');
-    if (pick) sfx.select(Math.max(0, pack.finishes.indexOf(pick)) + 3);
-    // From the haul, every card flies into the deck before the overlay goes.
-    const deck = fromHaul && !reduced ? o.deckRect?.() : undefined;
-    if (deck) {
+    if (next && next !== 'deck') sfx.select(Math.max(0, pack.finishes.indexOf(next)) + 3);
+    // From the haul, or the list unless the deck builder comes next, every card flies into the deck before the overlay goes.
+    const deck = (fromHaul || (fromList && !next)) && !reduced ? o.deckRect?.() : undefined;
+    if (deck && fromList) {
+      root.classList.add('is-to-deck');
+      flyList(deck);
+    } else if (deck) {
       root.classList.add('is-to-deck');
       cards.forEach((c, i) => {
         c.dealAt = 0;
@@ -800,11 +1020,12 @@ export function openPack(o: OpeningOptions) {
       removeEventListener('deviceorientation', onTilt);
       document.removeEventListener('keydown', onKey);
       removeEventListener('resize', layout);
+      removeEventListener('resize', relist);
       r.gl.getExtension('WEBGL_lose_context')?.loseContext();
       swirl.gl.getExtension('WEBGL_lose_context')?.loseContext();
       root.remove();
       o.pause(false);
-      o.onClose(result, pick);
+      o.onClose(next, added ? { n: added, note } : null);
     }, (reduced ? 120 : 220) + (deck ? 700 : 0));
   }
 
@@ -920,13 +1141,15 @@ export function openPack(o: OpeningOptions) {
   $('.pk-x').addEventListener('click', () => close(null));
   $('.pk-try').addEventListener('click', () => close(showpiece.id));
   $('.pk-close').addEventListener('click', () => close(null));
+  $('.pk-list-close').addEventListener('click', () => close(null));
+  $('.pk-list-deck').addEventListener('click', () => close('deck'));
   let keyboard = false;
   root.addEventListener('pointerdown', () => (keyboard = false), true);
   const onKey = (e: KeyboardEvent) => {
     keyboard = true;
     if (e.key === 'Escape') {
       e.preventDefault();
-      return phase === 'haul' || phase === 'shop' || phase === 'load' ? close(null) : skip();
+      return phase === 'haul' || phase === 'all' || phase === 'shop' || phase === 'load' ? close(null) : skip();
     }
     if (e.key === 'Tab') {
       // Keep focus inside the dialog.
@@ -958,6 +1181,7 @@ export function openPack(o: OpeningOptions) {
   // On the document, so keys still work when the focused button (Open) goes away.
   document.addEventListener('keydown', onKey);
   addEventListener('resize', layout);
+  addEventListener('resize', relist);
 
   // ---------- Frame ----------
 
@@ -1290,7 +1514,7 @@ export function openPack(o: OpeningOptions) {
     }
     const packDraws: (() => void)[] = [];
     if (shopFade > 0) drawShop();
-    if (pk.alpha > 0 && phase !== 'shop' && (phase !== 'load' || fromShop) && phase !== 'haul') {
+    if (pk.alpha > 0 && (phase === 'load' ? fromShop : !['shop', 'haul', 'all'].includes(phase)) && !listed.length) {
       const s = pk.s.x;
       const lean: [number, number] = [pk.ry.x / 0.3, pk.rx.x / 0.25];
       // The wrapper's finish follows the tilt; the pillow's light comes from the upper left and swings with it.

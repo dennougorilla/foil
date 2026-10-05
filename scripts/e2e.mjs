@@ -79,7 +79,7 @@ await step('nothing of a pack loads before one is opened', async () => {
   const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth/.test(n));
   expect(pack.length === 0, `loaded early: ${pack.join(', ')}`);
   expect((await page.locator('.hand-slot').count()) === 7, 'the hand does not start with seven');
-  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '4', 'the pack button does not count four sealed packs');
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', 'the pack button does not count five sealed packs');
   expect((await page.textContent('#deckBtn .deck-count')) === '0', 'the deck is not empty on a first visit');
 });
 
@@ -1000,7 +1000,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.click('#packsBtn');
   // The shop: every pack on the tray, the first sealed one chosen.
   await phase('shop');
-  expect((await page.locator('.pk-slot').count()) === 4, 'the shop does not show the four packs');
+  expect((await page.locator('.pk-slot').count()) === 5, 'the shop does not show the five theme packs');
   expect((await page.getAttribute('.pk-slot[data-pack=metal]', 'aria-checked')) === 'true', 'the first sealed pack is not the chosen one');
   await page.click('.pk-buy');
   await phase('pack');
@@ -1016,21 +1016,21 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.move(g.x + g.width * 0.5, g.y, { steps: 6 });
   await page.mouse.up();
   await page.waitForTimeout(500);
-  expect(!(await packsSaved())?.opened?.length, 'a trace stopped halfway opened the pack');
+  expect(!(await packsSaved())?.owned?.length, 'a trace stopped halfway opened the pack');
   await page.mouse.move(g.x + 4, g.y);
   await page.mouse.down();
   await page.mouse.move(g.x + g.width, g.y, { steps: 12 });
   await page.mouse.up();
   await phase('deck');
-  expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
-  for (const name of ['Relief', 'Gold', 'Platinum', 'Cosmo Holo']) {
+  expect((await packsSaved()).owned.join() === 'platinum,gold,relief,cosmoholo', 'the tear did not own the Metal finishes');
+  for (const name of ['Platinum', 'Gold', 'Relief']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
   await page.waitForSelector('.pk.is-waiting', { timeout: 10000 });
   expect((await page.textContent('.pk-label b')) === '？？？', 'the showpiece showed its name before it was turned over');
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Crystal', null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Cosmo Holo', null, { timeout: 15000 });
   // Under the card, top to bottom and never overlapping, even on a low screen: progress and tag,
   // name, line, next-step button.
   for (const [w, h] of [[1367, 664], [1440, 900]]) {
@@ -1045,10 +1045,10 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   }
   await page.keyboard.press('ArrowRight');
   await phase('haul');
-  expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
+  expect((await page.locator('.pk-name').count()) === 4, 'the haul does not show all four');
   await page.click('.pk-try');
   await overlayGone();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'cosmoholo', null, { timeout: 10000 });
   // The proof beside step 2 still copies finished frames once the stage draws again after the opening.
   await page.waitForTimeout(1500);
   const proofLit = await page.evaluate(() => {
@@ -1060,9 +1060,9 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   });
   expect(proofLit > 0.3, `the finish proof is blank after the opening (${(proofLit * 100).toFixed(0)}% lit)`);
   const hand = (await state()).hand;
-  expect(hand.includes('crystal') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
+  expect(hand.includes('cosmoholo') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
   expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck does not hold the other four Metal finishes and the swapped-out Glitch');
+  expect((await page.textContent('#deckBtn .deck-count')) === '4', 'the deck does not hold the other three Metal finishes and the swapped-out Glitch');
 });
 
 await step('the deck builder: one tap moves a card, a full hand gives up its last card, undo, drag, reset', async () => {
@@ -1076,20 +1076,20 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   // Out of the hand: its slot stays open, and the next card goes there.
   await page.click('.db-hand .db-card[data-id=holo]');
   expect((await count()) === '6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
-  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck count did not rise');
+  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck count did not rise');
   await page.click('.db-grid .db-card[data-id=relief]');
   expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
   // Full: the last card that is not Base gives way.
   await page.click('.db-grid .db-card[data-id=gold]');
   const full = await hand();
-  expect(full.length === 7 && full[6] === 'gold' && !full.includes('crystal'), `a full hand did not give up its last card: ${full}`);
+  expect(full.length === 7 && full[6] === 'gold' && !full.includes('cosmoholo'), `a full hand did not give up its last card: ${full}`);
   // The next tap swaps the card before it, not the card just added.
   await page.click('.db-grid .db-card[data-id=glitch]');
   const next = await hand();
   expect(next[5] === 'glitch' && next[6] === 'gold', `the next tap replaced the card just added: ${next}`);
   await page.click('.db-undo');
   await page.click('.db-undo');
-  expect((await hand()).includes('crystal') && !(await hand()).includes('gold'), 'undo did not step back');
+  expect((await hand()).includes('cosmoholo') && !(await hand()).includes('gold'), 'undo did not step back');
   // Base cannot leave.
   await page.click('.db-hand .db-card[data-id=base]');
   expect((await hand()).includes('base'), 'Base left the hand');
@@ -1159,17 +1159,17 @@ await step('held still, the pack opens with a button and the haul fades in', asy
   await page.click('.pk-name >> nth=0');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
-  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the deck does not hold both packs');
+  expect((await page.textContent('#deckBtn .deck-count')) === '8', 'the deck does not hold both packs');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 });
 
 await step('a support link puts the Supporter pack in the shop, and only then', async () => {
-  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '2', 'expected two sealed packs before the support link');
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '3', 'expected three sealed packs before the support link');
   await page.click('#supportBtn');
   const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
   await popup.close();
   await page.keyboard.press('Escape');
-  await page.waitForSelector('#packsBtn[data-sealed="3"]', { timeout: 5000 });
+  await page.waitForSelector('#packsBtn[data-sealed="4"]', { timeout: 5000 });
   expect((await packsSaved()).supporter === true, 'the support link was not remembered');
 });
 
@@ -1184,8 +1184,9 @@ await step('finishes unlocked by the old support links carry over as opened pack
   });
   await page.reload();
   await page.waitForTimeout(1500);
+  // The packs that held them then: Light, and the old Supporter pack (Opal, Raden, Confetti, Fireworks, Kintsugi).
   const saved = await packsSaved();
-  expect(saved.opened.join() === 'light,supporter' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
+  expect(saved.owned.join() === 'opal,raden,kintsugi,galaxy,aurora,glow,blacklight,shallows,confetti,fireworks' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
   expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
   const after = await state();
   expect(after.hand.length === 7 && after.hand.includes('shallows') && !('drawn' in after), `the drawn card did not move into the hand: ${after.hand}`);
@@ -1194,7 +1195,7 @@ await step('finishes unlocked by the old support links carry over as opened pack
 
 await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {
   await page.evaluate(() => {
-    localStorage.setItem('foil:packs', '{"opened":[],"supporter":false}');
+    localStorage.setItem('foil:packs', '{"owned":[],"supporter":false}');
     const s = JSON.parse(localStorage.getItem('foil:v1'));
     localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'magma', hand: ['base', 'magma', 'foil', 'holo', 'poly', 'negative', 'prism'] }));
   });
@@ -1203,6 +1204,124 @@ await step('a card on a finish whose pack is sealed goes back to Holographic', a
   const s = await state();
   expect(s.edition === 'holo' && !s.hand.includes('magma') && s.hand.includes('base'), `got ${s.edition} / ${s.hand}`);
   expect((await handCount()) === s.hand.length, 'the page hand does not match the saved hand');
+});
+
+await step('packs reorganized: a v0.13 save keeps every finish it had, a pack that gained one is sealed again, and the deck opens on one list', async () => {
+  // Opened up to v0.13: the old Nature pack (with Snow Globe) and the old Supporter pack (Opal, Raden, Confetti, Fireworks, Kintsugi).
+  await page.evaluate(() => {
+    localStorage.setItem('foil:packs', '{"opened":["nature","supporter"],"supporter":true}');
+    const s = JSON.parse(localStorage.getItem('foil:v1'));
+    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'raden', layer2: null, hand: ['base', 'opal', 'snowglobe', 'kintsugi', 'raden', 'holo', 'magma'] }));
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const s = await state();
+  expect(s.edition === 'raden' && s.hand.join() === 'base,opal,snowglobe,kintsugi,raden,holo,magma', `finishes were lost: ${s.edition} / ${s.hand}`);
+  const saved = await packsSaved();
+  expect(!('opened' in saved) && saved.owned.join() === 'opal,raden,kintsugi,sakura,frost,stardust,magma,confetti,snowglobe,fireworks', `not rewritten as owned finishes: ${JSON.stringify(saved)}`);
+  // Nature and the new Supporter pack are whole; Jewel lacks Crystal, so it is sealed with Metal, Light and Studio.
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '4', `sealed: ${await page.getAttribute('#packsBtn', 'data-sealed')}`);
+  await page.click('#packsBtn');
+  await phase('shop');
+  expect((await page.locator('.pk-slot').count()) === 6, 'the shop does not show six packs');
+  await page.click('.pk-slot[data-pack=jewel]', { force: true });
+  const note = await page.textContent('.pk-note');
+  expect(/have 3/.test(note) && /other 1/.test(note) && !(await page.textContent('.pk-buy')).includes('Watch'), `the Jewel pack does not say what it adds: ${note}`);
+  await page.click('.pk-slot[data-pack=supporter]', { force: true });
+  expect((await page.textContent('.pk-buy')).includes('Watch'), 'the whole Supporter pack is not opened');
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  // The deck builder opens on All: one list, the hand first in its order, then everything else.
+  await page.click('#deckBtn');
+  await page.waitForSelector('.dv.is-in', { timeout: 15000 });
+  expect((await page.getAttribute('.db-tab[data-tab=all]', 'aria-selected')) === 'true', 'the builder does not open on All');
+  expect((await page.locator('.db-grid h3').count()) === 0, 'All is broken up by pack');
+  // The cards shown, in the order they are laid out (the list's order, or a tab's CSS order).
+  const ids = () => page.$$eval('.db-grid .db-card', (els) => els.map((e, i) => [e, i]).filter(([e]) => e.offsetParent).sort(([a, i], [b, j]) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order) || i - j).map(([e]) => e.dataset.id));
+  const list = await ids();
+  expect(list.length === 17 && list.slice(0, 7).join() === s.hand.join(), `All does not start with the hand: ${list}`);
+  expect(list.slice(7, 12).join() === 'foil,poly,negative,prism,glitch', `the starters do not follow the hand: ${list}`);
+  // A pack's tab narrows it to that pack, in its own order.
+  await page.click('.db-tab[data-tab=nature]');
+  expect((await ids()).join() === 'sakura,frost,stardust,magma', `the Nature tab shows ${await ids()}`);
+  await page.click('.db-done');
+  await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
+});
+
+await step('Open all opens every sealed pack on the tray at once, lists them pack by pack and leads to the deck builder; the Supporter pack joins only once it is on the tray', async () => {
+  // Saved by v0.13 with the old Metal pack opened: Crystal is owned, so Jewel brings three.
+  await page.evaluate(() => localStorage.setItem('foil:packs', '{"opened":["metal"],"supporter":false}'));
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const handBefore = (await state()).hand.join();
+  await page.click('#packsBtn');
+  await phase('shop');
+  // The count leaves out the Supporter pack, which is not on the tray.
+  expect((await page.textContent('.pk-all small')) === '4 packs · no intros', `Open all does not count four sealed packs: ${await page.textContent('.pk-all small')}`);
+  // The first tap only arms it.
+  await page.click('.pk-all');
+  await page.waitForSelector('.pk-all.is-armed', { timeout: 3000 });
+  expect((await packsSaved()).owned.length === 5, 'the first tap opened packs');
+  await page.click('.pk-all');
+  await phase('all');
+  const saved = await packsSaved();
+  expect(saved.owned.length === 23 && saved.supporter === false, `saved ${JSON.stringify(saved)}`);
+  // One row per pack opened now, every finish in it, the showpiece in the middle with a star.
+  const rows = await page.$$eval('.pk-row', (els) => els.map((r) => [r.dataset.pack, [...r.querySelectorAll('.pk-swatch b')].map((b) => b.textContent), r.querySelector('.pk-swatch.is-showpiece b')?.textContent, r.querySelector('.pk-row-tag small').textContent, [...r.querySelectorAll('.pk-swatch.is-had b')].map((b) => b.textContent).join()]));
+  expect(rows.map((r) => r[0]).join() === 'jewel,light,nature,studio', `rows ${rows.map((r) => r[0])}`);
+  expect(rows.map((r) => r[1].length).join() === '4,5,4,6', `cards per row ${rows.map((r) => r[1].length)}`);
+  expect(rows.map((r) => r[2]).join() === 'Kintsugi,Shallows,Magma,Shadowbox', `showpieces ${rows.map((r) => r[2])}`);
+  expect(rows[1][1][2] === 'Shallows', `the showpiece is not in the middle: ${rows[1][1]}`);
+  // Crystal was owned already: in its place, marked, and not counted.
+  expect(rows[0][3] === '+3 new' && rows[0][4] === 'Crystal' && rows.slice(1).every((r) => !r[4]), `Jewel row: ${rows[0]}`);
+  expect(/^18 new finishes from 4 packs/.test(await page.textContent('.pk-list-title b')), `title: ${await page.textContent('.pk-list-title b')}`);
+  // The list draws no finish (nothing compiles for it).
+  expect((await page.locator('.pk-list canvas').count()) === 0, 'the list draws cards with WebGL');
+  await page.click('.pk-list-deck');
+  await overlayGone();
+  await page.waitForSelector('.dv.is-in', { timeout: 15000 });
+  expect((await page.locator('.db-grid .db-card').count()) === 30, `the deck builder shows ${await page.locator('.db-grid .db-card').count()} finishes, not 30`);
+  expect((await state()).hand.join() === handBefore, 'Open all changed the hand');
+  await page.click('.db-done');
+  await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
+  const deck30 = String(30 - (await state()).hand.length);
+  expect((await page.textContent('#deckBtn .deck-count')) === deck30, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck30}`);
+  // Nothing sealed: no Open all, and each pack can still be watched.
+  await page.click('#packsBtn');
+  await phase('shop');
+  expect(!(await page.isVisible('.pk-all')), 'Open all shows with nothing sealed');
+  await page.click('.pk-slot[data-pack=studio]', { force: true });
+  expect((await page.textContent('.pk-buy')).includes('Watch'), 'a pack opened with Open all does not offer a replay');
+  await page.click('.pk-buy');
+  await phase('pack');
+  await page.click('.pk-skip');
+  await phase('haul');
+  expect((await page.locator('.pk-name').count()) === 6, 'the replay does not show the six Studio finishes');
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  // A support link puts the Supporter pack on the tray; Open all then opens it alone.
+  await page.click('#supportBtn');
+  const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
+  await popup.close();
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#packsBtn[data-sealed="1"]', { timeout: 5000 });
+  await page.click('#packsBtn');
+  await phase('shop');
+  expect((await page.textContent('.pk-all small')) === '1 pack · no intros', `Open all does not count the Supporter pack: ${await page.textContent('.pk-all small')}`);
+  await page.click('.pk-all');
+  await page.click('.pk-all');
+  await phase('all');
+  expect((await page.$$eval('.pk-row', (els) => els.map((r) => r.dataset.pack).join())) === 'supporter', 'the list is not the Supporter pack alone');
+  await page.click('.pk-list-close');
+  await overlayGone();
+  const all = await packsSaved();
+  expect(all.owned.length === 26 && all.supporter === true, `saved ${JSON.stringify(all)}`);
+  const deck33 = String(33 - (await state()).hand.length);
+  expect((await page.textContent('#deckBtn .deck-count')) === deck33, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck33}`);
+  // Kept across a reload.
+  await page.reload();
+  await page.waitForTimeout(1500);
+  expect((await packsSaved()).owned.length === 26 && (await page.getAttribute('#packsBtn', 'data-sealed')) === '0', 'the packs opened with Open all were not kept');
 });
 
 await step('Confetti and Fireworks keep the message and the name, and their loops close', async () => {
@@ -1490,8 +1609,8 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
   await p.addInitScript(() => {
     if (sessionStorage.getItem('seeded')) return;
     localStorage.clear();
-    // The Supporter pack opened, with Raden and Opal in the hand.
-    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['supporter'], supporter: true }));
+    // The Jewel pack opened, with Raden and Opal in the hand.
+    localStorage.setItem('foil:packs', JSON.stringify({ owned: ['crystal', 'opal', 'raden', 'kintsugi'], supporter: false }));
     localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'raden', 'opal'] }));
     sessionStorage.setItem('seeded', '1');
   });

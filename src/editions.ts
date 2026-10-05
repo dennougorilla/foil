@@ -30,7 +30,7 @@ export type EditionId =
   | 'lenticularflip'
   | 'stardust'
   | 'snowglobe'
-  // Shaders in src/gl/finishes/supporter.ts
+  // Shaders in src/gl/finishes/jewel.ts and supporter.ts
   | 'kintsugi'
   | 'opal'
   | 'raden'
@@ -94,10 +94,11 @@ export const EDITIONS: Edition[] = [
   { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
   // Glitter particles on the GPU, see src/gl/snowglobe.ts.
   { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7, solo: true },
-  // Shaders in src/gl/finishes/supporter.ts.
+  // Shaders in src/gl/finishes/jewel.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
   { id: 'raden', shader: 43, color: '#b9a6ff', swirl: ['#07060a', '#2c1a3a', '#4fc0c8'], value: 8 },
+  // Shaders in src/gl/finishes/supporter.ts.
   { id: 'confetti', shader: 80, color: '#ffcf5a', swirl: ['#1a0f24', '#a8386a', '#e8b94e'], value: 8 },
   { id: 'fireworks', shader: 82, color: '#ffc24a', swirl: ['#04061a', '#1a2658', '#d89a3a'], value: 8, dither: true },
 ];

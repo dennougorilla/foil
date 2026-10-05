@@ -9,7 +9,8 @@ import './deckView.css';
 import { CardRenderer } from '../gl/renderers';
 import { loadPack } from '../gl/finishes/registry';
 import { editionById, type EditionId } from '../editions';
-import { addToHand, HAND_SIZE, packById, packOf, placeAt, removeFromHand, type PackId } from '../packs';
+import { addToHand, HAND_SIZE, packById, packOf, type PackId } from '../packs';
+import { placeAt, removeFromHand } from './rules';
 import type { Dict } from '../i18n';
 import { tuneGl, type Tune } from '../tune/model';
 import { contain } from '../card/shape';
@@ -123,30 +124,33 @@ export function viewDeck(o: DeckViewOptions) {
 
   // ---------- The grid: every card owned, built once ----------
 
+  // One list, no breaks between packs: under All, the hand as it was when the builder opened, then
+  // everything else by family (the starters, then each pack's); a pack's tab shows its cards in its
+  // own order. The order is set once, so a card never jumps away from the finger as it is moved.
+  const all = [...o.hand, ...o.owned.flatMap((g) => g.finishes).filter((id) => !o.hand.includes(id))];
+  const row = document.createElement('div');
+  row.className = 'db-row';
+  gridEl.append(row);
   const gridCards = new Map<EditionId, HTMLButtonElement>();
   for (const g of o.owned) {
-    const sec = document.createElement('section');
-    sec.className = 'dv-group';
-    sec.dataset.group = g.group;
     const colors = g.group === 'open' ? ['#9fb0b3', '#5b6d73'] : [packById(g.group).colors[2], packById(g.group).colors[1]];
-    sec.style.setProperty('--c', colors[0]);
-    sec.style.setProperty('--b', colors[1]);
-    sec.innerHTML = `<h3><i aria-hidden="true"></i>${g.group === 'open' ? t.deckStarters : t.title.replace('{name}', t.name[g.group])}</h3><div class="db-row"></div>`;
-    const row = sec.querySelector('.db-row')!;
-    for (const id of g.finishes) {
+    g.finishes.forEach((id, i) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'db-card';
       b.dataset.id = id;
-      b.innerHTML = `<span class="db-pic" data-id="${id}"></span><b>${o.dict.edition[id]}</b><span class="db-tag">${t.inHandTag}</span>`;
-      b.title = o.dict.look[id];
+      b.dataset.group = g.group;
+      b.dataset.order = String(i);
+      b.style.setProperty('--c', colors[0]);
+      b.style.setProperty('--b', colors[1]);
+      b.innerHTML = `<span class="db-pic" data-id="${id}"></span><b><i class="db-pip" aria-hidden="true"></i>${o.dict.edition[id]}</b><span class="db-tag">${t.inHandTag}</span>`;
+      b.title = `${o.dict.look[id]} (${g.group === 'open' ? t.deckStarters : t.title.replace('{name}', t.name[g.group])})`;
       b.addEventListener('click', () => !dragged && tapGrid(id));
       b.addEventListener('pointerdown', (e) => startDrag(e, id, 'grid'));
       gridCards.set(id, b);
-      row.append(b);
-    }
-    gridEl.append(sec);
+    });
   }
+  for (const id of all) row.append(gridCards.get(id)!);
   if (o.owned.length === 1) {
     const more = document.createElement('div');
     more.className = 'db-more';
@@ -222,7 +226,10 @@ export function viewDeck(o: DeckViewOptions) {
     $<HTMLButtonElement>('.db-undo').disabled = !history.length;
     $<HTMLButtonElement>('.db-reset').disabled = hand.join() === o.starters.join();
     for (const b of root.querySelectorAll<HTMLElement>('.db-tab')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
-    for (const s of root.querySelectorAll<HTMLElement>('.dv-group')) s.hidden = tab !== 'all' && s.dataset.group !== tab;
+    for (const b of gridCards.values()) {
+      b.hidden = tab !== 'all' && b.dataset.group !== tab;
+      b.style.order = tab === 'all' ? '' : b.dataset.order!;
+    }
     paint();
   }
 
