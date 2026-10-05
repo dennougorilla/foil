@@ -156,8 +156,6 @@ export interface CardDraw {
   uv?: [number, number, number, number];
   /** Blacklight's lamp power, 0..1; full when absent. */
   lamp?: number;
-  /** Where Plasma's lightning reaches (card uv) and how firmly it is held there (0..1); at the light, half held, when absent. */
-  aim?: [number, number, number];
   /** There is a room round this card to throw light into (the stage, a file's backdrop): Mirror Ball's spots. */
   room?: boolean;
   /** Layer 2, drawn over the card in its own area (docs/layering.md); none when absent. */
@@ -443,8 +441,6 @@ export class CardRenderer {
     gl.uniform1f(p.u.uPlate, d.plate === false ? 0 : 1);
     gl.uniform1f(p.u.uLoop, d.loop ?? 0);
     gl.uniform1f(p.u.uUvLamp, d.lamp ?? 1);
-    const aim = d.aim ?? [d.light[0], d.light[1], 0.5];
-    gl.uniform3f(p.u.uPlasmaAim, aim[0], aim[1], aim[2]);
     gl.uniform1f(p.u.uLayer, layer ? 1 : 0);
     gl.uniform1f(p.u.uLayerK, layer?.strength ?? 1);
     gl.uniform1f(p.u.uBlend, layer?.light ? 1 : 0);

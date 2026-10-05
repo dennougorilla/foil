@@ -44,8 +44,8 @@ test('five theme packs and the supporter pack of celebrations, showpiece last', 
     nature: ['sakura', 'frost', 'stardust', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
     supporter: ['confetti', 'snowglobe', 'fireworks'],
-    // Provisional, for review: the nine finishes added after v0.14 until the owner places them.
-    lab: ['chameleon', 'neon', 'rain', 'plasma', 'liquidmetal', 'kaleidoscope', 'marble', 'mirrorball', 'engraving'],
+    // Provisional, for review: the finishes added after v0.14 until the owner places them.
+    lab: ['chameleon', 'neon', 'rain', 'liquidmetal', 'marble', 'mirrorball', 'engraving'],
   });
   assert.deepEqual(PACKS.filter((p) => p.supporter).map((p) => p.id), ['supporter']);
   // No theme pack is lopsided: four to six each (the provisional Lab pack aside).

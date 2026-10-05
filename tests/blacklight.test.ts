@@ -11,7 +11,7 @@ test('Blacklight is a pack finish on shader 72 whose light is a lamp', () => {
   const ed = EDITIONS.find((e) => e.id === 'blacklight');
   assert.ok(ed, 'no Blacklight edition');
   assert.equal(ed.shader, 72);
-  assert.equal(ed.torch, 'uv');
+  assert.equal(ed.torch, true);
   assert.ok(!OPEN_EDITIONS.includes('blacklight'), 'Blacklight must not be in the hand from the start');
   assert.equal(EDITIONS.filter((e) => e.shader === 72).length, 1);
 });

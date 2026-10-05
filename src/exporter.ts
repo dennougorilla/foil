@@ -11,7 +11,7 @@ import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
-import { PLASMA_STILL, plasmaFinger, TORCH_DRIFT, TORCH_IDLE, TORCH_STILL, torchAt } from './gl/torch';
+import { TORCH_DRIFT, TORCH_IDLE, TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
 import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
@@ -108,8 +108,6 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
       pixel: input.pixel,
       // A finish that reacts to touch shows a swipe made for this picture, caught while it still shows.
       heat: input.edition.touch ? autoTouch(input.face, input.edition.touch) : undefined,
-      // Plasma's lightning gathers on a finger held on the art.
-      aim: input.edition.torch === 'plasma' ? PLASMA_STILL : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
       // except on Flip Lenticular, where a nudge could land between its two pictures.
       ...(input.edition.id === 'lenticularflip' ? { tilt, light } : stillPose(tilt, light)),
@@ -220,9 +218,6 @@ export async function createScene(input: ExportInput, W0: number, H0: number, re
           // Blacklight's lamp drifts round the art, as dim as on the stage left alone (unless the tune fixes the light).
           light: lampLights(tune, torch) ? torchAt(time / TORCH_DRIFT) : light,
           lamp: torch ? TORCH_IDLE : undefined,
-          // Plasma's lightning wanders as on the stage, and an unseen finger touches the card once per loop
-          // (held down in a still loop).
-          aim: input.edition.torch === 'plasma' ? (tune.speed > 0 ? plasmaFinger(time / TORCH_DRIFT) : PLASMA_STILL) : undefined,
           alpha: 1,
           flash: pose.flash,
           glint: pose.glint,

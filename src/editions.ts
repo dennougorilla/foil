@@ -1,6 +1,5 @@
 import type { TouchKind } from './touch/heat';
 import type { RangeRegion } from './featureState';
-import type { TorchKind } from './gl/torch';
 
 export type EditionId =
   | 'base'
@@ -30,7 +29,6 @@ export type EditionId =
   | 'glow'
   | 'blacklight'
   | 'neon'
-  | 'plasma'
   | 'mirrorball'
   | 'lenticular3d'
   | 'lenticularflip'
@@ -38,7 +36,6 @@ export type EditionId =
   | 'snowglobe'
   | 'rain'
   | 'liquidmetal'
-  | 'kaleidoscope'
   | 'marble'
   // Shaders in src/gl/finishes/jewel.ts and supporter.ts
   | 'kintsugi'
@@ -61,11 +58,10 @@ export interface Edition {
   /** Reacts to touch: drags on the card stroke it instead of tossing it, and it carries a field of this kind. */
   touch?: TouchKind;
   /**
-   * Its light is a lamp (Blacklight's ultraviolet one, or the spot Plasma's lightning reaches for):
-   * it sits exactly under the pointer, drifts slowly by itself otherwise, and a drag on the card
-   * moves it instead of tossing the card.
+   * Its light is an ultraviolet lamp: it sits exactly under the pointer, drifts slowly by itself
+   * otherwise, and a drag on the card moves it instead of tossing the card.
    */
-  torch?: TorchKind;
+  torch?: boolean;
   /** Reads the picture's depth (src/depth), so choosing it starts the depth model. */
   depth?: boolean;
   /** Needs the card to itself (a second picture, particles over the art), like touch, torch and depth finishes. */
@@ -102,11 +98,9 @@ export const EDITIONS: Edition[] = [
   { id: 'stainedglass', shader: 26, color: '#e8a33c', swirl: ['#0a0710', '#3a1f4a', '#c0532e'], value: 6 },
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
   // Shader in src/gl/blacklight.ts.
-  { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: 'uv' },
+  { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
   // Shader in src/gl/neon.ts.
   { id: 'neon', shader: 92, color: '#ff4fc8', swirl: ['#05030d', '#2a0c46', '#16b8d8'], value: 7, dither: true },
-  // Shader in src/gl/plasma.ts.
-  { id: 'plasma', shader: 96, color: '#d36bff', swirl: ['#08031a', '#3c1478', '#ff5ccf'], value: 7, dither: true, torch: 'plasma' },
   // Shader and the spots it throws round the stage in src/gl/mirrorball.ts.
   { id: 'mirrorball', shader: 104, color: '#e6ecf5', swirl: ['#07060f', '#2a2350', '#b86fd0'], value: 7 },
   // Shader in src/gl/lenticular3d.ts.
@@ -119,8 +113,6 @@ export const EDITIONS: Edition[] = [
   { id: 'rain', shader: 94, color: '#a9c6d8', swirl: ['#0a1018', '#2a4152', '#8fb0c4'], value: 7, dither: true, touch: 'rain' },
   // Shader in src/gl/liquidMetal.ts; its ripples are a touch field (src/touch/heat.ts).
   { id: 'liquidmetal', shader: 98, color: '#d4dde8', swirl: ['#07090d', '#323c4a', '#c3cfdc'], value: 7, dither: true, touch: 'liquid' },
-  // Shader in src/gl/kaleidoscope.ts.
-  { id: 'kaleidoscope', shader: 100, color: '#f2c879', swirl: ['#0b0a1a', '#3a2a6e', '#e8a85a'], value: 6 },
   // Shader in src/gl/marble.ts.
   { id: 'marble', shader: 102, color: '#7f95c8', swirl: ['#07080d', '#1f2b4a', '#c9b79a'], value: 7, dither: true, touch: 'marble' },
   // Shaders in src/gl/finishes/jewel.ts.

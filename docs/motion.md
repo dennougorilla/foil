@@ -22,9 +22,6 @@ version of any motion and no export-only motion.
 - Blacklight's lamp drifts round the art in six seconds and glows dimmer while nobody holds it, on the
   stage and in a file alike; under the pointer it turns up to full. Under a Light motion the lamp is
   the light whatever the light setting; otherwise a fixed light holds it still.
-- Plasma's lightning wanders on the same six-second clock, on the stage and in a file alike, and
-  reaches for the pointer while you point at the card. A file has no pointer, so an unseen finger
-  touches the card once per loop and slides across the art: the lightning gathers on it and lets go.
 - Reduced motion stops the motion and the backdrop on the stage (the card faces you); exports still move.
 
 ## Groups and loop lengths
@@ -56,7 +53,7 @@ divides it (speed 2 halves it) on the stage and in the file alike.
 | | ぴょん | Bounce | Hops, lands with a thud, then hops the other way | 6 s |
 
 - A loop is 6 seconds (at speed 1) whenever something else in it goes round in 6: the orbiting light
-  (except under the Light motions, which bring their own light) Blacklight's drifting lamp and Plasma's lightning. The
+  (except under the Light motions, which bring their own light) and Blacklight's drifting lamp. The
   lengths above all divide 6, so the stage and the file stay in step.
 - At speed 0 nothing moves on its own: the stage holds still and an export is a still loop (an
   animated picture's own timing, or 2.4 s).

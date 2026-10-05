@@ -1,13 +1,11 @@
-// Lab pack (provisional, review-v015): the nine finishes added after v0.14, gathered in one pack so
+// Lab pack (provisional, review-v015): the finishes added after v0.14, gathered in one pack so
 // they can be tried together. Where each one finally goes is the owner's call. See docs/packs.md.
 import { CHAMELEON_GLSL } from '../chameleon';
 import { NEON_GLSL } from '../neon';
 import { RAIN_GLSL } from '../rain';
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { HeatLayer } from '../../touch/layer';
-import { PLASMA_GLSL } from '../plasma';
 import { LIQUID_METAL_GLSL, LiquidMetalLayer } from '../liquidMetal';
-import { KALEIDOSCOPE_GLSL } from '../kaleidoscope';
 import { MARBLE_GLSL } from '../marble';
 import { MIRRORBALL_GLSL, MIRRORBALL_SHADER } from '../mirrorball';
 import { MirrorRoom } from '../mirrorRoom';
@@ -20,9 +18,7 @@ ${CHAMELEON_GLSL}
 ${NEON_GLSL}
 ${TOUCH_GLSL}
 ${RAIN_GLSL}
-${PLASMA_GLSL}
 ${LIQUID_METAL_GLSL}
-${KALEIDOSCOPE_GLSL}
 ${MARBLE_GLSL}
 ${MIRRORBALL_GLSL}
 ${ENGRAVING_GLSL}
@@ -31,9 +27,7 @@ ${ENGRAVING_GLSL}
   else if (e == 90) col = chameleon(c, uv, uTilt, L, m.r);
   else if (e == 92) col = neon(c, uv, uTilt, L, m.r);
   else if (e == 94) col = rain(c, uv, uTilt, lod, m.r);
-  else if (e == 96) col = plasma(c, uv, L);
   else if (e == 98) col = liquidMetal(c, uv, uTilt, L, lod, m.r);
-  else if (e == 100) col = kaleidoscope(c, uv, uTilt, lod, m.r);
   else if (e == 102) col = marble(c, uv, uTilt, L, m.r);
   else if (e == 104) col = mirrorball(c, uv, artUv, uTilt, lod, m.r);
   else if (e == 106) col = engraving(c, uv, uTilt, L, lod, m);

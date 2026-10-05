@@ -14,20 +14,22 @@ the new finishes finally go is the owner's call.
 4. `foil-frameless` (#45): the picture as the whole card.
 5. `foil-pixelart` (#46): pixel art over the whole card (replaces the Pixelate slider).
 6. `foil-samples`: seven samples.
-7. The nine new finishes: `foil-chameleon` (90), `foil-neon` (92), `foil-rain` (94), `foil-plasma`
-   (96), `foil-liquidmetal` (98), `foil-kaleido` (100), `foil-marble` (102), `foil-mirrorball`
-   (104), `foil-engraving` (106).
+7. The new finishes: `foil-chameleon` (90), `foil-neon` (92), `foil-rain` (94), `foil-liquidmetal`
+   (98), `foil-marble` (102), `foil-mirrorball` (104), `foil-engraving` (106).
+   `foil-plasma` (96) and `foil-kaleido` (100) were merged and then taken out again by hand (one
+   commit), as the owner dropped both: their editions, shaders, texts, tests and docs are gone, and
+   the torch is a boolean again (Plasma had made it `'uv' | 'plasma'`).
 
 ## Decisions on conflicts
 
 - **Packs:** `foil-openall`'s packs are kept as they are. Each finish branch put its finish in a
-  pack of the old layout (Metal, Light, Nature); instead all nine go to a new provisional pack,
+  pack of the old layout (Metal, Light, Nature); instead all seven go to a new provisional pack,
   **Lab / ラボ (試作)** (`src/gl/finishes/lab.ts`, `lab` in `PACKS`, after Supporter on the shelf,
   wrapped in Holographic with the Light pack's star art in teal). The theme packs' modules are
   unchanged. Tests that said "in the Metal / Light / Nature pack" now say Lab; `tests/lab.test.ts`
   checks that shader numbers are unique, that `lab.ts` dispatches exactly the Lab finishes, that
   their own uniforms are declared nowhere else, and that the Lab layers' texture units are free.
-- **One program for nine finishes:** the touch field's GLSL (`TOUCH_GLSL`, `uHeat`/`uPrints`) is
+- **One program for seven finishes:** the touch field's GLSL (`TOUCH_GLSL`, `uHeat`/`uPrints`) is
   spliced once. Rainy Window reads the heat on unit 6; Liquid Metal's ripples (`uLmField`) moved
   from unit 6 to 10 and Marble's flow (`uMarbleFlow`) to 11, so no two samplers share a unit.
   Mirror Ball's room of spots is a Lab layer.
@@ -35,8 +37,7 @@ the new finishes finally go is the owner's call.
   field, `calm` under reduced motion) and Marble (`marble`, two channels, `moves`) all kept; the
   stage sets `calm` and skips stepping a field that `moves` under reduced motion.
 - **Core shader:** the frame-in-full list and the glare tweaks of every branch are kept together
-  (90, 92, 96, 98, 106 cover the frame; 70 and 92 get the dim glare; 90 a softer one).
-- **Torch:** Plasma's `torch: 'uv' | 'plasma'` replaces the boolean; Blacklight is `'uv'`.
+  (90, 92, 98, 106 cover the frame; 70 and 92 get the dim glare; 90 a softer one).
 - **Export and backdrops:** v0.14 has no PNG and adds MP4; the backdrop branch replaced
   `gifClear` with the Clear backdrop. Merged: `createScene` is async and draws the card's backdrop
   for GIF, APNG and MP4 (the MP4 keeps v0.14's coarser pixel scale); Clear makes a GIF or APNG
@@ -48,7 +49,7 @@ the new finishes finally go is the owner's call.
   backdrop. The glossary gains Backdrop and Pixel art and loses PNG.
 - **Frameless × samples:** the crisp-pixel check reads samples through `sampleImg`, since the
   card samples load later.
-- **Counts:** 42 finishes, seven in the hand and 35 in seven packs (README, features, the page's
+- **Counts:** 40 finishes, seven in the hand and 33 in seven packs (README, features, the page's
   meta descriptions, which also now say GIF, APNG or MP4).
 - **e2e:** not run (by request). The finish branches' edits to `scripts/e2e.mjs` were not taken; the
   e2e script is v0.14's plus the earlier branches' and needs a pass for the Lab pack.
@@ -57,5 +58,5 @@ the new finishes finally go is the owner's call.
 ## For the review build only
 
 `index.html` gets an uncommitted script that marks every pack finish owned and the Supporter
-pack shown, so all 42 finishes are in the hand or the deck from the first visit. It is not
+pack shown, so all 40 finishes are in the hand or the deck from the first visit. It is not
 committed.

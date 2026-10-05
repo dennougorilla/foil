@@ -35,7 +35,7 @@ const editions = [
   ...['sakura', 'frost', 'stardust', 'magma'],
   ...['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
   ...['confetti', 'snowglobe', 'fireworks'],
-  ...['chameleon', 'neon', 'rain', 'plasma', 'liquidmetal', 'kaleidoscope', 'marble', 'mirrorball', 'engraving'],
+  ...['chameleon', 'neon', 'rain', 'liquidmetal', 'marble', 'mirrorball', 'engraving'],
 ];
 const errors = [];
 
