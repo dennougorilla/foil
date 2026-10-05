@@ -1420,7 +1420,7 @@ function celebrate(file: string) {
   void saveBtn.offsetWidth;
   saveBtn.classList.add('is-saved');
   // Save keeps its name (it can be pressed again); its note says what was written.
-  saveBtn.querySelector('.btn-text small')!.textContent = `${t.savedShort}: ${file}`;
+  saveBtn.querySelector('.btn-text small')!.textContent = t.savedShort.replace('{file}', file);
   $('seal').textContent = t.sealDone;
   clearTimeout(celebrateTimer);
   celebrateTimer = window.setTimeout(() => {
