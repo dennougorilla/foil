@@ -10,7 +10,7 @@ const N = RANGE_W * RANGE_H;
 const UNDO_DEPTH = 24;
 const SOFTNESS = 0.06;
 
-interface Layers {
+export interface Layers {
   add: Uint8Array;
   erase: Uint8Array;
 }

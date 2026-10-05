@@ -1,7 +1,7 @@
 // Where each layer's finish lands on the live card: the region, the brightness band and the brush
 // strokes, turned into the stage's range textures. This is the part the first view needs; the Layers
 // tab that edits it (rangePanel.ts) loads with Fine-tune and plugs in through `attach`.
-import { Paint, RangeModel } from './range';
+import { Paint, RangeModel, type Layers } from './range';
 import type { Area } from './editions';
 import type { FaceSpec } from './card/face';
 import type { RangeSnapshot } from './gl/range';
@@ -125,6 +125,15 @@ export function initAreas(host: AreasHost) {
     attach(next: AreasUi) {
       ui = next;
       if (last) ui.faced(...last, true);
+      push();
+    },
+    /** A kept card's strokes (layer 1, layer 2) take the place of these; none leaves no strokes. Undo starts afresh. */
+    restore(brush: Layers[] | null) {
+      paints.forEach((p, i) => {
+        p.reset();
+        if (brush) p.layers = brush[i];
+        void p.save();
+      });
       push();
     },
     /** What the exporter needs to put the finish in the same place. */
