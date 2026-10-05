@@ -17,3 +17,13 @@ test('Engraving draws with shader 106 in the Lab pack (provisional)', async () =
   assert.equal(EDITIONS.find((x) => x.id === 'engraving')?.shader, 106);
   assert.equal(packOf('engraving')?.id, 'lab');
 });
+
+test('Engraving casts no soft glare: its polished plate mirrors its own window strip instead', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/gl/shaders.ts', import.meta.url), 'utf8');
+  assert.match(src, /if \(e == 72 \|\| e == 106\) \{/);
+});
+
+test('Engraving GIFs are not dithered: its copper is one ramp that fits 256 colours, and dither noise on fine lines only adds bytes', () => {
+  assert.equal(EDITIONS.find((x) => x.id === 'engraving')?.dither, undefined);
+});

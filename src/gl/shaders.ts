@@ -328,8 +328,9 @@ void main() {
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
-  if (e == 72) {
-    // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
+  if (e == 72 || e == 106) {
+    // An ultraviolet lamp casts no white glare; its beam is drawn by the finish. Engraving's polished
+    // plate mirrors its own window strip instead of a soft glare.
   } else if (e != 0) {
     float d = length((uv - uLight) * uCardK);
     // Glow's and Neon's rooms are dim, so only a faint glare reaches them.

@@ -91,7 +91,7 @@ export const EDITIONS: Edition[] = [
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
   { id: 'platinum', shader: 24, color: '#dfe6ee', swirl: ['#0a0d12', '#2b3440', '#aeb9c6'], value: 7, dither: true },
   // Shader in src/gl/engraving.ts.
-  { id: 'engraving', shader: 106, color: '#d98a54', swirl: ['#140a06', '#6e3a1c', '#e0a070'], value: 7, dither: true },
+  { id: 'engraving', shader: 106, color: '#d98a54', swirl: ['#140a06', '#6e3a1c', '#e0a070'], value: 7 },
   { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
   // Shader in src/gl/chameleon.ts.
   { id: 'chameleon', shader: 90, color: '#7fd6a0', swirl: ['#0c0718', '#3a1f6e', '#2f9a74'], value: 7, dither: true },

@@ -237,7 +237,7 @@ const en: Dict = {
     shadowbox: 'The picture as paper-cut layers, set deep in a box',
     shallows: 'Sunlight netting a pool floor, fraying into spectrum',
     platinum: 'Hairline-brushed platinum; a streak of light runs as you tilt',
-    engraving: 'Fine engraved lines on a copper plate; the grooves flash as you tilt',
+    engraving: 'Fine engraved lines on a polished copper plate; the cuts catch the light as you tilt',
     cosmoholo: 'Rows of foil circles and stars that flash rainbow as it tilts',
     chameleon: 'Color-shift car paint: violet, green and gold flow over it as it tilts',
     stainedglass: 'The picture set in leaded glass, lit from behind',
