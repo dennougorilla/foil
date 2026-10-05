@@ -30,7 +30,7 @@ const shots = [
 const editions = [
   ...['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
   ...['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
-  ...['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
+  ...['galaxy', 'aurora', 'glow', 'blacklight', 'neon', 'shallows'],
   ...['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
   ...['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
   ...['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],

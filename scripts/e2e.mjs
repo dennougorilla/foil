@@ -1563,6 +1563,93 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
   await still.close();
 });
 
+await step('Neon lights the outlines in a dark room, keeps the picture, and its loop closes', async () => {
+  const r = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('light');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    // A mid-pink disc and a grey square on a dark ground: nothing in it is near white.
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    x.fillStyle = '#1c1c2a';
+    x.fillRect(0, 0, 600, 800);
+    x.fillStyle = '#b8406e';
+    x.beginPath();
+    x.arc(300, 330, 170, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = '#6a6a72';
+    x.fillRect(170, 560, 260, 150);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = mask.width = back.width = 900;
+    face.height = mask.height = back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Neon', shape: 'card', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
+    drawBack(back, 'card');
+    const W = 360;
+    const H = 450;
+    const cw = (320 * 5) / 7;
+    const box = (u0, v0, u1, v1) => [Math.round(W / 2 + (u0 - 0.5) * cw), Math.round(H / 2 + (v0 - 0.5) * 320), Math.round(W / 2 + (u1 - 0.5) * cw), Math.round(H / 2 + (v1 - 0.5) * 320)];
+    const ART = box(0.1, 0.08, 0.9, 0.85);
+    const grab = (intensity, ps) => {
+      const s = createScene({ face, mask, back, edition: editionById('neon'), intensity, pixel: 0, name: 't', tune: { ...TUNE_DEFAULTS, idle: 'none' } }, W, H, true, true, false);
+      const out = ps.map((p) => {
+        s.draw(p, 40);
+        return s.ctx.getImageData(0, 0, W, H).data;
+      });
+      s.dispose();
+      return out;
+    };
+    const lumas = (d, [x0, y0, x1, y1]) => {
+      const v = [];
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = (y * W + x) * 4;
+        v.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      }
+      return v;
+    };
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sd = (v) => Math.sqrt(mean(v.map((a) => (a - mean(v)) ** 2)));
+    const corr = (a, b) => {
+      const ma = mean(a);
+      const mb = mean(b);
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += (a[i] - ma) * (b[i] - mb);
+      return n / a.length / (sd(a) * sd(b));
+    };
+    const diff = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += Math.abs(a[i] - b[i]);
+      return n / a.length;
+    };
+    const [plain] = grab(0, [0]);
+    const [p0, p1] = grab(1, [0, 1]);
+    const a = lumas(p0, ART);
+    const b = lumas(plain, ART);
+    // The middle of the disc, far from any outline: the dimmed wall.
+    const wall = (d) => mean(lumas(d, box(0.47, 0.36, 0.53, 0.4)));
+    return {
+      tubes: a.filter((v) => v > 200).length / a.length,
+      plainBright: b.filter((v) => v > 200).length / b.length,
+      dim: wall(p0) / wall(plain),
+      keep: corr(a, b),
+      seam: diff(p0, p1),
+    };
+  });
+  const f = (v) => v.toFixed(3);
+  console.log(`  neon tubes ${f(r.tubes)} dim ${f(r.dim)} keep ${f(r.keep)} seam ${f(r.seam)}`);
+  expect(r.plainBright === 0, `the test picture should have no near-white pixels (${f(r.plainBright)})`);
+  expect(r.tubes > 0.01, `Neon draws no white-hot tubes along the outlines (${f(r.tubes)})`);
+  expect(r.dim < 0.75, `Neon does not dim the room (${f(r.dim)})`);
+  expect(r.keep > 0.4, `Neon loses the picture (${f(r.keep)})`);
+  expect(r.seam < 0.6, `Neon jumps where its loop closes (${f(r.seam)})`);
+});
+
 // Last, as it reloads the page.
 await step('a motion picked for exports in v0.13.0 becomes the card motion, and Save names it', async () => {
   const saved = await page.evaluate(() => localStorage.getItem('foil:v1'));

@@ -56,7 +56,7 @@ Metal, not Relief, which is subtle until it is tilted).
 | Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish |
 |---|---|---|---|
 | `metal` Metal & Gem | 金属 | Relief → Gold → Platinum → Cosmo Holo → **Crystal** | Gold |
-| `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic |
+| `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → Neon → **Shallows** | Holographic |
 | `nature` Nature | 自然 | Sakura → Frost → Stardust → Snow Globe → **Magma** | Sakura |
 | `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone |
 | `supporter` Supporter | サポーター限定 | Opal → Raden → Confetti → Fireworks → **Kintsugi** | Opal (rainbow on a silver-white body) |
@@ -65,9 +65,13 @@ Where the finishes added in v0.11 went, and why: Platinum is a metal, and Cosmo 
 metal foil, so both join Metal (Crystal stays its showpiece). Glow (glow-in-the-dark ink) and
 Blacklight (a UV lamp) are about a source of light, so they join Light. Stardust (star dust) and
 Snow Globe (glitter swirling in liquid) are sky and weather, so Nature. Stained Glass and the two
-lenticular prints are crafts of the print shop, so Studio, which is the one pack of six. Confetti
+lenticular prints are crafts of the print shop, so Studio, a pack of six. Confetti
 and Fireworks are celebration finishes for the Supporter pack. Packs stay at five or six finishes
 each; a haul draws at most six cards at once (see the frame budget below).
+
+Neon (glowing gas tubes) is a source of light too, so it joins Light, which becomes a pack
+of six; Shallows stays the showpiece and Neon is the rare card before it. (Where packs end up is
+being reworked separately; this is its place until then.)
 
 Why not a separate 和 (Japanese) pack: today only Sakura would be in it (Kintsugi and Raden are
 supporter finishes), and a one-card pack has no build-up. Sakura sits with the other seasons and

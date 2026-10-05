@@ -338,7 +338,7 @@ void main() {
   if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82 || e == 92) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art, Neon's room is dark all over)
   if (uLayer > 0.5) amt = uIntensity; // layer 2 often lies on the frame: in full there too
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
@@ -363,8 +363,8 @@ void main() {
     // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
   } else if (e != 0) {
     float d = length((uv - uLight) * uCardK);
-    // Glow's room is dim, so only a faint glare reaches it.
-    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0)) * (1.0 - 0.6 * uSpot.y); // a spot lights the foil, not a glare
+    // Glow's and Neon's rooms are dim, so only a faint glare reaches them.
+    spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 || e == 92 ? 0.35 : 1.0)) * (1.0 - 0.6 * uSpot.y); // a spot lights the foil, not a glare
     if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
   } else {
     float d = length((uv - uLight) * uCardK);
