@@ -1,6 +1,5 @@
 // The samples, so the first card looks good before any upload: three procedurally painted pixel-art
-// scenes here, and four cards (a Joker and three game cards) that come with their own chunk.
-import type { Lang } from './i18n';
+// scenes here, and five illustrations (sampleArt.ts) that come with their own chunk.
 
 const W = 72;
 const H = 96;
@@ -114,9 +113,11 @@ export function paintSample(index: number): HTMLCanvasElement {
   return big;
 }
 
-/** The scenes painted up front; the card samples follow them. */
+/** The scenes painted up front; the illustrations follow them. */
 export const SCENES = PAINTERS.length;
-export const SAMPLE_COUNT = SCENES + 4;
+/** How many illustrations sampleArt.ts paints (its ART_SAMPLES; tests/sample-art.test.ts keeps them equal). */
+export const ARTS = 5;
+export const SAMPLE_COUNT = SCENES + ARTS;
 
-/** The card samples (indices SCENES and up), painted in a language. */
-export const loadCardSamples = (lang: Lang) => import('./sampleCards').then((m) => m.paintCards(lang));
+/** The illustrations (indices SCENES and up). */
+export const loadArtSamples = () => import('./sampleArt').then((m) => m.paintArt());
