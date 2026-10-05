@@ -28,7 +28,7 @@ test('level 0 is full quality and every later level draws less', () => {
     assert.ok(b.bg >= a.bg);
     assert.ok(b.sparks <= a.sparks);
     assert.ok(b.still || !a.still, 'a lower level never moves more');
-    assert.ok(!b.crt || a.crt, 'a lower level never adds the CRT lines back');
+    assert.ok(!b.crt || a.crt, 'a lower level never adds the CRT filter back');
   }
 });
 

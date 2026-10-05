@@ -328,7 +328,7 @@ function applyText() {
   $('langBtn').textContent = t.lang;
   $('langBtn').setAttribute('aria-label', t.langLabel);
   $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
-  $('crtBtn').setAttribute('aria-label', s.crt ? t.crtOn : t.crtOff);
+  $('crtBtn').setAttribute('aria-label', s.crtFilter ? t.crtOn : t.crtOff);
   $('cardSlot').setAttribute('aria-label', t.stageLabel);
   document.querySelectorAll('.support-link').forEach((a) => a.setAttribute('title', t.supportOpen));
   $('creditLink').title = t.creditLink;
@@ -757,8 +757,8 @@ function syncInputs() {
   // The way back only shows once there is something to go back from.
   $('cropReset').hidden = s.crop.zoom === 1 && s.crop.x === 0.5 && s.crop.y === 0.5;
   $('soundBtn').setAttribute('aria-pressed', String(s.sound));
-  $('crtBtn').setAttribute('aria-pressed', String(s.crt));
-  $('crt').classList.toggle('is-off', !s.crt);
+  $('crtBtn').setAttribute('aria-pressed', String(s.crtFilter));
+  $('crt').classList.toggle('is-off', !s.crtFilter);
 }
 
 // ---------- Use as the whole card ----------
@@ -1223,7 +1223,7 @@ $('soundBtn').addEventListener('click', () => {
 });
 $('crtBtn').addEventListener('click', () => {
   sfx.tick();
-  store.set({ crt: !store.get().crt });
+  store.set({ crtFilter: !store.get().crtFilter });
 });
 rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
@@ -2380,7 +2380,7 @@ store.on((s, changed) => {
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
   if (['sample', 'name', 'message', 'plate', 'layout', 'cardType', 'frameless'].some((k) => changed.has(k as keyof State))) syncInputs();
-  if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
+  if (['intensity', 'pixel', 'crop', 'sound', 'crtFilter'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) {
     buildFormats();
     renderShare();
@@ -2397,9 +2397,9 @@ store.on((s, changed) => {
   }
   if (shareReady && [...CARD_KEYS, 'gifMatte', 'exportFormat'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
-  if (changed.has('sound') || changed.has('crt')) {
+  if (changed.has('sound') || changed.has('crtFilter')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
-    $('crtBtn').setAttribute('aria-label', s.crt ? t.crtOn : t.crtOff);
+    $('crtBtn').setAttribute('aria-label', s.crtFilter ? t.crtOn : t.crtOff);
   }
 });
 
