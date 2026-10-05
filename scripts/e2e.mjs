@@ -253,34 +253,6 @@ await step('the motion button above the deck switches the idle motion in one tap
   await page.click('#pane-light .tune-reset-all');
 });
 
-await step('a motion picked for exports in v0.13.0 becomes the card motion, and Save names it', async () => {
-  const saved = await page.evaluate(() => localStorage.getItem('foil:v1'));
-  try {
-    await page.evaluate(() => {
-      const s = JSON.parse(localStorage.getItem('foil:v1') ?? '{}');
-      localStorage.setItem('foil:v1', JSON.stringify({ ...s, exportMotion: 'moment', tune: { ...(s.tune ?? {}), idle: 'sway' } }));
-    });
-    await page.reload();
-    await page.waitForSelector('#deckDock .qm-btn');
-    expect((await page.getAttribute('#deckDock .qm-btn', 'data-value')) === 'glint', 'Moment did not become Glint');
-    await page.click('#formatSeg [role=radio][data-format=gif]');
-    if ((await page.getAttribute('#saveOptsToggle', 'aria-expanded')) !== 'true') await page.click('#saveOptsToggle');
-    expect(!(await page.isVisible('#exportMotionSeg')), 'the export still has its own motion choice');
-    const name = await page.textContent('#saveMotionName');
-    const len = await page.textContent('#saveMotionLen');
-    expect(name === 'Glint' && /^3 s/.test(len), `Save names ${name}, ${len}`);
-    expect((await page.textContent('#saveMotionNote')).length > 10, 'no line saying the file moves as the stage does');
-    // "Change" opens the tray above the deck.
-    await page.click('#saveMotionPick');
-    await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 });
-    await page.keyboard.press('Escape');
-  } finally {
-    await page.evaluate((s) => localStorage.setItem('foil:v1', s), saved);
-    await page.reload();
-    await page.waitForTimeout(1500);
-  }
-});
-
 await step('lettering from the name tag', async () => {
   await tab('card');
   // The name tag sways gently, so Playwright's "stable" wait can time out; the chip is still clickable.
@@ -1589,6 +1561,35 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
     expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
   }
   await still.close();
+});
+
+// Last, as it reloads the page.
+await step('a motion picked for exports in v0.13.0 becomes the card motion, and Save names it', async () => {
+  const saved = await page.evaluate(() => localStorage.getItem('foil:v1'));
+  try {
+    await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('foil:v1') ?? '{}');
+      localStorage.setItem('foil:v1', JSON.stringify({ ...s, exportMotion: 'moment', tune: { ...(s.tune ?? {}), idle: 'sway' } }));
+    });
+    await page.reload();
+    await page.waitForSelector('#deckDock .qm-btn');
+    expect((await page.getAttribute('#deckDock .qm-btn', 'data-value')) === 'glint', 'Moment did not become Glint');
+    await page.click('#formatSeg [role=radio][data-format=gif]');
+    if ((await page.getAttribute('#saveOptsToggle', 'aria-expanded')) !== 'true') await page.click('#saveOptsToggle');
+    expect(!(await page.isVisible('#exportMotionSeg')), 'the export still has its own motion choice');
+    const name = await page.textContent('#saveMotionName');
+    const len = await page.textContent('#saveMotionLen');
+    expect(name === 'Glint' && /^3 s/.test(len), `Save names ${name}, ${len}`);
+    expect((await page.textContent('#saveMotionNote')).length > 10, 'no line saying the file moves as the stage does');
+    // "Change" opens the tray above the deck.
+    await page.click('#saveMotionPick');
+    await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 });
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.evaluate((s) => localStorage.setItem('foil:v1', s), saved);
+    await page.reload();
+    await page.waitForTimeout(1500);
+  }
 });
 
 await browser.close();
