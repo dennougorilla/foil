@@ -2,7 +2,7 @@
 // missing frames, steps the on-screen drawing down. Exports never read this.
 //
 // This table is the one place where the page draws less: every level applies to the whole page
-// (the stage, the hand, the backdrop, the sparks, the pack opening, the CSS loops, the CRT lines),
+// (the stage, the hand, the backdrop, the sparks, the pack opening, the CSS loops, the CRT filter),
 // so a new finish, backdrop or feature needs no light version of its own (docs/performance.md).
 
 export interface QualityLevel {
@@ -14,7 +14,7 @@ export interface QualityLevel {
   sparks: number;
   /** The backdrop holds still (drawn again only when its colors, size or place change) and the page's endless CSS loops play once. */
   still: boolean;
-  /** The CRT lines over the page (when the CRT filter is on). */
+  /** The CRT filter over the page (when it is on; level 1 also drops its glow through data-still). */
   crt: boolean;
 }
 

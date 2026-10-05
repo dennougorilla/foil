@@ -3,7 +3,7 @@
 .pk {
   position: fixed;
   inset: 0;
-  /* Under the CRT scanlines, so the opening sits in the same screen. */
+  /* Under the CRT filter, so the opening sits in the same screen. */
   z-index: 45;
   overflow: hidden;
   opacity: 0;

@@ -1,4 +1,4 @@
-/* The ?fps=1 meter (src/fpsMeter.ts): a small slate tag over the logo, above the CRT lines, clear of the header's buttons. */
+/* The ?fps=1 meter (src/fpsMeter.ts): a small slate tag over the logo, above the CRT filter, clear of the header's buttons. */
 .fps-meter {
   position: fixed;
   top: max(6px, env(safe-area-inset-top));

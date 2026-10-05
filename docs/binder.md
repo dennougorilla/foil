@@ -7,7 +7,7 @@ of cards must not slow the page down, so nothing is read or drawn before it is l
 ## What a kept card is
 
 - **Its settings**: every saved setting that belongs to the card (`CARD_KEYS` in `src/state.ts`):
-  the finish, rarity, frame and frame color, strength, pixelation, name, line, crop, Shine,
+  the finish, rarity, frame and frame color, strength, pixelation, pixel art, name, line, crop, Shine,
   lettering, the finish area's region and band, and which picture (`sample`). The rest of the
   saved state (language, sound, the hand, which panel tab is open, the export format, the brush,
   the swatches) is about the app, not the card, and stays out. A setting added to the store later

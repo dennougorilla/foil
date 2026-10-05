@@ -41,6 +41,7 @@ in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 | Making a file: GIF (`exporter.ts`), APNG (`anim/apngExport.ts`), MP4 and its muxer (`anim/mp4Export.ts`, `mp4-muxer`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
+| Pixel art: the face's conversion and its words (`dot/dot.ts`, `dot/convert.ts`, `dot/words.ts`) | pixel art is turned on (at once if it was left on) | idle, pointing at the pixel art choices |
 | The backdrops other than the swirl (`gl/backdrops.ts`; the stage keeps the old one until the new one is ready) | another backdrop is picked, or was left picked | pointing at the backdrop tiles |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
 | Touch: the heat a finger leaves and the preview's own strokes (`touch/heat.ts`), for Warmth and Glow only | a touch finish is in the hand or on the card (until it arrives the card draws cold) | — |
@@ -92,12 +93,12 @@ draws less, and they reach everything through shared paths:
 - bursts of sparks are scaled down;
 - at a still level `<html data-still>` plays every endless CSS loop once, whatever it belongs to
   (what shows that something is loading, under `[aria-busy]` or `.is-waiting`, keeps moving);
-  `<html data-no-crt>` hides the CRT lines.
+  `<html data-no-crt>` hides the CRT filter, and `data-still` its glow.
 
-| Level | Card canvases | Backdrop | Sparks | Still | CRT lines |
+| Level | Card canvases | Backdrop | Sparks | Still | CRT filter (when on) |
 | --- | --- | --- | --- | --- | --- |
 | 0 | full (at most 2×, 1.5× on phones) | ¼ of the window, moving | all | no | yes |
-| 1 | 0.8 | ¼, still | all | yes | yes |
+| 1 | 0.8 | ¼, still | all | yes | without its glow |
 | 2 | 0.65 | ⅙, still | half | yes | no |
 | 3 | 0.5 | ⅛, still | half | yes | no |
 
@@ -121,8 +122,26 @@ step down. A browser that doesn't say (Safari) starts at full quality.
 - The proofs of the card (step 2, the folded recap) copy the stage canvas only while they are on
   screen: a copy reads the canvas back from the GPU, and on a phone they sit far below the card.
 - The lettering's per-piece uniforms are worked out once per change, not for every card drawn.
-- The CRT lines blend normally: the overlay is black, so plain blending darkens exactly as the former
-  multiply did (to rounding), without a pass of its own over the whole screen.
+- The CRT filter is off by default, and while off its layers are hidden (`visibility: hidden`), so
+  they cost nothing. See below for what it costs when on.
+
+**The CRT filter.** It is plain CSS over the DOM (`.crt` in `src/style.css`): four fixed layers that
+the compositor blends over the page on each frame, with nothing redrawn and no script. A glow layer
+(`backdrop-filter: blur() contrast() brightness()`, screened back on at 30%) makes bright areas bleed;
+a mask layer (overlay blending) carries the 3 px scanlines and the 1 px RGB aperture grille and a
+red/blue fringe at the left and right edges; a noise layer carries the grain, a flicker and a slow
+rolling band (all transforms and opacity, hidden under `prefers-reduced-motion`); a glass layer has
+the rounded black corners, the edge shading, a faint reflection and the dark gaps between scanlines.
+A WebGL pass was the other way: it could bend the picture for real (barrel distortion) and split
+its colors per pixel, but it would reach only the canvases (the card and the backdrop), not the
+header, the panel or the pack opening, and it would need one more full-screen render target every
+frame. So the curvature is shown, not made (corners, shading, the reflection), and the chromatic
+aberration is a colored fringe toward the sides. Measured on an Apple M3 in headless Chromium with
+vsync off and the page pinned at full quality (`?quality=0`), mean frame time over 4 s, CRT off → on:
+desktop 1440 × 900 at 2× 9.3 → 9.5 ms; phone 390 × 844 at 3× 5.7 → 8.3 ms in one run and 9.6 → 7.1
+and 6.5 → 6.7 ms in two more (the runs vary more than the filter costs; hiding the glow saved 0.03–0.3 ms). With vsync on, both
+stay at 60 fps. The glow is the one layer that does real work on every frame (a blur of the whole
+screen), so level 1 leaves it out, and levels 2 and 3 the whole filter.
 
 **Checking a device by hand.** `?fps=1` shows a small meter over the logo: frames per second over the
 last second, its slowest frame (ms), the level (0 of 3 is full), when the first card was drawn, the
