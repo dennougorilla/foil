@@ -143,8 +143,13 @@ const ja = {
   } satisfies Record<BackdropId, string>,
   backdropColor: '色を変える',
   intensity: '加工の強さ',
+  pixel: 'ピクセル化',
+  pixelHint: '絵だけを粗くします。枠と文字はくっきり。',
+  off: 'オフ',
+  pixelLevels: ['オフ', '微', '弱', '中', '強', '極', '最大'],
   dot: {
     label: 'ドット絵',
+    hint: '枠も文字もふくめ、カード全体をドット絵に。',
     preset: { off: 'オフ', chunky: '太ドット', retro: 'レトロ', fine: '細かい' },
     custom: 'カスタム',
     more: '細かく調整',

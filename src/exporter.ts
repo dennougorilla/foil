@@ -15,6 +15,7 @@ import { TORCH_DRIFT, TORCH_IDLE, TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
 import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
+import { pixelCells } from './dot/model';
 
 /** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
 async function packLoaded(edition: Edition): Promise<void> {
@@ -33,8 +34,10 @@ export interface ExportInput {
   /** Layer 2 (docs/layering.md): its finish, how it is drawn, and its area. */
   layer?: { edition: Edition; draw: LayerDraw; range: RangeSnapshot };
   intensity: number;
-  /** Pixel art's grid across the card's short side, 0 = off (the face is already drawn on it). */
+  /** Pixelate: its slider step (0 = off), the art window only. */
   pixel: number;
+  /** Pixel art's grid across the card's short side, 0 or absent = off (the face is already drawn on it). */
+  dot?: number;
   name: string;
   /** For animated sources: paints the card face as it looks `ms` into the animation. */
   faceAt?: (ms: number, face: HTMLCanvasElement, mask: HTMLCanvasElement) => void;
@@ -105,7 +108,8 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
       scale: 1,
       edition: input.edition.shader,
       intensity: input.intensity,
-      pixel: input.pixel,
+      pixel: pixelCells(input.pixel),
+      dot: input.dot,
       // A finish that reacts to touch shows a swipe made for this picture, caught while it still shows.
       heat: input.edition.touch ? autoTouch(input.face, input.edition.touch) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
@@ -212,7 +216,8 @@ export async function createScene(input: ExportInput, W0: number, H0: number, re
           scale: pose.scale,
           edition: input.edition.shader,
           intensity: input.intensity,
-          pixel: input.pixel,
+          pixel: pixelCells(input.pixel),
+          dot: input.dot,
           tilt,
           // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
           // Blacklight's lamp drifts round the art, as dim as on the stage left alone (unless the tune fixes the light).

@@ -1,6 +1,7 @@
 // A piece of text's own print, picked in a small popover: the five print styles and,
 // for hot foil, its colour. Everything finer (depth, gloss, ink) stays the card's.
-// Opened by tapping the words on the card or the chip beside their field.
+// Opened by tapping the words on the card or the chip beside their field. It sits on the page
+// beside what opened it, so it closes rather than drift when the page (or that box) scrolls.
 
 import './print.css';
 import type { Store } from './state';
@@ -22,6 +23,8 @@ export interface PrintPop {
   open(field: TextField, at: HTMLElement | { x: number; y: number }): void;
   /** A chip that shows a field's print and opens the popover for it. */
   chip(field: TextField): HTMLButtonElement;
+  /** Closes it (letting go of the words on the card does). */
+  close(): void;
 }
 
 export function mountPrintPop(o: { store: Store; dict: () => Dict; onPick: () => void }): PrintPop {
@@ -168,6 +171,17 @@ export function mountPrintPop(o: { store: Store; dict: () => Dict; onPick: () =>
     if (e.key === 'Escape' && !pop.hidden) close();
   });
   addEventListener('resize', () => close(false));
+  // Scrolling what holds its anchor (the page, or the panel round a chip) would leave it behind.
+  document.addEventListener(
+    'scroll',
+    (e) => {
+      const t = e.target;
+      const anchor = opener ?? document.getElementById('cardSlot');
+      if (!pop.hidden && (t === document || (t instanceof Node && !!anchor && t.contains(anchor)))) close(false);
+    },
+    { capture: true, passive: true },
+  );
+  document.addEventListener('visibilitychange', () => document.hidden && close(false));
   // Arrow keys move along the choices, like the panel's own radio rows.
   styles.addEventListener('keydown', (e) => {
     const all = [follow, ...styleBtns];
@@ -182,6 +196,8 @@ export function mountPrintPop(o: { store: Store; dict: () => Dict; onPick: () =>
 
   store.on((_, changed) => {
     if (changed.has('prints') || changed.has('text') || changed.has('lang')) sync();
+    // Another finish is another card: the menu of the last one's words closes.
+    if (changed.has('edition')) close(false);
   });
 
   function open(f: TextField, at: HTMLElement | { x: number; y: number }) {
@@ -198,6 +214,7 @@ export function mountPrintPop(o: { store: Store; dict: () => Dict; onPick: () =>
 
   return {
     open,
+    close: () => close(false),
     chip(f) {
       const b = el('button', 'pp-chip');
       b.type = 'button';

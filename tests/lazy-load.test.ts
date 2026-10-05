@@ -58,7 +58,8 @@ test('no pack shader code is in the first load', () => {
  * What waits until it is used (docs/performance.md): Fine-tune's tabs, the print menu, free placement,
  * the motion tray, the motions other than Sway, the backdrops other than the swirl, making a file (with the MP4 muxer),
  * the illustrated samples, reading an animated picture, pixel art's conversion, each language's texts, the service worker's
- * registration (with the Update chip and a picture shared to FOIL), and the deck builder's and the shop's rules.
+ * registration (with the Update chip and a picture shared to FOIL), the deck builder's and the shop's rules, touch (only
+ * the touch finishes, which come in packs, use it) and the ?fps=1 meter.
  */
 const ON_DEMAND = [
   'i18n/ja.ts',
@@ -89,6 +90,8 @@ const ON_DEMAND = [
   'card/effect.ts',
   'pack/rules.ts',
   'gl/backdrops.ts',
+  'fpsMeter.ts',
+  'touch/heat.ts',
   'dot/dot.ts',
   'dot/convert.ts',
   'sampleArt.ts',

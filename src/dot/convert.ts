@@ -162,3 +162,33 @@ export function dotFrames(frames: Uint8ClampedArray[], w: number, h: number, dot
   }
   return pal;
 }
+
+/**
+ * Pixelate under pixel art: the art window (`inArt`, one flag per pixel of the grid) is averaged in
+ * `k` × `k` blocks of the grid before the colours are cut down, so Pixelate's blocks are whole pixels
+ * of the pixel art and the outline follows them. Pixels outside the art window are left as they are.
+ */
+export function pixelateArt(d: Uint8ClampedArray, w: number, h: number, inArt: Uint8Array, k: number): void {
+  if (k <= 1) return;
+  for (let by = 0; by < h; by += k)
+    for (let bx = 0; bx < w; bx += k) {
+      const ye = Math.min(by + k, h);
+      const xe = Math.min(bx + k, w);
+      const sum = [0, 0, 0, 0];
+      let n = 0;
+      for (let y = by; y < ye; y++)
+        for (let x = bx; x < xe; x++) {
+          if (!inArt[y * w + x]) continue;
+          const i = (y * w + x) * 4;
+          for (let c = 0; c < 4; c++) sum[c] += d[i + c];
+          n++;
+        }
+      if (!n) continue;
+      for (let y = by; y < ye; y++)
+        for (let x = bx; x < xe; x++) {
+          if (!inArt[y * w + x]) continue;
+          const i = (y * w + x) * 4;
+          for (let c = 0; c < 4; c++) d[i + c] = Math.round(sum[c] / n);
+        }
+    }
+}

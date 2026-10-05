@@ -11,6 +11,7 @@ import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
 import { cardK } from '../card/shape';
 import type { BackdropId } from '../backdrop';
+import type { QualityLevel } from '../quality';
 
 export type RGB = [number, number, number];
 
@@ -91,9 +92,38 @@ export class BackgroundRenderer {
     }
   }
 
-  render(f: BackgroundFrame): void {
+  /** What a still backdrop was last drawn with (size, colors, place), and the moment it holds. */
+  private stillKey = '';
+  /** The program the still backdrop was last drawn with. */
+  private drawn: PendingProgram | null = null;
+  private held: { time: number; phase?: number; pointer: [number, number] } | null = null;
+
+  /**
+   * Sizes and draws the backdrop for a window of w × h css px at a drawing level (src/quality.ts).
+   * At a still level it holds its moment and is drawn again only when its size, colors or place
+   * change, so any backdrop drawn here is light on a slow device without a light version of its own.
+   */
+  draw(f: BackgroundFrame, q: QualityLevel, w: number, h: number): void {
+    this.resize(Math.ceil(w / q.bg), Math.ceil(h / q.bg));
+    if (!q.still) {
+      this.held = null;
+      this.stillKey = '';
+      this.render(f);
+      return;
+    }
+    this.held ??= { time: f.time, phase: f.phase, pointer: f.pointer };
+    // Settled to a 256th of a color step and a pixel of place is settled.
+    const focus = f.focus ?? [0.5, 0.5];
+    const key = [this.canvas.width, this.canvas.height, ...[...f.colors.flat(), ...(f.color ?? [])].map((c) => Math.round(c * 256)), Math.round(focus[0] * this.canvas.width), Math.round(focus[1] * this.canvas.height), Math.round((f.card ?? 0.6) * 256)].join();
+    // A newly picked backdrop that has compiled is drawn once too.
     if (!this.live || this.wanted.done()) this.shown = this.wanted;
-    if (this.live && !this.shown.done()) return;
+    if ((key !== this.stillKey || this.shown !== this.drawn) && this.render({ ...f, ...this.held })) this.stillKey = key;
+  }
+
+  /** Draws one frame; false while the program is still compiling (on the page). */
+  render(f: BackgroundFrame): boolean {
+    if (!this.live || this.wanted.done()) this.shown = this.wanted;
+    if (this.live && !this.shown.done()) return false;
     const { gl } = this;
     const p = this.shown.get();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -111,6 +141,8 @@ export class BackgroundRenderer {
     gl.uniform2f(p.u.uFocus, focus[0], focus[1]);
     gl.uniform1f(p.u.uCard, f.card ?? 0.6);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    this.drawn = this.shown;
+    return true;
   }
 }
 
@@ -125,7 +157,10 @@ export interface CardDraw {
   scale: number;
   edition: number;
   intensity: number;
+  /** Pixelate: cells across the card's short side in the art window only, 0 = off. */
   pixel: number;
+  /** Pixel art: the whole face's grid across the short side (the face is already drawn on it), 0 or absent = off. */
+  dot?: number;
   tilt: [number, number];
   light: [number, number];
   alpha: number;
@@ -421,6 +456,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uIntensity, d.intensity);
     gl.uniform1f(p.u.uTime, time);
     gl.uniform1f(p.u.uPixel, d.pixel);
+    gl.uniform1f(p.u.uDot, d.dot ?? 0);
     gl.uniform2f(p.u.uTilt, d.tilt[0], d.tilt[1]);
     gl.uniform2f(p.u.uLight, d.light[0], d.light[1]);
     gl.uniform1f(p.u.uAlpha, d.alpha);

@@ -6,6 +6,10 @@ A new finish always goes into a pack (its shader in that pack's module, never th
 
 Interface texts (Japanese and English) use the names and writing rules in `docs/glossary.md`: one name for each thing, in both languages.
 
+## Slow devices
+
+Nothing new needs a light version of its own. The drawing levels in `src/quality.ts` lower the card canvases' resolution, still the backdrop and the page's endless CSS loops, cut the sparks and drop the CRT lines for the whole page (`docs/performance.md`); draw backdrops through `BackgroundRenderer.draw` and put loading indicators under `[aria-busy]` or `.is-waiting` (they keep moving). After adding a finish, a backdrop or anything drawn on every frame, run `npm run perf` (with the dev server running) and look only at what it lists as over budget.
+
 ## Premise
 
 FOIL is under active development (pre-1.0). **Do not keep backward compatibility or write data migrations.** Remove old formats, old APIs and compatibility branches instead of carrying them, and always rewrite toward the ideal, simplest (KISS) code. When saved settings (`localStorage`) or stored images (IndexedDB) no longer match the current shape, discard them and start from defaults instead of migrating.

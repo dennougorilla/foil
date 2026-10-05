@@ -37,6 +37,8 @@ export interface State extends RangeColorState {
   /** The picture is the whole card: FOIL's frame, nameplate and words are not drawn (their settings stay). */
   frameless: boolean;
   intensity: number;
+  /** Pixelate: the art window's step (0 = off, see dot/model.ts PIXEL_STEPS); the frame and words stay crisp. */
+  pixel: number;
   /** Pixel art over the whole card, or null (src/dot). */
   dot: Dot | null;
   name: string;
@@ -98,6 +100,7 @@ const PERSIST: (keyof State)[] = [
   'shape',
   'frameless',
   'intensity',
+  'pixel',
   'dot',
   'name',
   'nameEdited',
@@ -164,6 +167,7 @@ const defaults = (): State => ({
   fit: '',
   frameless: false,
   intensity: 1,
+  pixel: 0,
   dot: null,
   name: '',
   nameEdited: false,

@@ -3205,10 +3205,11 @@ input[type='range']:disabled {
   inset: 0;
   z-index: 50;
   pointer-events: none;
+  /* Only black, so plain blending darkens exactly as multiply would, without the compositor
+     blending the whole screen under it in a pass of its own. */
   background:
     repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 0 1px, transparent 1px 4px),
     radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
-  mix-blend-mode: multiply;
   transition: opacity 0.3s;
 }
 
@@ -3772,6 +3773,19 @@ input[type='range']:disabled {
   }
 }
 
+/* A device that has to draw less (a still level, src/quality.ts) plays every endless CSS loop once,
+   whatever it belongs to; what shows that something is loading ([aria-busy], .is-waiting) keeps moving. */
+[data-still] :not([aria-busy], [aria-busy] *, .is-waiting, .is-waiting *),
+[data-still] :not([aria-busy], [aria-busy] *, .is-waiting, .is-waiting *)::before,
+[data-still] :not([aria-busy], [aria-busy] *, .is-waiting, .is-waiting *)::after {
+  animation-iteration-count: 1 !important;
+}
+
+/* ...and the lowest levels go without the CRT lines (one more layer blended over the whole screen). */
+[data-no-crt] .crt {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .support-menu,
   .chip-heart[aria-expanded='true'] svg,
@@ -3794,6 +3808,23 @@ input[type='range']:disabled {
   .chip-binder.is-bump {
     animation: none;
   }
+}
+
+/* Pixelate and Pixel art sit together, each with one line saying what it touches. */
+.row-hint {
+  grid-template-areas:
+    'label out'
+    'hint hint'
+    'input input';
+}
+
+.row-hint > .hint {
+  grid-area: hint;
+  margin-top: -4px;
+}
+
+.dot-hint {
+  margin-top: -6px;
 }
 
 /* Pixel art: its presets in one row, its four choices folded under Adjust. */

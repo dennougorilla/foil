@@ -20,6 +20,7 @@ import { paintPack, PACK_H, PACK_W, TEAR_Y } from './packArt';
 import { buzz, packSfx } from './sounds';
 import { Pillow, type Print } from './pillow';
 import { contain, fitArea } from '../card/shape';
+import type { QualityLevel } from '../quality';
 
 export interface OpeningOptions {
   /** The pack asked for: chosen in the shop at first, or opened straight away (a replay). */
@@ -41,6 +42,8 @@ export interface OpeningOptions {
   back: HTMLCanvasElement;
   tune: Tune;
   intensity: number;
+  /** The stage's drawing level (src/quality.ts): a device that had to draw less there draws less here too. */
+  quality: QualityLevel;
   /** Stops the stage underneath from drawing while the overlay is up. */
   pause: (on: boolean) => void;
   /** A pack counts as opened from the tear (or a skip) on; Open all opens several at once. */
@@ -1196,15 +1199,14 @@ export function openPack(o: OpeningOptions) {
     last = now;
     time += dt;
     phaseT += dt;
-    const dpr = Math.min(devicePixelRatio || 1, maxDpr);
+    const dpr = Math.min(devicePixelRatio || 1, maxDpr) * o.quality.res;
     r.resize(vw, vh, dpr);
-    swirl.resize(Math.ceil(vw / 4), Math.ceil(vh / 4));
     // The room's swirl winds up while the showpiece charges, then settles.
     if (!reduced) swirlT += dt * (hit === 'charge' ? 1 + 6 * clamp(hitT / 0.9, 0, 1) : 1);
     const ease = 1 - Math.exp(-dt * 3);
     roomNow ??= room;
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) roomNow[i][j] += (room[i][j] - roomNow[i][j]) * ease;
-    swirl.render({ time: swirlT + 40, colors: roomNow, pointer: [0.5, 0.5], focus: [0.5, 0.5] });
+    swirl.draw({ time: swirlT + 40, colors: roomNow, pointer: [0.5, 0.5], focus: [0.5, 0.5] }, o.quality, vw, vh);
 
     if (phase === 'load') {
       // Wait for the pack's finishes and every program this opening draws.

@@ -62,6 +62,7 @@ npm test         # unit tests (Node's built-in runner)
 npm run shoot -- <outDir> [filter]   # with the dev server running: capture the screenshot matrix
 npm run e2e      # with the dev server running: check the panel, every export, the packs, the binder, sharing and the phone stage
 npm run e2e:pwa  # after npm run build: check the manifest, the service worker, an offline launch, the Update chip and a shared picture
+npm run perf     # with the dev server running: the performance budget, every finish and the backdrop on a slowed-down phone page (docs/performance.md)
 npm run og       # with the dev server running: render public/og.png and the home-screen icons
 node scripts/layering-check.mjs [--measure]   # with the dev server running: single finishes unchanged pixel for pixel (against a reference URL), and the cost of a second finish
 ```

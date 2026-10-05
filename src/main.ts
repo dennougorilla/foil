@@ -39,8 +39,8 @@ import { mountQuickMotion } from './tune/quick';
 import { BACKDROPS } from './backdrop';
 import { loadBackdrops } from './gl/renderers';
 import type { Kept } from './binder/db';
+import { artBlock, DOT_COLORS, DOT_PRESETS, DOT_SIZES, dotGrid, dotKey, presetOf, type Dot } from './dot/model';
 import type { Layers } from './range';
-import { DOT_COLORS, DOT_PRESETS, DOT_SIZES, dotGrid, dotKey, presetOf, type Dot } from './dot/model';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -153,7 +153,7 @@ const mask = document.createElement('canvas');
 const back = document.createElement('canvas');
 drawBack(back, store.get().shape);
 // Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
-document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
+void backUrl().then((url) => document.documentElement.style.setProperty('--card-back', `url(${url})`));
 
 stage.cards.setBack(back);
 // Shadowbox and 3D Lenticular read the art's depth; its code loads the first time one is chosen.
@@ -192,7 +192,7 @@ function artKey() {
   const src: object = s.sample >= 0 ? sampleImg(s.sample) : (userAnim ?? userImage ?? sampleImg(0));
   if (!artIds.has(src)) artIds.set(src, ++artCount);
   const a = faceArt(s);
-  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? dotKey(s.dot) : ''}`;
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? `${dotKey(s.dot)}/${s.pixel}` : ''}`;
 }
 
 function faceSpec(image: Img) {
@@ -248,7 +248,7 @@ function redrawFace() {
   lastRuns = drawFace(face, mask, spec);
   // A moving picture's next frame keeps the palette the face was last given.
   if (!framing) facePalette = `face${++paletteRun}`;
-  pixelArt(face, facePalette);
+  pixelArt(face, facePalette, mask);
   setTextRuns(face.width, face.height, lastRuns);
   const { font, text } = spec.message;
   const ask = text.trim() ? `${font}|${text}` : '';
@@ -282,9 +282,10 @@ let facePalette = '';
 /**
  * Draws a just-painted face (or Flip Lenticular's picture) as pixel art when it is on. Calls with the
  * same `keep` share one palette (empty: a palette of its own). The face stays plain until the code is here.
+ * With the face's `artMask`, Pixelate (when it is on too) runs first on the art window.
  */
-function pixelArt(canvas: HTMLCanvasElement, keep: string) {
-  const d = store.get().dot;
+function pixelArt(canvas: HTMLCanvasElement, keep: string, artMask?: HTMLCanvasElement) {
+  const { dot: d, pixel } = store.get();
   if (!d) return;
   if (!dot)
     return void useDot().then(
@@ -294,7 +295,7 @@ function pixelArt(canvas: HTMLCanvasElement, keep: string) {
       },
       () => toast(t.loadFailed, true),
     );
-  dot.dotFace(canvas, d, keep || `own${++paletteRun}`);
+  dot.dotFace(canvas, d, keep || `own${++paletteRun}`, artMask && { mask: artMask, block: artBlock(d, pixel) });
 }
 
 // ---------- Text ----------
@@ -601,6 +602,7 @@ function buildDot() {
   };
   const td = t.dot;
   $('dotLabel').textContent = td.label;
+  $('dotHint').textContent = td.hint;
   $('dotNow').textContent = preset === null ? td.custom : '';
   const presets = ['off', 'chunky', 'retro', 'fine'] as const;
   seg('dotSeg', td.label, presets, (p) => td.preset[p], (p) => preset === p, (p) => store.set({ dot: p === 'off' ? null : { ...DOT_PRESETS[p] } }));
@@ -735,6 +737,11 @@ function syncInputs() {
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
   setRangeFill(inten);
+  const px = $<HTMLInputElement>('pixel');
+  px.value = String(s.pixel);
+  $('pixelOut').textContent = t.pixelLevels[s.pixel] ?? t.off;
+  px.setAttribute('aria-valuetext', t.pixelLevels[s.pixel] ?? t.off);
+  setRangeFill(px);
   const zoom = $<HTMLInputElement>('zoom');
   zoom.value = String(s.crop.zoom);
   $('zoomOut').textContent = `${Math.round(s.crop.zoom * 100)}%`;
@@ -1186,6 +1193,9 @@ $<HTMLInputElement>('typeInput').addEventListener('input', (e) => store.set({ ca
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
+$<HTMLInputElement>('pixel').addEventListener('input', (e) => {
+  store.set({ pixel: +(e.target as HTMLInputElement).value });
+});
 $('langBtn').addEventListener('click', () => {
   sfx.tick();
   // The other language's texts arrive first; then everything changes at once.
@@ -1251,7 +1261,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1348,7 +1358,7 @@ const tabNow = (s = store.get()): PanelTab => (tabsShown(s).includes(s.panelTab)
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, dot: null, frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
+  store.set({ intensity: 1, pixel: 0, dot: null, frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1425,7 +1435,8 @@ function exportInput() {
     back,
     edition: editionById(s.edition),
     intensity: s.intensity,
-    pixel: dotGrid(s.dot),
+    pixel: s.pixel,
+    dot: dotGrid(s.dot),
     tune: s.tune,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
@@ -1454,7 +1465,7 @@ function animatedExport(anim: Anim) {
     loopMs: anim.duration,
     faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) => {
       drawFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] });
-      pixelArt(f, keep);
+      pixelArt(f, keep, m);
     },
   };
 }
@@ -2023,6 +2034,7 @@ function openShop() {
         back,
         tune: store.get().tune,
         intensity: store.get().intensity,
+        quality: stage.qualityNow,
         pause: (on) => stage.pause(on),
         onOpened: (ids) => packs.open(ids),
         onClose: (next, added) => {
@@ -2117,6 +2129,7 @@ function useArrange() {
       dict: () => t,
       runs: () => lastRuns,
       openPrint: (f, at) => void usePrint().then((p) => p.open(f, at), () => toast(t.loadFailed, true)),
+      closePrint: () => void printLoad?.then((p) => p.close(), () => {}),
     }),
   );
   arrangeLoad.catch(() => {
@@ -2352,13 +2365,13 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot'].some((k) => changed.has(k as keyof State))) && !changed.has('sample')) {
+  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && !!s.dot)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
   if (['sample', 'name', 'message', 'plate', 'layout', 'cardType', 'frameless'].some((k) => changed.has(k as keyof State))) syncInputs();
-  if (['intensity', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
+  if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) {
     buildFormats();
     renderShare();
@@ -2422,9 +2435,9 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before
-// painting the face. Their stylesheet may still be on its way (index.html adds it without holding the
-// script), and fonts not declared yet would count as loaded at once.
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so the face is painted
+// again once they are here (the crop preview has no text). Their stylesheet may still be on its way
+// (index.html adds it without holding the script), and fonts not declared yet would count as loaded at once.
 new Promise<unknown>((done) => {
   const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
   if (!sheet || sheet.sheet) return done(null);
@@ -2432,11 +2445,13 @@ new Promise<unknown>((done) => {
   sheet.addEventListener('error', done);
 })
   .then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]))
-  .then(boot, boot);
+  .then(redrawFace, redrawFace);
 boot();
 // An illustration left on the card is fetched at once; the others when the page is idle or the pointer nears them.
 if (store.get().sample >= SCENES) void wakeArtSamples().catch(() => {});
 for (const ev of ['pointerenter', 'focusin']) $('thumbs').addEventListener(ev, () => void wakeArtSamples().catch(() => {}), { once: true });
+// ?fps=1: a frame-rate meter for checking a device by hand (docs/performance.md).
+if (new URLSearchParams(location.search).get('fps') === '1') void import('./fpsMeter').then((m) => m.mountFpsMeter(stage));
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
   // A picture chosen (or removed) meanwhile wins over last visit's.

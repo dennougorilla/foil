@@ -239,13 +239,20 @@
                 <span class="field-label" id="layoutLabel" data-t="layoutLabel"></span>
                 <div class="seg seg-layouts" id="layoutSeg" role="radiogroup" aria-labelledby="layoutLabel"></div>
               </div>
+              <div class="row row-hint">
+                <label class="field-label" for="pixel" data-t="pixel"></label>
+                <output id="pixelOut" for="pixel"></output>
+                <p class="hint" id="pixelHint" data-t="pixelHint"></p>
+                <input type="range" id="pixel" min="0" max="6" step="1" aria-describedby="pixelHint" />
+              </div>
               <div class="field dot-field">
                 <div class="dot-head">
                   <span class="field-label" id="dotLabel"></span>
                   <small class="dot-now" id="dotNow"></small>
                   <button class="link dot-more" id="dotMore" type="button" aria-controls="dotBody" aria-expanded="false"></button>
                 </div>
-                <div class="seg" id="dotSeg" role="radiogroup"></div>
+                <p class="hint dot-hint" id="dotHint"></p>
+                <div class="seg" id="dotSeg" role="radiogroup" aria-describedby="dotHint"></div>
                 <div class="dot-body" id="dotBody" hidden>
                   <div class="field"><span class="field-label" id="dotSizeLabel"></span><div class="seg" id="dotSizeSeg" role="radiogroup"></div></div>
                   <div class="field"><span class="field-label" id="dotColorsLabel"></span><div class="seg" id="dotColorsSeg" role="radiogroup"></div></div>

@@ -53,3 +53,24 @@ export function gridOf(w: number, h: number, size: number): { w: number; h: numb
   const m = Math.min(w, h);
   return { w: Math.floor((size * w) / m + 0.5), h: Math.floor((size * h) / m + 0.5) };
 }
+
+/**
+ * Pixelate (the older, separate choice: the art window only, the frame and words stay crisp): cells
+ * across the card's short side for each step of its slider, 0 = off.
+ */
+export const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
+
+/** Pixelate's cells on the big card and in files; 0 = off. */
+export const pixelCells = (step: number) => PIXEL_STEPS[step] ?? 0;
+
+/** Pixelate's cells on a small card (mini preview, hand), a little coarser so it still shows; 0 = off. */
+export const pixelCellsSmall = (step: number) => (PIXEL_STEPS[step] ? Math.max(18, PIXEL_STEPS[step] * 0.5) : 0);
+
+/**
+ * With both on, Pixelate runs first on the art and pixel art then draws the whole face: each Pixelate
+ * block is this many pixel art pixels wide (whole pixels, so its edges stay on the pixel art grid); 1 = none.
+ */
+export function artBlock(dot: Dot, step: number): number {
+  const cells = pixelCells(step);
+  return cells ? Math.max(1, Math.round(dot.size / cells)) : 1;
+}

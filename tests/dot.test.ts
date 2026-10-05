@@ -2,8 +2,8 @@
 // Pixel art (docs/features.md, Picture): the choices, and the conversion on raw RGBA.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DOT_PRESETS, gridOf, presetOf, sanitizeDot, type Dot } from '../src/dot/model.ts';
-import { dotFrames, FOIL_PALETTE } from '../src/dot/convert.ts';
+import { artBlock, DOT_PRESETS, gridOf, PIXEL_STEPS, pixelCells, pixelCellsSmall, presetOf, sanitizeDot, type Dot } from '../src/dot/model.ts';
+import { dotFrames, FOIL_PALETTE, pixelateArt } from '../src/dot/convert.ts';
 
 const W = 32;
 const H = 24;
@@ -123,4 +123,39 @@ test('the dither breaks a smooth ramp into more steps than flat bands', () => {
   dotFrames([flat], W, H, { ...plain, colors: 8 });
   dotFrames([dith], W, H, { ...plain, colors: 8, dither: true });
   assert.ok(changes(dith) > changes(flat) * 1.5, `${changes(dith)} vs ${changes(flat)}`);
+});
+
+test('Pixelate keeps its own steps: art window cells for the slider, coarser on small cards', () => {
+  assert.deepEqual(PIXEL_STEPS, [0, 96, 72, 56, 44, 34, 26]);
+  assert.equal(pixelCells(0), 0);
+  assert.equal(pixelCells(3), 56);
+  assert.equal(pixelCellsSmall(0), 0);
+  assert.equal(pixelCellsSmall(1), 48);
+  assert.equal(pixelCellsSmall(6), 18);
+});
+
+test('with both on, a Pixelate block is a whole number of pixel art pixels, never less than one', () => {
+  const chunky = DOT_PRESETS.chunky; // 72 across
+  assert.equal(artBlock(chunky, 0), 1);
+  assert.equal(artBlock(chunky, 1), 1); // Pixelate finer than the pixel art: nothing more to do
+  assert.equal(artBlock(chunky, 4), 2); // 44 across: blocks of two
+  assert.equal(artBlock(DOT_PRESETS.fine, 6), 5); // 128 / 26
+});
+
+test('Pixelate under pixel art averages the art window in blocks and leaves the rest alone', () => {
+  const w = 4;
+  const h = 2;
+  // The left half is the art window, the right half the frame.
+  const inArt = new Uint8Array([1, 1, 0, 0, 1, 1, 0, 0]);
+  const d = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) d.set([i * 10, 0, 0, 255], i * 4);
+  const before = d.slice();
+  pixelateArt(d, w, h, inArt, 2);
+  // The art block (pixels 0, 1, 4, 5) takes their average red: (0 + 10 + 40 + 50) / 4 = 25.
+  for (const i of [0, 1, 4, 5]) assert.equal(d[i * 4], 25);
+  for (const i of [2, 3, 6, 7]) assert.equal(d[i * 4], before[i * 4]);
+  // A block of one changes nothing.
+  const e = before.slice();
+  pixelateArt(e, w, h, inArt, 1);
+  assert.deepEqual(e, before);
 });
