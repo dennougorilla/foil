@@ -157,28 +157,6 @@
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
 }
 
-.dv-group + .dv-group {
-  margin-top: 14px;
-}
-
-.dv-group h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  font-weight: 400;
-  font-size: 17px;
-  color: var(--c);
-  text-shadow: 0 2px 0 #05080a;
-}
-
-.dv-group h3 i {
-  width: 12px;
-  height: 16px;
-  background: linear-gradient(160deg, var(--c), var(--b));
-  clip-path: polygon(0 2px, 3px 0, 6px 2px, 9px 0, 12px 2px, 12px 14px, 9px 16px, 6px 14px, 3px 16px, 0 14px);
-}
-
 .db-row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
@@ -575,17 +553,14 @@
   line-height: 1.2;
 }
 
-/* Pack names stay in view while the grid scrolls; the grid fades under the footer. */
-.dv-group h3 {
-  position: sticky;
-  top: -10px;
-  z-index: 1;
-  padding: 6px 0;
-  background: linear-gradient(#141c20 70%, transparent);
-}
-
+/*
+ * The grid fades under the tabs and under the footer, so a scrolled card slips away instead of
+ * being cut on a hard line; at rest the first row sits clear of the top fade (room for a lifted
+ * card's tag too).
+ */
 .db-grid {
-  mask-image: linear-gradient(#000 calc(100% - 24px), transparent);
+  padding-top: 26px;
+  mask-image: linear-gradient(transparent, #000 22px, #000 calc(100% - 24px), transparent);
 }
 
 .db-card {
@@ -606,4 +581,23 @@
   .db-empty {
     font-size: 9px;
   }
+  .db-grid {
+    padding-top: 22px;
+  }
+}
+
+/* A tab shows only its pack's cards. */
+.db-card[hidden] {
+  display: none;
+}
+
+/* Each card's family at a glance: a little pack-shaped pip in its pack's colors before the name. */
+.db-pip {
+  display: inline-block;
+  width: 7px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  background: linear-gradient(160deg, var(--c), var(--b));
+  clip-path: polygon(0 1px, 2px 0, 3.5px 1px, 5px 0, 7px 1px, 7px 9px, 5px 10px, 3.5px 9px, 2px 10px, 0 9px);
 }

@@ -1007,34 +1007,6 @@
   color: rgba(245, 242, 234, 0.75);
 }
 
-/* One small face-down card per finish inside, the showpiece's with a star. */
-.pk-minis {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.pk-minis i {
-  position: relative;
-  width: 28px;
-  height: 40px;
-  border-radius: 4px;
-  background: repeating-linear-gradient(135deg, var(--b) 0 4px, var(--a) 4px 8px);
-  box-shadow: 0 0 0 2px #f3eee2, 0 0 0 4px #0b1012, 0 4px 0 2px #0b1012;
-}
-
-.pk-minis i.is-star::after {
-  content: '★';
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-style: normal;
-  color: var(--gold);
-  text-shadow: 0 1px 0 #0b1012;
-}
-
 .pk-buy-row {
   padding: 14px 22px 18px;
 }
@@ -1291,4 +1263,396 @@
   max-width: min(92vw, 520px);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---------- Open all ---------- */
+
+/* Under Open pack, Balatro's second button: smaller, green, the same fat lip. */
+.pk-buy-row {
+  gap: 18px;
+}
+
+.pk-all {
+  --ring: #05080a;
+  --lip: #1c6a45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 4px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #33b072;
+  color: #fff;
+  font-size: 19px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), 0 0 0 3px var(--ring), 0 6px 0 3px var(--lip), 0 9px 0 3px var(--ring);
+  transition: transform 0.06s, box-shadow 0.06s, filter 0.15s, background 0.15s;
+}
+
+.pk-all[hidden] {
+  display: none;
+}
+
+.pk-all span,
+.pk-all small {
+  white-space: nowrap;
+}
+
+.pk-all small {
+  padding: 0 8px 1px;
+  border-radius: 6px;
+  background: rgba(5, 8, 10, 0.35);
+  font-size: 14px;
+  text-shadow: none;
+}
+
+.pk-all:hover {
+  filter: brightness(1.1);
+}
+
+.pk-all:active {
+  transform: translateY(6px);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), 0 0 0 3px var(--ring), 0 3px 0 3px var(--ring);
+}
+
+/* Armed: gold, a wobble, and it asks for the second tap. */
+.pk-all.is-armed {
+  --lip: #8a6a1c;
+  background: var(--gold);
+  color: var(--paper-ink);
+  text-shadow: none;
+  animation: pk-armed 0.42s var(--ease-out);
+}
+
+.pk-all.is-armed small {
+  background: rgba(5, 8, 10, 0.15);
+}
+
+@keyframes pk-armed {
+  20% { transform: rotate(-2.5deg) scale(1.04); }
+  45% { transform: rotate(2deg) scale(1.03); }
+  70% { transform: rotate(-1deg); }
+}
+
+@media (min-width: 900px) {
+  .pk-all { font-size: 21px; min-height: 50px; }
+}
+
+/* The list after Open all: a title, one row per pack (its haul in miniature), two buttons. */
+.pk-list {
+  display: none;
+}
+
+.pk.is-list .pk-list {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: 14px;
+  padding: 64px 8px max(20px, env(safe-area-inset-bottom));
+}
+
+.pk.is-list .pk-title,
+.pk.is-list .pk-skip {
+  visibility: hidden;
+}
+
+.pk-list-title {
+  display: grid;
+  gap: 4px;
+  max-width: min(92vw, 640px);
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+  text-align: center;
+  text-shadow: 0 3px 0 var(--edge);
+  animation: pk-drop 0.4s var(--ease-back) both;
+}
+
+.pk-list-title small {
+  font-size: 15px;
+  color: rgba(245, 242, 234, 0.82);
+}
+
+.pk-rows {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 1), auto);
+  align-content: safe center;
+  justify-content: center;
+  gap: 22px 40px;
+  min-height: 0;
+  max-width: 100%;
+  overflow: hidden auto;
+  padding: 18px 10px 8px;
+  scrollbar-width: thin;
+}
+
+.pk-row {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+/* The pack's name on its color, and how many came in. */
+.pk-row-tag {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 1px 12px 3px;
+  border-radius: 8px;
+  background: var(--b);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 400;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 0 0 3px #05080a, 0 5px 0 3px #05080a;
+  animation: pk-drop 0.3s var(--d, 0s) var(--ease-back) both;
+}
+
+.pk-row-tag small {
+  font-size: 15px;
+  color: var(--gold);
+}
+
+.pk-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(var(--line, 6) * (var(--sw, 90px) + var(--sgap, 14px)));
+  row-gap: 10px;
+  align-items: flex-start;
+  gap: var(--sgap, 14px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pk-swatch {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: var(--sw, 90px);
+  animation: pk-fade 0.12s var(--d, 0s) both;
+}
+
+/* Each card flips up off the card back, springing. */
+.pk-card {
+  position: relative;
+  width: var(--sw, 90px);
+  height: var(--sh, 126px);
+  transform-style: preserve-3d;
+  animation: pk-flip 0.46s var(--d, 0s) var(--ease-back) both;
+}
+
+.pk-card > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.pk-face {
+  object-fit: cover;
+  box-shadow: 0 0 0 2px #05080a, 0 5px 0 2px rgba(5, 8, 10, 0.75);
+}
+
+/* Not the finish (it is compiled only when used): the face washed in the finish's own colors, with a passing sheen. */
+.pk-wash {
+  overflow: hidden;
+  background: linear-gradient(var(--ang, 140deg), var(--s0), var(--s1) 45%, var(--s2) 78%, var(--s1));
+  mix-blend-mode: color;
+  opacity: 0.72;
+}
+
+.pk-wash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.7) 50%, transparent 62%) no-repeat;
+  background-size: 260% 100%;
+  background-position: 120% 0;
+  mix-blend-mode: overlay;
+  animation: pk-sheen 0.9s calc(var(--d, 0s) + 0.3s) ease-out both;
+}
+
+@keyframes pk-sheen {
+  from { background-position: 120% 0; }
+  to { background-position: -40% 0; }
+}
+
+.pk-back {
+  transform: rotateY(180deg);
+  object-fit: cover;
+}
+
+@keyframes pk-flip {
+  from { transform: perspective(600px) translateY(-18px) rotateY(180deg) scale(0.86); }
+}
+
+/* The showpiece: a size up, ringed in gold, its star above the name. */
+.pk-swatch.is-showpiece .pk-card {
+  scale: 1.08;
+}
+
+.pk-swatch.is-showpiece .pk-face {
+  box-shadow: 0 0 0 2px var(--gold), 0 0 0 4px #05080a, 0 6px 0 4px rgba(5, 8, 10, 0.75), 0 0 22px 6px rgba(242, 193, 78, 0.45);
+}
+
+/* The star rides on the showpiece's lower edge, so every name keeps one baseline. */
+.pk-swatch em {
+  position: absolute;
+  top: calc(var(--sh, 126px) * 1.04 - 9px);
+  z-index: 1;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--gold);
+  color: var(--paper-ink);
+  font-size: 12px;
+  font-style: normal;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px #05080a;
+}
+
+.pk-swatch b {
+  width: calc(var(--sw, 90px) + var(--sgap, 14px));
+  margin: 12px calc(var(--sgap, 14px) / -2) 0;
+  font-weight: 400;
+  font-size: clamp(11px, calc(var(--sw, 90px) * 0.15), 16px);
+  text-wrap: balance;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 0 var(--edge);
+}
+
+.pk-list-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 14px;
+  width: min(480px, calc(100vw - 32px));
+}
+
+/* The way on is the shop's red: fat, a dark lip; closing is a dark slab beside it. */
+.pk-list-actions .btn {
+  --lip: 6px;
+  font-size: 19px;
+  box-shadow: 0 0 0 3px #05080a, 0 var(--lip) 0 3px var(--lo), 0 calc(var(--lip) + 3px) 0 3px #05080a, inset 0 3px 0 rgba(255, 255, 255, 0.22);
+}
+
+.pk-list-close {
+  --c: #26323a;
+  --lo: #111a1f;
+}
+
+.pk-list-deck {
+  --c: #ee4f32;
+  --lo: #8a2414;
+  font-size: 21px !important;
+}
+
+@media (max-width: 640px) {
+  .pk-list-actions .btn { font-size: 17px; min-height: 48px; }
+  .pk-list-deck { font-size: 18px !important; }
+}
+
+/* More below: the list fades at its bottom edge until it is scrolled to the end. */
+.pk-rows.is-more {
+  mask-image: linear-gradient(#000 calc(100% - 36px), transparent);
+}
+
+@media (max-width: 640px) {
+  .pk.is-list .pk-list { gap: 10px; }
+  .pk-list-title { font-size: 19px; }
+  .pk-list-title small { font-size: 13px; }
+  .pk-rows { gap: 14px; padding: 12px 6px 8px; }
+  .pk-row { gap: 7px; }
+  .pk-row-tag { font-size: 14px; padding: 0 10px 2px; }
+  .pk-row-tag small { font-size: 13px; }
+  .pk-swatch b { font-size: 11px; margin-top: 9px; }
+  .pk-swatch em { font-size: 10px; height: 15px; line-height: 15px; top: calc(var(--sh, 126px) * 1.04 - 7px); }
+}
+
+/* Into the deck: the words go first, the cards fly. */
+.pk.is-to-deck .pk-list-title,
+.pk.is-to-deck .pk-list-actions,
+.pk.is-to-deck .pk-row-tag,
+.pk.is-to-deck .pk-swatch b,
+.pk.is-to-deck .pk-swatch em {
+  opacity: 0;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.pk.is-still .pk-card,
+.pk.is-still .pk-wash::after,
+.pk.is-still .pk-row-tag,
+.pk.is-still .pk-list-title {
+  animation: none;
+}
+
+.pk.is-still .pk-swatch {
+  animation-duration: 0.2s;
+}
+
+/* A finish owned before the pack was sealed again: in its place, quieter, tagged. */
+.pk-swatch.is-had .pk-card {
+  filter: saturate(0.4) brightness(0.7);
+}
+
+.pk-swatch em.is-had {
+  background: #26323a;
+  color: var(--text);
+}
+
+/* Small cards wear the showpiece's star alone; its name says the rest in gold. */
+.pk.is-tight .pk-swatch em span {
+  display: none;
+}
+
+.pk-swatch.is-showpiece b {
+  color: var(--gold);
+}
+
+/* The list sits on a quieter room: the swirl dims behind it so the names stay readable. */
+.pk.is-list .pk-room {
+  filter: brightness(0.5) saturate(0.75);
+}
+
+/* In two columns, a last row on its own takes the middle. */
+.pk-row:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+/* Armed: the time left to tap again runs out along its bottom edge. */
+.pk-all {
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-all.is-armed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 100%;
+  background: rgba(5, 8, 10, 0.45);
+  transform-origin: left;
+  animation: pk-runout 3s linear forwards;
+}
+
+@keyframes pk-runout {
+  to { transform: scaleX(0); }
 }

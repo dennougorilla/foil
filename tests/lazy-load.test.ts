@@ -56,7 +56,10 @@ test('no pack shader code is in the first load', () => {
 
 /**
  * What waits until it is used (docs/performance.md): Fine-tune's tabs, the print menu, free placement,
- * the motion tray, the motions other than Sway, making a file, reading an animated picture, and each language's texts.
+ * the motion tray, the motions other than Sway, the backdrops other than the swirl, making a file (with the MP4 muxer),
+ * reading an animated picture, each language's texts, the service worker's registration (with the Update chip and a
+ * picture shared to FOIL), the deck builder's and the shop's rules, touch (only the touch finishes, which come in
+ * packs, use it) and the ?fps=1 meter.
  */
 const ON_DEMAND = [
   'i18n/ja.ts',
@@ -78,10 +81,17 @@ const ON_DEMAND = [
   'tune/moves.ts',
   'tune/motionIcons.ts',
   'anim/apngExport.ts',
+  'anim/mp4Export.ts',
   'anim/png.ts',
   'gifDecode.ts',
   'anim/apngDecode.ts',
   'card/tcgFace.ts',
+  'pwa.ts',
+  'card/effect.ts',
+  'pack/rules.ts',
+  'gl/backdrops.ts',
+  'fpsMeter.ts',
+  'touch/heat.ts',
 ];
 
 test('the on-demand modules are not in the first load', () => {
@@ -109,4 +119,8 @@ test('each on-demand module is still loaded somewhere (a dynamic import reaches 
   };
   walk(SRC);
   for (const f of ON_DEMAND) assert.ok(reached.has(join(SRC, f)), `${f} is never loaded`);
+});
+
+test('the MP4 muxer is not in the first load', () => {
+  for (const f of closure(join(SRC, 'main.ts'))) assert.ok(!/from\s+['"]mp4-muxer['"]/.test(readFileSync(f, 'utf8')), `${f.slice(SRC.length + 1)} imports mp4-muxer`);
 });

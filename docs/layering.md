@@ -14,8 +14,8 @@ ways to do it and records the one FOIL uses. The product summary is in `README.m
 - The **Finish area** (`src/range.ts`, `src/gl/range.ts`) already says, per pixel, how much of the
   finish lands there: a region (all, art, frame, name, none) from the face mask, a brightness band,
   invert, and a brush that paints in or out. Outside it the card shows the plain picture.
-- Some finishes cover the frame in full (Gold, Halftone, Platinum, Stained Glass, Blacklight, Neon,
-  Confetti, Fireworks, Negative), two stay in the art window (Crystal, Cosmo Holo), the rest soften
+- Some finishes cover the frame in full (Gold, Halftone, Platinum, Chameleon, Stained Glass,
+  Blacklight, Neon, Confetti, Fireworks, Negative), two stay in the art window (Crystal, Cosmo Holo), the rest soften
   a little on the frame.
 - Some finishes need the card to themselves: Warmth and Glow are driven by touch, Blacklight by a
   lamp that follows the pointer, Shadowbox and 3D Lenticular by the depth model, Flip Lenticular by
@@ -118,7 +118,7 @@ Where each finish goes is shown, not described:
 - "+ Layer a finish" is a dashed empty slot above layer 1; it opens the finish list, and the
   finish chosen becomes layer 2 on the whole card, adding its light.
 - Choosing a row hands the area controls below (region, brightness, invert, brush) to that
-  layer; their heading names the finish they place ("Where Kintsugi goes"). While those controls
+  layer; their heading names the finish they place ("Area of layer 2 (Kintsugi)"). While those controls
   are in use, the card shows that layer alone in its area with the proof overlay, so what is being
   changed is exactly what is marked; in the layer list the card shows both layers as they are.
 - With two layers: "Where they overlap" (Add its light / Lay it over, one line saying what that

@@ -14,7 +14,7 @@ export interface Meta {
   at: number;
   name: string;
   edition: EditionId;
-  /** Thumbnail plus picture. */
+  /** Thumbnail, picture and brush strokes. */
   bytes: number;
   /** Its pocket, 0–53; a card without one is given the first empty pocket (limits.ts arrange). */
   slot?: number;
@@ -25,6 +25,8 @@ export interface Kept {
   card: Card;
   /** The person's picture; null for a sample (its number is in the card). */
   picture: Blob | null;
+  /** The finish area's brush strokes, deflated (brush.ts); null when nothing is painted. */
+  brush: Blob | null;
 }
 
 let db: Promise<IDBDatabase> | null = null;
@@ -68,6 +70,15 @@ export const fillOf = (metas: Meta[]): Fill => ({ count: metas.length, bytes: me
 export const thumb = (id: string) => tx<Blob | undefined>(['thumbs'], 'readonly', (t) => t.objectStore('thumbs').get(id));
 
 export const kept = (id: string) => tx<Kept | undefined>(['cards'], 'readonly', (t) => t.objectStore('cards').get(id));
+
+/**
+ * Asks the browser not to clear this site's storage when space runs short (docs/pwa.md), while it is
+ * not persistent yet. Chrome answers by itself, Firefox asks the person once; FOIL says nothing either way.
+ */
+export async function persist(): Promise<void> {
+  const s = navigator.storage;
+  if (s?.persist && !(await s.persisted())) await s.persist();
+}
 
 export async function put(meta: Meta, thumbnail: Blob, card: Kept): Promise<void> {
   await tx(['meta', 'thumbs', 'cards'], 'readwrite', (t) => {

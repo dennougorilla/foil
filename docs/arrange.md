@@ -27,10 +27,14 @@ its size and its turn are free.
   square handle at its corner that sizes them, and a round handle on a short stalk above them
   that turns them (up to ±15°; within ±3° of level they settle level, with a click). Two fingers
   pinch to size and turn. A readout over the turn handle shows only what is changing (the turn,
-  naming level and the 15° limit; the size against where the gesture began). A tap elsewhere on
-  the card, Esc or **Done** lets go.
+  naming level and the 15° limit; the size against where the gesture began). A press anywhere
+  but the words, their handles, their bar and their print menu (elsewhere on the card, the
+  panel, the page), Esc, **Done**, scrolling the page, switching finishes or leaving the tab
+  lets go. Letting go also closes the print menu, and nothing of the selection stays on screen.
 - A small **bar under the card** names the selected piece and offers **Print** (its print
   menu), **Straighten**, **Back to Auto** and **Done**; on a phone it wraps to fit the screen.
+  The box, its handles and the bar follow the card on screen; the print menu sits on the page
+  beside what opened it and closes when the page (or the box holding what opened it) scrolls.
 - While Free is on and nothing is selected, a faint dashed outline marks the words that can be
   picked up, and the hint beside the card says how.
 - While words are selected the card **holds still** and faces the viewer (as while painting the
@@ -38,7 +42,8 @@ its size and its turn are free.
   come back when nothing is selected.
 - **Guides:** while dragging, the words snap to the card's centre lines, the picture's edges and
   the frame's inner edge (with a click), and a guide on a dark keyline shows the line they
-  snapped to. They stop at the frame's inner edge; sizing or turning past it shrinks them to
+  snapped to. A guide shows only while the words are held: lifting the finger or the mouse (or
+  the press being cancelled or lost) takes it away. They stop at the frame's inner edge; sizing or turning past it shrinks them to
   fit. They never leave the card.
 - **Keyboard:** with words selected, the arrow keys move them (Shift for bigger steps), + and −
   size them, [ and ] turn them. "Back to Auto" (おまかせに戻す) in the tab returns every word to

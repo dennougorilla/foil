@@ -3,14 +3,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { artWindow, cardK, contain, exportFrame, fitArea, shapeById, shapeOf, SHAPES } from '../src/card/shape.ts';
+import { artWindow, cardK, contain, exportFrame, FIT_MAX, fitArea, setFit, shapeById, shapeOf, SHAPES } from '../src/card/shape.ts';
 
 const near = (a: number, b: number, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≈ ${b}`);
 
 test('the trading card leads, and every shape has the proportions it is named for', () => {
   assert.deepEqual(
     SHAPES.map((s) => s.id),
-    ['card', 'wide', 'square', 'post', 'postWide', 'meishi'],
+    ['card', 'wide', 'square', 'post', 'postWide', 'meishi', 'fit'],
   );
   const ratio = (id: Parameters<typeof shapeById>[0]) => shapeById(id).h / shapeById(id).w;
   near(ratio('card'), 88 / 63, 0.01);
@@ -32,6 +32,23 @@ test('a saved shape that is not known starts over on the trading card', () => {
   assert.equal(shapeOf('hexagon'), 'card');
   assert.equal(shapeOf(undefined), 'card');
   assert.equal(shapeOf(3), 'card');
+});
+
+test('Picture takes the picture\'s proportions, its short side 900, never past 1 : FIT_MAX', () => {
+  assert.equal(shapeOf('fit'), 'fit');
+  assert.equal(setFit(300, 600), true);
+  assert.deepEqual([shapeById('fit').w, shapeById('fit').h], [900, 1800]);
+  // The same proportions again change nothing.
+  assert.equal(setFit(150, 300), false);
+  setFit(1000, 500);
+  assert.deepEqual([shapeById('fit').w, shapeById('fit').h], [1800, 900]);
+  setFit(100, 1000);
+  assert.deepEqual([shapeById('fit').w, shapeById('fit').h], [900, Math.round(900 * FIT_MAX)]);
+  setFit(1000, 10);
+  assert.deepEqual([shapeById('fit').w, shapeById('fit').h], [Math.round(900 * FIT_MAX), 900]);
+  setFit(63, 88);
+  near(shapeById('fit').h / shapeById('fit').w, 88 / 63, 0.01);
+  setFit(900, 1260);
 });
 
 test('cardK is the face in units of its short side', () => {

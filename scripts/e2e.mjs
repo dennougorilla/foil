@@ -76,10 +76,10 @@ await step('content fades out above the pinned Save bar', async () => {
 
 await step('nothing of a pack loads before one is opened', async () => {
   const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
-  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth/.test(n));
+  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth|gl\/backdrops/.test(n));
   expect(pack.length === 0, `loaded early: ${pack.join(', ')}`);
   expect((await page.locator('.hand-slot').count()) === 7, 'the hand does not start with seven');
-  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '4', 'the pack button does not count four sealed packs');
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', 'the pack button does not count five sealed packs');
   expect((await page.textContent('#deckBtn .deck-count')) === '0', 'the deck is not empty on a first visit');
 });
 
@@ -89,7 +89,7 @@ await step('the binder loads nothing before it is used, and Share shows only whe
   expect(binder.length === 0, `loaded early: ${binder.join(', ')}`);
   expect(await page.isVisible('#keepBtn'), 'no Keep button in the Save box');
   expect(await page.evaluate(() => !!document.getElementById('keepBtn').closest('.sec-export')), 'Keep is not in the Save box');
-  const files = await page.evaluate(() => !!navigator.canShare?.({ files: [new File([''], 'card.png', { type: 'image/png' })] }));
+  const files = await page.evaluate(() => !!navigator.canShare?.({ files: [new File([''], 'card.gif', { type: 'image/gif' })] }));
   expect((await page.isVisible('#shareBtn')) === files, `Share is ${files ? 'hidden although' : 'shown although no'} share sheet takes files`);
   expect((await page.textContent('#binderBtn .binder-count')) === '0', 'the binder chip does not count an empty binder');
 });
@@ -262,15 +262,30 @@ await step('lettering from the name tag', async () => {
   expect((await state()).text.style === 'foil', 'lettering style not applied');
 });
 
-/** Saves a PNG and returns its bytes (base64). */
-const savePng = async () => {
-  await page.click('#formatSeg [role=radio][data-format=png]');
-  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#saveBtn')]);
+/** Picks a motion from the tray above the deck. */
+const pickMotion = async (v) => {
+  await page.click('#deckDock .qm-btn');
+  await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 });
+  await page.click(`.qm-opt[data-value=${v}]`);
+  await page.keyboard.press('Escape');
+  expect((await state()).tune.idle === v, `the motion did not become ${v}`);
+};
+/** The motion to go back to once the still saves below are done. */
+let motionBefore = 'sway';
+/**
+ * Saves an APNG and returns its bytes (base64); read as an image it is its first frame, lossless.
+ * Under no motion the trading card sits square in the middle of it.
+ */
+const saveStill = async () => {
+  await page.click('#formatSeg [role=radio][data-format=apng]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
   const png = readFileSync(await dl.path()).toString('base64');
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
   return png;
 };
-/** Mean colour difference (0–255) of two PNGs inside each rect, given as fractions of the image [x0, y0, x1, y1]. */
+/** A point of the card (fractions of it) as fractions of the APNG's frame: 320 × 400, the card 203.2 × 284.4 in its middle. */
+const onCard = (x, y) => [(160 + (x - 0.5) * 203.2) / 320, (200 + (y - 0.5) * 284.4) / 400];
+/** Mean colour difference (0–255) of two stills inside each rect, given as fractions of the card [x0, y0, x1, y1]. */
 const pngDiff = (a, b, rects) =>
   page.evaluate(async ([a, b, rects]) => {
     const load = async (s) => {
@@ -289,20 +304,22 @@ const pngDiff = (a, b, rects) =>
       for (let i = 0; i < p.length; i += 4) d += Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]);
       return d / (p.length / 4) / 3;
     });
-  }, [a, b, rects]);
-// Card regions (fractions of the saved PNG): a message at the bottom of the art, the top of the art, the nameplate.
+  }, [a, b, rects.map(([x0, y0, x1, y1]) => [...onCard(x0, y0), ...onCard(x1, y1)])]);
+// Card regions (fractions of the card): a message at the bottom of the art, the top of the art, the nameplate.
 const MSG = [0.25, 0.68, 0.75, 0.8];
 const TOP = [0.25, 0.12, 0.75, 0.3];
 const PLATE = [0.15, 0.9, 0.6, 0.95];
 
 await step('a ready phrase puts a message on the card and in every export; the nameplate can go', async () => {
-  // Base and plain ink, so only the words differ between the saves.
+  // Base and plain ink, so only the words differ between the saves; no motion, so the card sits still in them.
+  motionBefore = (await state()).tune.idle;
+  await pickMotion('none');
   await page.locator('#cardSlot').focus();
   await page.keyboard.press('1');
   await tab('text');
   await page.click('.lt-style[data-style=ink]');
   expect(!(await page.isVisible('.msg-detail')), 'place and typeface show before there are any words');
-  const bare = await savePng();
+  const bare = await saveStill();
   await page.click('.msg-phrase >> nth=0');
   await page.click('.msg-places [data-v=bottom]');
   await page.click('.msg-fonts [data-v=serif]');
@@ -310,7 +327,7 @@ await step('a ready phrase puts a message on the card and in every export; the n
   expect(s.message.text === 'Happy\nBirthday' && s.message.place === 'bottom' && s.message.font === 'serif', `message saved as ${JSON.stringify(s.message)}`);
   expect((await page.inputValue('#messageInput')) === 'Happy\nBirthday', 'the tag beside the card does not show the message');
   await page.waitForFunction(() => document.fonts.check('800 40px "Shippori Mincho"', 'Happy'), null, { timeout: 15000 });
-  const said = await savePng();
+  const said = await saveStill();
   const [msg, top] = await pngDiff(bare, said, [MSG, TOP]);
   expect(msg > 12 && top < 1, `the message did not land at the bottom of the art (bottom ${msg.toFixed(1)}, top ${top.toFixed(1)})`);
 
@@ -322,13 +339,13 @@ await step('a ready phrase puts a message on the card and in every export; the n
   // Message only: the nameplate leaves the band plain.
   await page.click('.msg-plate [data-v=off]');
   expect((await state()).plate === false, 'nameplate still on');
-  const only = await savePng();
+  const only = await saveStill();
   const [plate, kept] = await pngDiff(said, only, [PLATE, MSG]);
   expect(plate > 4 && kept < 1, `turning the nameplate off (plate ${plate.toFixed(1)}, message ${kept.toFixed(1)})`);
 
   // Hot foil prints the message too: metal, not the flat ink.
   await page.click('.lt-style[data-style=foil]');
-  const foil = await savePng();
+  const foil = await saveStill();
   const [metal] = await pngDiff(only, foil, [MSG]);
   expect(metal > 6, `the foil did not reach the message (${metal.toFixed(1)})`);
   await page.click('.msg-plate [data-v=on]');
@@ -344,10 +361,10 @@ await step('the trading-card layout: the message fills the effect box, and each 
   expect((await state()).cardType === 'Birthday card', 'type line not saved');
   // The effect box holds the message; without one the box goes and the picture runs down to the footer.
   const EFFECT = [0.25, 0.74, 0.75, 0.9];
-  const said = await savePng();
+  const said = await saveStill();
   const keep = (await state()).message.text;
   await page.fill('#messageInput', '');
-  const blank = await savePng();
+  const blank = await saveStill();
   const [box] = await pngDiff(said, blank, [EFFECT]);
   expect(box > 1, `the effect box did not change with the message (${box.toFixed(1)})`);
   await page.fill('#messageInput', keep);
@@ -375,10 +392,64 @@ await step('the trading-card layout: the message fills the effect box, and each 
   await page.keyboard.press('Escape');
 });
 
+await step("a trading card's text area is its words alone, upright and wide, where the wide card sets its words beside the picture", async () => {
+  const r = await page.evaluate(async () => {
+    const { drawFace, loadTcgFace, artOf } = await import('/src/card/face.ts');
+    const { tcgFrame } = await import('/src/card/tcg.ts');
+    const { RangeModel } = await import('/src/range.ts');
+    const { RANGE_W, RANGE_H } = await import('/src/gl/range.ts');
+    await loadTcgFace();
+    await document.fonts.ready;
+    const img = document.createElement('canvas');
+    img.width = 800;
+    img.height = 600;
+    const x = img.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 800, 600);
+    g.addColorStop(0, '#2a6f97');
+    g.addColorStop(1, '#f4a261');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 800, 600);
+    const out = {};
+    for (const shape of ['card', 'wide']) {
+      const spec = { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Gorilla', shape, message: { text: 'When this card comes into play,\ndraw a card.', place: 'top', font: 'dot' }, plate: true, layout: 'tcg', cardType: 'Monster — Forest', arrange: 'auto', placements: {} };
+      const face = document.createElement('canvas');
+      const mask = document.createElement('canvas');
+      drawFace(face, mask, spec);
+      const model = new RangeModel();
+      model.onFace(face, mask, spec);
+      const text = model.region('text');
+      // Share of a rectangle (face px) the region takes.
+      const share = (rc, pad = 0) => {
+        let on = 0;
+        let n = 0;
+        const sx = RANGE_W / face.width;
+        const sy = RANGE_H / face.height;
+        for (let py = Math.ceil((rc.y + pad) * sy); py < Math.floor((rc.y + rc.h - pad) * sy); py++)
+          for (let px = Math.ceil((rc.x + pad) * sx); px < Math.floor((rc.x + rc.w - pad) * sx); px++) {
+            n++;
+            if (text[py * RANGE_W + px] > 127) on++;
+          }
+        return on / Math.max(1, n);
+      };
+      const f = tcgFrame(face.width, face.height, { type: true, lines: 2 });
+      const a = artOf(face);
+      out[shape] = { art: share(a, 8), effect: share(f.effect, 12), name: share(f.name, 6), type: share(f.type, 6), beside: f.effect.x >= a.x + a.w, size: [face.width, face.height] };
+    }
+    return out;
+  });
+  for (const [shape, v] of Object.entries(r)) {
+    const f = (n) => (n * 100).toFixed(1) + '%';
+    expect(v.art < 0.002, `${shape}: the text area covers the picture (${f(v.art)})`);
+    expect(v.effect > 0.03 && v.effect < 0.6, `${shape}: the text area misses the card text (${f(v.effect)})`);
+    expect(v.name > 0.03 && v.type > 0.03, `${shape}: the text area misses the name or the type line (${f(v.name)}, ${f(v.type)})`);
+  }
+  expect(r.wide.beside && !r.card.beside, `the wide card does not set its words beside the picture (${JSON.stringify(r)})`);
+});
+
 await step('free placement: drag the words on the card, a tap still opens their print, Auto puts them back', async () => {
   await tab('text');
   await page.fill('#messageInput', 'Happy\nBirthday');
-  const auto = await savePng();
+  const auto = await saveStill();
   await page.click('.msg-arrange [data-v=free]');
   await page.waitForFunction(() => !!JSON.parse(localStorage.getItem('foil:v1')).placements?.message, null, { timeout: 5000 });
   const p0 = (await state()).placements.message;
@@ -396,7 +467,7 @@ await step('free placement: drag the words on the card, a tap still opens their 
   expect(p1.y < p0.y - 0.15 && p1.x < p0.x - 0.05, `the message did not follow the drag (${JSON.stringify(p0)} → ${JSON.stringify(p1)})`);
   expect(p1.x > 0 && p1.x < 1 && p1.y > 0 && p1.y < 1, 'the message left the card');
   // Exports draw it where it now is.
-  const moved = await savePng();
+  const moved = await saveStill();
   const [top] = await pngDiff(auto, moved, [[0.1, 0.1, 0.9, 0.35]]);
   expect(top > 1, `the export does not show the moved message (${top.toFixed(1)})`);
   // A short tap opens its print menu instead of moving it.
@@ -429,7 +500,8 @@ await step('finish area tab and brush', async () => {
 });
 
 /** Pixels of a saved PNG at the given points, read back through the page. */
-const pngAt = (path, points) =>
+/** The colours of a still at points of the card. */
+const pngAt = (b64, points) =>
   page.evaluate(
     async ({ b64, points }) => {
       const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
@@ -438,16 +510,10 @@ const pngAt = (path, points) =>
       x.drawImage(img, 0, 0);
       return points.map(([px, py]) => [...x.getImageData(Math.round(px * img.width), Math.round(py * img.height), 1, 1).data]);
     },
-    { b64: readFileSync(path).toString('base64'), points },
+    { b64, points: points.map(([x, y]) => onCard(x, y)) },
   );
-const savePngPath = async () => {
-  await page.click('#formatSeg [role=radio][data-format=png]');
-  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
-  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
-  return dl.path();
-};
 
-await step('layers: layer 2 from owned finishes, each layer its own area, the overlap blend, and the PNG shows both', async () => {
+await step('layers: layer 2 from owned finishes, each layer its own area, the overlap blend, and a file shows both', async () => {
   await tab('range');
   if (await page.isVisible('#pane-range .range-reset')) await page.click('#pane-range .range-reset');
   expect((await page.locator('.layer-row').count()) === 1 && (await page.isVisible('.layer-add')), 'one layer and a + slot to start with');
@@ -455,7 +521,7 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
   const edition = (await state()).edition;
   expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
-  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  expect(!chips.some((v) => ['warmth', 'glow', 'rain', 'marble', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
   const pick = chips.includes('negative') ? 'negative' : 'poly';
   await page.click(`.layer-chip[data-v=${pick}]`);
   let s = await state();
@@ -473,21 +539,23 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   await page.click('.seg-blend [data-b=over]');
   expect((await state()).layer2.blend === 'over', 'the blend did not change');
   await page.click('.seg-blend [data-b=light]');
-  // The PNG (948 × 1308, 24 px of padding): a point in the art and one on the side of the frame.
+  // A point in the art and one on the side of the frame.
   const points = [[0.5, 0.42], [0.042, 0.42]];
-  const layered = await pngAt(await savePngPath(), points);
+  const layered = await pngAt(await saveStill(), points);
   await page.click('.layer-row[data-n="2"] .layer-x');
   expect((await state()).layer2 === null && (await page.locator('.layer-row').count()) === 1, '× did not remove layer 2');
-  const single = await pngAt(await savePngPath(), points);
+  const single = await pngAt(await saveStill(), points);
   const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
   expect(d(layered[0], single[0]) === 0, `the art changed: ${layered[0]} vs ${single[0]}`);
   expect(d(layered[1], single[1]) > 24, `the frame did not take layer 2: ${layered[1]} vs ${single[1]}`);
   // Left on (whole card, adding its light) for the exports below, so GIF and APNG are made with two layers.
   await page.click('.layer-add');
   await page.click(`.layer-chip[data-v=${pick}]`);
+  // The stills are done: the card moves again.
+  await pickMotion(motionBefore);
 });
 
-for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.png']]) {
+for (const [format, ext] of [['gif', '.gif'], ['apng', '-anim.png']]) {
   await step(`export ${format}`, async () => {
     await page.click(`#formatSeg [role=radio][data-format=${format}]`);
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
@@ -497,11 +565,15 @@ for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.p
   });
 }
 
-await step('GIF with a clear background is really clear', async () => {
+await step('a GIF on the Clear backdrop is really clear', async () => {
   await page.click('#formatSeg [role=radio][data-format=gif]');
-  expect(!(await page.isVisible('#gifBgSeg')), 'GIF options are open before being asked for');
+  expect(!(await page.isVisible('#saveBackdropPick')), 'GIF options are open before being asked for');
   await page.click('#saveOptsToggle');
-  await page.click('#gifBgSeg [data-v=clear]');
+  // The options name the backdrop and lead to the tiles in Fine-tune → Card.
+  await page.click('#saveBackdropPick');
+  await page.waitForSelector('#backdropSeg [data-v=clear]', { state: 'visible' });
+  await page.click('#backdropSeg [data-v=clear]');
+  expect((await state()).backdrop === 'clear', 'the Clear tile did not pick the backdrop');
   await page.click('#matteSeg [data-v="#ffffff"]');
   expect(await page.isVisible('#gifClearNote'), 'no note about the dropped shadow');
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
@@ -515,12 +587,67 @@ await step('GIF with a clear background is really clear', async () => {
     expect(at(width >> 1, height >> 1) === 255, 'the card is not opaque');
   }
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  await page.click('#backdropSeg [data-v=swirl]');
 });
 
-await step('a GIF moves exactly as the card does on the stage, for every motion', async () => {
-  // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
-  // exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
-  await page.evaluate(async () => {
+await step('every backdrop is drawn in the file as on the stage, and closes its loop', async () => {
+  // The stage draws the picked backdrop once its shader has arrived.
+  const bgPixel = () =>
+    page.evaluate(() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 1;
+      const bg = document.getElementById('bg');
+      c.getContext('2d').drawImage(bg, 4, 4, 1, 1, 0, 0, 1, 1);
+      return [...c.getContext('2d').getImageData(0, 0, 1, 1).data];
+    });
+  await page.click('#backdropSeg [data-v=plain]');
+  await page.waitForTimeout(600);
+  const plain = await bgPixel();
+  const want = (await state()).backdropColor;
+  const hex = '#' + plain.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
+  expect(hex === want, `the stage shows ${hex} on Plain, not ${want}`);
+  expect(await page.isVisible('#backdropColorBtn'), 'Plain has no color button');
+  await page.click('#backdropSeg [data-v=swirl]');
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const face = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = back.width = 900;
+    face.height = back.height = 1260;
+    drawBack(back, 'card');
+    const out = {};
+    for (const id of ['swirl', 'felt', 'studio', 'velvet', 'bokeh', 'stars', 'confetti', 'plain', 'clear']) {
+      const s = await createScene({ face, mask: face, back, edition: editionById('holo'), intensity: 1, pixel: 0, name: 't', tune: { ...TUNE_DEFAULTS, idle: 'jelly' }, backdrop: { id, color: '#336699' } }, 480, 600, true);
+      // The top-left corner, clear of the card: at the loop's start, its end, and halfway.
+      const corner = (p) => {
+        s.draw(p);
+        return [...s.ctx.getImageData(0, 0, 80, 60).data];
+      };
+      const [a, b, c] = [corner(0), corner(1), corner(0.5)];
+      s.dispose();
+      const diff = (x, y) => x.reduce((n, v, i) => n + (Math.abs(v - y[i]) > 2 ? 1 : 0), 0);
+      out[id] = { seam: diff(a, b), moved: diff(a, c), first: a.slice(0, 4) };
+    }
+    return out;
+  });
+  for (const [id, r] of Object.entries(report)) expect(r.seam === 0, `${id} does not close its loop (${r.seam} values differ)`);
+  // The swirl breathes; the felt, studio, velvet and plain hold still. Bokeh, stars and confetti move
+  // in the whole frame, so their top-left corner may or may not show it.
+  expect(report.swirl.moved > 0, 'the swirl does not breathe in a file');
+  for (const id of ['felt', 'studio', 'velvet', 'plain']) expect(report[id].moved === 0, `${id} moves`);
+  expect(report.plain.first.slice(0, 3).join() === '51,102,153', `Plain is ${report.plain.first}`);
+  expect(report.clear.first[3] === 0, 'the Clear backdrop is not transparent in a file');
+  expect(report.felt.first[3] === 255, 'Felt is not opaque');
+});
+
+// Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
+// exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
+// The stage's idle clock is frozen meanwhile.
+const recordDraws = () =>
+  page.evaluate(async () => {
     const { CardRenderer } = await import('/src/gl/renderers.ts');
     const { motion, LiveMotion } = await import('/src/tune/motion.ts');
     const live = document.getElementById('cards');
@@ -546,6 +673,49 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
       return LiveMotion.prototype.step.call(this, 0, ...rest);
     };
   });
+/** Lets the stage's clock and the renderer go again. */
+const stopRecording = () =>
+  page.evaluate(async () => {
+    const { motion } = await import('/src/tune/motion.ts');
+    const { CardRenderer } = await import('/src/gl/renderers.ts');
+    delete motion.step;
+    CardRenderer.prototype.drawCard = window.__drawCard;
+  });
+/** The pose, sheen and light of a drawn card, relative to its centre `ox`, `oy` and its height. */
+const norm = (d, ox, oy) => ({
+  dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale,
+  t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint,
+  b0: d.beam[0], b3: d.beam[3], s1: d.spot[1], dim: d.dim, st: d.star[2],
+});
+/** The biggest gap between exported frames and the stage held at the same moment of its idle cycle. */
+async function driftFromStage(frames) {
+  // The pointer leaves the card and the card settles.
+  await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
+  await page.waitForTimeout(1500);
+  // Each exported frame against the stage held at the same moment of its idle cycle.
+  let worst = { d: 0, at: '' };
+  for (const f of frames.filter((_, i, a) => i % Math.ceil(a.length / 12) === 0)) {
+    // An exported frame's loop time is its moment in idle seconds.
+    const sAt = f.time;
+    const got = await page.evaluate(async (sAt) => {
+      const { motion } = await import('/src/tune/motion.ts');
+      motion.idleTime = sAt;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return window.__draws.live;
+    }, sAt);
+    expect(Math.abs(got.s - sAt) < 1e-9, 'the stage clock moved while frozen');
+    const a = norm(got, got.ox, got.oy);
+    const b = norm(f, f.W / 2, f.H / 2);
+    for (const k of Object.keys(a)) {
+      const d = Math.abs(a[k] - b[k]);
+      if (d > worst.d) worst = { d, at: `${k} at ${sAt.toFixed(2)}s: stage ${a[k].toFixed(4)}, export ${b[k].toFixed(4)}` };
+    }
+  }
+  return worst;
+}
+
+await step('a GIF moves exactly as the card does on the stage, for every motion', async () => {
+  await recordDraws();
   await tab('light');
   try {
   // Every motion in the list (docs/motion.md), under each light setting and a few speeds.
@@ -572,11 +742,6 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
     ['bounce', 'pointer', 2],
     ['none', 'orbit', 1],
   ];
-  const norm = (d, ox, oy) => ({
-    dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale,
-    t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint,
-    b0: d.beam[0], b3: d.beam[3], s1: d.spot[1], dim: d.dim, st: d.star[2],
-  });
   for (const [n, [idle, light, speed]] of cases.entries()) {
     await page.click(`#pane-light [data-key=light] [role=radio][data-value=${light}]`);
     await page.click(`#pane-light [data-key=idle] [role=radio][data-value=${idle}]`);
@@ -609,48 +774,146 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
         face.height = back.height = 1260;
         drawBack(back, 'card');
         window.__draws.frames = [];
-        const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
-        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40);
+        const scene = await createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune, backdrop: { id: 'clear', color: '#000000' } }, 480, 600, false, false);
+        for (let i = 0; i < 12; i++) scene.draw(i / 12);
         scene.dispose();
         return window.__draws.frames;
       });
     }
-    // The pointer leaves the card and the card settles.
-    await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
-    await page.waitForTimeout(1500);
-    // Each exported frame against the stage held at the same moment of its idle cycle.
-    let worst = { d: 0, at: '' };
-    for (const f of frames.filter((_, i, a) => i % Math.ceil(a.length / 12) === 0)) {
-      // An exported frame's loop time is its moment in idle seconds.
-      const sAt = f.time;
-      const got = await page.evaluate(async (sAt) => {
-        const { motion } = await import('/src/tune/motion.ts');
-        motion.idleTime = sAt;
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        return window.__draws.live;
-      }, sAt);
-      expect(Math.abs(got.s - sAt) < 1e-9, 'the stage clock moved while frozen');
-      const a = norm(got, got.ox, got.oy);
-      const b = norm(f, f.W / 2, f.H / 2);
-      for (const k of Object.keys(a)) {
-        const d = Math.abs(a[k] - b[k]);
-        if (d > worst.d) worst = { d, at: `${k} at ${sAt.toFixed(2)}s: stage ${a[k].toFixed(4)}, export ${b[k].toFixed(4)}` };
-      }
-    }
+    const worst = await driftFromStage(frames);
     expect(worst.d < 2e-3, `${idle}/${light}/${speed}: the export drifts from the stage (${worst.at})`);
   }
   } finally {
-    await page.evaluate(async () => {
-      const { motion } = await import('/src/tune/motion.ts');
-      const { CardRenderer } = await import('/src/gl/renderers.ts');
-      delete motion.step;
-      CardRenderer.prototype.drawCard = window.__drawCard;
-    });
+    await stopRecording();
     await page.click('#pane-light .tune-reset-all');
   }
 });
 
-/** Width and height of a downloaded PNG (or APNG), from its header. */
+/** What an MP4 holds, read from its boxes: frame size, codec, frame and key-frame counts, length, tracks, and which of index and data comes first. */
+function mp4Info(buf) {
+  const info = { tracks: 0, first: null };
+  const walk = (from, to) => {
+    for (let at = from; at + 8 <= to; ) {
+      let size = buf.readUInt32BE(at);
+      const type = buf.toString('latin1', at + 4, at + 8);
+      if (size === 1) size = Number(buf.readBigUInt64BE(at + 8));
+      if (size === 0) size = to - at;
+      const body = at + 8;
+      if (!info.first && (type === 'moov' || type === 'mdat')) info.first = type;
+      if (type === 'trak') info.tracks++;
+      if (['moov', 'trak', 'mdia', 'minf', 'stbl'].includes(type)) walk(body, at + size);
+      if (type === 'mdhd') {
+        const v1 = buf[body] === 1;
+        info.timescale = buf.readUInt32BE(body + (v1 ? 20 : 12));
+        info.duration = v1 ? Number(buf.readBigUInt64BE(body + 24)) : buf.readUInt32BE(body + 16);
+      }
+      if (type === 'stsd') {
+        const entry = body + 8;
+        info.codec = buf.toString('latin1', entry + 4, entry + 8);
+        info.width = buf.readUInt16BE(entry + 32);
+        info.height = buf.readUInt16BE(entry + 34);
+      }
+      if (type === 'stsz') info.frames = buf.readUInt32BE(body + 8);
+      if (type === 'stss') info.keys = buf.readUInt32BE(body + 4);
+      at += size;
+    }
+  };
+  walk(0, buf.length);
+  return info;
+}
+
+await step('an MP4 for Instagram: H.264 at 30 fps in 4 : 5, several loops and at least six seconds, moving as the stage does frame for frame', async () => {
+  await recordDraws();
+  await tab('light');
+  try {
+    await page.click('#pane-light [data-key=light] [role=radio][data-value=pointer]');
+    await page.click('#pane-light [data-key=idle] [role=radio][data-value=jelly]');
+    await page.locator('#tune-speed').fill('1');
+    await page.waitForTimeout(300);
+    const plan = await page.evaluate(async () => {
+      const { mp4Plan } = await import('/src/anim/mp4Plan.ts');
+      return mp4Plan(JSON.parse(localStorage.getItem('foil:v1')).tune, 1260 / 900);
+    });
+    expect(plan.loops === 2, `Jelly's three-second loop plays ${plan.loops} times`);
+    // Frames at different moments of the loop, one of them in the second loop, kept small as the
+    // exporter hands them to the encoder.
+    const perLoop = plan.frames / plan.loops;
+    const picks = [0, 0.2, 0.4, 0.6, 0.8, 1.5].map((q) => Math.round(q * perLoop));
+    await page.evaluate((picks) => {
+      window.__src = {};
+      const VF = (window.__VideoFrame = VideoFrame);
+      window.VideoFrame = class extends VF {
+        constructor(src, init) {
+          super(src, init);
+          const i = Math.round((init.timestamp * 30) / 1e6);
+          if (!picks.includes(i)) return;
+          const c = new OffscreenCanvas(216, 270);
+          c.getContext('2d').drawImage(src, 0, 0, 216, 270);
+          window.__src[i] = [...c.getContext('2d').getImageData(0, 0, 216, 270).data];
+        }
+      };
+    }, picks);
+    await page.click('#formatSeg [role=radio][data-format=mp4]');
+    const label = await page.textContent('#saveBtn');
+    expect(/1080×1350/.test(label) && /\d s|\ds\b/.test(label), `Save does not name the size and length: ${label}`);
+    await page.evaluate(() => (window.__draws.frames = []));
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 400000 }), page.click('#saveBtn')]);
+    expect(dl.suggestedFilename().endsWith('.mp4'), `unexpected file ${dl.suggestedFilename()}`);
+    await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+    const buf = readFileSync(await dl.path());
+    const mp4 = mp4Info(buf);
+    const secs = mp4.duration / mp4.timescale;
+    expect(mp4.codec === 'avc1' && mp4.width === 1080 && mp4.height === 1350, `not 1080×1350 H.264: ${JSON.stringify(mp4)}`);
+    expect(mp4.tracks === 1 && mp4.first === 'moov', `expected one video track with its index first: ${JSON.stringify(mp4)}`);
+    expect(mp4.frames === plan.frames && Math.abs(secs - plan.frames / 30) < 1e-6, `${mp4.frames} frames over ${secs} s, planned ${plan.frames}`);
+    expect(secs >= 6 && secs < 12 && plan.loops * plan.loopMs >= 6000, `${secs} s, ${plan.loops} loops of ${plan.loopMs} ms`);
+    expect(mp4.keys >= Math.ceil(mp4.frames / 60), `only ${mp4.keys} key frames`);
+    // The browser plays it, and each picked frame of the video is the frame drawn for it.
+    const seen = await page.evaluate(
+      async ({ b64, picks }) => {
+        const v = document.createElement('video');
+        v.muted = true;
+        v.src = URL.createObjectURL(await (await fetch(`data:video/mp4;base64,${b64}`)).blob());
+        await new Promise((r, j) => ((v.onloadedmetadata = r), (v.onerror = () => j(new Error(`the video does not play: ${v.error?.message}`)))));
+        const c = new OffscreenCanvas(216, 270);
+        const x = c.getContext('2d');
+        const diff = (a, b) => {
+          let d = 0;
+          for (let k = 0; k < a.length; k += 4) d += Math.abs(a[k] - b[k]) + Math.abs(a[k + 1] - b[k + 1]) + Math.abs(a[k + 2] - b[k + 2]);
+          return d / ((a.length / 4) * 3);
+        };
+        const rows = [];
+        for (const i of picks) {
+          v.currentTime = (i + 0.5) / 30;
+          await new Promise((r) => (v.onseeked = r));
+          x.drawImage(v, 0, 0, 216, 270);
+          const got = x.getImageData(0, 0, 216, 270).data;
+          rows.push(picks.map((j) => diff(got, window.__src[j])));
+        }
+        return { w: v.videoWidth, h: v.videoHeight, d: v.duration, rows };
+      },
+      { b64: buf.toString('base64'), picks },
+    );
+    expect(seen.w === 1080 && seen.h === 1350 && Math.abs(seen.d - secs) < 0.05, `the player reads ${JSON.stringify({ ...seen, rows: undefined })}`);
+    for (const [n, row] of seen.rows.entries()) {
+      const others = row.filter((_, k) => k !== n);
+      expect(row[n] < 4, `frame ${picks[n]} differs from the frame drawn for it by ${row[n].toFixed(2)}`);
+      expect(others.every((d) => d > row[n] * 1.5), `frame ${picks[n]} looks as much like another frame: ${row.map((d) => d.toFixed(2)).join(' ')}`);
+    }
+    // The recorded frames: the whole video, each against the stage at the same moment.
+    const frames = await page.evaluate(() => window.__draws.frames);
+    expect(frames.length === mp4.frames && frames.every((f) => f.W === 1080 && f.H === 1350), `drew ${frames.length} frames for a ${mp4.frames}-frame video`);
+    const worst = await driftFromStage(frames);
+    expect(worst.d < 2e-3, `the MP4 drifts from the stage (${worst.at})`);
+  } finally {
+    await page.evaluate(() => (window.VideoFrame = window.__VideoFrame));
+    await stopRecording();
+    await page.click('#pane-light .tune-reset-all');
+    await page.click('#formatSeg [role=radio][data-format=gif]');
+  }
+});
+
+/** Width and height of a downloaded APNG, from its header. */
 const pngSize = async (dl) => {
   const b = readFileSync(await dl.path());
   return [b.readUInt32BE(16), b.readUInt32BE(20)];
@@ -672,15 +935,16 @@ await step('shape: a wide card turns the slot, the hand and every export on thei
   expect(Math.abs(slot.width / slot.height - 1.4) < 0.03, `the slot is ${slot.width}x${slot.height}, not 7:5`);
   const card = await page.locator('.hand-slot').first().boundingBox();
   expect(card.width > card.height, 'the hand still holds upright cards');
-  const [pw, ph] = await pngSize(await save('png'));
-  expect(pw === 1260 + 48 && ph === 900 + 48, `the PNG is ${pw}x${ph}`);
+  await page.click('#formatSeg [role=radio][data-format=mp4]');
+  const [mw, mh] = (await page.textContent('#saveBtn .btn-text small')).match(/(\d+)×(\d+)/).slice(1).map(Number);
+  expect(mw > mh && mw / mh < 1.91, `the MP4 is ${mw}x${mh}`);
   const gif = parseGIF(readFileSync(await (await save('gif')).path()));
   expect(gif.lsd.width > gif.lsd.height, `the GIF is ${gif.lsd.width}x${gif.lsd.height}`);
   const [aw, ah] = await pngSize(await save('apng'));
   expect(aw > ah, `the APNG is ${aw}x${ah}`);
   await page.click('#shapeSeg [data-shape=square]');
-  const [sw, sh] = await pngSize(await save('png'));
-  expect(sw === 948 && sh === 948, `the square PNG is ${sw}x${sh}`);
+  const [sw, sh] = await pngSize(await save('apng'));
+  expect(Math.abs(sw / sh - 1) < 0.02, `the square APNG is ${sw}x${sh}`);
   // The celebration frames, on a card of another shape.
   for (const f of ['rim', 'ribbon']) {
     await page.click(`#frameSeg [role=radio]:nth-child(${['paper', 'ink', 'gilt', 'rarity', 'rim', 'ribbon'].indexOf(f) + 1})`);
@@ -692,7 +956,7 @@ await step('shape: a wide card turns the slot, the hand and every export on thei
   expect(r.shape === 'card' && r.frame === 'paper', `reset left ${r.shape}/${r.frame}`);
   const back = await page.locator('#cardSlot').boundingBox();
   expect(Math.abs(back.width / back.height - 5 / 7) < 0.02, 'the slot did not go back to 5:7');
-  await page.click('#formatSeg [role=radio][data-format=png]');
+  await page.click('#formatSeg [role=radio][data-format=gif]');
 });
 
 // ---------- Binder ----------
@@ -701,14 +965,60 @@ const binderCount = async () => +(await page.textContent('#binderBtn .binder-cou
 const binderOpen = () => page.waitForSelector('.bd.is-in', { timeout: 15000 });
 const binderClosed = () => page.waitForSelector('.bd', { state: 'detached', timeout: 15000 });
 let kept = null;
+/** Painted cells of each layer's brush strokes, as saved for the stage (IndexedDB `foil`). */
+const brushCells = () =>
+  page.evaluate(
+    () =>
+      new Promise((res, rej) => {
+        const r = indexedDB.open('foil');
+        r.onerror = () => rej(r.error);
+        r.onsuccess = () => {
+          const t = r.result.transaction('images');
+          const st = t.objectStore('images');
+          const out = {};
+          for (const k of ['rangeBrush', 'rangeBrush2']) st.get(k).onsuccess = (e) => (out[k] = e.target.result ? [...e.target.result.add, ...e.target.result.erase].filter((v) => v).length : 0);
+          t.oncomplete = () => (r.result.close(), res(JSON.stringify(out)));
+        };
+      }),
+  );
+let keptBrush = '';
+/** One stroke across the card with the area brush, for the layer chosen in the Layers tab. */
+const paintStroke = async (from, to) => {
+  await tab('range');
+  await page.click('#pane-range .range-paint');
+  await page.waitForSelector('.brush', { state: 'visible' });
+  const b = await page.locator('#cardSlot').boundingBox();
+  await page.mouse.move(b.x + b.width * from[0], b.y + b.height * from[1]);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * to[0], b.y + b.height * to[1], { steps: 8 });
+  await page.mouse.up();
+  await page.click('.brush-done');
+  await page.waitForSelector('.brush', { state: 'hidden' });
+};
 
-await step('keep a card: it goes into the binder as a still picture, and Keep rests until the card changes', async () => {
+await step('keep a card: it goes into the binder as a still picture with its brush strokes, and Keep rests until the card changes', async () => {
+  // The layers step reset the area; the card kept gets a stroke of its own.
+  await paintStroke([0.25, 0.3], [0.7, 0.6]);
   await page.fill('#nameInput', 'Kept meadow');
   await page.keyboard.press('Escape');
   await page.click('#keepBtn');
   await page.waitForFunction(() => document.querySelector('#binderBtn .binder-count')?.textContent === '1', null, { timeout: 30000 });
   expect((await page.getAttribute('#keepBtn', 'data-kept')) === 'true', 'Keep does not say the card is kept');
   kept = await state();
+  keptBrush = await brushCells();
+  expect(Object.values(JSON.parse(keptBrush)).some((n) => n > 0), `the card kept has no brush strokes to keep (${keptBrush})`);
+  // The strokes are kept with the card, deflated: a few kilobytes, not the grids' megabyte.
+  const size = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        const r = indexedDB.open('foil-binder');
+        r.onsuccess = () => {
+          const g = r.result.transaction('cards').objectStore('cards').getAll();
+          g.onsuccess = () => (r.result.close(), res(g.result.map((c) => (c.brush instanceof Blob ? c.brush.size : -1))));
+        };
+      }),
+  );
+  expect(size.length === 1 && size[0] > 0 && size[0] < 60000, `the brush strokes are not kept small with the card (${size})`);
   await page.click('#binderBtn');
   await binderOpen();
   expect((await page.locator('.bd-card').count()) === 1, 'the binder does not show one card');
@@ -725,12 +1035,15 @@ await step('keep a card: it goes into the binder as a still picture, and Keep re
   await binderClosed();
 });
 
-await step('play a card from the binder: its picture and settings come back, the app settings stay', async () => {
+await step('play a card from the binder: its picture, settings and brush strokes come back, the app settings stay', async () => {
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('1');
   await page.fill('#nameInput', 'Something else');
   await page.click('.pill-rarity .rpip >> nth=0');
-  await page.waitForTimeout(200);
+  // Another stroke on the stage's card, which the kept card did not have.
+  await paintStroke([0.2, 0.75], [0.8, 0.2]);
+  await page.waitForTimeout(300);
+  expect((await brushCells()) !== keptBrush, 'the new stroke did not change the brush');
   expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the card changed');
   await page.click('#binderBtn');
   await binderOpen();
@@ -745,6 +1058,10 @@ await step('play a card from the binder: its picture and settings come back, the
     expect(JSON.stringify(now[k]) === JSON.stringify(kept[k]), `${k} did not come back (${JSON.stringify(now[k])} ≠ ${JSON.stringify(kept[k])})`);
   expect(now.lang === kept.lang && now.exportFormat === kept.exportFormat, 'an app setting changed');
   expect((await page.locator('#thumbs .thumb').count()) === 4, 'the kept picture is not the picture in step 1');
+  // The brush strokes came back with it, and only those.
+  let brush = '';
+  for (let i = 0; i < 20 && (brush = await brushCells()) !== keptBrush; i++) await page.waitForTimeout(150);
+  expect(brush === keptBrush, `the brush strokes did not come back (${brush} ≠ ${keptBrush})`);
 });
 
 await step('a card is thrown away from its own corner at once, and Undo brings it back', async () => {
@@ -941,7 +1258,7 @@ await step('share: a small moving GIF goes to the share sheet with the site addr
   await p.goto(`${URL}?lang=en`);
   await p.waitForTimeout(1500);
   expect(await p.isVisible('#shareBtn'), 'Share is hidden although files can be shared');
-  // PNG is the chosen format; Share still sends the moving card.
+  // GIF is the chosen format: Share sends the small GIF.
   await p.click('#shareBtn');
   await p.waitForFunction(() => window.__shared.length === 1, null, { timeout: 240000 });
   const gif = await p.evaluate(() => window.__shared[0]);
@@ -991,6 +1308,47 @@ await step('share on a Mac: one call, one GIF, no text (its Copy would put two i
   await mac.close();
 });
 
+await step('share with MP4 chosen: the MP4 goes to the share sheet, for Instagram', async () => {
+  const sharer = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p = await sharer.newPage();
+  p.on('pageerror', (e) => errors.push(`mp4 share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__shared = [];
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File);
+    navigator.share = async (data) => {
+      for (const f of data.files) {
+        const box = new TextDecoder().decode(await f.slice(4, 8).arrayBuffer());
+        window.__shared.push({ name: f.name, type: f.type, size: f.size, box });
+      }
+    };
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(1500);
+  await p.click('#formatSeg [role=radio][data-format=mp4]');
+  const hint = await p.getAttribute('#shareBtn', 'title');
+  expect(/MP4/.test(hint) && /Instagram/.test(hint), `Share does not say it sends an MP4: ${hint}`);
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__shared.length === 1, null, { timeout: 400000 });
+  const mp4 = await p.evaluate(() => window.__shared[0]);
+  expect(mp4.type === 'video/mp4' && mp4.name.endsWith('.mp4') && mp4.box === 'ftyp' && mp4.size > 100_000, `not an MP4: ${JSON.stringify(mp4)}`);
+  await sharer.close();
+});
+
+await step('no MP4 where the browser cannot encode H.264: it is not offered, and a saved MP4 choice falls back to GIF', async () => {
+  for (const block of ['delete window.VideoEncoder;', 'VideoEncoder.isConfigSupported = async () => ({ supported: false });']) {
+    const plain = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p = await plain.newPage();
+    p.on('pageerror', (e) => errors.push(`no mp4: ${e.message}`));
+    await p.addInitScript({ content: `${block} localStorage.setItem('foil:v1', JSON.stringify({ exportFormat: 'mp4' }));` });
+    await p.goto(`${URL}?lang=en`);
+    await p.waitForTimeout(1500);
+    const shown = await p.locator('#formatSeg [role=radio]').evaluateAll((els) => els.map((e) => e.dataset.format));
+    const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('foil:v1')).exportFormat);
+    expect(shown.join() === 'gif,apng' && saved === 'gif', `${block}: formats ${shown.join()}, saved ${saved}`);
+    await plain.close();
+  }
+});
+
 const handCount = () => page.locator('.hand-slot').count();
 const packsSaved = () => page.evaluate(() => JSON.parse(localStorage.getItem('foil:packs') ?? 'null'));
 const phase = (p) => page.waitForSelector(`.pk[data-phase=${p}]`, { timeout: 30000 });
@@ -1000,7 +1358,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.click('#packsBtn');
   // The shop: every pack on the tray, the first sealed one chosen.
   await phase('shop');
-  expect((await page.locator('.pk-slot').count()) === 4, 'the shop does not show the four packs');
+  expect((await page.locator('.pk-slot').count()) === 5, 'the shop does not show the five theme packs');
   expect((await page.getAttribute('.pk-slot[data-pack=metal]', 'aria-checked')) === 'true', 'the first sealed pack is not the chosen one');
   await page.click('.pk-buy');
   await phase('pack');
@@ -1016,21 +1374,21 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.move(g.x + g.width * 0.5, g.y, { steps: 6 });
   await page.mouse.up();
   await page.waitForTimeout(500);
-  expect(!(await packsSaved())?.opened?.length, 'a trace stopped halfway opened the pack');
+  expect(!(await packsSaved())?.owned?.length, 'a trace stopped halfway opened the pack');
   await page.mouse.move(g.x + 4, g.y);
   await page.mouse.down();
   await page.mouse.move(g.x + g.width, g.y, { steps: 12 });
   await page.mouse.up();
   await phase('deck');
-  expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
-  for (const name of ['Relief', 'Gold', 'Platinum', 'Cosmo Holo']) {
+  expect((await packsSaved()).owned.join() === 'platinum,gold,relief,chameleon,cosmoholo', 'the tear did not own the Metal finishes');
+  for (const name of ['Platinum', 'Gold', 'Relief', 'Chameleon']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
   await page.waitForSelector('.pk.is-waiting', { timeout: 10000 });
   expect((await page.textContent('.pk-label b')) === '？？？', 'the showpiece showed its name before it was turned over');
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Crystal', null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('.pk-label b')?.textContent === 'Cosmo Holo', null, { timeout: 15000 });
   // Under the card, top to bottom and never overlapping, even on a low screen: progress and tag,
   // name, line, next-step button.
   for (const [w, h] of [[1367, 664], [1440, 900]]) {
@@ -1048,7 +1406,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
   await page.click('.pk-try');
   await overlayGone();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'cosmoholo', null, { timeout: 10000 });
   // The proof beside step 2 still copies finished frames once the stage draws again after the opening.
   await page.waitForTimeout(1500);
   const proofLit = await page.evaluate(() => {
@@ -1060,7 +1418,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   });
   expect(proofLit > 0.3, `the finish proof is blank after the opening (${(proofLit * 100).toFixed(0)}% lit)`);
   const hand = (await state()).hand;
-  expect(hand.includes('crystal') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
+  expect(hand.includes('cosmoholo') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
   expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
   expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck does not hold the other four Metal finishes and the swapped-out Glitch');
 });
@@ -1082,14 +1440,14 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   // Full: the last card that is not Base gives way.
   await page.click('.db-grid .db-card[data-id=gold]');
   const full = await hand();
-  expect(full.length === 7 && full[6] === 'gold' && !full.includes('crystal'), `a full hand did not give up its last card: ${full}`);
+  expect(full.length === 7 && full[6] === 'gold' && !full.includes('cosmoholo'), `a full hand did not give up its last card: ${full}`);
   // The next tap swaps the card before it, not the card just added.
   await page.click('.db-grid .db-card[data-id=glitch]');
   const next = await hand();
   expect(next[5] === 'glitch' && next[6] === 'gold', `the next tap replaced the card just added: ${next}`);
   await page.click('.db-undo');
   await page.click('.db-undo');
-  expect((await hand()).includes('crystal') && !(await hand()).includes('gold'), 'undo did not step back');
+  expect((await hand()).includes('cosmoholo') && !(await hand()).includes('gold'), 'undo did not step back');
   // Base cannot leave.
   await page.click('.db-hand .db-card[data-id=base]');
   expect((await hand()).includes('base'), 'Base left the hand');
@@ -1159,17 +1517,17 @@ await step('held still, the pack opens with a button and the haul fades in', asy
   await page.click('.pk-name >> nth=0');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
-  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the deck does not hold both packs');
+  expect((await page.textContent('#deckBtn .deck-count')) === '11', 'the deck does not hold both packs');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 });
 
 await step('a support link puts the Supporter pack in the shop, and only then', async () => {
-  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '2', 'expected two sealed packs before the support link');
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '3', 'expected three sealed packs before the support link');
   await page.click('#supportBtn');
   const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
   await popup.close();
   await page.keyboard.press('Escape');
-  await page.waitForSelector('#packsBtn[data-sealed="3"]', { timeout: 5000 });
+  await page.waitForSelector('#packsBtn[data-sealed="4"]', { timeout: 5000 });
   expect((await packsSaved()).supporter === true, 'the support link was not remembered');
 });
 
@@ -1184,8 +1542,9 @@ await step('finishes unlocked by the old support links carry over as opened pack
   });
   await page.reload();
   await page.waitForTimeout(1500);
+  // The packs that held them then: Light, and the old Supporter pack (Opal, Raden, Confetti, Fireworks, Kintsugi).
   const saved = await packsSaved();
-  expect(saved.opened.join() === 'light,supporter' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
+  expect(saved.owned.join() === 'opal,raden,kintsugi,galaxy,aurora,glow,blacklight,shallows,confetti,fireworks' && saved.supporter === true, `got ${JSON.stringify(saved)}`);
   expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
   const after = await state();
   expect(after.hand.length === 7 && after.hand.includes('shallows') && !('drawn' in after), `the drawn card did not move into the hand: ${after.hand}`);
@@ -1194,7 +1553,7 @@ await step('finishes unlocked by the old support links carry over as opened pack
 
 await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {
   await page.evaluate(() => {
-    localStorage.setItem('foil:packs', '{"opened":[],"supporter":false}');
+    localStorage.setItem('foil:packs', '{"owned":[],"supporter":false}');
     const s = JSON.parse(localStorage.getItem('foil:v1'));
     localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'magma', hand: ['base', 'magma', 'foil', 'holo', 'poly', 'negative', 'prism'] }));
   });
@@ -1203,6 +1562,125 @@ await step('a card on a finish whose pack is sealed goes back to Holographic', a
   const s = await state();
   expect(s.edition === 'holo' && !s.hand.includes('magma') && s.hand.includes('base'), `got ${s.edition} / ${s.hand}`);
   expect((await handCount()) === s.hand.length, 'the page hand does not match the saved hand');
+});
+
+await step('packs reorganized: a v0.13 save keeps every finish it had, a pack that gained one is sealed again, and the deck opens on one list', async () => {
+  // Opened up to v0.13: the old Nature pack (with Snow Globe) and the old Supporter pack (Opal, Raden, Confetti, Fireworks, Kintsugi).
+  await page.evaluate(() => {
+    localStorage.setItem('foil:packs', '{"opened":["nature","supporter"],"supporter":true}');
+    const s = JSON.parse(localStorage.getItem('foil:v1'));
+    localStorage.setItem('foil:v1', JSON.stringify({ ...s, edition: 'raden', layer2: null, hand: ['base', 'opal', 'snowglobe', 'kintsugi', 'raden', 'holo', 'magma'] }));
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const s = await state();
+  expect(s.edition === 'raden' && s.hand.join() === 'base,opal,snowglobe,kintsugi,raden,holo,magma', `finishes were lost: ${s.edition} / ${s.hand}`);
+  const saved = await packsSaved();
+  expect(!('opened' in saved) && saved.owned.join() === 'opal,raden,kintsugi,sakura,frost,stardust,magma,confetti,snowglobe,fireworks', `not rewritten as owned finishes: ${JSON.stringify(saved)}`);
+  // The new Supporter pack is whole; Jewel lacks Crystal and Nature Rainy Window and Marble, so they are sealed with Metal, Light and Studio.
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', `sealed: ${await page.getAttribute('#packsBtn', 'data-sealed')}`);
+  await page.click('#packsBtn');
+  await phase('shop');
+  expect((await page.locator('.pk-slot').count()) === 6, 'the shop does not show six packs');
+  await page.click('.pk-slot[data-pack=jewel]', { force: true });
+  const note = await page.textContent('.pk-note');
+  expect(/have 3/.test(note) && /other 1/.test(note) && !(await page.textContent('.pk-buy')).includes('Watch'), `the Jewel pack does not say what it adds: ${note}`);
+  await page.click('.pk-slot[data-pack=supporter]', { force: true });
+  expect((await page.textContent('.pk-buy')).includes('Watch'), 'the whole Supporter pack is not opened');
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  // The deck builder opens on All: one list, the hand first in its order, then everything else.
+  await page.click('#deckBtn');
+  await page.waitForSelector('.dv.is-in', { timeout: 15000 });
+  expect((await page.getAttribute('.db-tab[data-tab=all]', 'aria-selected')) === 'true', 'the builder does not open on All');
+  expect((await page.locator('.db-grid h3').count()) === 0, 'All is broken up by pack');
+  // The cards shown, in the order they are laid out (the list's order, or a tab's CSS order).
+  const ids = () => page.$$eval('.db-grid .db-card', (els) => els.map((e, i) => [e, i]).filter(([e]) => e.offsetParent).sort(([a, i], [b, j]) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order) || i - j).map(([e]) => e.dataset.id));
+  const list = await ids();
+  expect(list.length === 17 && list.slice(0, 7).join() === s.hand.join(), `All does not start with the hand: ${list}`);
+  expect(list.slice(7, 12).join() === 'foil,poly,negative,prism,glitch', `the starters do not follow the hand: ${list}`);
+  // A pack's tab narrows it to that pack, in its own order.
+  await page.click('.db-tab[data-tab=nature]');
+  expect((await ids()).join() === 'sakura,frost,stardust,magma', `the Nature tab shows ${await ids()}`);
+  await page.click('.db-done');
+  await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
+});
+
+await step('Open all opens every sealed pack on the tray at once, lists them pack by pack and leads to the deck builder; the Supporter pack joins only once it is on the tray', async () => {
+  // Saved by v0.13 with the old Metal pack opened: Crystal is owned, so Jewel brings three, and Metal only Chameleon.
+  await page.evaluate(() => localStorage.setItem('foil:packs', '{"opened":["metal"],"supporter":false}'));
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const handBefore = (await state()).hand.join();
+  await page.click('#packsBtn');
+  await phase('shop');
+  // The count leaves out the Supporter pack, which is not on the tray.
+  expect((await page.textContent('.pk-all small')) === '5 packs · no intros', `Open all does not count five sealed packs: ${await page.textContent('.pk-all small')}`);
+  // The first tap only arms it.
+  await page.click('.pk-all');
+  await page.waitForSelector('.pk-all.is-armed', { timeout: 3000 });
+  expect((await packsSaved()).owned.length === 5, 'the first tap opened packs');
+  await page.click('.pk-all');
+  await phase('all');
+  const saved = await packsSaved();
+  expect(saved.owned.length === 26 && saved.supporter === false, `saved ${JSON.stringify(saved)}`);
+  // One row per pack opened now, every finish in it, the showpiece in the middle with a star.
+  const rows = await page.$$eval('.pk-row', (els) => els.map((r) => [r.dataset.pack, [...r.querySelectorAll('.pk-swatch b')].map((b) => b.textContent), r.querySelector('.pk-swatch.is-showpiece b')?.textContent, r.querySelector('.pk-row-tag small').textContent, [...r.querySelectorAll('.pk-swatch.is-had b')].map((b) => b.textContent).join()]));
+  expect(rows.map((r) => r[0]).join() === 'metal,jewel,light,nature,studio', `rows ${rows.map((r) => r[0])}`);
+  expect(rows.map((r) => r[1].length).join() === '5,4,5,6,6', `cards per row ${rows.map((r) => r[1].length)}`);
+  expect(rows.map((r) => r[2]).join() === 'Cosmo Holo,Kintsugi,Shallows,Magma,Shadowbox', `showpieces ${rows.map((r) => r[2])}`);
+  expect(rows[2][1][2] === 'Shallows', `the showpiece is not in the middle: ${rows[2][1]}`);
+  // Crystal and the old Metal finishes were owned already: in their places, marked, and not counted.
+  expect(rows[0][3] === '+1 new' && rows[0][4].split(',').sort().join() === 'Cosmo Holo,Gold,Platinum,Relief', `Metal row: ${rows[0]}`);
+  expect(rows[1][3] === '+3 new' && rows[1][4] === 'Crystal' && rows.slice(2).every((r) => !r[4]), `Jewel row: ${rows[1]}`);
+  expect(/^21 new finishes from 5 packs/.test(await page.textContent('.pk-list-title b')), `title: ${await page.textContent('.pk-list-title b')}`);
+  // The list draws no finish (nothing compiles for it).
+  expect((await page.locator('.pk-list canvas').count()) === 0, 'the list draws cards with WebGL');
+  await page.click('.pk-list-deck');
+  await overlayGone();
+  await page.waitForSelector('.dv.is-in', { timeout: 15000 });
+  expect((await page.locator('.db-grid .db-card').count()) === 33, `the deck builder shows ${await page.locator('.db-grid .db-card').count()} finishes, not 33`);
+  expect((await state()).hand.join() === handBefore, 'Open all changed the hand');
+  await page.click('.db-done');
+  await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
+  const deck30 = String(33 - (await state()).hand.length);
+  expect((await page.textContent('#deckBtn .deck-count')) === deck30, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck30}`);
+  // Nothing sealed: no Open all, and each pack can still be watched.
+  await page.click('#packsBtn');
+  await phase('shop');
+  expect(!(await page.isVisible('.pk-all')), 'Open all shows with nothing sealed');
+  await page.click('.pk-slot[data-pack=studio]', { force: true });
+  expect((await page.textContent('.pk-buy')).includes('Watch'), 'a pack opened with Open all does not offer a replay');
+  await page.click('.pk-buy');
+  await phase('pack');
+  await page.click('.pk-skip');
+  await phase('haul');
+  expect((await page.locator('.pk-name').count()) === 6, 'the replay does not show the six Studio finishes');
+  await page.keyboard.press('Escape');
+  await overlayGone();
+  // A support link puts the Supporter pack on the tray; Open all then opens it alone.
+  await page.click('#supportBtn');
+  const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.support-link >> nth=0')]);
+  await popup.close();
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#packsBtn[data-sealed="1"]', { timeout: 5000 });
+  await page.click('#packsBtn');
+  await phase('shop');
+  expect((await page.textContent('.pk-all small')) === '1 pack · no intros', `Open all does not count the Supporter pack: ${await page.textContent('.pk-all small')}`);
+  await page.click('.pk-all');
+  await page.click('.pk-all');
+  await phase('all');
+  expect((await page.$$eval('.pk-row', (els) => els.map((r) => r.dataset.pack).join())) === 'supporter', 'the list is not the Supporter pack alone');
+  await page.click('.pk-list-close');
+  await overlayGone();
+  const all = await packsSaved();
+  expect(all.owned.length === 29 && all.supporter === true, `saved ${JSON.stringify(all)}`);
+  const deck33 = String(36 - (await state()).hand.length);
+  expect((await page.textContent('#deckBtn .deck-count')) === deck33, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck33}`);
+  // Kept across a reload.
+  await page.reload();
+  await page.waitForTimeout(1500);
+  expect((await packsSaved()).owned.length === 26 && (await page.getAttribute('#packsBtn', 'data-sealed')) === '0', 'the packs opened with Open all were not kept');
 });
 
 await step('Confetti and Fireworks keep the message and the name, and their loops close', async () => {
@@ -1246,10 +1724,10 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const ART = box(0.1, 0.08, 0.9, 0.85);
     const PLATE = box(0.1, 0.9, 0.55, 0.965);
     // A second loop length comes from a motion with a shorter loop (Heartbeat's two seconds).
-    const grab = (id, intensity, ps, idle = 'none') => {
-      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
+    const grab = async (id, intensity, ps, idle = 'none') => {
+      const s = await createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle }, backdrop: { id: 'clear', color: '#000000' } }, W, H, true, false);
       const out = ps.map((p) => {
-        s.draw(p, 40);
+        s.draw(p);
         return s.ctx.getImageData(0, 0, W, H).data;
       });
       s.dispose();
@@ -1281,8 +1759,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     };
     const out = {};
     for (const id of ['confetti', 'fireworks']) {
-      const [plain] = grab(id, 0, [0]);
-      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 'pulse')];
+      const [plain] = await grab(id, 0, [0]);
+      const [p0, p1, half, p0b, p1b] = [...(await grab(id, 1, [0, 1, 0.5])), ...(await grab(id, 1, [0, 1], 'pulse'))];
       out[id] = {
         shader: editionById(id).id,
         change: marked(lumas(p0, ART), lumas(plain, ART)),
@@ -1490,8 +1968,8 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
   await p.addInitScript(() => {
     if (sessionStorage.getItem('seeded')) return;
     localStorage.clear();
-    // The Supporter pack opened, with Raden and Opal in the hand.
-    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['supporter'], supporter: true }));
+    // The Jewel pack opened, with Raden and Opal in the hand.
+    localStorage.setItem('foil:packs', JSON.stringify({ owned: ['crystal', 'opal', 'raden', 'kintsugi'], supporter: false }));
     localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'raden', 'opal'] }));
     sessionStorage.setItem('seeded', '1');
   });
@@ -1560,6 +2038,138 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
     expect(keep > 0.6, `${id} loses the picture (${keep.toFixed(2)})`);
     expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
   }
+  await still.close();
+});
+
+await step('Rainy Window fogs the picture but keeps it, a wipe clears it, its drops run, its loops close, and it holds still under reduced motion', async () => {
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('nature');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const { AUTO_STILL } = await import('/src/touch/heat.ts');
+    // A detailed picture: stripes, blocks and words, so blur and sharpness are easy to tell apart.
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    for (let i = 0; i < 40; i++) {
+      x.fillStyle = `hsl(${i * 37},70%,${i % 2 ? 30 : 70}%)`;
+      x.fillRect(0, i * 20, 600, 20);
+    }
+    x.fillStyle = '#fff';
+    x.font = 'bold 70px sans-serif';
+    x.fillText('RAIN', 150, 300);
+    x.fillText('WINDOW', 90, 520);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = mask.width = back.width = 900;
+    face.height = mask.height = back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Rain', shape: 'card', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
+    drawBack(back, 'card');
+    const W = 360;
+    const H = 450;
+    const tune = { ...TUNE_DEFAULTS, idle: 'none' };
+    const cw = (320 * 5) / 7;
+    const [x0, y0, x1, y1] = [Math.round(W / 2 - 0.4 * cw), Math.round(H / 2 - 0.42 * 320), Math.round(W / 2 + 0.4 * cw), Math.round(H / 2 + 0.35 * 320)];
+    const grab = (intensity, ps, idle = 'none') => {
+      const s = createScene({ face, mask, back, edition: editionById('rain'), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
+      const out = ps.map((p) => {
+        s.draw(p, 40);
+        const d = s.ctx.getImageData(0, 0, W, H).data;
+        const v = [];
+        for (let y = y0; y < y1; y++) for (let xx = x0; xx < x1; xx++) {
+          const i = (y * W + xx) * 4;
+          v.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        }
+        return v;
+      });
+      s.dispose();
+      return out;
+    };
+    const w = x1 - x0;
+    // Mean step between neighbouring pixels: high on a sharp picture, low through fog.
+    const sharp = (v) => {
+      let n = 0;
+      for (let i = 0; i < v.length - w; i++) n += Math.abs(v[i] - v[i + 1]) + Math.abs(v[i] - v[i + w]);
+      return n / v.length;
+    };
+    // The same in each tile of a 6 × 6 grid over the art, where a wipe shows as a few tiles turning sharp.
+    const tiles = (v) => {
+      const h = v.length / w;
+      const out = [];
+      for (let ty = 0; ty < 6; ty++) for (let tx = 0; tx < 6; tx++) {
+        let n = 0, c = 0;
+        for (let y = Math.floor((ty * h) / 6); y < Math.floor(((ty + 1) * h) / 6) - 1; y++) for (let xx = Math.floor((tx * w) / 6); xx < Math.floor(((tx + 1) * w) / 6) - 1; xx++) {
+          const i = y * w + xx;
+          n += Math.abs(v[i] - v[i + 1]) + Math.abs(v[i] - v[i + w]);
+          c++;
+        }
+        out.push(n / c);
+      }
+      return out;
+    };
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const corr = (a, b) => {
+      const ma = mean(a);
+      const mb = mean(b);
+      let n = 0, sa = 0, sb = 0;
+      for (let i = 0; i < a.length; i++) {
+        n += (a[i] - ma) * (b[i] - mb);
+        sa += (a[i] - ma) ** 2;
+        sb += (b[i] - mb) ** 2;
+      }
+      return n / Math.sqrt(sa * sb);
+    };
+    const diff = (a, b) => a.reduce((n, v, i) => n + Math.abs(v - b[i]), 0) / a.length;
+    const [plain] = grab(0, [0]);
+    const [p0, drift, wiped, p1] = grab(1, [0, 0.04, AUTO_STILL.rain, 1]);
+    const [q0, q1] = grab(1, [0, 1], 'pulse');
+    return {
+      fogged: sharp(p0) / sharp(plain),
+      cleared: (() => {
+        const a = tiles(p0);
+        return tiles(wiped).filter((v, i) => v > a[i] * 1.25).length;
+      })(),
+      keep: corr(p0, plain),
+      drops: diff(p0, drift),
+      seam: Math.max(diff(p0, p1), diff(q0, q1)),
+    };
+  });
+  const f = (v) => v.toFixed(3);
+  console.log(`  rain fogged ${f(report.fogged)} cleared ${report.cleared} tiles, keep ${f(report.keep)} drops ${f(report.drops)} seam ${f(report.seam)}`);
+  expect(report.fogged < 0.8, `the fog hardly softens the picture (${f(report.fogged)} of its sharpness)`);
+  expect(report.keep > 0.6, `the fog hides the picture (correlation ${f(report.keep)})`);
+  expect(report.cleared >= 3, `the unseen finger's wipe does not clear the glass (${report.cleared} of 36 tiles sharper)`);
+  expect(report.drops > 0.05, `the drops do not run (${f(report.drops)})`);
+  expect(report.seam < 0.6, `the loop jumps where it closes (${f(report.seam)})`);
+
+  // On the stage, held still: once the arrival wipe has fogged over again (about 11 s), nothing moves.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ owned: ['rain'], supporter: false }));
+    localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'rain'], edition: 'rain' }));
+    sessionStorage.setItem('seeded', '1');
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(8000);
+  const b = await p.locator('#cardSlot').boundingBox();
+  const clip = { x: b.x + b.width * 0.1, y: b.y + b.height * 0.1, width: b.width * 0.8, height: b.height * 0.8 };
+  let last = await p.screenshot({ clip });
+  let settled = false;
+  for (let i = 0; i < 20 && !settled; i++) {
+    await p.waitForTimeout(1500);
+    const now = await p.screenshot({ clip });
+    settled = now.equals(last);
+    last = now;
+  }
+  expect(settled, 'the card keeps moving under reduced motion');
   await still.close();
 });
 

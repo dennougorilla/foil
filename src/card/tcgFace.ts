@@ -4,7 +4,8 @@
 
 import { rarityById } from '../editions';
 import { paintLettering, type TextRun } from '../lettering';
-import { layoutEffect, messageFont, messageLines, type Rect } from '../message';
+import { messageFont, messageLines, type Rect } from '../message';
+import { columnSize, layoutEffect } from './effect';
 import { paintFreeMessage, LINE, OUTLINE, RADIUS, S, fitName, paintArt, paintPips, roundRect, tcgContent, type FaceSpec } from './face';
 import { tcgFrame } from './tcg';
 
@@ -113,7 +114,7 @@ function artWell(ctx: CanvasRenderingContext2D, spec: FaceSpec, art: Rect) {
   ctx.save();
   shape(ctx, art, rad);
   ctx.clip();
-  paintArt(ctx, art, spec.image, spec.crop, 0);
+  paintArt(ctx, art, spec.image, spec.crop, 0, spec.crisp);
   ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.fillRect(art.x, art.y, art.w, px());
   ctx.fillRect(art.x, art.y, px(), art.h);
@@ -246,7 +247,9 @@ export function paintTcg(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: Frame
       ctx.font = messageFont(font, size);
       return ctx.measureText(text).width;
     };
-    const effect = layoutEffect(messageLines(spec.message.text), box, measure);
+    // In a wide card's narrower column the text gives way a little where a line would otherwise wrap.
+    const lines = messageLines(spec.message.text);
+    const effect = layoutEffect(lines, t.text!, measure, ctx.canvas.width > ctx.canvas.height ? columnSize(lines, box.w, measure) : Infinity);
     if (effect) {
       ctx.font = messageFont(font, effect.size);
       for (const l of effect.lines.filter((l) => l.text)) {

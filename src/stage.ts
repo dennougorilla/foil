@@ -1,12 +1,14 @@
 import { EDITIONS, editionById, type EditionId } from './editions';
-import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
+import { backdropShader, BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
+import { backdropPhase, swirlTime, type BackdropId } from './backdrop';
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
 import { lampLights, loopCycle, roomShade, tuneGl } from './tune/model';
-import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardPoint, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
+import type { AutoTouch, HeatField, Swipe, TouchKind } from './touch/heat';
+import { cardPoint, cardUv } from './card/pose';
 import { flickDir } from './handStep';
-import { QualityGovernor } from './quality';
+import { QualityGovernor, startLevel, type QualityLevel } from './quality';
 import { cardLayers } from './layers';
 import './stage-phone.css';
 import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
@@ -94,14 +96,20 @@ export class Stage {
   readonly bg: BackgroundRenderer;
   private o: StageOptions;
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  /** Not under reduced motion; kept up to date rather than asked on every card of every frame. */
+  private moving = !this.reduced.matches;
   private last = performance.now();
   private time = 0;
-  private bgTime = 0;
   private running = false;
   // Phones and low-core machines get a lighter backbuffer; the pixel look hides the difference.
   private maxDpr = (navigator.hardwareConcurrency || 8) <= 4 || matchMedia('(pointer: coarse)').matches ? 1.5 : 2;
   /** Steps the on-screen drawing down while the device keeps missing frames; ?quality=0…3 pins it. */
-  private quality = new QualityGovernor(pinnedQuality());
+  private quality = new QualityGovernor(
+    pinnedQuality(),
+    startLevel({ memory: (navigator as { deviceMemory?: number }).deviceMemory, touch: matchMedia('(pointer: coarse)').matches }),
+  );
+  /** When the card was first drawn (ms from navigation), 0 until then; the ?fps=1 meter shows it. */
+  firstCardAt = 0;
 
   // Main card motion
   private ox = new Spring(0, 0, 150, 14);
@@ -132,8 +140,11 @@ export class Stage {
   private shown: string | null = null;
   /** The unseen finger that swipes a touch finish as it arrives, until someone touches it themselves. */
   private greet: Swipe | null = null;
+  /** Touch (src/touch/heat.ts) is only for the touch finishes, which come in packs: it loads with the first of them. */
+  private touch: typeof import('./touch/heat') | null = null;
+  private touchAsked = false;
   /** What touch left on the main card, and the strokes the hand's preview cards draw themselves. */
-  private heat = new HeatField();
+  private heat: HeatField | null = null;
   private demos = new Map<string, AutoTouch>();
 
   private hand: HandCard[] = [];
@@ -142,6 +153,8 @@ export class Stage {
   private focused = -1;
   private particles: Particle[] = [];
   private palette: [RGB, RGB, RGB];
+  /** The backdrop asked for last; the renderer keeps the old one on screen until the new one is ready. */
+  private backdrop: BackdropId | null = null;
   private bgPointer: [number, number] = [0.5, 0.5];
   private focus: [number, number] = [0.4, 0.55];
   private lastTune: unknown = null;
@@ -171,6 +184,7 @@ export class Stage {
     }
     this.resume();
     this.syncQuality();
+    this.reduced.addEventListener('change', () => (this.moving = !this.reduced.matches));
     motion.armGyro(o.stage, this.reduced);
     // Nothing to see in a hidden tab, so stop drawing until it comes back.
     document.addEventListener('visibilitychange', () => this.resume());
@@ -182,6 +196,16 @@ export class Stage {
   pause(on: boolean) {
     this.paused = on;
     this.resume();
+  }
+
+  /** The drawing level now (0 is full quality). */
+  get qualityLevel(): number {
+    return this.quality.level;
+  }
+
+  /** What the drawing level draws (the pack opening draws as much as the stage does). */
+  get qualityNow(): QualityLevel {
+    return this.quality.current;
   }
 
   /** Exports draw and read back on every frame; their frames say nothing about the stage's own speed. */
@@ -200,7 +224,7 @@ export class Stage {
   }
 
   private get motion() {
-    return !this.reduced.matches;
+    return this.moving;
   }
 
   /**
@@ -386,7 +410,7 @@ export class Stage {
       if (this.rub.active && e.pointerId === this.rub.id) {
         this.rub.active = false;
         this.sc.target = 1;
-        this.heat.lift();
+        this.heat?.lift();
       }
       if (!this.drag.active || e.pointerId !== this.drag.id) return;
       this.drag.active = false;
@@ -531,7 +555,6 @@ export class Stage {
     this.last = now;
     // Advance by the clamped step so a long pause never jumps the animation ahead.
     this.time += dt;
-    if (this.motion) this.bgTime += dt;
     const state = this.o.store.get();
     const tune = motion.view(state.tune);
     if (tune !== this.lastTune) {
@@ -544,7 +567,6 @@ export class Stage {
     const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr) * q.res;
     this.canvasRect = this.o.canvas.getBoundingClientRect();
     this.cards.resize(this.canvasRect.width, this.canvasRect.height, dpr);
-    this.bg.resize(Math.ceil(innerWidth / q.bg), Math.ceil(innerHeight / q.bg));
 
     // Background palette eases to the selected edition
     const ed = EDITIONS.find((e) => e.id === state.edition) ?? EDITIONS[0];
@@ -553,13 +575,23 @@ export class Stage {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });
-    if (`${ed.id}|${state.shape}` !== this.shown) {
-      this.shown = `${ed.id}|${state.shape}`;
+    if (state.backdrop !== this.backdrop) {
+      const id = (this.backdrop = state.backdrop);
+      // Fetched the first time one other than the swirl is wanted; a failed fetch keeps the old one.
+      void backdropShader(id).then((fs) => this.backdrop === id && this.bg.use(fs), () => {});
+    }
+    const touch = ed.touch ? this.useTouch() : null;
+    // The size, not the shape's name: the Picture shape changes with the picture.
+    const size = `${shapeById(state.shape).w}x${shapeById(state.shape).h}`;
+    if (`${ed.id}|${size}` !== this.shown && (!ed.touch || touch)) {
+      this.shown = `${ed.id}|${size}`;
+      this.lastTouch = null;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
-      if (ed.touch) this.heat = new HeatField(ed.touch, kOf(state.shape));
-      this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
+      this.heat = ed.touch && touch ? new touch.HeatField(ed.touch, kOf(state.shape)) : null;
+      // Under reduced motion a field that moves the picture (Marble) gets no hint: nothing would carry it back.
+      this.greet = this.heat && touch && (this.motion || !this.heat.moves) ? new touch.Swipe(this.heat, touch.SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
-      if (this.greet && !this.motion) {
+      if (this.greet && this.heat && !this.motion) {
         while (this.greet.step(1 / 30)) this.heat.step(1 / 30);
         this.greet = null;
       }
@@ -572,11 +604,13 @@ export class Stage {
       this.focus[0] += (fx - this.focus[0]) * k;
       this.focus[1] += (fy - this.focus[1]) * k;
     }
-    this.bg.render({ time: this.bgTime + 40, colors: this.palette, pointer: this.bgPointer, focus: this.focus });
 
     this.cards.begin();
-    this.stepHand(dt, state);
-    this.stepLeaving(dt, state);
+    // Every box is read before any style is written (the deck's only while a card flies to or from
+    // it), so a frame never forces a style pass of its own.
+    const deck = this.leaving.length || this.hand.some((c) => c.fromDeck) ? (this.o.deckRect?.() ?? null) : null;
+    this.stepHand(dt, state, deck);
+    this.stepLeaving(dt, state, deck);
 
     if (r) {
       // Pointer relative to the card
@@ -661,7 +695,7 @@ export class Stage {
       // The card's shadow drops further as it lifts or rises off the table.
       const lift = (this.sc.x * pose.scale - 1) * 120 - fy * 0.6 + (this.drag.active ? 14 : 0);
       this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
-      this.cards.drawCard(
+      const drawn = this.cards.drawCard(
         {
           ...cardPose,
           ...cardLayers(state, this.rangeView > 0 ? this.rangeLayer : 0),
@@ -680,25 +714,47 @@ export class Stage {
           loop: tune.speed > 0 ? loopCycle(tune, !!ed.torch) : 0,
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
-          heat: ed.touch ? this.heat : undefined,
+          heat: ed.touch ? (this.heat ?? undefined) : undefined,
           lamp: this.lampPower,
         },
         motion.fx,
       );
+      if (drawn && !this.firstCardAt) this.firstCardAt = performance.now();
       // Info box sways a little with the card, like a hanging tag.
       // ...but holds still while someone is pointing at it or typing in it.
       if (this.o.info.matches(':hover, :focus-within')) this.o.info.style.transform = '';
       else this.o.info.style.transform = `translate(${(this.ox.x * 0.12 + fx * 0.4).toFixed(1)}px, ${(this.oy.x * 0.12 + fy * 0.4).toFixed(1)}px) rotate(${(RZ * 0.25).toFixed(4)}rad)`;
     }
 
+    // The backdrop moves on the motion's clock, at the same place of the loop as a file (docs/backdrops.md).
+    const phase = backdropPhase(tune, motion.idleTime, !!ed.torch);
+    this.bg.draw(
+      {
+        time: swirlTime(phase),
+        phase,
+        colors: this.palette,
+        pointer: this.bgPointer,
+        focus: this.focus,
+        card: r ? r.h / innerHeight : undefined,
+        color: hexToRgb(state.backdropColor),
+      },
+      q,
+      innerWidth,
+      innerHeight,
+    );
+
     this.stepParticles(dt);
     this.cards.drawParticles(this.particles);
     requestAnimationFrame(this.frame);
   };
 
-  /** Shows the drawing level on the page (data-quality), for anyone checking what the stage chose. */
+  /** Puts the drawing level on the page: data-quality for anyone checking, data-still and data-no-crt for the styles (src/quality.ts). */
   private syncQuality() {
-    document.documentElement.dataset.quality = String(this.quality.level);
+    const root = document.documentElement;
+    const q = this.quality.current;
+    root.dataset.quality = String(this.quality.level);
+    root.toggleAttribute('data-still', q.still);
+    root.toggleAttribute('data-no-crt', !q.crt);
   }
 
   /**
@@ -721,6 +777,7 @@ export class Stage {
 
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
   private warm(at: [number, number] | null, dt: number) {
+    if (!this.heat) return;
     const on = at && at[0] > -0.02 && at[0] < 1.02 && at[1] > -0.02 && at[1] < 1.02;
     if (on && this.greet) {
       // A real touch takes over from the hint.
@@ -744,10 +801,11 @@ export class Stage {
       this.lastTouch = null;
       this.heat.lift();
     }
-    this.heat.step(dt);
+    // Under reduced motion Marble's ink stays where a finger left it instead of drifting back.
+    if (this.motion || !this.heat.moves) this.heat.step(dt);
   }
 
-  private stepHand(dt: number, state: ReturnType<Store['get']>) {
+  private stepHand(dt: number, state: ReturnType<Store['get']>, deck: DOMRect | null) {
     const { hr, w, h, spacing, arcK, rowH, top, slot } = this.handLayout(this.hand.length);
     const ox = hr.left - this.canvasRect.left;
     const oy = hr.top - this.canvasRect.top;
@@ -790,7 +848,6 @@ export class Stage {
       let y = top + row * rowH + 30 + h / 2 + arc - card.lift.x + card.deal.x * 260;
       if (card.fromDeck) {
         // Waiting on the deck until its moment, then springing to its place in the hand.
-        const deck = this.o.deckRect?.();
         if (deck) {
           card.dx.x = deck.left + deck.width / 2 - this.canvasRect.left - (ox + x);
           card.dy.x = deck.top + deck.height / 2 - this.canvasRect.top - (oy + y);
@@ -842,8 +899,7 @@ export class Stage {
   }
 
   /** Cards leaving the hand: each shrinks along a short arc into the deck. */
-  private stepLeaving(dt: number, state: ReturnType<Store['get']>) {
-    const deck = this.o.deckRect?.();
+  private stepLeaving(dt: number, state: ReturnType<Store['get']>, deck: DOMRect | null) {
     for (let i = this.leaving.length - 1; i >= 0; i--) {
       const c = this.leaving[i];
       c.t += dt / 0.42;
@@ -881,11 +937,26 @@ export class Stage {
 
   /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
   private demoAt(kind: TouchKind, time: number) {
+    const touch = this.useTouch();
+    if (!touch) return undefined;
     const shape = this.o.store.get().shape;
-    let demo = this.demos.get(`${kind}|${shape}`);
-    if (!demo) this.demos.set(`${kind}|${shape}`, (demo = new AutoTouch(kind, SWIPES[0], kOf(shape))));
-    demo.at(2 + AUTO_STILL[kind] + time / AUTO_LOOP);
+    const key = `${kind}|${kOf(shape).join('x')}`;
+    let demo = this.demos.get(key);
+    if (!demo) this.demos.set(key, (demo = new touch.AutoTouch(kind, touch.SWIPES[0], kOf(shape))));
+    demo.at(2 + touch.AUTO_STILL[kind] + time / touch.AUTO_LOOP);
     return demo;
+  }
+
+  /** The touch module, once it is here; asking fetches it (again after a failed fetch). */
+  private useTouch() {
+    if (!this.touch && !this.touchAsked) {
+      this.touchAsked = true;
+      void import('./touch/heat').then(
+        (m) => (this.touch = m),
+        () => (this.touchAsked = false),
+      );
+    }
+    return this.touch;
   }
 
   private stepParticles(dt: number) {

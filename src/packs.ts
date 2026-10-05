@@ -1,6 +1,6 @@
-// The packs: which finishes start in the hand, which pack holds each of the others, and what is
-// opened. Plain data and pure functions (tested under Node); the DOM side is src/packStore.ts.
-// The design is in docs/packs.md.
+// The packs: which finishes start in the hand, which pack holds each of the others, and which
+// finishes this browser owns. Plain data and pure functions (tested under Node); the DOM side is
+// src/packStore.ts. The design is in docs/packs.md.
 
 import type { EditionId } from './editions';
 import type { FinishModule } from './gl/finishes/types';
@@ -8,7 +8,7 @@ import type { FinishModule } from './gl/finishes/types';
 /** The hand-picked finishes in the hand from the start, in hand order. Nothing else loads until asked for. */
 export const OPEN_EDITIONS: readonly EditionId[] = ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'];
 
-export type PackId = 'metal' | 'light' | 'nature' | 'studio' | 'supporter';
+export type PackId = 'metal' | 'jewel' | 'light' | 'nature' | 'studio' | 'supporter';
 
 export interface Pack {
   id: PackId;
@@ -26,10 +26,17 @@ export interface Pack {
 export const PACKS: readonly Pack[] = [
   {
     id: 'metal',
-    finishes: ['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
+    finishes: ['platinum', 'gold', 'relief', 'chameleon', 'cosmoholo'],
     wrap: 'gold',
     colors: ['#1f1209', '#a86a22', '#f2c14e'],
     load: () => import('./gl/finishes/metal'),
+  },
+  {
+    id: 'jewel',
+    finishes: ['crystal', 'opal', 'raden', 'kintsugi'],
+    wrap: 'opal',
+    colors: ['#14080b', '#9e1f2e', '#f3e2c4'],
+    load: () => import('./gl/finishes/jewel'),
   },
   {
     id: 'light',
@@ -40,7 +47,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'nature',
-    finishes: ['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
+    finishes: ['sakura', 'frost', 'stardust', 'rain', 'marble', 'magma'],
     wrap: 'sakura',
     colors: ['#0f1a14', '#3f8a5c', '#ffa8c8'],
     load: () => import('./gl/finishes/nature'),
@@ -54,8 +61,8 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'supporter',
-    finishes: ['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],
-    wrap: 'opal',
+    finishes: ['confetti', 'snowglobe', 'fireworks'],
+    wrap: 'prism',
     colors: ['#140f1e', '#6b5aa0', '#ffe9a8'],
     supporter: true,
     load: () => import('./gl/finishes/supporter'),
@@ -65,31 +72,53 @@ export const PACKS: readonly Pack[] = [
 export const packById = (id: PackId): Pack => PACKS.find((p) => p.id === id)!;
 export const packOf = (id: EditionId): Pack | undefined => PACKS.find((p) => p.finishes.includes(id));
 
-/** What this browser has opened, and whether a support link was ever opened. */
-export interface Opened {
-  opened: PackId[];
+/**
+ * The pack finishes this browser owns, and whether a support link was ever opened. Finishes, not
+ * packs, are kept: a finish moved to another pack stays owned, and a pack is opened once every
+ * finish in it is owned (so a pack that gains one is sealed again until it is opened anew).
+ */
+export interface Owned {
+  owned: EditionId[];
   supporter: boolean;
 }
 
-const known = (list: unknown[]): PackId[] => PACKS.map((p) => p.id).filter((id) => list.includes(id));
+/** Every pack finish, in pack order: the order `owned` is kept in. */
+const PACKED: readonly EditionId[] = PACKS.flatMap((p) => p.finishes);
+const known = (list: unknown[]): EditionId[] => PACKED.filter((id) => list.includes(id));
 
-/** `foil:packs` as saved; anything that does not parse counts as nothing opened. */
-export function parsePacks(raw: string | null): Opened {
+/**
+ * The packs as they were up to v0.13, when `foil:packs` kept the ids of the packs opened (and
+ * `foil:secrets` the finishes unlocked by support links up to v0.9.3): read once into the
+ * finishes they held, so no finish is lost when packs are reorganized.
+ */
+const V013: Record<string, EditionId[]> = {
+  // In today's order where they overlap (`known` sorts anyway), which keeps the table small to load.
+  metal: ['platinum', 'gold', 'relief', 'cosmoholo', 'crystal'],
+  light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
+  nature: ['sakura', 'frost', 'stardust', 'magma', 'snowglobe'],
+  studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
+  supporter: ['opal', 'raden', 'kintsugi', 'confetti', 'fireworks'],
+};
+const fromV013 = (opened: unknown[]): EditionId[] => known(Object.entries(V013).flatMap(([id, list]) => (opened.includes(id) ? list : [])));
+
+/** `foil:packs` as saved (or as v0.13 saved it); anything that does not parse counts as nothing owned. */
+export function parsePacks(raw: string | null): Owned {
   try {
-    const v = JSON.parse(raw ?? 'null') as { opened?: unknown; supporter?: unknown } | null;
-    if (v && typeof v === 'object' && Array.isArray(v.opened)) return { opened: known(v.opened), supporter: v.supporter === true };
+    const v = JSON.parse(raw ?? 'null') as { owned?: unknown; opened?: unknown; supporter?: unknown } | null;
+    const owned = Array.isArray(v?.owned) ? known(v.owned) : Array.isArray(v?.opened) ? fromV013(v.opened) : null;
+    if (owned) return { owned, supporter: v!.supporter === true };
   } catch {
     /* fall through */
   }
-  return { opened: [], supporter: false };
+  return { owned: [], supporter: false };
 }
 
 /**
- * The finishes unlocked by support links up to v0.9.3 (`foil:secrets`, a JSON list), as packs: each
- * pack holding one counts as opened, and any unlock at all means a support link was opened.
+ * The finishes unlocked by support links up to v0.9.3 (`foil:secrets`, a JSON list): each pack of
+ * the time holding one counted as opened, and any unlock at all means a support link was opened.
  * Null when there is nothing to carry over.
  */
-export function fromSecrets(raw: string | null): Opened | null {
+export function fromSecrets(raw: string | null): Owned | null {
   let list: unknown;
   try {
     list = JSON.parse(raw ?? 'null');
@@ -97,25 +126,31 @@ export function fromSecrets(raw: string | null): Opened | null {
     return null;
   }
   if (!Array.isArray(list)) return null;
-  const opened = PACKS.filter((p) => p.finishes.some((id) => list.includes(id))).map((p) => p.id);
-  return { opened, supporter: list.length > 0 };
+  const opened = Object.keys(V013).filter((id) => V013[id].some((f) => list.includes(f)));
+  return { owned: fromV013(opened), supporter: list.length > 0 };
 }
 
-/** Both sides' packs: two tabs that opened at the same moment each keep theirs. */
-export function mergePacks(a: Opened, b: Opened): Opened {
-  return { opened: known([...a.opened, ...b.opened]), supporter: a.supporter || b.supporter };
+/** Both sides' finishes: two tabs that opened packs at the same moment each keep theirs. */
+export function mergePacks(a: Owned, b: Owned): Owned {
+  return { owned: known([...a.owned, ...b.owned]), supporter: a.supporter || b.supporter };
 }
+
+/** Opens packs: every finish in them is owned. */
+export const openPacks = (o: Owned, ids: readonly PackId[]): Owned => mergePacks(o, { owned: ids.flatMap((id) => packById(id).finishes), supporter: false });
+
+/** A pack is opened once every finish in it is owned. */
+export const isOpened = (o: Owned, id: PackId): boolean => packById(id).finishes.every((f) => o.owned.includes(f));
 
 /** The packs on the shelf: the theme packs, and the supporter pack once a support link was opened. */
-export const shelf = (o: Opened): Pack[] => PACKS.filter((p) => !p.supporter || o.supporter);
+export const shelf = (o: Owned): Pack[] => PACKS.filter((p) => !p.supporter || o.supporter);
 
 /** The hand's size; Base is always one of them. */
 export const HAND_SIZE = 7;
 /** Every finish is open or in exactly one pack (tested), so these are all the finishes there are. */
-const isEdition = (id: unknown): id is EditionId => OPEN_EDITIONS.includes(id as EditionId) || PACKS.some((p) => p.finishes.includes(id as EditionId));
+const isEdition = (id: unknown): id is EditionId => OPEN_EDITIONS.includes(id as EditionId) || PACKED.includes(id as EditionId);
 
 /** A saved hand made valid: owned finishes once each, at most seven, Base always among them. */
-export function normalizeHand(saved: unknown, o: Opened): EditionId[] {
+export function normalizeHand(saved: unknown, o: Owned): EditionId[] {
   if (!Array.isArray(saved)) return [...OPEN_EDITIONS];
   let hand = saved.filter((id, i): id is EditionId => isEdition(id) && available(id, o) && saved.indexOf(id) === i);
   if (!hand.includes('base')) hand = ['base', ...hand];
@@ -124,17 +159,14 @@ export function normalizeHand(saved: unknown, o: Opened): EditionId[] {
 
 type Group = { group: PackId | 'open'; finishes: EditionId[] };
 
-/** Everything owned, grouped: the starters, then each opened pack in pack order. */
-export const ownedGroups = (o: Opened): Group[] => [
+/** Everything owned, grouped: the starters, then each pack's owned finishes in pack order. */
+export const ownedGroups = (o: Owned): Group[] => [
   { group: 'open', finishes: [...OPEN_EDITIONS] },
-  ...PACKS.filter((p) => o.opened.includes(p.id)).map((p) => ({ group: p.id, finishes: [...p.finishes] })),
+  ...PACKS.map((p) => ({ group: p.id, finishes: p.finishes.filter((id) => o.owned.includes(id)) })).filter((g) => g.finishes.length),
 ];
 
-/** The deck: every owned finish not in the hand, grouped the same way (empty groups left out). */
-export const deckOf = (hand: readonly EditionId[], o: Opened): Group[] =>
-  ownedGroups(o)
-    .map((g) => ({ group: g.group, finishes: g.finishes.filter((id) => !hand.includes(id)) }))
-    .filter((g) => g.finishes.length);
+/** The deck: every owned finish not in the hand. */
+export const deckOf = (hand: readonly EditionId[], o: Owned): EditionId[] => owned(o).filter((id) => !hand.includes(id));
 
 /**
  * Adds a card to the hand: at `at` (a slot just emptied) or the end; a full hand gives up its last
@@ -150,36 +182,11 @@ export function addToHand(hand: readonly EditionId[], id: EditionId, at?: number
   return hand.map((x, i) => (i === last ? id : x));
 }
 
-/**
- * Puts a card exactly in slot `at`, swapping out what is there (never Base); past the end it is
- * added. A card already in the hand trades places with the one in that slot.
- */
-export function placeAt(hand: readonly EditionId[], id: EditionId, at: number): EditionId[] {
-  if (hand[at] === 'base') return [...hand];
-  const from = hand.indexOf(id);
-  if (from >= 0 && at < hand.length) return hand.map((x, i) => (i === at ? id : i === from ? hand[at] : x));
-  const rest = hand.filter((x) => x !== id);
-  if (at >= rest.length) return addToHand(rest, id);
-  return rest.map((x, i) => (i === at ? id : x));
-}
+/** Every owned finish, starters first, then each pack's in pack order. */
+export const owned = (o: Owned): EditionId[] => ownedGroups(o).flatMap((g) => g.finishes);
 
-/** Sends a card back to the deck; Base stays. */
-export const removeFromHand = (hand: readonly EditionId[], id: EditionId): EditionId[] => (id === 'base' ? [...hand] : hand.filter((x) => x !== id));
+/** The packs on the shelf still sealed: what Open all opens, the pack button's count, and (the first) the one the shop offers first. */
+export const sealed = (o: Owned): Pack[] => shelf(o).filter((p) => !isOpened(o, p.id));
 
-/** Every owned finish, starters first, then each opened pack in pack order. */
-export const owned = (o: Opened): EditionId[] => ownedGroups(o).flatMap((g) => g.finishes);
-
-/** The first pack on the shelf that is still sealed: the one the shop offers first. */
-export const firstSealed = (o: Opened): Pack | undefined => shelf(o).find((p) => !o.opened.includes(p.id));
-
-/** Open from the start, or in an opened pack. */
-export function available(id: EditionId, o: Opened): boolean {
-  const pack = packOf(id);
-  return !pack || o.opened.includes(pack.id);
-}
-
-/** How big an entrance the card at `i` gets: 3 for the showpiece, 2 for the one before it, else 1. */
-export function tierOf(pack: Pack, i: number): 1 | 2 | 3 {
-  const n = pack.finishes.length;
-  return i === n - 1 ? 3 : i === n - 2 ? 2 : 1;
-}
+/** Open from the start, or owned. */
+export const available = (id: EditionId, o: Owned): boolean => OPEN_EDITIONS.includes(id) || o.owned.includes(id);
