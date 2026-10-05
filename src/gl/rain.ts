@@ -33,7 +33,7 @@ vec3 rnFace(vec2 uv, float lod) {
   return f.rgb / max(f.a, 1e-4);
 }
 
-vec3 rain(vec3 c, vec2 uv, vec2 t, float L, float lod, float art) {
+vec3 rain(vec3 c, vec2 uv, vec2 t, float lod, float art) {
   // Wipes live on the card itself; the tuned pattern space only moves the drops.
   vec2 cuv = tuneFaceUv(uv);
   float px = max(length(fwidth(uv * uCardK)), 1e-4);

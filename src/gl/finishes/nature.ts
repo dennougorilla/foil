@@ -82,7 +82,7 @@ ${RAIN_GLSL}
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 22) col = stardust(c, uv, uTilt, L);
   else if (e == 60) col = snowglobe(c, artUv, uTilt, L, lod, m.r);
-  else if (e == 94) col = rain(c, uv, uTilt, L, lod, m.r);
+  else if (e == 94) col = rain(c, uv, uTilt, lod, m.r);
 `,
   // Snow Globe's flakes are GPU particles drawn over its card; one set per renderer, made on first use.
   // Rainy Window keeps where its glass was wiped in a touch field, like Warmth's heat (see touch/).

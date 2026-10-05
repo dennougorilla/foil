@@ -37,13 +37,13 @@ from main v0.13.1 (a66c8dc). The WIP commit (e148b0a) holds everything below.
 
 ## Remaining
 
-1. **Run the full `npm run e2e`.** Here it timed out at 50 min (it reached the Raden step without any
-   FAIL) because four other sessions were running e2e at the same time. Rerun it on a quiet machine.
-2. **Quality:** the judge scores barely moved (below). Round 3's fixes were applied but not re-scored. Ideas: fewer beads still,
-   trails a touch more visible on bright skies, check the pixel-art sample where the fog blur shows the
-   dither as a grid, and on a phone-sized card.
-3. Small cleanup: `rain()` takes an unused `L` parameter (kept for the common signature; drop it if
-   preferred).
+1. **Full `npm run e2e` not run.** The owner chose review over e2e for now (the machine was too loaded).
+   The new step passed on its own earlier; run the full suite before a release.
+2. **Look and direction:** the owner reviews the finish by eye and decides the direction; the strict
+   scoring loop is stopped (3 rounds done, round 3's fixes not re-scored). Open ideas: fewer beads,
+   trails a touch more visible on bright skies, the pixel-art sample's dither shows through the fog,
+   a wipe over a dark sky reads as a dark patch more than as glass wiped clear.
+3. ~~Unused `L` parameter of `rain()`~~ removed (Mac session).
 4. Final check per AGENTS.md (unused code/docs), the hand-preview build for the owner, and the
    decision on the final pack (foil-openall).
 5. The "light version for low-end Android" was dropped by the owner (handled globally), so there is
