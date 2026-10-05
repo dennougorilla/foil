@@ -76,7 +76,7 @@ await step('content fades out above the pinned Save bar', async () => {
 
 await step('nothing of a pack loads before one is opened', async () => {
   const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
-  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth/.test(n));
+  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth|gl\/backdrops/.test(n));
   expect(pack.length === 0, `loaded early: ${pack.join(', ')}`);
   expect((await page.locator('.hand-slot').count()) === 7, 'the hand does not start with seven');
   expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', 'the pack button does not count five sealed packs');
@@ -565,11 +565,15 @@ for (const [format, ext] of [['gif', '.gif'], ['apng', '-anim.png']]) {
   });
 }
 
-await step('GIF with a clear background is really clear', async () => {
+await step('a GIF on the Clear backdrop is really clear', async () => {
   await page.click('#formatSeg [role=radio][data-format=gif]');
-  expect(!(await page.isVisible('#gifBgSeg')), 'GIF options are open before being asked for');
+  expect(!(await page.isVisible('#saveBackdropPick')), 'GIF options are open before being asked for');
   await page.click('#saveOptsToggle');
-  await page.click('#gifBgSeg [data-v=clear]');
+  // The options name the backdrop and lead to the tiles in Fine-tune → Card.
+  await page.click('#saveBackdropPick');
+  await page.waitForSelector('#backdropSeg [data-v=clear]', { state: 'visible' });
+  await page.click('#backdropSeg [data-v=clear]');
+  expect((await state()).backdrop === 'clear', 'the Clear tile did not pick the backdrop');
   await page.click('#matteSeg [data-v="#ffffff"]');
   expect(await page.isVisible('#gifClearNote'), 'no note about the dropped shadow');
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
@@ -583,6 +587,60 @@ await step('GIF with a clear background is really clear', async () => {
     expect(at(width >> 1, height >> 1) === 255, 'the card is not opaque');
   }
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  await page.click('#backdropSeg [data-v=swirl]');
+});
+
+await step('every backdrop is drawn in the file as on the stage, and closes its loop', async () => {
+  // The stage draws the picked backdrop once its shader has arrived.
+  const bgPixel = () =>
+    page.evaluate(() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 1;
+      const bg = document.getElementById('bg');
+      c.getContext('2d').drawImage(bg, 4, 4, 1, 1, 0, 0, 1, 1);
+      return [...c.getContext('2d').getImageData(0, 0, 1, 1).data];
+    });
+  await page.click('#backdropSeg [data-v=plain]');
+  await page.waitForTimeout(600);
+  const plain = await bgPixel();
+  const want = (await state()).backdropColor;
+  const hex = '#' + plain.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
+  expect(hex === want, `the stage shows ${hex} on Plain, not ${want}`);
+  expect(await page.isVisible('#backdropColorBtn'), 'Plain has no color button');
+  await page.click('#backdropSeg [data-v=swirl]');
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const face = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = back.width = 900;
+    face.height = back.height = 1260;
+    drawBack(back, 'card');
+    const out = {};
+    for (const id of ['swirl', 'felt', 'studio', 'velvet', 'bokeh', 'stars', 'confetti', 'plain', 'clear']) {
+      const s = await createScene({ face, mask: face, back, edition: editionById('holo'), intensity: 1, pixel: 0, name: 't', tune: { ...TUNE_DEFAULTS, idle: 'jelly' }, backdrop: { id, color: '#336699' } }, 480, 600, true);
+      // The top-left corner, clear of the card: at the loop's start, its end, and halfway.
+      const corner = (p) => {
+        s.draw(p);
+        return [...s.ctx.getImageData(0, 0, 80, 60).data];
+      };
+      const [a, b, c] = [corner(0), corner(1), corner(0.5)];
+      s.dispose();
+      const diff = (x, y) => x.reduce((n, v, i) => n + (Math.abs(v - y[i]) > 2 ? 1 : 0), 0);
+      out[id] = { seam: diff(a, b), moved: diff(a, c), first: a.slice(0, 4) };
+    }
+    return out;
+  });
+  for (const [id, r] of Object.entries(report)) expect(r.seam === 0, `${id} does not close its loop (${r.seam} values differ)`);
+  // The swirl breathes; the felt, studio, velvet and plain hold still. Bokeh, stars and confetti move
+  // in the whole frame, so their top-left corner may or may not show it.
+  expect(report.swirl.moved > 0, 'the swirl does not breathe in a file');
+  for (const id of ['felt', 'studio', 'velvet', 'plain']) expect(report[id].moved === 0, `${id} moves`);
+  expect(report.plain.first.slice(0, 3).join() === '51,102,153', `Plain is ${report.plain.first}`);
+  expect(report.clear.first[3] === 0, 'the Clear backdrop is not transparent in a file');
+  expect(report.felt.first[3] === 255, 'Felt is not opaque');
 });
 
 // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
@@ -716,8 +774,8 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
         face.height = back.height = 1260;
         drawBack(back, 'card');
         window.__draws.frames = [];
-        const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
-        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40);
+        const scene = await createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune, backdrop: { id: 'clear', color: '#000000' } }, 480, 600, false, false);
+        for (let i = 0; i < 12; i++) scene.draw(i / 12);
         scene.dispose();
         return window.__draws.frames;
       });
@@ -1665,10 +1723,10 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const ART = box(0.1, 0.08, 0.9, 0.85);
     const PLATE = box(0.1, 0.9, 0.55, 0.965);
     // A second loop length comes from a motion with a shorter loop (Heartbeat's two seconds).
-    const grab = (id, intensity, ps, idle = 'none') => {
-      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
+    const grab = async (id, intensity, ps, idle = 'none') => {
+      const s = await createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle }, backdrop: { id: 'clear', color: '#000000' } }, W, H, true, false);
       const out = ps.map((p) => {
-        s.draw(p, 40);
+        s.draw(p);
         return s.ctx.getImageData(0, 0, W, H).data;
       });
       s.dispose();
@@ -1700,8 +1758,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     };
     const out = {};
     for (const id of ['confetti', 'fireworks']) {
-      const [plain] = grab(id, 0, [0]);
-      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 'pulse')];
+      const [plain] = await grab(id, 0, [0]);
+      const [p0, p1, half, p0b, p1b] = [...(await grab(id, 1, [0, 1, 0.5])), ...(await grab(id, 1, [0, 1], 'pulse'))];
       out[id] = {
         shader: editionById(id).id,
         change: marked(lumas(p0, ART), lumas(plain, ART)),
