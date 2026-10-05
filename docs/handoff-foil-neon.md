@@ -85,3 +85,21 @@ frame tube. The scores plateaued; what the judge kept asking for:
 - The first page load after a shader edit on the dev server sometimes came up unstyled; reload.
 - e2e imports `/src/...` directly, so restart the dev server before e2e and don't edit sources while
   it runs (HMR reloads the page).
+
+## Polish round 1 (2026-10-06, Mac)
+
+Owner's feedback: "完成度上げればかなり良さそう" (good direction, raise the finish). Real neon, as
+aimed for: even glass tubes in smooth bends (no stair-steps), a white-hot core in saturated glass,
+a tight saturated bloom, colored light pooling on a dark wall behind, electrodes where the gas
+stops and standoffs holding the tube off the wall, and a dark board round it.
+
+- Tubes are traced at lod 4 / 5 (was 2.6 / 3.9) through `neonPath`, so pixel-art steps and fine
+  texture (stars, feathers) no longer become tubes.
+- The room is much darker (picture ×0.12–0.32 with a soft room light on `uLight`, slight contrast
+  curve), the frame a darker board; the wide haze is halved and the light pools on the wall line
+  behind each tube (from the tube's own distance field), lighting the picture's colors there.
+- Parallax 44 face px: the tube slides off its pool and off its standoff posts as the card tilts.
+- Electrode caps at tube ends; standoffs (post + clip) from a 120 px hashed grid, projected onto the
+  nearest tube.
+- Still open: short tube fragments along the art window's sides on the moon sample; overlapping
+  tubes in the moon's water read busy.

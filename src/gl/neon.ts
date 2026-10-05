@@ -86,63 +86,103 @@ float neonFlicker(vec2 uv, vec3 tint) {
   return 1.0 - 0.95 * off * reach;
 }
 
-// art is 1 in the art window; the frame is the dark wall round the sign and catches less light.
+// The tube path and how firmly it holds at a point p (face uv, already in the tubes' plane):
+// x, zw as neonEdge; y is 1 where a tube runs. Traced on a blurred picture, so the tube is a smooth
+// bend over pixel-art steps and texture, the way a glass bender simplifies a drawing.
+vec4 neonPath(vec2 p, float art) {
+  vec4 e = neonEdge(p, 4.0, 9.0);
+  float big = neonEdge(p, 5.0, 22.0).y;
+  // Only outlines that hold when blurred further; on the frame only its strongest lines.
+  float hold = mix(smoothstep(0.26, 0.38, big), smoothstep(0.16, 0.26, big), art);
+  e.y = smoothstep(0.07, 0.16, e.y) * hold;
+  return e;
+}
+
+// art is 1 in the art window; the frame is the board the sign is mounted on.
 vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
-  // The tubes stand off the wall, so they slide against it as the card tilts.
-  vec4 fine = neonEdge(uv + t * 34.0 / NEON_FACE, 2.6, 5.0);
-  vec4 big = neonEdge(uv, 3.9, 14.0);
-  // Only outlines that hold at both scales become tubes; on the frame only its strongest lines
-  // (the window and the card's edge), so the name and the pips are not traced into a tangle.
-  float hold = mix(smoothstep(0.3, 0.42, big.y), smoothstep(0.2, 0.3, big.y), art);
-  float lit = smoothstep(0.12, 0.2, fine.y) * hold;
+  vec2 px = 1.0 / NEON_FACE;
+  // The tubes stand off the wall on standoffs: tilting slides them against the wall and the light
+  // they pool on it (the pool stays where the tube is mounted).
+  vec2 par = t * 44.0;
+  vec2 tuv = uv + par * px;
+  vec4 tube = neonPath(tuv, art);
   // The card's own edge is the sign's board, not a tube.
   vec2 fuv = tuneFaceUv(uv);
-  vec2 rim = min(fuv, 1.0 - fuv) * uCardK;
-  lit *= smoothstep(0.025, 0.045, min(rim.x, rim.y));
-  hold *= smoothstep(0.025, 0.045, min(rim.x, rim.y));
+  vec2 rimv = min(fuv, 1.0 - fuv) * uCardK;
+  float rim = smoothstep(0.025, 0.045, min(rimv.x, rimv.y));
+  float lit = tube.y * rim;
   // A tube takes the color of the shape it outlines (the bright side), not a blend of both sides.
-  vec3 tint = neonGas(uv + big.zw * 18.0 / NEON_FACE);
+  vec3 tint = neonGas(tuv + tube.zw * 22.0 * px);
   float on = neonFlicker(uv, tint);
 
-  // The wall: the picture in a dark room, cooler and dimmer.
-  vec3 col = c * vec3(0.44, 0.44, 0.52) * mix(0.62, 1.0, art);
-  // Light from the tubes falls on the wall around them, lighting the picture in their color, and
-  // hangs in the air as a haze: close and bright, then wide and faint.
-  float near = exp(-abs(big.x) / 14.0) * hold;
-  float wide = smoothstep(0.03, 0.3, neonSpread(uv));
-  float bloom = exp(-abs(fine.x) / 7.0) * lit;
-  vec3 light = tint * (near * 1.1 + wide * 0.6 + bloom * 0.8) * on;
-  col += (c * light * 1.3 + light * 0.34) * mix(0.25, 1.0, art);
+  // The wall: the picture in a dark room, a little more contrast so it is not murky, lit only by
+  // a faint room light from the light's side; the frame is a darker painted board.
+  vec3 alb = pow(c, vec3(1.2));
+  float room = 0.12 + 0.2 * exp(-pow(length((uv - uLight) * uCardK) / 0.75, 2.0));
+  vec3 col = alb * vec3(0.9, 0.92, 1.05) * room * mix(0.5, 1.0, art);
+
+  // The line on the wall behind the tube (where it is mounted), from the tube's own distance field.
+  float wallX = tube.x - dot(tube.zw, par);
+  vec4 big = neonEdge(uv, 5.0, 22.0);
+  float gate = mix(smoothstep(0.24, 0.36, big.y), smoothstep(0.14, 0.24, big.y), art) * rim;
+  float pool = (exp(-abs(wallX) / 9.0) + 0.3 * exp(-abs(wallX) / 24.0)) * lit + exp(-abs(big.x) / 26.0) * gate * 0.35;
+  float wide = smoothstep(0.04, 0.3, neonSpread(uv)) * 0.14;
+  vec3 light = tint * (pool + wide) * on;
+  // The wall shows the picture's own colors where the gas lights it; a faint haze hangs in the air.
+  col += (alb * light * 1.5 + light * 0.08) * mix(0.35, 1.0, art);
+  // Standoffs: every so often a post holds the tube off the wall, a small dark disc on the wall
+  // that the tube slides off as the card tilts, and a clip that crosses the tube.
+  vec2 P = tuv * NEON_FACE;
+  vec2 cell = floor(P / 120.0);
+  vec2 q = (cell + 0.2 + 0.6 * hash22(cell + 9.1)) * 120.0;
+  vec4 at = neonPath(q / NEON_FACE, art);
+  vec2 foot = q - at.zw * at.x;
+  float has = smoothstep(0.7, 0.9, at.y) * step(abs(at.x), 50.0);
+  vec2 dq = P - foot;
+  float alongQ = dot(dq, vec2(-at.w, at.z));
+  float acrossQ = dot(dq, at.zw);
+  float post = has * (1.0 - smoothstep(4.0, 5.5, length(P - par - foot)));
+  col = mix(col, vec3(0.05, 0.05, 0.06) + col * 0.3, post * 0.85);
 
   // The name and the pips on the frame are lit as thin neon lettering: wherever the print is
   // darker than the paper round it.
   float ink = (1.0 - art) * smoothstep(0.08, 0.24, luma(face(uv, 3.0).rgb) - L);
-  col = mix(col, mix(tint, vec3(1.0), 0.5) * on, ink);
-  col += tint * smoothstep(0.03, 0.2, luma(face(uv, 4.0).rgb) - luma(face(uv, 1.0).rgb)) * (1.0 - art) * 0.5 * on;
+  col = mix(col, mix(tint, vec3(1.0), 0.55) * on, ink);
+  col += tint * smoothstep(0.03, 0.2, luma(face(uv, 4.0).rgb) - luma(face(uv, 1.0).rgb)) * (1.0 - art) * 0.45 * on;
 
-  // The tube: a column of glowing gas (white-hot at its core, deep in color at its edge) inside a
-  // glass wall of its own thickness (at least two screen pixels across on a small card).
-  float W = max(7.0, fwidth(fine.x) * 0.9);
-  float across = fine.x / W;
+  // The tube: a glass wall of even thickness round a column of gas, white-hot at its core and
+  // deep in color towards the glass (at least two screen pixels across on a small card).
+  float W = max(6.5, fwidth(tube.x) * 0.9);
+  float across = tube.x / W;
   float x = abs(across);
-  float gas = (1.0 - smoothstep(0.8, 1.05, x)) * lit;
-  float wall = (1.0 - smoothstep(1.3, 1.55, x)) * lit;
-  vec3 burn = mix(tint * (1.35 - 0.6 * x), mix(tint, vec3(1.0), 0.7), exp(-x * x * 10.0));
-  // Unlit, the gas is a dull grey tube with a trace of its color.
-  vec3 gasCol = mix(vec3(0.16, 0.16, 0.19) + tint * 0.12, burn, on);
+  // At a tube's end the gas stops before the glass: the electrode, a dark metal cap in clear glass.
+  float glass = smoothstep(0.25, 0.4, lit);
+  float gasOn = smoothstep(0.4, 0.55, lit);
+  float gas = (1.0 - smoothstep(0.72, 0.95, x)) * gasOn;
+  float wall = (1.0 - smoothstep(1.0, 1.2, x)) * glass;
+  float cap = (1.0 - smoothstep(0.55, 0.75, x)) * glass * (1.0 - gasOn);
+  // Light right round the glass: tight and saturated.
+  float bloom = exp(-max(x - 0.9, 0.0) * 1.1) * glass * gasOn;
+  col += tint * bloom * 0.55 * on;
+  float core = exp(-x * x * 7.0);
+  vec3 burn = mix(tint * (1.5 - 0.5 * x), vec3(1.0, 0.98, 0.95), core * 0.85);
+  // Unlit, the gas is a pale glass tube with a trace of its colored coating.
+  vec3 gasCol = mix(vec3(0.2, 0.2, 0.23) + tint * 0.12 + col * 0.3, burn, on);
   // The glass round it carries the color faintly, and the room's light runs along its edge on the
   // side that faces the light, changing sides as the card tilts.
   vec2 toLight = (uLight - uv) * uCardK * 2.0 + t * 1.4;
-  float facing = dot(fine.zw, toLight) / max(length(toLight), 0.35);
-  float edge = 0.8 * exp(-pow((x - 1.2) / 0.18, 2.0)) * max(sign(across) * facing, 0.0);
-  // On the round tube itself the reflection is a narrow streak that slides across it with the angle.
-  float streak = exp(-pow((across - 0.6 * clamp(facing, -1.0, 1.0)) / 0.13, 2.0)) * gas * 0.55;
-  // The glass's shoulders, seen edge-on, are a little darker than what lies behind them.
-  float shoulder = smoothstep(0.95, 1.15, x) * (1.0 - smoothstep(1.35, 1.55, x));
-  vec3 glassCol = col * (1.0 - 0.35 * shoulder) + tint * 0.1 * on + vec3(0.92, 0.95, 1.0) * edge;
+  float facing = dot(tube.zw, toLight) / max(length(toLight), 0.35);
+  float edge = 0.7 * exp(-pow((x - 0.95) / 0.12, 2.0)) * max(sign(across) * facing, 0.0);
+  float streak = exp(-pow((across - 0.55 * clamp(facing, -1.0, 1.0)) / 0.12, 2.0)) * gas * 0.5;
+  float shoulder = smoothstep(0.7, 0.9, x) * (1.0 - smoothstep(1.0, 1.2, x));
+  vec3 glassCol = col * (1.0 - 0.22 * shoulder) + tint * 0.12 * on + vec3(0.9, 0.94, 1.0) * edge;
   col = mix(col, glassCol, wall);
-  col = mix(col, gasCol * mix(0.7, 1.0, art), gas);
+  col = mix(col, vec3(0.22, 0.21, 0.22) + tint * 0.08 + 0.4 * exp(-pow(across + 0.3, 2.0) * 8.0), cap * 0.8);
+  col = mix(col, gasCol * mix(0.8, 1.0, art), gas);
   col += vec3(0.95, 0.97, 1.0) * streak;
+  // The clip across the tube at a standoff: a thin band of dark metal with a bright edge.
+  float clip = has * (1.0 - smoothstep(2.4, 3.4, abs(alongQ))) * (1.0 - smoothstep(W * 1.15, W * 1.35, abs(acrossQ))) * gas;
+  col = mix(col, vec3(0.16, 0.16, 0.18) + 0.5 * exp(-pow((alongQ + 1.2) / 0.9, 2.0)) * (1.0 - 0.5 * abs(acrossQ) / W), clip * 0.9);
   return col;
 }
 `;
