@@ -165,7 +165,10 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ## Performance
 
-- Slow devices keep moving smoothly: the stage measures how long its frames take, and when it keeps missing frames it lowers the drawing resolution step by step, then the backdrop's resolution and the number of sparks. A step that doesn't help (the device is capped, say by a battery saver, rather than busy drawing) is undone and not tried again. Fast devices never leave full quality, and exports are always made at full quality. Add `?quality=0`…`3` to the address to pin a level (0 is full).
+- Slow devices keep moving smoothly: the stage measures how long its frames take, and when it keeps missing frames (under 40 fps over a second) it lowers the drawing resolution step by step, then the backdrop's resolution and the number of sparks; far too slow (under 20 fps) it skips a step. It starts judging a second and a half after the page opens. A step that doesn't help (the device is capped, say by a battery saver, rather than busy drawing) is undone and not tried again.
+- Phones and tablets that report little memory (4 GB or less, as low-priced Android phones do) start a step down (2 GB or less, two), so their first seconds are smooth too, and climb back a step at a time while their frames keep a 60 Hz pace; a climb that misses frames is undone and not tried again.
+- Below full quality the backdrop holds still and the page's endless animations (the logo's tiles and sparkles, the sealed packs' glow and the like) play once; loading indicators keep moving. The two lowest levels also go without the CRT lines. This applies to the whole page, finishes, backdrops and the pack opening alike. Fast devices never leave full quality, and exports are always made at full quality.
+- Add `?quality=0`…`3` to the address to pin a level (0 is full), and `?fps=1` for a small meter over the logo: frames per second, the slowest frame of the last second and a bar for each of its frames, the drawing level, when the first card was drawn, and the GPU and memory the browser reports, to check a device by hand.
 
 ## Language and accessibility
 

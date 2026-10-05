@@ -1,0 +1,78 @@
+/* The ?fps=1 meter (src/fpsMeter.ts): a small slate tag over the logo, above the CRT lines, clear of the header's buttons. */
+.fps-meter {
+  position: fixed;
+  top: max(6px, env(safe-area-inset-top));
+  left: max(6px, env(safe-area-inset-left));
+  z-index: 51;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 4px;
+  width: 112px;
+  padding: 6px 8px 7px;
+  border-radius: 6px;
+  background: rgba(13, 19, 21, 0.92);
+  box-shadow: 0 2px 0 var(--edge), inset 0 0 0 2px var(--panel-hi);
+  color: var(--text);
+  font: 11px/1.35 var(--font);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  contain: layout paint;
+}
+
+.fps-n {
+  font: 700 20px/1 var(--display);
+  color: var(--green);
+}
+
+.fps-meter[data-pace='fair'] .fps-n {
+  color: var(--gold);
+}
+
+.fps-meter[data-pace='poor'] .fps-n {
+  color: var(--red);
+}
+
+.fps-u {
+  font: 700 10px/1 var(--display);
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.fps-row {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fps-slow {
+  margin-top: 4px;
+}
+
+.fps-graph {
+  width: 100%;
+  height: 14px;
+  margin: 4px 0 3px;
+  image-rendering: pixelated;
+}
+
+.fps-dev {
+  color: var(--text-dim);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fps-dev:empty {
+  display: none;
+}
+
+/* Beside the side panel the logo is wider: the tag covers all four of its tiles, in larger type. */
+@media (min-width: 901px) {
+  .fps-meter {
+    width: 156px;
+    font-size: 12px;
+  }
+}

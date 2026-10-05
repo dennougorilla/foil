@@ -56,7 +56,7 @@ test('no pack shader code is in the first load', () => {
 
 /**
  * What waits until it is used (docs/performance.md): Fine-tune's tabs, the print menu, free placement,
- * the motion tray, the motions other than Sway, making a file, reading an animated picture, and each language's texts.
+ * the motion tray, the motions other than Sway, making a file, reading an animated picture, each language's texts, touch (only the touch finishes, which come in packs, use it) and the ?fps=1 meter.
  */
 const ON_DEMAND = [
   'i18n/ja.ts',
@@ -82,6 +82,8 @@ const ON_DEMAND = [
   'gifDecode.ts',
   'anim/apngDecode.ts',
   'card/tcgFace.ts',
+  'fpsMeter.ts',
+  'touch/heat.ts',
 ];
 
 test('the on-demand modules are not in the first load', () => {

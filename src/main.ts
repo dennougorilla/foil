@@ -139,7 +139,7 @@ const mask = document.createElement('canvas');
 const back = document.createElement('canvas');
 drawBack(back, store.get().shape);
 // Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
-document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
+void backUrl().then((url) => document.documentElement.style.setProperty('--card-back', `url(${url})`));
 
 stage.cards.setBack(back);
 // Shadowbox and 3D Lenticular read the art's depth; its code loads the first time one is chosen.
@@ -1720,6 +1720,7 @@ function openShop() {
         back,
         tune: store.get().tune,
         intensity: store.get().intensity,
+        quality: stage.qualityNow,
         pause: (on) => stage.pause(on),
         onOpened: (id) => packs.open(id),
         onClose: (done, pick) => {
@@ -2109,9 +2110,9 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before
-// painting the face. Their stylesheet may still be on its way (index.html adds it without holding the
-// script), and fonts not declared yet would count as loaded at once.
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so the face is painted
+// again once they are here (the crop preview has no text). Their stylesheet may still be on its way
+// (index.html adds it without holding the script), and fonts not declared yet would count as loaded at once.
 new Promise<unknown>((done) => {
   const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
   if (!sheet || sheet.sheet) return done(null);
@@ -2119,8 +2120,10 @@ new Promise<unknown>((done) => {
   sheet.addEventListener('error', done);
 })
   .then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]))
-  .then(boot, boot);
+  .then(redrawFace, redrawFace);
 boot();
+// ?fps=1: a frame-rate meter for checking a device by hand (docs/performance.md).
+if (new URLSearchParams(location.search).get('fps') === '1') void import('./fpsMeter').then((m) => m.mountFpsMeter(stage));
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
   // A picture chosen (or removed) meanwhile wins over last visit's.

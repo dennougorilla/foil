@@ -1,7 +1,8 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AutoTouch, cardPoint, cardUv, HeatField, pickSwipe, Swipe, SWIPES, swipeAt } from '../src/touch/heat.ts';
+import { AutoTouch, HeatField, pickSwipe, Swipe, SWIPES, swipeAt } from '../src/touch/heat.ts';
+import { cardPoint, cardUv } from '../src/card/pose.ts';
 
 const at = (f: { data: Float32Array; w: number; h: number }, u: number, v: number) =>
   f.data[Math.min(f.h - 1, Math.floor(v * f.h)) * f.w + Math.min(f.w - 1, Math.floor(u * f.w))];

@@ -38,13 +38,18 @@ export function copyCard(view: HTMLCanvasElement, padX: number, padY: number): b
   return true;
 }
 
-/** Keeps a proof of the card in `el`, refreshed twice a second (it is a thumbnail, not a film). */
+/**
+ * Keeps a proof of the card in `el`, refreshed twice a second (it is a thumbnail, not a film), and
+ * only while it is on screen: a copy reads the stage canvas back from the GPU, and on a phone the
+ * proofs sit far below the card.
+ */
 export function mountProof(el: HTMLElement): void {
   const view = document.createElement('canvas');
   el.append(view);
   let raf = 0;
   let last = 0;
   let drawn = false;
+  let shown = false;
 
   function draw(now: number) {
     raf = requestAnimationFrame(draw);
@@ -54,10 +59,16 @@ export function mountProof(el: HTMLElement): void {
     drawn = copyCard(view, 0.04, 0.03) && facing() >= 0.35;
   }
 
-  raf = requestAnimationFrame(draw);
   // The stage restarts its frame loop when the tab comes back or a pack opening closes; queue ours after it again.
-  document.addEventListener(STAGE_RESUMED, () => {
+  const start = () => {
     cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(draw);
-  });
+    raf = shown ? requestAnimationFrame(draw) : 0;
+  };
+  new IntersectionObserver((entries) => {
+    shown = entries[entries.length - 1].isIntersecting;
+    // Coming into view, it copies a fresh frame at once.
+    last = 0;
+    start();
+  }).observe(el);
+  document.addEventListener(STAGE_RESUMED, start);
 }
