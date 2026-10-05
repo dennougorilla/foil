@@ -3844,6 +3844,7 @@ input[type='range']:disabled {
 }
 
 .dot-more[hidden],
+.dot-scope[hidden],
 .dot-body[hidden] {
   display: none;
 }

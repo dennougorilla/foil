@@ -39,7 +39,7 @@ import { mountQuickMotion } from './tune/quick';
 import { BACKDROPS } from './backdrop';
 import { loadBackdrops } from './gl/renderers';
 import type { Kept } from './binder/db';
-import { artBlock, DOT_COLORS, DOT_PRESETS, DOT_SIZES, dotGrid, dotKey, presetOf, type Dot } from './dot/model';
+import { artBlock, DOT_COLORS, DOT_PRESETS, DOT_SCOPES, DOT_SIZES, dotGrid, dotKey, dotScopeOf, presetOf, type Dot } from './dot/model';
 import type { Layers } from './range';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -192,7 +192,7 @@ function artKey() {
   const src: object = s.sample >= 0 ? sampleImg(s.sample) : (userAnim ?? userImage ?? sampleImg(0));
   if (!artIds.has(src)) artIds.set(src, ++artCount);
   const a = faceArt(s);
-  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? `${dotKey(s.dot)}/${s.pixel}` : ''}`;
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? `${dotKey(s.dot)}/${s.pixel}/${dotScopeOf(s)}` : ''}`;
 }
 
 function faceSpec(image: Img) {
@@ -282,11 +282,14 @@ let facePalette = '';
 /**
  * Draws a just-painted face (or Flip Lenticular's picture) as pixel art when it is on. Calls with the
  * same `keep` share one palette (empty: a palette of its own). The face stays plain until the code is here.
- * With the face's `artMask`, Pixelate (when it is on too) runs first on the art window.
+ * With the face's `artMask`: on the whole card Pixelate (when it is on too) runs first on the art window;
+ * on the frame only the picture in it is kept. Without it the canvas is a picture, left as it is on the frame only.
  */
 function pixelArt(canvas: HTMLCanvasElement, keep: string, artMask?: HTMLCanvasElement) {
-  const { dot: d, pixel } = store.get();
-  if (!d) return;
+  const s = store.get();
+  const d = s.dot;
+  const scope = dotScopeOf(s);
+  if (!d || (scope === 'frame' && !artMask)) return;
   if (!dot)
     return void useDot().then(
       () => {
@@ -295,7 +298,7 @@ function pixelArt(canvas: HTMLCanvasElement, keep: string, artMask?: HTMLCanvasE
       },
       () => toast(t.loadFailed, true),
     );
-  dot.dotFace(canvas, d, keep || `own${++paletteRun}`, artMask && { mask: artMask, block: artBlock(d, pixel) });
+  dot.dotFace(canvas, d, keep || `own${++paletteRun}`, artMask && { mask: artMask, block: artBlock(d, s.pixel), frameOnly: scope === 'frame' });
 }
 
 // ---------- Text ----------
@@ -601,11 +604,16 @@ function buildDot() {
     }
   };
   const td = t.dot;
+  // A card used as the whole card has no frame: the area steps aside and pixel art covers all of it.
+  const scope = dotScopeOf(s) ?? s.dotScope;
   $('dotLabel').textContent = td.label;
-  $('dotHint').textContent = td.hint;
+  $('dotHint').textContent = scope === 'frame' ? td.hintFrame : td.hint;
   $('dotNow').textContent = preset === null ? td.custom : '';
   const presets = ['off', 'chunky', 'retro', 'fine'] as const;
   seg('dotSeg', td.label, presets, (p) => td.preset[p], (p) => preset === p, (p) => store.set({ dot: p === 'off' ? null : { ...DOT_PRESETS[p] } }));
+  $('dotScopeRow').hidden = !d || s.frameless;
+  $('dotScopeLabel').textContent = td.scope;
+  seg('dotScopeSeg', td.scope, DOT_SCOPES, (v) => td.scopeName[v], (v) => s.dotScope === v, (dotScope) => store.set({ dotScope }));
   const more = $('dotMore');
   more.hidden = !d;
   more.textContent = dotOpen ? td.less : td.more;
@@ -1221,6 +1229,7 @@ rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
 rovingKeys($('layoutSeg'));
+for (const id of ['dotSeg', 'dotScopeSeg', 'dotSizeSeg', 'dotColorsSeg', 'dotOutlineSeg', 'dotDitherSeg']) rovingKeys($(id));
 rovingKeys($('backdropSeg'));
 $('backdropSeg').addEventListener('pointerenter', () => void loadBackdrops().catch(() => {}), { once: true });
 $('backdropColorBtn').addEventListener('click', () => {
@@ -1234,7 +1243,6 @@ $('backdropColorBtn').addEventListener('click', () => {
   }
 });
 $<HTMLInputElement>('backdropPicker').addEventListener('input', (e) => store.set({ backdropColor: (e.target as HTMLInputElement).value }));
-for (const id of ['dotSeg', 'dotSizeSeg', 'dotColorsSeg', 'dotOutlineSeg', 'dotDitherSeg']) rovingKeys($(id));
 $('layoutSeg').addEventListener('pointerenter', () => void loadTcgFace().catch(() => {}), { once: true });
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
@@ -1358,7 +1366,7 @@ const tabNow = (s = store.get()): PanelTab => (tabsShown(s).includes(s.panelTab)
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, dot: null, frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
+  store.set({ intensity: 1, pixel: 0, dot: null, dotScope: 'card', frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1437,6 +1445,7 @@ function exportInput() {
     intensity: s.intensity,
     pixel: s.pixel,
     dot: dotGrid(s.dot),
+    dotFrame: dotScopeOf(s) === 'frame',
     tune: s.tune,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
@@ -2347,9 +2356,9 @@ store.on((s, changed) => {
   }
   // The Picture shape changing size is a new shape.
   const reshaped = changed.has('shape') || (changed.has('fit') && s.shape === 'fit');
-  if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit', 'dot'].some((k) => changed.has(k as keyof State))) buildSegments();
+  if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State))) buildSegments();
   if (['backdrop', 'backdropColor', 'edition'].some((k) => changed.has(k as keyof State))) buildBackdrops();
-  if (changed.has('dot') && flipImage) setFlip(flipImage);
+  if ((changed.has('dot') || changed.has('dotScope')) && flipImage) setFlip(flipImage);
   if (changed.has('arrange')) {
     renderCardHint();
     if (s.arrange === 'free') useArrange();
@@ -2365,7 +2374,7 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && !!s.dot)) && !changed.has('sample')) {
+  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && dotScopeOf(s) === 'card')) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();

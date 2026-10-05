@@ -38,6 +38,8 @@ export interface ExportInput {
   pixel: number;
   /** Pixel art's grid across the card's short side, 0 or absent = off (the face is already drawn on it). */
   dot?: number;
+  /** Pixel art on the frame only (the art window is drawn as without it). */
+  dotFrame?: boolean;
   name: string;
   /** For animated sources: paints the card face as it looks `ms` into the animation. */
   faceAt?: (ms: number, face: HTMLCanvasElement, mask: HTMLCanvasElement) => void;
@@ -110,6 +112,7 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
       intensity: input.intensity,
       pixel: pixelCells(input.pixel),
       dot: input.dot,
+      dotFrame: input.dotFrame,
       // A finish that reacts to touch shows a swipe made for this picture, caught while it still shows.
       heat: input.edition.touch ? autoTouch(input.face, input.edition.touch) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
@@ -218,6 +221,7 @@ export async function createScene(input: ExportInput, W0: number, H0: number, re
           intensity: input.intensity,
           pixel: pixelCells(input.pixel),
           dot: input.dot,
+          dotFrame: input.dotFrame,
           tilt,
           // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
           // Blacklight's lamp drifts round the art, as dim as on the stage left alone (unless the tune fixes the light).
