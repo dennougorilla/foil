@@ -44,6 +44,8 @@ export interface FaceSpec {
   frameless: boolean;
   /** The picture is pixel art: it is enlarged with hard pixels (card/pixelArt.ts). */
   crisp: boolean;
+  /** The name is set in a serif (the Engraving finish cuts it into its plate) instead of the pixel face. */
+  serifName?: boolean;
   /** Pixel art is on: the words are held back, to be printed on its grid once the face is converted (card/words.ts). */
   holdWords?: boolean;
 }
@@ -156,12 +158,17 @@ function frameFill(ctx: CanvasRenderingContext2D, frame: FrameId, rarity: Rarity
   }
 }
 
-export function fitName(ctx: CanvasRenderingContext2D, text: string, max: number, size: number): number {
+/** The name's typeface at `size`: the pixel face (bold on request), or the serif an engraved card cuts. */
+export function nameFont(spec: Pick<FaceSpec, 'serifName'>, size: number, bold = false): string {
+  return spec.serifName ? messageFont('serif', size) : `${bold ? '700 ' : ''}${size}px "DotGothic16", monospace`;
+}
+
+export function fitName(ctx: CanvasRenderingContext2D, text: string, max: number, size: number, font: (size: number) => string = (s) => nameFont({}, s)): number {
   let s = size;
-  ctx.font = `${s}px "DotGothic16", monospace`;
+  ctx.font = font(s);
   while (ctx.measureText(text).width > max && s > 16 * S) {
     s -= 2;
-    ctx.font = `${s}px "DotGothic16", monospace`;
+    ctx.font = font(s);
   }
   return s;
 }
@@ -409,10 +416,10 @@ function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: s
   const plateH = H - LINE - plateY;
   const pipsW = 4 * (15 * S + 7 * S);
   const name = spec.name.trim() || ' ';
-  const size = fitName(ctx, name, art.w - pipsW - 24 * S, 40 * S);
+  const size = fitName(ctx, name, art.w - pipsW - 24 * S, 40 * S, (s) => nameFont(spec, s));
   if (spec.plate) {
     // A freely placed name leaves the plate (the rarity stays) and is printed over the card.
-    if (freeName) runs.push(...paintFree(ctx, 'name', [name], (s) => `${s}px "DotGothic16", monospace`, freeName));
+    if (freeName) runs.push(...paintFree(ctx, 'name', [name], (s) => nameFont(spec, s), freeName));
     else {
       const y = plateY + plateH / 2 + S;
       const stock = y - 0.0588 * SHORT;

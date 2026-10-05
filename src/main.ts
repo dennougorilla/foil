@@ -194,7 +194,7 @@ function artKey() {
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements, frameless: s.frameless, crisp: isCrisp() };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements, frameless: s.frameless, crisp: isCrisp(), serifName: s.edition === 'engraving' };
 }
 
 const crispOf = new WeakMap<object, boolean>();
@@ -217,6 +217,10 @@ const thumbKey = () => `${faceVersion}|${JSON.stringify(store.get().tune)}|${sto
 
 /** The message's typeface and words last asked for; the face is painted again once they can be drawn. */
 let fontAsked = '';
+/** The same for the name in the serif (an engraved card's). */
+let nameAsked = '';
+/** Whether the face was last painted with the serif name, so a change of finish repaints it only when that changes. */
+let paintedSerif = false;
 
 /** The text the face last painted (Free placement starts each piece where it was). */
 let lastRuns: TextRun[] = [];
@@ -252,6 +256,10 @@ function redrawFace() {
   const ask = text.trim() ? `${font}|${text}` : '';
   if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
   fontAsked = ask;
+  const nameAsk = spec.serifName && !wordsOnGrid() ? spec.name : '';
+  if (nameAsk && nameAsk !== nameAsked) void loadMessageFont('serif', nameAsk).then(() => nameAsked === nameAsk && redrawFace());
+  nameAsked = nameAsk;
+  paintedSerif = !!spec.serifName;
   stage.cards.setFace(face, mask);
   areas.onFace(face, mask, spec);
   depth?.update(face, artKey());
@@ -2359,7 +2367,7 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && dotScopeOf(s) === 'card')) && !changed.has('sample')) {
+  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && dotScopeOf(s) === 'card') || (changed.has('edition') && (s.edition === 'engraving') !== paintedSerif)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();

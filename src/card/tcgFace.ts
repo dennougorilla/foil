@@ -6,7 +6,7 @@ import { rarityById } from '../editions';
 import { paintLettering, type TextRun } from '../lettering';
 import { messageFont, messageLines, type Rect } from '../message';
 import { columnSize, layoutEffect } from './effect';
-import { paintFreeMessage, LINE, OUTLINE, RADIUS, S, fitName, paintArt, paintPips, roundRect, tcgContent, type FaceSpec } from './face';
+import { paintFreeMessage, LINE, OUTLINE, RADIUS, S, fitName, nameFont, paintArt, paintPips, roundRect, tcgContent, type FaceSpec } from './face';
 import { tcgFrame } from './tcg';
 import { holdWord } from './words';
 
@@ -206,9 +206,8 @@ export function paintTcg(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: Frame
   if (spec.plate) {
     const name = spec.name.trim() || ' ';
     const pipsW = 4 * (15 * S + 7 * S);
-    const size = fitName(ctx, name, t.name.w - pipsW - 40 * S, Math.round(t.name.h * 0.66));
-    // The name leads the card: the pixel face set bold.
-    ctx.font = `700 ${ctx.font}`;
+    // The name leads the card: the pixel face set bold (an engraved card's serif is bold already).
+    const size = fitName(ctx, name, t.name.w - pipsW - 40 * S, Math.round(t.name.h * 0.66), (s) => nameFont(spec, s, true));
     const x = t.name.x + 18 * S;
     const stock = t.name.y + 4 * S;
     runs.push({ part: 'name', text: name, font: ctx.font, size, x, y: mid + S, stock });
