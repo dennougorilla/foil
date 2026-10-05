@@ -192,6 +192,10 @@ test('a hand on the card takes the light; the Light motions give it back when le
 test('held (a drag) the motion eases out; reduced motion stops it at once', () => {
   for (const idle of ['pendulum', 'spotlight'] as const) {
     const t = { ...TUNE_DEFAULTS, idle };
+    // The clock runs on while held, so the finishes' own motion stays in step with the file.
+    const timed = new IdleClock();
+    for (let i = 0; i < 30; i++) timed.step(1 / 60, t, false, true, true);
+    assert.ok(close(timed.idleTime, 0.5), `${idle}: the clock stopped while held (${timed.idleTime})`);
     const amount = (p: IdlePose) => Math.abs(p.rz) + Math.abs(p.ry) + (p.dim ?? 0) + (p.spot?.[1] ?? 0);
     const live = new IdleClock();
     for (let i = 0; i < 40; i++) live.step(1 / 60, t, false, false);
@@ -265,6 +269,7 @@ test('the size scales every motion; zero holds the card and the light still, a t
       }
       assert.ok(Math.abs(b.scale - 1 - 2 * (a.scale - 1)) < 1e-12, `${idle}: scale not doubled`);
       assert.equal(b.spin, a.spin, `${idle}: the size changed how far it turns`);
+      assert.ok(z.glint < -1, `${idle}: a streak of light still passes at size zero`);
       if (a.beam) assert.ok(close(b.beam![0], 2 * a.beam[0], 1e-12) && z.beam![0] === 0, `${idle}: the band's travel does not follow the size`);
     }
     // At size zero the light stays put too.

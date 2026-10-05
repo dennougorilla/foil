@@ -364,6 +364,8 @@ export function idlePose(t: Tune, s: number): IdlePose {
     scale: 1 + (p.scale - 1) * k,
     sheen: [p.sheen[0] * k, p.sheen[1] * k],
     flash: p.flash * k,
+    // At size zero nothing moves, a passing streak of light included.
+    glint: k > 0 ? p.glint : -2,
     light: p.light && [LIGHT_HOME[0] + (p.light[0] - LIGHT_HOME[0]) * k, LIGHT_HOME[1] + (p.light[1] - LIGHT_HOME[1]) * k],
     beam: p.beam && [p.beam[0] * k, p.beam[1], p.beam[2], p.beam[3]],
   };
@@ -473,7 +475,8 @@ export class IdleClock {
   /**
    * `still` is reduced motion: nothing moves on its own. `facing` (the pointer is on the card) brings
    * a turning card round to its face and keeps it there. `held` (dragged, or held flat for the
-   * brush) also faces it, and eases the motion out until it is let go.
+   * brush) also faces it, and eases the motion out until it is let go. Only a turning card waiting on
+   * its face stops the clock, so the finishes' own motion (timed by it too) stays in step with the file.
    */
   step(dt: number, t: Tune, still: boolean, facing: boolean, held = false) {
     const face = facingAt(t, this.idleTime);
@@ -488,7 +491,7 @@ export class IdleClock {
       // Let go of a turn by easing forward to the next time the face looks straight on.
       this.idleTime += Math.min(face - this.idleTime, Math.max(dt * t.speed, (face - this.idleTime) * (1 - Math.exp(-dt * 5))));
       if (face - this.idleTime < 1e-3) this.idleTime = face;
-    } else if (!held && !(facing && face === this.idleTime && TURNING.has(t.idle))) {
+    } else if (!((facing || held) && TURNING.has(t.idle))) {
       this.idleTime += dt * t.speed;
     }
     this.spinAngle = idlePose(t, this.idleTime).spin;
