@@ -22,7 +22,7 @@ import { placeAt, removeFromHand, tierOf } from '../src/pack/rules.ts';
 import { EDITIONS } from '../src/editions.ts';
 
 const NONE = { owned: [], supporter: false };
-const METAL = ['platinum', 'gold', 'relief', 'cosmoholo'];
+const METAL = ['platinum', 'gold', 'relief', 'chameleon', 'cosmoholo'];
 
 test('the hand starts with the five editions of the original game plus Prism and Glitch', () => {
   assert.deepEqual([...OPEN_EDITIONS], ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch']);
@@ -76,8 +76,9 @@ test('a v0.13 save (opened pack ids) becomes every finish those packs held then,
   // The old Supporter pack held Opal, Raden, Confetti, Fireworks and Kintsugi; the old Metal pack Crystal.
   const o = parsePacks('{"opened":["supporter","metal","nope"],"supporter":true}');
   assert.deepEqual(o, { owned: ['platinum', 'gold', 'relief', 'cosmoholo', 'crystal', 'opal', 'raden', 'kintsugi', 'confetti', 'fireworks'], supporter: true });
-  // Metal is whole; Jewel lacks nothing; the new Supporter pack gained Snow Globe, so it is sealed again.
-  assert.ok(isOpened(o, 'metal') && isOpened(o, 'jewel'));
+  // Jewel lacks nothing; Metal gained Chameleon (v0.15) and the new Supporter pack Snow Globe, so both are sealed again.
+  assert.ok(isOpened(o, 'jewel'));
+  assert.ok(!isOpened(o, 'metal') && !o.owned.includes('chameleon'));
   assert.ok(!isOpened(o, 'supporter') && !o.owned.includes('snowglobe'));
   // The old Nature pack held Snow Globe: with it, the new Supporter pack is whole too.
   const n = parsePacks('{"opened":["nature","supporter"],"supporter":true}');
@@ -125,7 +126,7 @@ test('a saved hand keeps up to seven owned finishes, once each, with Base always
 
 test('the deck is every owned finish not in the hand; the builder lists everything owned, a pack sealed again by what is owned of it', () => {
   const hand = ['base', 'relief', 'holo', 'poly', 'negative', 'prism', 'glitch'] as const;
-  assert.deepEqual(deckOf([...hand], M), ['foil', 'platinum', 'gold', 'cosmoholo']);
+  assert.deepEqual(deckOf([...hand], M), ['foil', 'platinum', 'gold', 'chameleon', 'cosmoholo']);
   assert.deepEqual(deckOf([...OPEN_EDITIONS], NONE), []);
   assert.deepEqual(ownedGroups({ owned: ['gold', 'kintsugi'], supporter: false }), [
     { group: 'open', finishes: [...OPEN_EDITIONS] },

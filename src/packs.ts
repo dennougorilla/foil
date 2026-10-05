@@ -26,7 +26,7 @@ export interface Pack {
 export const PACKS: readonly Pack[] = [
   {
     id: 'metal',
-    finishes: ['platinum', 'gold', 'relief', 'cosmoholo'],
+    finishes: ['platinum', 'gold', 'relief', 'chameleon', 'cosmoholo'],
     wrap: 'gold',
     colors: ['#1f1209', '#a86a22', '#f2c14e'],
     load: () => import('./gl/finishes/metal'),

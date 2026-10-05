@@ -63,7 +63,7 @@ pack, three celebrations.
 
 | Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish | Wrapper art |
 |---|---|---|---|---|
-| `metal` Metal | 金属 | Platinum → Gold → Relief → **Cosmo Holo** | Gold | a gold coin on a platinum ingot |
+| `metal` Metal | 金属 | Platinum → Gold → Relief → Chameleon → **Cosmo Holo** | Gold | a gold coin on a platinum ingot |
 | `jewel` Jewel | 宝飾 | Crystal → Opal → Raden → **Kintsugi** | Opal | a brilliant-cut gem, a pearl, a seam of gold, on lacquer red |
 | `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic | a star and a planet |
 | `nature` Nature | 自然 | Sakura → Frost → Stardust → **Magma** | Sakura | a blossom branch |
@@ -77,6 +77,7 @@ pack to be the celebrations and the rest to be tidied):
 |---|---|---|
 | Platinum, Gold | Metal | Metals themselves. |
 | Relief | Metal | The picture struck into a metal medal. |
+| Chameleon | Metal | Color-shift car paint: a coat over metal, the card before the showpiece (added in v0.15). |
 | Cosmo Holo | Metal (showpiece) | A printed metal foil, and the most striking of the four at first sight (Relief is subtle until tilted). |
 | Crystal | Jewel | A cut stone: it was Metal's showpiece while Metal was "Metal & Gem"; gems now have their own pack. |
 | Opal | Jewel | A precious stone. |
