@@ -76,7 +76,7 @@ await step('content fades out above the pinned Save bar', async () => {
 
 await step('nothing of a pack loads before one is opened', async () => {
   const names = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
-  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth/.test(n));
+  const pack = names.filter((n) => /finishes\/(metal|light|nature|studio|supporter)|\/pack\/|opening|shadowDepth|gl\/backdrops/.test(n));
   expect(pack.length === 0, `loaded early: ${pack.join(', ')}`);
   expect((await page.locator('.hand-slot').count()) === 7, 'the hand does not start with seven');
   expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', 'the pack button does not count five sealed packs');
@@ -521,7 +521,7 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
   const edition = (await state()).edition;
   expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
-  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  expect(!chips.some((v) => ['warmth', 'glow', 'rain', 'marble', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
   const pick = chips.includes('negative') ? 'negative' : 'poly';
   await page.click(`.layer-chip[data-v=${pick}]`);
   let s = await state();
@@ -565,11 +565,15 @@ for (const [format, ext] of [['gif', '.gif'], ['apng', '-anim.png']]) {
   });
 }
 
-await step('GIF with a clear background is really clear', async () => {
+await step('a GIF on the Clear backdrop is really clear', async () => {
   await page.click('#formatSeg [role=radio][data-format=gif]');
-  expect(!(await page.isVisible('#gifBgSeg')), 'GIF options are open before being asked for');
+  expect(!(await page.isVisible('#saveBackdropPick')), 'GIF options are open before being asked for');
   await page.click('#saveOptsToggle');
-  await page.click('#gifBgSeg [data-v=clear]');
+  // The options name the backdrop and lead to the tiles in Fine-tune → Card.
+  await page.click('#saveBackdropPick');
+  await page.waitForSelector('#backdropSeg [data-v=clear]', { state: 'visible' });
+  await page.click('#backdropSeg [data-v=clear]');
+  expect((await state()).backdrop === 'clear', 'the Clear tile did not pick the backdrop');
   await page.click('#matteSeg [data-v="#ffffff"]');
   expect(await page.isVisible('#gifClearNote'), 'no note about the dropped shadow');
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
@@ -583,6 +587,60 @@ await step('GIF with a clear background is really clear', async () => {
     expect(at(width >> 1, height >> 1) === 255, 'the card is not opaque');
   }
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+  await page.click('#backdropSeg [data-v=swirl]');
+});
+
+await step('every backdrop is drawn in the file as on the stage, and closes its loop', async () => {
+  // The stage draws the picked backdrop once its shader has arrived.
+  const bgPixel = () =>
+    page.evaluate(() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 1;
+      const bg = document.getElementById('bg');
+      c.getContext('2d').drawImage(bg, 4, 4, 1, 1, 0, 0, 1, 1);
+      return [...c.getContext('2d').getImageData(0, 0, 1, 1).data];
+    });
+  await page.click('#backdropSeg [data-v=plain]');
+  await page.waitForTimeout(600);
+  const plain = await bgPixel();
+  const want = (await state()).backdropColor;
+  const hex = '#' + plain.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
+  expect(hex === want, `the stage shows ${hex} on Plain, not ${want}`);
+  expect(await page.isVisible('#backdropColorBtn'), 'Plain has no color button');
+  await page.click('#backdropSeg [data-v=swirl]');
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const face = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = back.width = 900;
+    face.height = back.height = 1260;
+    drawBack(back, 'card');
+    const out = {};
+    for (const id of ['swirl', 'felt', 'studio', 'velvet', 'bokeh', 'stars', 'confetti', 'plain', 'clear']) {
+      const s = await createScene({ face, mask: face, back, edition: editionById('holo'), intensity: 1, pixel: 0, name: 't', tune: { ...TUNE_DEFAULTS, idle: 'jelly' }, backdrop: { id, color: '#336699' } }, 480, 600, true);
+      // The top-left corner, clear of the card: at the loop's start, its end, and halfway.
+      const corner = (p) => {
+        s.draw(p);
+        return [...s.ctx.getImageData(0, 0, 80, 60).data];
+      };
+      const [a, b, c] = [corner(0), corner(1), corner(0.5)];
+      s.dispose();
+      const diff = (x, y) => x.reduce((n, v, i) => n + (Math.abs(v - y[i]) > 2 ? 1 : 0), 0);
+      out[id] = { seam: diff(a, b), moved: diff(a, c), first: a.slice(0, 4) };
+    }
+    return out;
+  });
+  for (const [id, r] of Object.entries(report)) expect(r.seam === 0, `${id} does not close its loop (${r.seam} values differ)`);
+  // The swirl breathes; the felt, studio, velvet and plain hold still. Bokeh, stars and confetti move
+  // in the whole frame, so their top-left corner may or may not show it.
+  expect(report.swirl.moved > 0, 'the swirl does not breathe in a file');
+  for (const id of ['felt', 'studio', 'velvet', 'plain']) expect(report[id].moved === 0, `${id} moves`);
+  expect(report.plain.first.slice(0, 3).join() === '51,102,153', `Plain is ${report.plain.first}`);
+  expect(report.clear.first[3] === 0, 'the Clear backdrop is not transparent in a file');
+  expect(report.felt.first[3] === 255, 'Felt is not opaque');
 });
 
 // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
@@ -716,8 +774,8 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
         face.height = back.height = 1260;
         drawBack(back, 'card');
         window.__draws.frames = [];
-        const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
-        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40);
+        const scene = await createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune, backdrop: { id: 'clear', color: '#000000' } }, 480, 600, false, false);
+        for (let i = 0; i < 12; i++) scene.draw(i / 12);
         scene.dispose();
         return window.__draws.frames;
       });
@@ -1322,8 +1380,8 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.move(g.x + g.width, g.y, { steps: 12 });
   await page.mouse.up();
   await phase('deck');
-  expect((await packsSaved()).owned.join() === 'platinum,gold,relief,cosmoholo', 'the tear did not own the Metal finishes');
-  for (const name of ['Platinum', 'Gold', 'Relief']) {
+  expect((await packsSaved()).owned.join() === 'platinum,gold,relief,chameleon,cosmoholo', 'the tear did not own the Metal finishes');
+  for (const name of ['Platinum', 'Gold', 'Relief', 'Chameleon']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
@@ -1345,7 +1403,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   }
   await page.keyboard.press('ArrowRight');
   await phase('haul');
-  expect((await page.locator('.pk-name').count()) === 4, 'the haul does not show all four');
+  expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
   await page.click('.pk-try');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'cosmoholo', null, { timeout: 10000 });
@@ -1362,7 +1420,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   const hand = (await state()).hand;
   expect(hand.includes('cosmoholo') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
   expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '4', 'the deck does not hold the other three Metal finishes and the swapped-out Glitch');
+  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck does not hold the other four Metal finishes and the swapped-out Glitch');
 });
 
 await step('the deck builder: one tap moves a card, a full hand gives up its last card, undo, drag, reset', async () => {
@@ -1376,7 +1434,7 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   // Out of the hand: its slot stays open, and the next card goes there.
   await page.click('.db-hand .db-card[data-id=holo]');
   expect((await count()) === '6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
-  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck count did not rise');
+  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck count did not rise');
   await page.click('.db-grid .db-card[data-id=relief]');
   expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
   // Full: the last card that is not Base gives way.
@@ -1459,7 +1517,7 @@ await step('held still, the pack opens with a button and the haul fades in', asy
   await page.click('.pk-name >> nth=0');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
-  expect((await page.textContent('#deckBtn .deck-count')) === '8', 'the deck does not hold both packs');
+  expect((await page.textContent('#deckBtn .deck-count')) === '11', 'the deck does not hold both packs');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 });
 
@@ -1519,8 +1577,8 @@ await step('packs reorganized: a v0.13 save keeps every finish it had, a pack th
   expect(s.edition === 'raden' && s.hand.join() === 'base,opal,snowglobe,kintsugi,raden,holo,magma', `finishes were lost: ${s.edition} / ${s.hand}`);
   const saved = await packsSaved();
   expect(!('opened' in saved) && saved.owned.join() === 'opal,raden,kintsugi,sakura,frost,stardust,magma,confetti,snowglobe,fireworks', `not rewritten as owned finishes: ${JSON.stringify(saved)}`);
-  // Nature and the new Supporter pack are whole; Jewel lacks Crystal, so it is sealed with Metal, Light and Studio.
-  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '4', `sealed: ${await page.getAttribute('#packsBtn', 'data-sealed')}`);
+  // The new Supporter pack is whole; Jewel lacks Crystal and Nature Rainy Window and Marble, so they are sealed with Metal, Light and Studio.
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', `sealed: ${await page.getAttribute('#packsBtn', 'data-sealed')}`);
   await page.click('#packsBtn');
   await phase('shop');
   expect((await page.locator('.pk-slot').count()) === 6, 'the shop does not show six packs');
@@ -1549,7 +1607,7 @@ await step('packs reorganized: a v0.13 save keeps every finish it had, a pack th
 });
 
 await step('Open all opens every sealed pack on the tray at once, lists them pack by pack and leads to the deck builder; the Supporter pack joins only once it is on the tray', async () => {
-  // Saved by v0.13 with the old Metal pack opened: Crystal is owned, so Jewel brings three.
+  // Saved by v0.13 with the old Metal pack opened: Crystal is owned, so Jewel brings three, and Metal only Chameleon.
   await page.evaluate(() => localStorage.setItem('foil:packs', '{"opened":["metal"],"supporter":false}'));
   await page.reload();
   await page.waitForTimeout(1500);
@@ -1557,7 +1615,7 @@ await step('Open all opens every sealed pack on the tray at once, lists them pac
   await page.click('#packsBtn');
   await phase('shop');
   // The count leaves out the Supporter pack, which is not on the tray.
-  expect((await page.textContent('.pk-all small')) === '4 packs · no intros', `Open all does not count four sealed packs: ${await page.textContent('.pk-all small')}`);
+  expect((await page.textContent('.pk-all small')) === '5 packs · no intros', `Open all does not count five sealed packs: ${await page.textContent('.pk-all small')}`);
   // The first tap only arms it.
   await page.click('.pk-all');
   await page.waitForSelector('.pk-all.is-armed', { timeout: 3000 });
@@ -1565,26 +1623,27 @@ await step('Open all opens every sealed pack on the tray at once, lists them pac
   await page.click('.pk-all');
   await phase('all');
   const saved = await packsSaved();
-  expect(saved.owned.length === 23 && saved.supporter === false, `saved ${JSON.stringify(saved)}`);
+  expect(saved.owned.length === 26 && saved.supporter === false, `saved ${JSON.stringify(saved)}`);
   // One row per pack opened now, every finish in it, the showpiece in the middle with a star.
   const rows = await page.$$eval('.pk-row', (els) => els.map((r) => [r.dataset.pack, [...r.querySelectorAll('.pk-swatch b')].map((b) => b.textContent), r.querySelector('.pk-swatch.is-showpiece b')?.textContent, r.querySelector('.pk-row-tag small').textContent, [...r.querySelectorAll('.pk-swatch.is-had b')].map((b) => b.textContent).join()]));
-  expect(rows.map((r) => r[0]).join() === 'jewel,light,nature,studio', `rows ${rows.map((r) => r[0])}`);
-  expect(rows.map((r) => r[1].length).join() === '4,5,4,6', `cards per row ${rows.map((r) => r[1].length)}`);
-  expect(rows.map((r) => r[2]).join() === 'Kintsugi,Shallows,Magma,Shadowbox', `showpieces ${rows.map((r) => r[2])}`);
-  expect(rows[1][1][2] === 'Shallows', `the showpiece is not in the middle: ${rows[1][1]}`);
-  // Crystal was owned already: in its place, marked, and not counted.
-  expect(rows[0][3] === '+3 new' && rows[0][4] === 'Crystal' && rows.slice(1).every((r) => !r[4]), `Jewel row: ${rows[0]}`);
-  expect(/^18 new finishes from 4 packs/.test(await page.textContent('.pk-list-title b')), `title: ${await page.textContent('.pk-list-title b')}`);
+  expect(rows.map((r) => r[0]).join() === 'metal,jewel,light,nature,studio', `rows ${rows.map((r) => r[0])}`);
+  expect(rows.map((r) => r[1].length).join() === '5,4,5,6,6', `cards per row ${rows.map((r) => r[1].length)}`);
+  expect(rows.map((r) => r[2]).join() === 'Cosmo Holo,Kintsugi,Shallows,Magma,Shadowbox', `showpieces ${rows.map((r) => r[2])}`);
+  expect(rows[2][1][2] === 'Shallows', `the showpiece is not in the middle: ${rows[2][1]}`);
+  // Crystal and the old Metal finishes were owned already: in their places, marked, and not counted.
+  expect(rows[0][3] === '+1 new' && rows[0][4].split(',').sort().join() === 'Cosmo Holo,Gold,Platinum,Relief', `Metal row: ${rows[0]}`);
+  expect(rows[1][3] === '+3 new' && rows[1][4] === 'Crystal' && rows.slice(2).every((r) => !r[4]), `Jewel row: ${rows[1]}`);
+  expect(/^21 new finishes from 5 packs/.test(await page.textContent('.pk-list-title b')), `title: ${await page.textContent('.pk-list-title b')}`);
   // The list draws no finish (nothing compiles for it).
   expect((await page.locator('.pk-list canvas').count()) === 0, 'the list draws cards with WebGL');
   await page.click('.pk-list-deck');
   await overlayGone();
   await page.waitForSelector('.dv.is-in', { timeout: 15000 });
-  expect((await page.locator('.db-grid .db-card').count()) === 30, `the deck builder shows ${await page.locator('.db-grid .db-card').count()} finishes, not 30`);
+  expect((await page.locator('.db-grid .db-card').count()) === 33, `the deck builder shows ${await page.locator('.db-grid .db-card').count()} finishes, not 33`);
   expect((await state()).hand.join() === handBefore, 'Open all changed the hand');
   await page.click('.db-done');
   await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
-  const deck30 = String(30 - (await state()).hand.length);
+  const deck30 = String(33 - (await state()).hand.length);
   expect((await page.textContent('#deckBtn .deck-count')) === deck30, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck30}`);
   // Nothing sealed: no Open all, and each pack can still be watched.
   await page.click('#packsBtn');
@@ -1615,8 +1674,8 @@ await step('Open all opens every sealed pack on the tray at once, lists them pac
   await page.click('.pk-list-close');
   await overlayGone();
   const all = await packsSaved();
-  expect(all.owned.length === 26 && all.supporter === true, `saved ${JSON.stringify(all)}`);
-  const deck33 = String(33 - (await state()).hand.length);
+  expect(all.owned.length === 29 && all.supporter === true, `saved ${JSON.stringify(all)}`);
+  const deck33 = String(36 - (await state()).hand.length);
   expect((await page.textContent('#deckBtn .deck-count')) === deck33, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck33}`);
   // Kept across a reload.
   await page.reload();
@@ -1665,10 +1724,10 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const ART = box(0.1, 0.08, 0.9, 0.85);
     const PLATE = box(0.1, 0.9, 0.55, 0.965);
     // A second loop length comes from a motion with a shorter loop (Heartbeat's two seconds).
-    const grab = (id, intensity, ps, idle = 'none') => {
-      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
+    const grab = async (id, intensity, ps, idle = 'none') => {
+      const s = await createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle }, backdrop: { id: 'clear', color: '#000000' } }, W, H, true, false);
       const out = ps.map((p) => {
-        s.draw(p, 40);
+        s.draw(p);
         return s.ctx.getImageData(0, 0, W, H).data;
       });
       s.dispose();
@@ -1700,8 +1759,8 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     };
     const out = {};
     for (const id of ['confetti', 'fireworks']) {
-      const [plain] = grab(id, 0, [0]);
-      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 'pulse')];
+      const [plain] = await grab(id, 0, [0]);
+      const [p0, p1, half, p0b, p1b] = [...(await grab(id, 1, [0, 1, 0.5])), ...(await grab(id, 1, [0, 1], 'pulse'))];
       out[id] = {
         shader: editionById(id).id,
         change: marked(lumas(p0, ART), lumas(plain, ART)),
@@ -1979,6 +2038,138 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
     expect(keep > 0.6, `${id} loses the picture (${keep.toFixed(2)})`);
     expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
   }
+  await still.close();
+});
+
+await step('Rainy Window fogs the picture but keeps it, a wipe clears it, its drops run, its loops close, and it holds still under reduced motion', async () => {
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('nature');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const { AUTO_STILL } = await import('/src/touch/heat.ts');
+    // A detailed picture: stripes, blocks and words, so blur and sharpness are easy to tell apart.
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    for (let i = 0; i < 40; i++) {
+      x.fillStyle = `hsl(${i * 37},70%,${i % 2 ? 30 : 70}%)`;
+      x.fillRect(0, i * 20, 600, 20);
+    }
+    x.fillStyle = '#fff';
+    x.font = 'bold 70px sans-serif';
+    x.fillText('RAIN', 150, 300);
+    x.fillText('WINDOW', 90, 520);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = mask.width = back.width = 900;
+    face.height = mask.height = back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Rain', shape: 'card', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
+    drawBack(back, 'card');
+    const W = 360;
+    const H = 450;
+    const tune = { ...TUNE_DEFAULTS, idle: 'none' };
+    const cw = (320 * 5) / 7;
+    const [x0, y0, x1, y1] = [Math.round(W / 2 - 0.4 * cw), Math.round(H / 2 - 0.42 * 320), Math.round(W / 2 + 0.4 * cw), Math.round(H / 2 + 0.35 * 320)];
+    const grab = (intensity, ps, idle = 'none') => {
+      const s = createScene({ face, mask, back, edition: editionById('rain'), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
+      const out = ps.map((p) => {
+        s.draw(p, 40);
+        const d = s.ctx.getImageData(0, 0, W, H).data;
+        const v = [];
+        for (let y = y0; y < y1; y++) for (let xx = x0; xx < x1; xx++) {
+          const i = (y * W + xx) * 4;
+          v.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        }
+        return v;
+      });
+      s.dispose();
+      return out;
+    };
+    const w = x1 - x0;
+    // Mean step between neighbouring pixels: high on a sharp picture, low through fog.
+    const sharp = (v) => {
+      let n = 0;
+      for (let i = 0; i < v.length - w; i++) n += Math.abs(v[i] - v[i + 1]) + Math.abs(v[i] - v[i + w]);
+      return n / v.length;
+    };
+    // The same in each tile of a 6 × 6 grid over the art, where a wipe shows as a few tiles turning sharp.
+    const tiles = (v) => {
+      const h = v.length / w;
+      const out = [];
+      for (let ty = 0; ty < 6; ty++) for (let tx = 0; tx < 6; tx++) {
+        let n = 0, c = 0;
+        for (let y = Math.floor((ty * h) / 6); y < Math.floor(((ty + 1) * h) / 6) - 1; y++) for (let xx = Math.floor((tx * w) / 6); xx < Math.floor(((tx + 1) * w) / 6) - 1; xx++) {
+          const i = y * w + xx;
+          n += Math.abs(v[i] - v[i + 1]) + Math.abs(v[i] - v[i + w]);
+          c++;
+        }
+        out.push(n / c);
+      }
+      return out;
+    };
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const corr = (a, b) => {
+      const ma = mean(a);
+      const mb = mean(b);
+      let n = 0, sa = 0, sb = 0;
+      for (let i = 0; i < a.length; i++) {
+        n += (a[i] - ma) * (b[i] - mb);
+        sa += (a[i] - ma) ** 2;
+        sb += (b[i] - mb) ** 2;
+      }
+      return n / Math.sqrt(sa * sb);
+    };
+    const diff = (a, b) => a.reduce((n, v, i) => n + Math.abs(v - b[i]), 0) / a.length;
+    const [plain] = grab(0, [0]);
+    const [p0, drift, wiped, p1] = grab(1, [0, 0.04, AUTO_STILL.rain, 1]);
+    const [q0, q1] = grab(1, [0, 1], 'pulse');
+    return {
+      fogged: sharp(p0) / sharp(plain),
+      cleared: (() => {
+        const a = tiles(p0);
+        return tiles(wiped).filter((v, i) => v > a[i] * 1.25).length;
+      })(),
+      keep: corr(p0, plain),
+      drops: diff(p0, drift),
+      seam: Math.max(diff(p0, p1), diff(q0, q1)),
+    };
+  });
+  const f = (v) => v.toFixed(3);
+  console.log(`  rain fogged ${f(report.fogged)} cleared ${report.cleared} tiles, keep ${f(report.keep)} drops ${f(report.drops)} seam ${f(report.seam)}`);
+  expect(report.fogged < 0.8, `the fog hardly softens the picture (${f(report.fogged)} of its sharpness)`);
+  expect(report.keep > 0.6, `the fog hides the picture (correlation ${f(report.keep)})`);
+  expect(report.cleared >= 3, `the unseen finger's wipe does not clear the glass (${report.cleared} of 36 tiles sharper)`);
+  expect(report.drops > 0.05, `the drops do not run (${f(report.drops)})`);
+  expect(report.seam < 0.6, `the loop jumps where it closes (${f(report.seam)})`);
+
+  // On the stage, held still: once the arrival wipe has fogged over again (about 11 s), nothing moves.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ owned: ['rain'], supporter: false }));
+    localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'rain'], edition: 'rain' }));
+    sessionStorage.setItem('seeded', '1');
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(8000);
+  const b = await p.locator('#cardSlot').boundingBox();
+  const clip = { x: b.x + b.width * 0.1, y: b.y + b.height * 0.1, width: b.width * 0.8, height: b.height * 0.8 };
+  let last = await p.screenshot({ clip });
+  let settled = false;
+  for (let i = 0; i < 20 && !settled; i++) {
+    await p.waitForTimeout(1500);
+    const now = await p.screenshot({ clip });
+    settled = now.equals(last);
+    last = now;
+  }
+  expect(settled, 'the card keeps moving under reduced motion');
   await still.close();
 });
 

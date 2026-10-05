@@ -3,55 +3,7 @@ import { TUNE_GLSL } from '../tune/glsl';
 import { LETTERING_GLSL } from '../lettering';
 import { RANGE_GLSL } from './range';
 import type { FinishModule } from './finishes/types';
-
-const COMMON = /* glsl */ `
-float hash12(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-vec2 hash22(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.xx + p3.yz) * p3.zy);
-}
-float vnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash12(i), hash12(i + vec2(1, 0)), u.x),
-             mix(hash12(i + vec2(0, 1)), hash12(i + vec2(1, 1)), u.x), u.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 5; i++) { v += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; }
-  return v;
-}
-vec3 hsv2rgb(vec3 c) {
-  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
-  return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
-}
-vec3 rgb2hsv(vec3 c) {
-  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-  float d = q.x - min(q.w, q.y);
-  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
-}
-float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
-vec3 screen(vec3 a, vec3 b) { return 1.0 - (1.0 - a) * (1.0 - b); }
-// Cell noise: x = distance to nearest seed, y = to second nearest, zw = nearest cell id.
-vec4 voronoi(vec2 p) {
-  vec2 ip = floor(p), fp = fract(p);
-  float d1 = 9.0, d2 = 9.0; vec2 id = vec2(0);
-  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-    vec2 b = vec2(x, y);
-    vec2 r = b + hash22(ip + b) - fp;
-    float d = dot(r, r);
-    if (d < d1) { d2 = d1; d1 = d; id = ip + b; } else if (d < d2) { d2 = d; }
-  }
-  return vec4(sqrt(d1), sqrt(d2), id);
-}
-`;
+import { COMMON } from './common';
 
 export const QUAD_VS = /* glsl */ `#version 300 es
 in vec2 aPos;
@@ -338,7 +290,7 @@ void main() {
   if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82 || e == 90) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
   if (uLayer > 0.5) amt = uIntensity; // layer 2 often lies on the frame: in full there too
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
@@ -366,6 +318,7 @@ void main() {
     // Glow's room is dim, so only a faint glare reaches it.
     spec = tuneGlare(d, 1.35, 3.0, 0.32 * uIntensity * (e == 70 ? 0.35 : 1.0)) * (1.0 - 0.6 * uSpot.y); // a spot lights the foil, not a glare
     if (e == 82) spec *= 0.3; // a soft glare, so it never washes out the Fireworks sparks
+    if (e == 90) spec *= 0.4; // Chameleon's clear coat draws its own soft highlight
   } else {
     float d = length((uv - uLight) * uCardK);
     spec = tuneGlare(d, 1.6, 4.0, 0.1);

@@ -10,6 +10,7 @@ import type { PackId } from '../packs';
 import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
 import { cardK } from '../card/shape';
+import type { BackdropId } from '../backdrop';
 import type { QualityLevel } from '../quality';
 
 export type RGB = [number, number, number];
@@ -24,18 +25,42 @@ interface CardProgram {
 }
 
 export interface BackgroundFrame {
+  /** The swirl's clock (the stage and a file: swirlTime of the loop's place, backdrop.ts). */
   time: number;
+  /** The place in the card's loop, 0..1, that every other backdrop moves by; 0 when absent. */
+  phase?: number;
   colors: [RGB, RGB, RGB];
   pointer: [number, number];
+  /** The card's middle, 0..1 with y up; the frame's middle when absent. */
   focus?: [number, number];
+  /** The card's height over the frame's (backdrops are laid out in card heights); 0.6 when absent. */
+  card?: number;
+  /** Plain's color. */
+  color?: RGB;
 }
 
-/** Full-viewport swirl. Rendered at a fraction of the screen size, then upscaled pixelated by CSS. */
+/** Fetches the backdrops other than the swirl (gl/backdrops.ts); also called ahead, from the tiles. */
+export const loadBackdrops = () => import('./backdrops');
+
+/** A backdrop's shader, fetching the module of the others the first time one is wanted. */
+export async function backdropShader(id: BackdropId): Promise<string> {
+  return id === 'swirl' ? BG_FS : (await loadBackdrops()).BACKDROP_FS[id];
+}
+
+/**
+ * Full-viewport backdrop: the swirl unless another one's shader is given (use). Rendered at a
+ * fraction of the screen size, then upscaled pixelated by CSS.
+ */
 export class BackgroundRenderer {
   readonly gl: WebGL2RenderingContext;
-  private pending: PendingProgram;
+  /** The program on screen, and the one asked for last (the same once it is ready). */
+  private shown: PendingProgram;
+  private wanted: PendingProgram;
+  private programs = new Map<string, PendingProgram>();
+  /** A number for each program, so a still backdrop knows when another one has come in. */
+  private ids = new Map<PendingProgram, number>();
   private vao: WebGLVertexArrayObject;
-  /** On the page, the swirl compiles in the background and shows from the first frame it is ready; an export waits for it. */
+  /** On the page, a backdrop compiles in the background and shows from the first frame it is ready; an export waits for it. */
   private live: boolean;
 
   constructor(readonly canvas: HTMLCanvasElement, opts: { live?: boolean } = {}) {
@@ -43,12 +68,26 @@ export class BackgroundRenderer {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error('webgl2');
     this.gl = gl;
-    this.pending = startProgram(gl, QUAD_VS, BG_FS, 'aPos');
+    this.shown = this.wanted = this.program(BG_FS);
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
     quadBuffer(gl, 1);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  private program(fs: string): PendingProgram {
+    let p = this.programs.get(fs);
+    if (!p) {
+      this.programs.set(fs, (p = startProgram(this.gl, QUAD_VS, fs, 'aPos')));
+      this.ids.set(p, this.ids.size);
+    }
+    return p;
+  }
+
+  /** Draws this backdrop's shader from now on (on the page: once it has compiled, the old one until then). */
+  use(fs: string): void {
+    this.wanted = this.program(fs);
   }
 
   resize(w: number, h: number): void {
@@ -58,14 +97,14 @@ export class BackgroundRenderer {
     }
   }
 
-  /** What a still backdrop was last drawn with (size, colors, place), and the moment it holds. */
+  /** What a still backdrop was last drawn with (backdrop, size, colors, place), and the moment it holds. */
   private stillKey = '';
-  private held: { time: number; pointer: [number, number] } | null = null;
+  private held: { time: number; phase: number; pointer: [number, number] } | null = null;
 
   /**
    * Sizes and draws the backdrop for a window of w × h css px at a drawing level (src/quality.ts).
-   * At a still level it holds its moment and is drawn again only when its size, colors or place
-   * change, so any backdrop drawn here is light on a slow device without a light version of its own.
+   * At a still level it holds its moment and is drawn again only when its backdrop, size, colors or
+   * place change, so any backdrop drawn here is light on a slow device without a light version of its own.
    */
   draw(f: BackgroundFrame, q: QualityLevel, w: number, h: number): void {
     this.resize(Math.ceil(w / q.bg), Math.ceil(h / q.bg));
@@ -75,29 +114,39 @@ export class BackgroundRenderer {
       this.render(f);
       return;
     }
-    this.held ??= { time: f.time, pointer: f.pointer };
+    this.held ??= { time: f.time, phase: f.phase ?? 0, pointer: f.pointer };
+    this.pick();
     // Settled to a 256th of a color step and a pixel of place is settled.
     const focus = f.focus ?? [0.5, 0.5];
-    const key = [this.canvas.width, this.canvas.height, ...f.colors.flat().map((c) => Math.round(c * 256)), Math.round(focus[0] * this.canvas.width), Math.round(focus[1] * this.canvas.height)].join();
+    const key = [this.ids.get(this.shown), this.canvas.width, this.canvas.height, ...f.colors.flat().map((c) => Math.round(c * 256)), ...(f.color ?? []).map((c) => Math.round(c * 256)), Math.round(focus[0] * this.canvas.width), Math.round(focus[1] * this.canvas.height), Math.round((f.card ?? 0.6) * this.canvas.height)].join();
     if (key !== this.stillKey && this.render({ ...f, ...this.held })) this.stillKey = key;
+  }
+
+  /** Shows the backdrop asked for last once it is ready (an export takes it at once and waits). */
+  private pick(): void {
+    if (!this.live || this.wanted.done()) this.shown = this.wanted;
   }
 
   /** Draws one frame; false while the program is still compiling (on the page). */
   render(f: BackgroundFrame): boolean {
-    if (this.live && !this.pending.done()) return false;
+    this.pick();
+    if (this.live && !this.shown.done()) return false;
     const { gl } = this;
-    const p = this.pending.get();
+    const p = this.shown.get();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(p.prog);
     gl.bindVertexArray(this.vao);
     gl.uniform2f(p.u.uRes, this.canvas.width, this.canvas.height);
     gl.uniform1f(p.u.uTime, f.time);
+    gl.uniform1f(p.u.uPhase, f.phase ?? 0);
     gl.uniform3fv(p.u.uC0, f.colors[0]);
     gl.uniform3fv(p.u.uC1, f.colors[1]);
     gl.uniform3fv(p.u.uC2, f.colors[2]);
+    gl.uniform3fv(p.u.uColor, f.color ?? [0, 0, 0]);
     gl.uniform2f(p.u.uPointer, f.pointer[0], f.pointer[1]);
     const focus = f.focus ?? [0.5, 0.5];
     gl.uniform2f(p.u.uFocus, focus[0], focus[1]);
+    gl.uniform1f(p.u.uCard, f.card ?? 0.6);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     return true;
   }

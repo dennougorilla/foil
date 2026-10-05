@@ -1,5 +1,6 @@
 import { EDITIONS, editionById, type EditionId } from './editions';
-import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
+import { backdropShader, BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } from './gl/renderers';
+import { backdropPhase, swirlTime, type BackdropId } from './backdrop';
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
@@ -99,7 +100,6 @@ export class Stage {
   private moving = !this.reduced.matches;
   private last = performance.now();
   private time = 0;
-  private bgTime = 0;
   private running = false;
   // Phones and low-core machines get a lighter backbuffer; the pixel look hides the difference.
   private maxDpr = (navigator.hardwareConcurrency || 8) <= 4 || matchMedia('(pointer: coarse)').matches ? 1.5 : 2;
@@ -153,6 +153,8 @@ export class Stage {
   private focused = -1;
   private particles: Particle[] = [];
   private palette: [RGB, RGB, RGB];
+  /** The backdrop asked for last; the renderer keeps the old one on screen until the new one is ready. */
+  private backdrop: BackdropId | null = null;
   private bgPointer: [number, number] = [0.5, 0.5];
   private focus: [number, number] = [0.4, 0.55];
   private lastTune: unknown = null;
@@ -553,7 +555,6 @@ export class Stage {
     this.last = now;
     // Advance by the clamped step so a long pause never jumps the animation ahead.
     this.time += dt;
-    if (this.motion) this.bgTime += dt;
     const state = this.o.store.get();
     const tune = motion.view(state.tune);
     if (tune !== this.lastTune) {
@@ -574,13 +575,21 @@ export class Stage {
       const t = hexToRgb(hex);
       for (let j = 0; j < 3; j++) this.palette[i][j] += (t[j] - this.palette[i][j]) * k;
     });
+    if (state.backdrop !== this.backdrop) {
+      const id = (this.backdrop = state.backdrop);
+      // Fetched the first time one other than the swirl is wanted; a failed fetch keeps the old one.
+      void backdropShader(id).then((fs) => this.backdrop === id && this.bg.use(fs), () => {});
+    }
     const touch = ed.touch ? this.useTouch() : null;
-    if (`${ed.id}|${state.shape}` !== this.shown && (!ed.touch || touch)) {
-      this.shown = `${ed.id}|${state.shape}`;
+    // The size, not the shape's name: the Picture shape changes with the picture.
+    const size = `${shapeById(state.shape).w}x${shapeById(state.shape).h}`;
+    if (`${ed.id}|${size}` !== this.shown && (!ed.touch || touch)) {
+      this.shown = `${ed.id}|${size}`;
       this.lastTouch = null;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
       this.heat = ed.touch && touch ? new touch.HeatField(ed.touch, kOf(state.shape)) : null;
-      this.greet = this.heat && touch ? new touch.Swipe(this.heat, touch.SWIPES[0]) : null;
+      // Under reduced motion a field that moves the picture (Marble) gets no hint: nothing would carry it back.
+      this.greet = this.heat && touch && (this.motion || !this.heat.moves) ? new touch.Swipe(this.heat, touch.SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && this.heat && !this.motion) {
         while (this.greet.step(1 / 30)) this.heat.step(1 / 30);
@@ -595,7 +604,6 @@ export class Stage {
       this.focus[0] += (fx - this.focus[0]) * k;
       this.focus[1] += (fy - this.focus[1]) * k;
     }
-    this.bg.draw({ time: this.bgTime + 40, colors: this.palette, pointer: this.bgPointer, focus: this.focus }, q, innerWidth, innerHeight);
 
     this.cards.begin();
     // Every box is read before any style is written (the deck's only while a card flies to or from
@@ -718,6 +726,23 @@ export class Stage {
       else this.o.info.style.transform = `translate(${(this.ox.x * 0.12 + fx * 0.4).toFixed(1)}px, ${(this.oy.x * 0.12 + fy * 0.4).toFixed(1)}px) rotate(${(RZ * 0.25).toFixed(4)}rad)`;
     }
 
+    // The backdrop moves on the motion's clock, at the same place of the loop as a file (docs/backdrops.md).
+    const phase = backdropPhase(tune, motion.idleTime, !!ed.torch);
+    this.bg.draw(
+      {
+        time: swirlTime(phase),
+        phase,
+        colors: this.palette,
+        pointer: this.bgPointer,
+        focus: this.focus,
+        card: r ? r.h / innerHeight : undefined,
+        color: hexToRgb(state.backdropColor),
+      },
+      q,
+      innerWidth,
+      innerHeight,
+    );
+
     this.stepParticles(dt);
     this.cards.drawParticles(this.particles);
     requestAnimationFrame(this.frame);
@@ -776,7 +801,8 @@ export class Stage {
       this.lastTouch = null;
       this.heat.lift();
     }
-    this.heat.step(dt);
+    // Under reduced motion Marble's ink stays where a finger left it instead of drifting back.
+    if (this.motion || !this.heat.moves) this.heat.step(dt);
   }
 
   private stepHand(dt: number, state: ReturnType<Store['get']>, deck: DOMRect | null) {
@@ -914,8 +940,9 @@ export class Stage {
     const touch = this.useTouch();
     if (!touch) return undefined;
     const shape = this.o.store.get().shape;
-    let demo = this.demos.get(`${kind}|${shape}`);
-    if (!demo) this.demos.set(`${kind}|${shape}`, (demo = new touch.AutoTouch(kind, touch.SWIPES[0], kOf(shape))));
+    const key = `${kind}|${kOf(shape).join('x')}`;
+    let demo = this.demos.get(key);
+    if (!demo) this.demos.set(key, (demo = new touch.AutoTouch(kind, touch.SWIPES[0], kOf(shape))));
     demo.at(2 + touch.AUTO_STILL[kind] + time / touch.AUTO_LOOP);
     return demo;
   }

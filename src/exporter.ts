@@ -1,5 +1,6 @@
 import { exportFrame } from './card/shape';
-import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
+import { backdropShader, BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
+import { backdropPhase, swirlTime, type BackdropId } from './backdrop';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
 import { exportLoop, fixedLight, framePlan, lampLights, loopCycle, loopView, roomShade, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
@@ -46,6 +47,8 @@ export interface ExportInput {
   layers?: LayerMap;
   /** Flip Lenticular's other picture (card/face.ts drawFlip); the front one in pencil when absent. */
   flip?: HTMLCanvasElement;
+  /** What the card sits on in a moving file (docs/backdrops.md), and Plain's color. */
+  backdrop: { id: BackdropId; color: string };
 }
 
 const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
@@ -53,12 +56,6 @@ const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
 
 export const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
-
-/**
- * The swirl's time at loop position p: it barely breathes and returns to where it started, so the
- * loop is seamless and most of the backdrop stays identical between frames, which keeps the file small.
- */
-export const swirlAt = (p: number) => 40 + Math.sin(p * Math.PI * 2) * 0.15;
 
 /** Saves a made file through the browser's download; answers with its name. */
 export function download(file: File): string {
@@ -140,19 +137,21 @@ function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
 export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** Draws loop position p∈[0,1) of the motion's loop: the card as the stage shows it left alone, on the swirl backdrop. */
-  draw(p: number, bgTime: number, sourceMs?: number): void;
+  /** Draws loop position p∈[0,1) of the motion's loop: the card on its backdrop, as the stage shows them left alone. */
+  draw(p: number, sourceMs?: number): void;
   dispose(): void;
 }
 
 /**
- * The shared stage for GIF, APNG and MP4: a pixel swirl upscaled nearest, with the card composited on top.
- * `W0` × `H0` is the frame for the trading card; other shapes turn and resize it (shape.ts
- * exportFrame), so `out` has the frame's real size. The swirl's pixels grow with a frame taller than the
- * GIF's, so it is as coarse next to the card in every file.
- * `transparent` leaves the swirl out so only the card (and its shadow, unless `shadow` is off) is drawn.
+ * The shared stage for GIF, APNG and MP4: the card's backdrop drawn small and upscaled nearest, with the
+ * card composited on top. `W0` × `H0` is the frame for the trading card; other shapes turn and
+ * resize it (shape.ts exportFrame), so `out` has the frame's real size. The backdrop's pixels grow with a
+ * frame taller than the GIF's, so it is as coarse next to the card in every file. The Clear backdrop leaves
+ * the frame transparent but for the card (and its shadow, unless `shadow` is off).
  */
-export function createScene(input: ExportInput, W0: number, H0: number, readback = false, transparent = false, shadow = true): Scene {
+export async function createScene(input: ExportInput, W0: number, H0: number, readback = false, shadow = true): Promise<Scene> {
+  const transparent = input.backdrop.id === 'clear';
+  const fs = await backdropShader(input.backdrop.id);
   const { W, H, cw, ch } = exportFrame(input.face.height / input.face.width, W0, H0);
   const out = document.createElement('canvas');
   out.width = W;
@@ -160,6 +159,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   const ctx = out.getContext('2d', { willReadFrequently: readback })!;
   const bgCanvas = document.createElement('canvas');
   const bg = new BackgroundRenderer(bgCanvas);
+  bg.use(fs);
   const block = Math.max(4, Math.round((4 * H0) / 600));
   bg.resize(W / block, H / block);
   const cardCanvas = document.createElement('canvas');
@@ -174,6 +174,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   cards.setFlip(input.flip ?? null);
   cards.resize(W, H, 1);
   const colors = input.edition.swirl.map(hexToRgb) as [RGB, RGB, RGB];
+  const color = hexToRgb(input.backdrop.color);
   // Animated sources repaint their own face canvases so the live card is left alone.
   const animFace = input.faceAt ? document.createElement('canvas') : null;
   const animMask = input.faceAt ? document.createElement('canvas') : null;
@@ -185,7 +186,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   return {
     out,
     ctx,
-    draw(p, bgTime, sourceMs) {
+    draw(p, sourceMs) {
       // The card's motion, sheen and light: the stage's, left alone, at the same moment of its loop.
       const { s: time, pose, tilt, light } = loopView(tune, p, torch);
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
@@ -193,7 +194,9 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
         cards.setFace(animFace, animMask);
       }
       if (kind) touch?.at(3 + (tune.speed <= 0 ? AUTO_STILL[kind] : p));
-      if (!transparent) bg.render({ time: bgTime, colors, pointer: [0.5, 0.5] });
+      // The backdrop at the same place of its loop as on the stage, round the card in the middle.
+      const phase = backdropPhase(tune, time, torch);
+      if (!transparent) bg.render({ time: swirlTime(phase), phase, colors, pointer: [0.5, 0.5], card: ch / H, color });
       cards.begin();
       // The shadow as the stage drops it, for a card 500 px tall.
       const u = ch / 500;
@@ -255,11 +258,10 @@ const GIF_DRAW_SHARE = 0.35;
 
 export interface GifOptions {
   /**
-   * Leave the backdrop out. GIF keeps one fully clear colour and nothing in between, so the
-   * shadow is dropped and every edge pixel is either clear or solid.
+   * With the Clear backdrop: 'auto' keeps the card's own edge colour on solid edge pixels; a
+   * '#rrggbb' blends them into it. GIF keeps one fully clear colour and nothing in between, so a
+   * clear GIF drops the shadow and every edge pixel is either clear or solid.
    */
-  clear: boolean;
-  /** 'auto' keeps the card's own edge colour on solid edge pixels; a '#rrggbb' blends them into it. */
   matte: string;
   /** The saved size when left out. */
   size?: GifSize;
@@ -272,8 +274,9 @@ export interface GifOptions {
 export async function exportGif(
   input: ExportInput,
   onProgress?: (p: number, encoding: boolean) => void,
-  opts: GifOptions = { clear: false, matte: 'auto' },
+  opts: GifOptions = { matte: 'auto' },
 ): Promise<File> {
+  const clear = input.backdrop.id === 'clear';
   await packsLoaded(input);
   const worker = new Worker(new URL('./gifWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: GifRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
@@ -295,18 +298,18 @@ export async function exportGif(
   const frames = delays.length;
   let scene: Scene | undefined;
   try {
-    scene = createScene(input, size.w, size.h, true, opts.clear, !opts.clear);
+    scene = await createScene(input, size.w, size.h, true, !clear);
     const { width, height } = scene.out;
     for (let i = 0, at = 0; i < frames; at += delays[i++]) {
       await nextFrame();
       const p = at / loopMs;
-      scene.draw(p, swirlAt(p), p * sourceSpan);
+      scene.draw(p, p * sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, width, height);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
     }
-    const matte = opts.clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
-    send({ type: 'encode', width, height, delays, clear: opts.clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.layer?.edition.dither) });
+    const matte = clear && opts.matte !== 'auto' ? hexToRgb(opts.matte).map((c) => Math.round(c * 255)) : null;
+    send({ type: 'encode', width, height, delays, clear, matte: matte as [number, number, number] | null, dither: !!(input.edition.dither || input.layer?.edition.dither) });
     const bytes = await result;
     return new File([bytes], `${fileSafe(input.name)}-${input.edition.id}.gif`, { type: 'image/gif' });
   } finally {

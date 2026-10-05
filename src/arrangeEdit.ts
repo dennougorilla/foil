@@ -104,6 +104,8 @@ export function mountArrange(o: Options): void {
   const movable = (): FreeField[] => {
     const s = store.get();
     const out: FreeField[] = [];
+    // A card that is all picture prints no words.
+    if (s.frameless) return out;
     if (s.message.text.trim() && s.placements.message) out.push('message');
     if (s.layout === 'classic' && s.plate && s.placements.name) out.push('name');
     return out;

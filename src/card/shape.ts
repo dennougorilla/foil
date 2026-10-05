@@ -3,7 +3,7 @@
 //
 // No imports: the tests load this file directly with Node.
 
-export type ShapeId = 'card' | 'wide' | 'square' | 'post' | 'postWide' | 'meishi';
+export type ShapeId = 'card' | 'wide' | 'square' | 'post' | 'postWide' | 'meishi' | 'fit';
 
 export interface Shape {
   id: ShapeId;
@@ -28,7 +28,23 @@ export const SHAPES: Shape[] = [
   { id: 'postWide', w: 1332, h: 900, size: '148 × 100 mm' },
   // A business card, 91 × 55, on its side.
   { id: 'meishi', w: 1489, h: 900, size: '91 × 55 mm' },
+  // The picture's own proportions (setFit), within 1 : FIT_MAX either way.
+  { id: 'fit', w: 900, h: 1260, size: '' },
 ];
+
+/** The longest a Picture-shaped card gets, in units of its short side. */
+export const FIT_MAX = 2.2;
+
+/** Gives the Picture shape the proportions of a w × h picture; true when they changed. */
+export function setFit(w: number, h: number): boolean {
+  const fit = SHAPES[SHAPES.length - 1];
+  const r = Math.min(FIT_MAX, Math.max(1 / FIT_MAX, h / w));
+  const next = r >= 1 ? [SHORT, Math.round(SHORT * r)] : [Math.round(SHORT / r), SHORT];
+  if (next[0] === fit.w && next[1] === fit.h) return false;
+  [fit.w, fit.h] = next;
+  fit.size = `${fit.w} × ${fit.h}`;
+  return true;
+}
 
 export const shapeById = (id: ShapeId): Shape => SHAPES.find((s) => s.id === id) ?? SHAPES[0];
 
