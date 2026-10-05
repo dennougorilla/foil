@@ -130,6 +130,6 @@ backdrop and the hint beside the tag on a card left in Free placement, which now
 from the first view (v0.13.0 showed the general hint until the language was switched).
 
 When the stage's motions and the export motions became one list (docs/motion.md), the first load
-stayed under the numbers above: 74.4 kB for an English page and 75.9 kB for a Japanese one. Only
+stayed under the numbers above: 74.8 kB for an English page and 76.3 kB for a Japanese one. Only
 Sway (the default) and None are in it; the other nineteen motions (2.1 kB) and their pixel icons
 come in their own chunks.
