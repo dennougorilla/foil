@@ -270,6 +270,7 @@ const LOOKS: Record<PackId, Look> = {
   light: { body: ['#0e1440', '#2a3c9a', '#5a78e0'], art: star, accent: ['#ffd84a', '#fff6c8', '#ffb84a', '#e07a2a', '#ffffff', '#ff7ab0'] },
   nature: { body: ['#0f3a24', '#2f7a46', '#5aae66'], art: blossom, accent: ['#5a3420', '#ffa8c8', '#ffe0ec', '#e0628f', '#ffe14a', '#3c9a4a', '#8ad87a'] },
   studio: { body: ['#5a140c', '#c8442a', '#f07a4a'], art: palette, accent: ['#c8904a', '#f0c88a', '#7a4a20', '#20b8e8', '#ff3a8a', '#ffe24a', '#ffffff', '#e8262a'] },
+  lab: { body: ['#0e3a3a', '#2a8a7a', '#5ad0b8'], art: star, accent: ['#c8f4e8', '#ffffff', '#5ad0ff', '#ff7ab0', '#ffd84a', '#7a4ae0'] },
   supporter: { body: ['#8a8fa6', '#cfd4e2', '#f6f8ff'], art: heart, accent: ['#e8304a', '#ff8aa0', '#9a1830', '#f2c14e', '#fff0b0', '#ffffff'] },
 };
 

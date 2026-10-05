@@ -8,7 +8,7 @@ import type { FinishModule } from './gl/finishes/types';
 /** The hand-picked finishes in the hand from the start, in hand order. Nothing else loads until asked for. */
 export const OPEN_EDITIONS: readonly EditionId[] = ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'];
 
-export type PackId = 'metal' | 'jewel' | 'light' | 'nature' | 'studio' | 'supporter';
+export type PackId = 'metal' | 'jewel' | 'light' | 'nature' | 'studio' | 'supporter' | 'lab';
 
 export interface Pack {
   id: PackId;
@@ -66,6 +66,14 @@ export const PACKS: readonly Pack[] = [
     colors: ['#140f1e', '#6b5aa0', '#ffe9a8'],
     supporter: true,
     load: () => import('./gl/finishes/supporter'),
+  },
+  {
+    // Provisional, for review: the finishes added after v0.14, until the owner places each one.
+    id: 'lab',
+    finishes: ['chameleon'],
+    wrap: 'holo',
+    colors: ['#0c1418', '#2f8a8a', '#c8f4e8'],
+    load: () => import('./gl/finishes/lab'),
   },
 ];
 

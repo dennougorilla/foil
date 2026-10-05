@@ -90,6 +90,7 @@ const STYLES: Record<PackId, { palette: string[]; g: number; drag: number; sway:
   light: { palette: ['#ffffff', '#c8f4ff', '#a99bff'], g: -50, drag: 2.6, sway: 0, size: [3, 6] },
   nature: { palette: ['#ffe0ea', '#ffa8c8', '#ff7aa8'], g: 120, drag: 3.2, sway: 120, size: [6, 9] },
   studio: { palette: ['#00b7eb', '#ff2e88', '#ffe600', '#f3eee2'], g: 800, drag: 1.4, sway: 0, size: [6, 9] },
+  lab: { palette: ['#ffffff', '#c8f4e8', '#5ad0ff', '#ff7ab0'], g: 300, drag: 2.0, sway: 40, size: [3, 7] },
   supporter: { palette: ['#f2c14e', '#ffe7a8', '#ff5a8a', '#5ad0ff', '#ffffff'], g: 900, drag: 1.5, sway: 60, size: [4, 8] },
 };
 const GOLD: RGB = hexToRgb('#f2c14e');
