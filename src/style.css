@@ -3795,3 +3795,39 @@ input[type='range']:disabled {
     animation: none;
   }
 }
+
+/* Pixel art: its presets in one row, its four choices folded under Adjust. */
+.dot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dot-now {
+  color: var(--gold);
+  font-size: 14px;
+}
+
+.dot-more {
+  margin-left: auto;
+}
+
+.dot-more[hidden],
+.dot-body[hidden] {
+  display: none;
+}
+
+.dot-body {
+  display: grid;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--panel-lo);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.dot-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

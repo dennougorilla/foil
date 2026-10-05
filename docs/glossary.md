@@ -9,7 +9,7 @@ name below.
 
 | ja | en | Meaning |
 | --- | --- | --- |
-| カード | Card | The card on the stage, and the first Fine-tune tab (strength, frame, shape, layout, pixelate). |
+| カード | Card | The card on the stage, and the first Fine-tune tab (strength, frame, shape, layout, pixel art, backdrop). |
 | 画像 | Picture | The picture you open (or a sample). Also the second picture of Flip Lenticular (傾けると出る画像 / Picture shown on tilt). |
 | イラスト | Art | The art window of the card, where the picture shows. As an area: only inside it. |
 | 窓 | Window | The box in the crop view that you drag to choose what the card shows. Never 枠 / Frame, which is the card's border. |
@@ -65,9 +65,10 @@ name below.
 | ja | en | Meaning |
 | --- | --- | --- |
 | 書き出す | Export | Step 3: make a file. The button says 保存 / Save. |
-| 書き出し形式 | File format | PNG (静止・透過 / Still, no bg), GIF (動く・軽い / Moving, small), APNG (動く・透過 / Moving, no bg). |
+| 書き出し形式 | File format | GIF (動く・軽い / Moving, small), APNG (動く・高画質 / Moving, full color), MP4 (動画・インスタ / Video, Instagram). |
 | 透過 | Transparent | No background in the file. Never "clear" in English. |
-| 背景 / 縁の色 | Background / Edge color | The GIF's backdrop (うずまき / Swirl or 透過 / Transparent) and the color its cut edge blends into. |
+| 背景 / 縁の色 | Backdrop / Edge color | What the card sits on, on the stage and in files (うずまき / Swirl … 透明 / Clear), and the color a clear GIF's cut edge blends into. |
+| ドット絵 | Pixel art | The whole card drawn as pixel art (Card tab). |
 | しまう / バインダー | Keep / Binder | Put the card in the binder, which lives in this browser. |
 | ステージ | Stage | Where the card shows. ステージに出す / To stage brings a kept card back. |
 | 共有 | Share | Send the card as a GIF to the device's share sheet. |

@@ -95,7 +95,7 @@ uniform sampler2D uBack;
 uniform int uEdition;
 uniform float uIntensity;
 uniform float uTime;
-uniform float uPixel;      // pixel columns across the card, 0 = off
+uniform float uPixel;      // pixel art: pixels across the card's short side, 0 = off (src/dot)
 uniform vec2 uTilt;        // -1..1, drives sheen
 uniform vec2 uLight;       // highlight position in card uv
 uniform float uShadow;     // 1 = draw as drop shadow
@@ -121,6 +121,9 @@ out vec4 o;
 ${COMMON}
 ${TUNE_GLSL}
 ${RANGE_GLSL}
+
+/** The pixel art grid in columns and rows: square cells on any shape (dot/model.ts gridOf). */
+vec2 pixelGrid() { return floor(uPixel * uCardK + 0.5); }
 
 vec4 face(vec2 uv, float lod) { return textureLod(uFace, tuneFaceUv(uv), lod); }
 
@@ -220,14 +223,17 @@ float motionLit(vec2 uv) {
 void main() {
   if (!gl_FrontFacing) {
     vec2 buv = vec2(1.0 - vUv.x, vUv.y);
+    // Under pixel art the back steps on the card's grid too.
+    if (uPixel > 0.5) buv = (floor(buv * pixelGrid()) + 0.5) / pixelGrid();
     vec4 b = texture(uBack, buv);
     if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, b.a * 0.45 * uAlpha); return; }
     // The back's foil pixels (alpha 254, see src/card/back.ts) catch a band of light that steps
     // across them, one pixel of the back at a time, as the card tilts and turns.
     float foil = b.a > 0.99 ? clamp((1.0 - b.a) * 255.0, 0.0, 1.0) : 0.0;
     float a = b.a > 0.99 ? 1.0 : b.a;
-    vec2 cell = floor(buv * uCardK * 90.0); // one cell per back pixel, on any shape
-    float sweep = dot(cell, vec2(0.8, 0.6) / 90.0) - (uTilt.x * 0.45 + uTilt.y * 0.3) - vShade * 1.5;
+    float cells = uPixel > 0.5 ? uPixel : 90.0; // one cell per back pixel, on any shape
+    vec2 cell = floor(buv * uCardK * cells);
+    float sweep = dot(cell, vec2(0.8, 0.6) / cells) - (uTilt.x * 0.45 + uTilt.y * 0.3) - vShade * 1.5;
     float wave = 0.5 + 0.5 * sin(sweep * 7.0);
     float glint = smoothstep(0.6, 1.0, wave) * (0.6 + 0.4 * hash12(cell));
     vec3 c = b.rgb / max(b.a, 1e-4);
@@ -240,14 +246,9 @@ void main() {
   }
   vec2 uv = vUv;
   float lod = 0.0;
-  // Only the art window is pixelated; the frame and nameplate stay crisp.
-  float inArt = texture(uMask, vUv).r;
-  if (uPixel > 0.5 && inArt > 0.5) {
-    // uPixel cells across the short side, square on every shape.
-    vec2 grid = floor(uPixel * uCardK + 0.5);
-    uv = (floor(uv * grid) + 0.5) / grid;
-    lod = max(log2(uFaceTexels / uCardK.x / uPixel) - 0.5, 0.0);
-  }
+  // Pixel art (src/dot): the face is already drawn on this grid; every pixel of the card reads its
+  // cell's centre, so the finish's light steps in the same grain and the corners step too.
+  if (uPixel > 0.5) uv = (floor(uv * pixelGrid()) + 0.5) / pixelGrid();
   vec4 base = face(uv, lod);
   if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
   if (base.a < 0.002) discard;
@@ -333,11 +334,13 @@ void main() {
   float shade = 1.0 + clamp(vShade, -0.25, 0.25) * 0.8;
   col *= shade;
   lit *= shade;
-  if (uPixel > 0.5 && inArt > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
+  // The light comes in a few levels, as a palette would.
+  if (uPixel > 0.5) col = floor(col * 18.0 + 0.5) / 18.0;
   col = showRange(col, uv, range);
   if (uGlint > -1.0) {
     // Stepped on a coarse pixel grid, like the rest of the page: a bright bar with a thin one trailing.
-    vec2 g = floor(vUv * uCardK * 60.0) / (uCardK * 60.0);
+    vec2 gs = uPixel > 0.5 ? pixelGrid() : uCardK * 60.0;
+    vec2 g = floor(vUv * gs) / gs;
     float d = g.x * 0.8 + g.y * 0.6 - uGlint;
     float streak = step(abs(d), 0.045) + step(abs(d + 0.11), 0.012) * 0.7;
     col = mix(col, vec3(1.0, 0.98, 0.9), streak * 0.6);

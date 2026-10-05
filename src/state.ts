@@ -8,6 +8,7 @@ import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
 import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
 import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
 import { DEFAULT_BACKDROP, PLAIN_DEFAULT, sanitizeBackdrop, sanitizeBackdropColor, type BackdropId } from './backdrop';
+import { sanitizeDot, type Dot } from './dot/model';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 /** Tabs of the Fine-tune area in the side panel. */
@@ -36,7 +37,8 @@ export interface State extends RangeColorState {
   /** The picture is the whole card: FOIL's frame, nameplate and words are not drawn (their settings stay). */
   frameless: boolean;
   intensity: number;
-  pixel: number;
+  /** Pixel art over the whole card, or null (src/dot). */
+  dot: Dot | null;
   name: string;
   /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
@@ -96,7 +98,7 @@ const PERSIST: (keyof State)[] = [
   'shape',
   'frameless',
   'intensity',
-  'pixel',
+  'dot',
   'name',
   'nameEdited',
   'message',
@@ -162,7 +164,7 @@ const defaults = (): State => ({
   fit: '',
   frameless: false,
   intensity: 1,
-  pixel: 0,
+  dot: null,
   name: '',
   nameEdited: false,
   message: { ...DEFAULT_MESSAGE },
@@ -192,6 +194,7 @@ const defaults = (): State => ({
 function sanitize(state: State) {
   if (state.lang !== 'ja') state.lang = 'en';
   state.tune = sanitizeTune(state.tune);
+  state.dot = sanitizeDot(state.dot);
   state.shape = shapeOf(state.shape);
   state.frameless = state.frameless === true;
   state.adjustOpen = state.adjustOpen === true;

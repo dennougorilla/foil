@@ -42,6 +42,7 @@ in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
 | The backdrops other than the swirl (`gl/backdrops.ts`; the stage keeps the old one until the new one is ready) | another backdrop is picked, or was left picked | pointing at the backdrop tiles |
+| Pixel art: the face's conversion (`dot/dot.ts`, `dot/convert.ts`) | pixel art is turned on (at once if it was left on) | idle, pointing at the pixel art choices |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
 | The binder, the pack shop and its opening, View deck, a pack's finishes, Shadowbox's depth model | as before (see `binder.md`, `packs.md`) | as before |
 | Registering the service worker, the Update chip, a picture shared to FOIL (`pwa.ts`, see `pwa.md`) | the page has loaded and is idle (also under a data saver), or at once when a picture was shared to it | — |

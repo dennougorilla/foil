@@ -239,10 +239,21 @@
                 <span class="field-label" id="layoutLabel" data-t="layoutLabel"></span>
                 <div class="seg seg-layouts" id="layoutSeg" role="radiogroup" aria-labelledby="layoutLabel"></div>
               </div>
-              <div class="row">
-                <label class="field-label" for="pixel" data-t="pixel"></label>
-                <output id="pixelOut" for="pixel"></output>
-                <input type="range" id="pixel" min="0" max="6" step="1" />
+              <div class="field dot-field">
+                <div class="dot-head">
+                  <span class="field-label" id="dotLabel"></span>
+                  <small class="dot-now" id="dotNow"></small>
+                  <button class="link dot-more" id="dotMore" type="button" aria-controls="dotBody" aria-expanded="false"></button>
+                </div>
+                <div class="seg" id="dotSeg" role="radiogroup"></div>
+                <div class="dot-body" id="dotBody" hidden>
+                  <div class="field"><span class="field-label" id="dotSizeLabel"></span><div class="seg" id="dotSizeSeg" role="radiogroup"></div></div>
+                  <div class="field"><span class="field-label" id="dotColorsLabel"></span><div class="seg" id="dotColorsSeg" role="radiogroup"></div></div>
+                  <div class="dot-pair">
+                    <div class="field"><span class="field-label" id="dotOutlineLabel"></span><div class="seg seg-two" id="dotOutlineSeg" role="radiogroup"></div></div>
+                    <div class="field"><span class="field-label" id="dotDitherLabel"></span><div class="seg seg-two" id="dotDitherSeg" role="radiogroup"></div></div>
+                  </div>
+                </div>
               </div>
               <div class="field" id="backdropField">
                 <span class="field-label" id="backdropLabel" data-t="backdrop"></span>
