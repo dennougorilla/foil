@@ -67,7 +67,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Confetti | Supporter | Gold, silver and rainbow foil confetti that glints piece by piece |
 | Snow Globe | Supporter | Shake it and gold glitter swirls up |
 | Fireworks | Supporter | Willows, chrysanthemums, hearts and stars burst in gold, silver, crimson and jade |
-| Neon | Lab | The outlines bent into glowing neon tubes that flicker now and then |
+| Neon | Lab | The picture's subject bent into a neon sign on a dark board, flickering now and then |
 | Liquid Metal | Lab | A mercury mirror: trace it and ripples run through the picture |
 | Mirror Ball | Lab | A disco ball in the art window, in a chrome frame: tiny mirrors that curve away round the ball, each reflecting a dark room tinted by the picture, a star where the light hits, colored spotlights and spots of light thrown round the stage |
 | Engraving | Lab | Fine engraved lines that follow the picture's forms on a polished copper plate in a guilloche frame; the cuts catch the light as you tilt |

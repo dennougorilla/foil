@@ -243,7 +243,7 @@ const en: Dict = {
     stainedglass: 'The picture set in leaded glass, lit from behind',
     glow: 'Shine a light on it and it glows on in the dark',
     blacklight: 'Move or drag over the card: a UV lamp reveals hidden ink and a seal',
-    neon: 'The outlines bent into glowing neon tubes that flicker now and then',
+    neon: "The picture's subject bent into a neon sign on a dark board, flickering now and then",
     mirrorball: 'Mirror tiles flash one by one and throw spots of light round the stage',
     lenticular3d: 'The picture floats in 3D behind fine ridged lenses',
     lenticularflip: 'Tilt it left and the picture swaps, stripe by stripe, under fine lenses',

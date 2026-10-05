@@ -9,7 +9,8 @@ New finish **Neon / ネオン**, shader **92**, `id: 'neon'`, in the **Light** p
 showpiece (Galaxy → Aurora → Glow → Blacklight → Neon → **Shallows**). The pack placement is
 provisional: foil-openall is reorganising packs, so `src/packs.ts` was changed by one id only.
 
-The picture's main shapes become a neon sign in a dark room (as of polish round 3):
+The picture's main shapes become a neon sign in a dark room. This list is as of polish round 3 and
+kept as history; the second polish cycle (at the end of this note) replaced the layout and the look:
 
 - The sign is laid out on the CPU from each new face (`src/gl/neonMap.ts`, pure and unit-tested in
   `tests/neonMap.test.ts`; GPU side in `src/gl/neonGL.ts`, a layer of the Lab pack (units 12 and 13) like Relief's
@@ -27,7 +28,7 @@ The picture's main shapes become a neon sign in a dark room (as of polish round 
   line, arc length along it, tube index; reach 110 px) and the wall map (10 px cells: the colored
   light the tubes pool on the wall, a line of lamps at two heights, and the tube lighting it most).
   Uniforms `uNeonGas[8]`, `uNeonLen[8]`, `uNeonPost[40]` (post positions), `uNeonInfo`; texture
-  units 5 and 11.
+  units 12 and 13 since the second cycle (as in review-v015's Lab module; 5 is Relief's, 6 Glow's).
 - The shader draws each tube (0.025 S wide) as a cream core (~15 % of the width) in a thick body of
   saturated glass with a softer rim and one sharp highlight on the lit side, a tight and a wide
   halo; electrode sleeves at the ends; posts as small clear discs with a contact shadow. The wall is
@@ -145,3 +146,100 @@ water). Changes:
   tilts, plus a GIF export. Still open: the moon sample keeps only the moon ring (the water no longer
   becomes a scribble, but nothing replaces it); a short neck tube on the parrot.
 
+
+## Second polish cycle, round 1 (2026-10-06, Mac)
+
+The first cycle plateaued (judge: realism 6 / premium 6 / picture 3) because tracing the picture's
+edges gives meaningless strokes. The owner asked to change the approach: Neon is now designed
+signage. Merged origin/main (v0.15.0) first: Neon joins the reorganised Light pack before Shallows
+(37 finishes; a v0.14 save now sees Light sealed again for Neon, as Metal and Nature are).
+
+- Layout (`neonMap.ts`, once per picture, cached by NeonGL as before):
+  - Ground = edge colors (k-means on the window's edge cells) that are rare in the middle box, smooth
+    when the backdrop is defocused, and not a shade of a subject hue. Saliency = distance to the
+    nearest ground color, split at Otsu (clamped 0.12–0.24), refined three times as two 4-color
+    models with a centre prior, largest component, holes filled.
+  - Subject = that figure, unless it is missing, too big, cropped by three sides or a band running
+    across the window; then the brightest, most colorful compact blob (a sun, a moon).
+  - Silhouette = one tube: Douglas–Peucker + Chaikin, smoothed until glass can bend it; closed with
+    a 2.8 W electrode gap at its lowest point, or (cropped) one open tube preferring the upper run;
+    a round outline is bent as a fitted circle (Kåsa fit of its upper part).
+  - Details (max 3): eye ring (spot inside the subject), round closed shapes inside it (compact >
+    0.45), long lines (>= 0.4 S) inside it; straight bars, hairpins, short arcs rejected.
+  - Sparse picture (subject 3–16 % of the window and clearly brighter than the rest): a warm sun gets
+    cut lines and, where a ridge crosses it, sets (arc stops above the horizon, horizon laid); a cool
+    moon gets cyan water dashes. A busy picture gets none.
+- Look (`neon.ts`): near-black board with grain and mottling; picture as a 12 % pale blurred tint;
+  spill from the wall map in the gas color; contact shadow cast away from the room light; glass with
+  a cylindrical body, one gaussian hot core (sigma 0.3 of the radius), no rim, one specular streak
+  sliding with tilt; ends painted black (1.3 W, shorter on short tubes); per-tube brightness
+  variation; border tube at 40 % and desaturated; standoff 11 face px.
+- Tests: new layout tests (cropped subject, setting sun, moon with water, busy picture gets no
+  strokes), texture units. e2e not run (the Neon step's `keep` bar lowered to 0.2, untested).
+- Analysis cost: about 250–350 ms per new picture on the dev server (no minification), more than
+  before (k-means for edge colors and the refinement); the stage re-reads a changing face at most
+  every 160 ms, so a crop drag on Neon can stutter. Worth trimming if the direction is kept.
+- Known weak spots: a subject whose shadowed part matches a dark backdrop (the parrot's crown) is
+  partly lost; a figure split by a crease (a poppy's two petals) keeps only the larger part.
+
+## Second polish cycle, round 2 (2026-10-06, Mac)
+
+Merged origin/main (v0.16.0) first (README finish count conflict: 37 with Neon). Judge after round 1:
+the silhouette did not say "eagle" or "parrot" (a smoothed hull over the head, no beak, no eye; the
+parrot as unrelated open strokes), tubes looked like flat vector strokes with a hard dark outline and
+long plastic electrode stubs, and the board read as the darkened photo (grey ghost at 30–40 %,
+pixel-stepped haze), with a frame tube that vanished in one still. Changes:
+
+- Layout (`neonMap.ts`): the subject's contour is traced from a lightly blurred mask (0.006 S, was
+  0.02 S) and bent by `glassBend`: Douglas–Peucker within 0.009 S of the contour, then each corner
+  rounded with a circular bend as wide as the runs allow (0.5 W to 0.12 S). A cropped outline is
+  started at its longest stretch along the window edge, so a brief graze (a beak's tip) is bridged
+  (up to 0.3 S); `calm` replaces zigzag stretches (much turning that cancels out: feather tips) with
+  a heavily smoothed course and keeps one-way turns (a beak's hook); `unfold` cuts a run where it
+  folds back beside itself (both sides of a slot). The eye search tries the strongest few spots and
+  accepts one that stands out at some radius on every side with subject all round it; the ring gets
+  a pupil dot (`role: 'dot'`, a stub shorter than the tube width, drawn without electrode boots).
+  Details are bent with `glassBend` too; an open detail from window edge to window edge that encloses
+  nothing is dropped. Posts carry the tube's direction (4 floats each) for the clips.
+- Look (`neon.ts`): picture as a matte print at 4.5 % from a wide blur (no pixel steps), no spill
+  brightening of the photo; spill is the wall map only (tight 1.6 W + broad 0.065 S inverse-square
+  terms, ×0.34); glass across the width: gaussian core (sigma 0.22 R) into saturated gas, slight
+  side falloff, a ~1 px darker wall, no outline; one narrow streak off-centre on the lit side whose
+  place across the tube follows the tilt (0.3–0.9 R); short boots (0.85 W, none on the dot), darker
+  at the tip; clear clips across the tube at each post with a faint rim; the glow color blended over
+  4 tube-map cells (no stepped edge where two tubes' glows meet); the frame tube never flickers and
+  burns at 50 %; flicker in about one cycle in five; white gas cooler (0.66, 0.8, 1.0).
+- Tests: glass bends, calm/unfold, beak profile, eye dot, edge-to-edge helper, frame never flickers,
+  print ≤ 6 %, post directions.
+- Still weak: the parrot's black lower beak is taken as ground, so its outline runs up the slot and
+  stops; the eagle's cropped beak front is a straight bridge along the window edge; owl-like faces
+  (subject fills the window) still give only an eye ring.
+
+## Second polish cycle, round 3 (2026-10-06, Mac)
+
+Judge after round 2: the eagle was one open, wandering line with an end floating mid-card and no
+beak; the parrot three disconnected strokes; tubes traced (micro-wiggles, facets) rather than bent;
+a ring plus pill eye that read as a power icon; standoffs and clips near invisible, no contact
+shadows, every tube equally bright, a dull mauve frame tube competing with the subject. Changes:
+
+- Layout (`neonMap.ts`):
+  - The subject mask is clipped a little inside the window before tracing, so a cropped subject
+    closes: where it runs off the picture its outline becomes a straight cut (a bust's base). One
+    closed icon unless the cut is more than 38 % of it; the electrode gap sits at the middle of the
+    base. The lowest 30 % of a closed silhouette is smoothed into one calm sweep (`calmBase`).
+  - `iconBend`: Douglas–Peucker within 2 % of the card, corners bent at 1.8 W or wider, the joins
+    eased (no jump in curvature), then `relax` eases any stretch still tighter than 1.6 W.
+  - A subject that fills the window: its own edge as one open tube whose ends run straight out of
+    the window under the frame (`outOfWindow`), never stopping in open board; a strong shape the
+    window crops (a parrot's beak) is drawn the same way as a detail.
+  - A shape that meets the silhouette (an eagle's beak) keeps the part of its outline clear of it as
+    a detail line, ending at the silhouette. Open details may be 0.25 S long (was 0.4) but turn no
+    more than 1.4 pi in all (`turning`), so no scribbles.
+  - The eye: a dot of glass in the eye's own color under a short brow arc in the silhouette's gas
+    (no ring).
+- Look (`neon.ts`): brushed black board (the spill catches on its streaks); spill wider (0.09 S),
+  deeper in color where it is strong (bends); contact shadow 5–9 px below right of each tube,
+  sliding against the tilt, also through the halo; metal standoff caps wider than the tube with a
+  shadow and a lit rim; clips as metal straps with bright edges; per-tube ±8 % brightness and a
+  slightly different shade; frame tube at 30 % and mostly desaturated, its spill at 0.2.
+- Tests: closed cropped icon with a base, brow + dot eye, relax / iconBend / outOfWindow.

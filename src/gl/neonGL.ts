@@ -32,7 +32,7 @@ export class NeonGL {
   private wall: WebGLTexture;
   private gas = new Float32Array(SLOTS * 3);
   private len = new Float32Array(SLOTS);
-  private posts = new Float32Array(POSTS * 2);
+  private posts = new Float32Array(POSTS * 4);
   private info = [13.5, 0, -1, 0];
   private cells = document.createElement('canvas');
   private ctx: CanvasRenderingContext2D;
@@ -102,13 +102,13 @@ export class NeonGL {
       this.gas.set(t.gas, i * 3);
       this.len[i] = t.len;
     });
-    const posts = neonPosts(d).slice(0, POSTS * 2);
+    const posts = neonPosts(d).slice(0, POSTS * 4);
     this.posts.fill(0);
     this.posts.set(posts);
-    this.info = [d.width, d.tubes.length, d.tubes.findIndex((t) => t.border), posts.length / 2];
+    this.info = [d.width, d.tubes.length, d.tubes.findIndex((t) => t.border), posts.length / 4];
   }
 
-  /** The tube map goes on `unit`, the wall on `unit + 1`. `neon`: the card being drawn is Neon, so its maps must be current. */
+  /** Binds the tube map to `unit` and the wall map to `unit + 1`; `neon`: the card being drawn is Neon, so its maps must be current. */
   bind(p: Program, unit: number, neon: boolean): void {
     const { gl } = this;
     // On their own units: a refresh uploads and must not disturb the other textures.
@@ -121,7 +121,7 @@ export class NeonGL {
     gl.uniform1i(p.u.uNeonWall, unit + 1);
     gl.uniform3fv(p.u.uNeonGas, this.gas);
     gl.uniform1fv(p.u.uNeonLen, this.len);
-    gl.uniform2fv(p.u.uNeonPost, this.posts);
+    gl.uniform4fv(p.u.uNeonPost, this.posts);
     gl.uniform4f(p.u.uNeonInfo, this.info[0], this.info[1], this.info[2], this.info[3]);
   }
 }
