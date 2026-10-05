@@ -51,3 +51,12 @@ test('its frame is chrome in full, and its mirrors read the picture once each', 
   assert.equal(MIRRORBALL_GLSL.match(/\bface\(/g)?.length, 1);
   assert.match(MIRRORBALL_GLSL, /face\(g0 \+ atUv - uv/);
 });
+
+test('its mirrors reflect a room, and only two stars are drawn, never a search of the mirrors round about', () => {
+  // Each mirror shows the room by its own normal, tinted by the picture.
+  assert.match(MIRRORBALL_GLSL, /vec3 env = mbRoom\(/);
+  // The stars: one at the mirror under the light point, one passing glint; no loop over neighbours.
+  const body = MIRRORBALL_GLSL.slice(MIRRORBALL_GLSL.indexOf('vec3 mirrorball('));
+  assert.equal(body.match(/mbStar\(/g)?.length, 2);
+  assert.equal(body.match(/\bfor \(/g)?.length, 1); // the three spotlights
+});
