@@ -66,4 +66,64 @@ them now loads later: the tag's (`tag.css`) and the print chips' look with the L
 
 ## Measurements
 
-Filled in with the numbers of this change.
+Measured on 2026-10-05 for this change (v0.13.0 → this branch), production builds served by `vite
+preview`. Sizes come from the build (gzip of each file, as served); the first load is the entry and
+everything it imports plus the language chunk.
+
+### Bytes on the first load (kB, gzip)
+
+| | v0.9.3 | v0.12.0 | v0.13.0 | now |
+| --- | ---: | ---: | ---: | ---: |
+| JavaScript, English page | 97.6 | 84.6 | 118.4 | **74.6** |
+| JavaScript, Japanese page | 97.6 | 84.6 | 118.4 | **76.1** |
+| CSS | 16.0 | 19.2 | 25.2 | **14.6** |
+| HTML | 3.9 | 4.2 | 4.7 | 5.1 |
+| Scripts requested | 1 | 2 | 3 | 2 |
+| JavaScript loaded on demand (all chunks) | 0 | 81.2 | 90.0 | 147.9 |
+
+(v0.12.0's often-quoted 77 kB is its entry chunk alone; its lettering chunk was imported up front too.)
+
+Where v0.13.0's 118 kB went: the other language (about 7 kB), Fine-tune's tabs (adjust, 19.6 kB on
+its own), the exporters and export motions (5.5 kB), the picture decoders (5.0 kB), free placement
+(3.9 kB), the motion tray and the print menu (1.9 kB each), the trading-card painter (1.7 kB), the
+modulepreload polyfill (0.5 kB), and one chunk instead of three compressing better. Shader source on
+the first load is unchanged (the core card program; packs still bring their own).
+
+Fonts are unchanged: Google Fonts' stylesheet (about 30 kB) and the slices the page's text uses
+(about 27 kB for an English page, about 150 kB for a Japanese one, which Google already splits by
+character range). The page itself loads no images; `og.png` (592 → 540 kB) and
+`apple-touch-icon.png` (8.6 → 5.9 kB) were re-encoded losslessly for the crawlers and home screens
+that fetch them.
+
+### Time and memory
+
+Headless Chromium, 1440×900, a fresh browser per run, base and branch runs alternating; medians
+(ms from navigation). GPU is the desktop RTX through ANGLE/D3D11; software is SwiftShader. "Slow
+4G" is 150 ms round trips, 1.6 Mbps down and the CPU slowed 4×. The first card frame is the first draw
+on the cards' canvas.
+
+| | v0.13.0 | now |
+| --- | ---: | ---: |
+| GPU: first contentful paint | 1024 | 740 |
+| GPU: DOMContentLoaded | 706 | 149 |
+| GPU: card program starts linking | 215 | 143 |
+| GPU: first card frame | 1031 | 937 |
+| Software: first contentful paint | 1236 | 808 |
+| Software: first card frame | 807 | 373 |
+| Slow 4G + CPU 4×, GPU: first contentful paint | 1240 | 1124 |
+| Slow 4G + CPU 4×, GPU: DOMContentLoaded | 2511 | 1143 |
+| Slow 4G + CPU 4×, GPU: first card frame | 2581 | 1858 |
+| JS heap after load (MB) | 3.8 | 2.9 |
+| JS heap with Fine-tune's four tabs opened (MB) | 4.5 | 3.6 |
+| Opening the Shine tab, click to filled (ms) | 120 | 85 |
+
+Frame times are unchanged: on the GPU every frame is 16.7 ms idle and while the pointer tilts the
+card (p95 16.8 ms both). With software rendering the quality governor is still stepping down during a
+short run, so the levels were pinned (`?quality=`): level 3 is 28.0 ms (v0.13.0) and 28.2 ms (now) per
+frame idle, 28.0 / 28.2 ms while tilting; level 0 is 60.1 / 59.6 ms idle and 61.9 / 61.2 ms tilting.
+
+Every one of the 33 finishes, the first view (English, Japanese, phone), Fine-tune's four tabs, the
+motion tray, the GIF options, APNG, a card with an area and with layer 2 were compared pixel by pixel
+with v0.13.0 (time held still, reduced motion): identical, apart from a one-pixel column of the
+backdrop and the hint beside the tag on a card left in Free placement, which now says what Free does
+from the first view (v0.13.0 showed the general hint until the language was switched).
