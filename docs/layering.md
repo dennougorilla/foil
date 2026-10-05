@@ -15,9 +15,9 @@ ways to do it and records the one FOIL uses. The product summary is in `README.m
   finish lands there: a region (all, art, frame, name, none) from the face mask, a brightness band,
   invert, and a brush that paints in or out. Outside it the card shows the plain picture.
 - Some finishes cover the frame in full (Gold, Halftone, Platinum, Chameleon, Stained Glass,
-  Blacklight, Confetti, Fireworks, Negative), two stay in the art window (Crystal, Cosmo Holo), the rest soften
+  Blacklight, Neon, Plasma, Liquid Metal, Engraving, Confetti, Fireworks, Negative), two stay in the art window (Crystal, Cosmo Holo), the rest soften
   a little on the frame.
-- Some finishes need the card to themselves: Warmth and Glow are driven by touch, Blacklight and Plasma by a
+- Some finishes need the card to themselves: Warmth, Glow, Rainy Window, Liquid Metal and Marble are driven by touch, Blacklight and Plasma by a
   lamp that follows the pointer, Shadowbox and 3D Lenticular by the depth model, Flip Lenticular by
   a second picture, Snow Globe by particles drawn over its art.
 

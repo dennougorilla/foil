@@ -5,14 +5,14 @@ import { EDITIONS, layerable } from '../src/editions.ts';
 import { OPEN_EDITIONS, packOf } from '../src/packs.ts';
 import { MIRRORBALL_SHADER, MIRRORBALL_GLSL, ROOM_FS, roomSpin, SPIN } from '../src/gl/mirrorball.ts';
 
-test('Mirror Ball is a Light pack finish on shader 104', () => {
+test('Mirror Ball is a Lab pack finish on shader 104 (provisional)', () => {
   const ed = EDITIONS.find((e) => e.id === 'mirrorball');
   assert.ok(ed, 'no Mirror Ball edition');
   assert.equal(ed.shader, 104);
   assert.equal(MIRRORBALL_SHADER, 104);
   assert.equal(EDITIONS.filter((e) => e.shader === 104).length, 1);
   assert.ok(!OPEN_EDITIONS.includes('mirrorball'), 'Mirror Ball must not be in the hand from the start');
-  assert.equal(packOf('mirrorball')?.id, 'light');
+  assert.equal(packOf('mirrorball')?.id, 'lab');
   // Its spots fall on the stage, not over the art, so it can be a layer like any plain finish.
   assert.ok(layerable('mirrorball'));
 });

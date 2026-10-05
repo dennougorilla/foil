@@ -69,6 +69,9 @@ pack, three celebrations.
 | `nature` Nature | 自然 | Sakura → Frost → Stardust → **Magma** | Sakura | a blossom branch |
 | `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone | a palette and brush |
 | `supporter` Supporter (celebrations) | サポーター限定 | Confetti → Snow Globe → **Fireworks** | Prism (rainbow shards on a silver-white body) | a crowned heart among fireworks |
+| `lab` Lab (provisional) | ラボ (試作) | Chameleon → Neon → Rainy Window → Plasma → Liquid Metal → Kaleidoscope → Marble → Mirror Ball → **Engraving** | Holographic | a star (Light's art in teal) |
+
+The Lab pack is provisional (review-v015): it gathers the nine finishes made after v0.14 so they can be tried together, nine to a haul. Each one moves to its theme pack once the owner has seen them, and the pack goes.
 
 Why each finish is where it is (reorganized after v0.13.1, when the owner asked for the Supporter
 pack to be the celebrations and the rest to be tidied):

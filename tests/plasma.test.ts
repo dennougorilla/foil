@@ -6,7 +6,7 @@ import { PLASMA_GLSL } from '../src/gl/plasma.ts';
 import { EDITIONS, layerable } from '../src/editions.ts';
 import { OPEN_EDITIONS, packOf } from '../src/packs.ts';
 
-test('Plasma is a Light pack finish on shader 96 whose light is a lamp under the pointer', () => {
+test('Plasma is a Lab pack finish on shader 96 whose light is a lamp under the pointer', () => {
   const ed = EDITIONS.find((e) => e.id === 'plasma');
   assert.ok(ed, 'no Plasma edition');
   assert.equal(ed.shader, 96);
@@ -15,9 +15,7 @@ test('Plasma is a Light pack finish on shader 96 whose light is a lamp under the
   assert.equal(EDITIONS.filter((e) => e.shader === 96).length, 1);
   assert.ok(!OPEN_EDITIONS.includes('plasma'), 'Plasma must not be in the hand from the start');
   const pack = packOf('plasma');
-  assert.equal(pack?.id, 'light');
-  // Before the showpiece, which stays last.
-  assert.deepEqual(pack.finishes.slice(-2), ['plasma', 'shallows']);
+  assert.equal(pack?.id, 'lab');
   assert.equal(layerable('plasma'), false);
 });
 

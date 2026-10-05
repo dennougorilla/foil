@@ -17,10 +17,8 @@ test('Neon is a pack finish on shader 92, dithered, and can be layer 2', () => {
   assert.ok(layerable('neon'));
 });
 
-test('Neon is the Light pack card before its showpiece', () => {
-  const light = packOf('neon');
-  assert.equal(light?.id, 'light');
-  assert.deepEqual(light.finishes.slice(-2), ['neon', 'shallows']);
+test('Neon is in the Lab pack (provisional)', () => {
+  assert.equal(packOf('neon')?.id, 'lab');
 });
 
 test("Neon's uniforms carry its own prefix, so no other finish can clash with them", () => {
@@ -32,8 +30,8 @@ test('the flicker runs on cycles that an exported loop holds a whole number of t
   assert.match(NEON_GLSL, /uLoop/);
 });
 
-test('the Light pack draws Neon on shader 92', () => {
-  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'gl', 'finishes', 'light.ts'), 'utf8');
+test('the Lab pack draws Neon on shader 92', () => {
+  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'gl', 'finishes', 'lab.ts'), 'utf8');
   assert.match(src, /e == 92\) col = neon\(c, uv, uTilt, L, m\.r\)/);
   assert.match(src, /NEON_GLSL/);
 });

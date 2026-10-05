@@ -12,14 +12,12 @@ const run = (f: HeatField, seconds: number) => {
 };
 const peak = (d: Float32Array) => d.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
 
-test('Liquid Metal is a touch finish on shader 98 in the Metal pack, before Crystal', () => {
+test('Liquid Metal is a touch finish on shader 98 in the Lab pack (provisional)', () => {
   const lm = EDITIONS.find((e) => e.id === 'liquidmetal');
   assert.ok(lm);
   assert.equal(lm.shader, 98);
   assert.equal(lm.touch, 'liquid');
-  const metal = packOf('liquidmetal');
-  assert.equal(metal?.id, 'metal');
-  assert.equal(metal?.finishes.at(-1), 'crystal');
+  assert.equal(packOf('liquidmetal')?.id, 'lab');
 });
 
 test('a touch sends a train of rings outward', () => {
