@@ -5,12 +5,13 @@
 // into broad bends, each one glass tube of one gas, plus a tube round the art window. The shader
 // draws them from two maps: the tube map (distance to the nearest tube, how far along it, which
 // tube) and the wall map (the colored light all tubes pool on the wall behind them).
-// Each tube: a white-hot core about a third of its width, saturated glass of its gas with a darker
-// rim, a soft halo falling off as the inverse square, electrode caps at both ends and clips on
-// posts that hold it off the wall. The wall is near black but for the light the tubes pool on it,
-// in which the picture shows. The tubes stand off the wall: tilting slides them off their pools
-// and shows their posts. Now and then one tube stutters, on cycles an exported loop holds a whole
-// number of times; held still (uTime stays put) every tube is lit.
+// Each tube: a thick body of saturated glass with a narrow cream-hot core, a darker rim and one
+// sharp reflection along the side facing the room; a tight bright halo in the air round it and a
+// wide soft one; clear electrode sleeves at both ends. Short clear standoffs hold it off the wall,
+// seen as small discs with a contact shadow. The wall is near black but for the light the tubes
+// pool on it, in which the picture shows. The tubes stand a little off the wall: tilting slides
+// them a few pixels against their pools and posts. Now and then one tube stutters, on cycles an
+// exported loop holds a whole number of times; held still (uTime stays put) every tube is lit.
 export const NEON_GLSL = /* glsl */ `
 uniform sampler2D uNeonMap;   // r: distance to the nearest tube's centre line (face px), g: how far along that tube, b: which tube
 uniform sampler2D uNeonWall;  // rgb: the light the tubes pool on the wall, a: the tube that lights it most
@@ -18,11 +19,16 @@ uniform vec3 uNeonGas[8];     // each tube's gas color
 uniform float uNeonLen[8];    // each tube's length (face px)
 uniform vec4 uNeonInfo;       // x: tube width (face px), y: how many tubes, z: the border tube (-1: none), w: how many posts
 #define NEON_POSTS 40
-#define NEON_POST_GAP 300.0
 uniform vec2 uNeonPost[NEON_POSTS];  // where each post meets the wall (face px)
 
 // The face in face pixels (a short side of 900).
 #define NEON_FACE (uCardK * 900.0)
+// How far the tubes stand off the wall, as face px of slide at full tilt.
+#define NEON_STANDOFF 16.0
+// The border tube burns at this share of the picture's tubes, so it frames rather than leads.
+#define NEON_BORDER_DIM 0.62
+// Past this distance (face px) the tube map holds no tube (NEON_REACH in neonMap.ts).
+#define NEON_REACH 110.0
 
 // A period near 2.4 s that an exported loop holds a whole number of times.
 float neonPeriod() { return uLoop > 0.0 ? uLoop / max(1.0, floor(uLoop / 2.4 + 0.5)) : 2.4; }
@@ -41,16 +47,6 @@ float neonFlicker(int id) {
   return 1.0 - 0.95 * off;
 }
 
-// Where a post holds the tube: x across, y along the tube from the nearest post (face px). Posts
-// sit evenly along each tube (neonPosts in neonMap.ts puts them in uNeonPost).
-vec2 neonPost(vec3 m) {
-  int id = int(m.b + 0.5);
-  float len = uNeonLen[clamp(id, 0, 7)];
-  float n = max(2.0, floor(len / NEON_POST_GAP));
-  float gap = len / n;
-  return vec2(m.r, (fract(m.g / gap) - 0.5) * gap);
-}
-
 vec3 neonTubeAt(vec2 p) { return texture(uNeonMap, p).rgb; }
 // The tube index without blending across the line between two tubes.
 float neonIdAt(vec2 p) { return texelFetch(uNeonMap, ivec2(p * vec2(textureSize(uNeonMap, 0))), 0).b; }
@@ -61,45 +57,45 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
   vec2 px = 1.0 / NEON_FACE;
   float W = uNeonInfo.x;
   float R = 0.5 * W;
-  // The tubes stand off the wall on posts: tilting slides them against the wall and the light they
-  // pool on it, which stays where they are mounted.
-  vec2 par = t * 54.0;
+  // The tubes stand off the wall on short posts: tilting slides them a little against the wall
+  // and the light they pool on it, which stays where they are mounted.
+  vec2 par = t * NEON_STANDOFF;
   vec2 tp = fuv + par * px;
+  vec2 X = fuv * NEON_FACE;
 
   // ---- The wall: near black, lit by the colored light the tubes pool on it ----
   vec2 ws = vec2(textureSize(uNeonWall, 0));
   vec4 wm = texture(uNeonWall, fuv);
   float wid = texelFetch(uNeonWall, ivec2(fuv * ws), 0).a;
   vec3 pool = wm.rgb * (wid > -0.5 ? neonFlicker(int(wid + 0.5)) : 1.0);
-  vec3 alb = pow(c, vec3(1.15));
+  vec3 alb = pow(c, vec3(1.2));
   // A faint room light from the light's side; the frame a darker painted board.
-  float room = 0.1 + 0.05 * exp(-pow(length((fuv - uLight) * uCardK) / 0.8, 2.0));
-  float board = mix(0.5, 1.0, art);
-  vec3 col = alb * vec3(0.92, 0.94, 1.04) * room * board;
-  col += (alb * pool * 1.15 + pool * 0.03) * mix(0.25, 1.0, art);
+  float room = 0.035 + 0.025 * exp(-pow(length((fuv - uLight) * uCardK) / 0.7, 2.0));
+  float board = mix(0.55, 1.0, art);
+  vec3 col = alb * vec3(0.9, 0.94, 1.06) * room * board;
+  // The picture shows where tube light falls on it; the light itself tints the wall a little.
+  vec3 fall = pool * pool / (pool + 0.25);
+  col += (alb * fall * 1.9 + pool * 0.035) * mix(0.3, 1.0, art);
 
-  // ---- The posts: a round foot on the wall with a soft shadow round it, and the post itself,
-  // a short dark rod from the foot to the tube, seen once the card tilts ----
-  vec2 X = fuv * NEON_FACE;
+  // ---- The posts: short clear glass standoffs. A small disc on the wall with a soft contact
+  // shadow; once the card tilts, the bit of post between the disc and the tube shows ----
   float footD = 1e4;
   float postD = 1e4;
-  float postU = 0.0;
   for (int i = 0; i < NEON_POSTS; i++) {
     if (float(i) >= uNeonInfo.w) break;
     vec2 F = uNeonPost[i];
     footD = min(footD, length(X - F));
     vec2 ab = -par;
     float u = clamp(dot(X - F, ab) / max(dot(ab, ab), 1e-3), 0.0, 1.0);
-    float dd = length(X - F - ab * u);
-    if (dd < postD) { postD = dd; postU = u; }
+    postD = min(postD, length(X - F - ab * u));
   }
-  col *= 1.0 - 0.6 * exp(-footD * footD / (W * W * 0.9));
-  float post = 1.0 - smoothstep(0.3 * W, 0.38 * W, postD);
-  float foot = 1.0 - smoothstep(0.42 * W, 0.52 * W, footD);
-  vec3 metal = vec3(0.1, 0.1, 0.11) + pool * 0.12;
-  col = mix(col, metal * 0.8 + vec3(0.25) * (1.0 - smoothstep(0.3 * W, 0.45 * W, footD)) * 0.3, foot * 0.9);
-  // The rod is a cylinder: a bright line down its middle catching the gas light.
-  col = mix(col, metal + (pool * 0.3 + vec3(0.12)) * (1.0 - postD / (0.38 * W)), post * step(0.02, postU));
+  float footR = 0.42 * W;
+  col *= 1.0 - 0.55 * exp(-pow(max(footD - footR * 0.6, 0.0) / (0.5 * W), 2.0));
+  float post = 1.0 - smoothstep(footR - 1.0, footR + 1.0, postD);
+  // Clear glass: dark where it shows the wall, a lit rim and a spark of the gas light it carries.
+  float rim = smoothstep(footR * 0.55, footR, postD);
+  vec3 glassPost = col * 0.6 + pool * (0.1 + 0.35 * rim) + vec3(0.06) * rim;
+  col = mix(col, glassPost, post * 0.9);
 
   // ---- The tube here ----
   vec3 tm = neonTubeAt(tp);
@@ -107,65 +103,70 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
   float tid = neonIdAt(tp);
   int id = clamp(int(tid + 0.5), 0, 7);
   bool none = tid < -0.5 || uNeonInfo.y < 0.5;
+  float has = none ? 0.0 : 1.0;
   vec3 gas = uNeonGas[id];
   float len = uNeonLen[id];
   bool border = float(id) == uNeonInfo.z;
   float on = neonFlicker(id);
-  // The gas is a little brighter near the electrode it starts from.
-  float glow = (1.0 - (border ? 0.3 : 0.12) * clamp(tm.g / len, 0.0, 1.0)) * on;
+  // The gas is a little brighter near the electrode it starts from; the border burns lower.
+  float glow = (1.0 - 0.12 * clamp(tm.g / len, 0.0, 1.0)) * on * (border ? NEON_BORDER_DIM : 1.0);
   // Across the tube: x is 0 on its centre line and 1 at the glass; the normal points outwards.
   vec2 e = vec2(1.5, 0.0);
   vec2 grad = vec2(neonTubeAt(tp + e.xy * px).r - neonTubeAt(tp - e.xy * px).r, neonTubeAt(tp + e.yx * px).r - neonTubeAt(tp - e.yx * px).r);
   vec2 nrm = grad / max(length(grad), 1e-4);
   float x = d / R;
   float aa = max(fwidth(d) / R, 0.04);
-  float inTube = (1.0 - smoothstep(1.0 - aa, 1.0 + aa, x)) * (none ? 0.0 : 1.0);
+  float inTube = (1.0 - smoothstep(1.0 - aa, 1.0 + aa, x)) * has;
   // Which side of the tube faces the room light (and turns as the card tilts).
   vec2 toLight = normalize((uLight - fuv) * uCardK * 2.0 + t * 1.2 + vec2(-0.35, -0.5));
   float facing = dot(nrm, toLight);
 
-  // The halo in the air round the glass: inverse square, about 3–4 tube widths across.
-  float h = max(d - R, 0.0) / (0.55 * W);
-  float halo = (1.0 / (1.0 + h * h)) * (1.0 - smoothstep(2.6 * W, 4.2 * W, d)) * (none ? 0.0 : 1.0);
-  col += gas * halo * 0.55 * glow * board;
+  // Two halos in the air round the glass: a tight bright one hugging the tube, and a wide, faint
+  // one spilling far out (the pool on the wall carries the rest).
+  float hd = max(d - R, 0.0);
+  float tight = exp(-pow(hd / (0.32 * W), 2.0)) * 0.5 + 0.22 / (1.0 + pow(hd / (0.45 * W), 2.0));
+  float wide = 0.1 / (1.0 + pow(hd / (2.2 * W), 2.0)) * (1.0 - smoothstep(0.75 * NEON_REACH, NEON_REACH, d));
+  col += gas * (tight + wide) * glow * board * has;
 
   // Electrodes: the last stretch at each end is a metal sleeve in clear glass; the gas stops there.
   float fromEnd = min(tm.g, len - tm.g);
-  float EL = 1.3 * W;
+  float EL = 1.1 * W;
   float cap = 1.0 - smoothstep(EL - 1.0, EL + 1.0, fromEnd);
-  // Clips round the tube at each post.
-  vec2 tpst = neonPost(tm);
-  float clip = (1.0 - smoothstep(0.24 * W, 0.34 * W, abs(tpst.y))) * (1.0 - cap);
 
-  // Lit glass: white-hot core about 30% of the width, saturated gas, a darker rim at the glass.
-  float core = 1.0 - smoothstep(0.16, 0.36, x);
-  vec3 lit = gas * (1.25 - 0.35 * x * x);
-  lit = mix(lit, gas * 0.82, smoothstep(0.72, 1.0, x));
-  lit = mix(lit, vec3(1.0, 0.98, 0.95), core * 0.92);
+  // Lit glass: a thick body of the gas's saturated color, brightest towards the middle, with a
+  // narrow cream-hot core (about 15 % of the width) and a darker rim where the glass turns away.
+  vec3 cream = vec3(1.0, 0.95, 0.82);
+  vec3 lit = gas * (1.18 - 0.4 * x * x);
+  lit = mix(lit, mix(gas, cream, 0.5) * 1.15, 0.45 * (1.0 - smoothstep(0.12, 0.42, x)));
+  lit = mix(lit, cream, 0.95 * (1.0 - smoothstep(0.1, 0.26, x)));
+  lit *= mix(1.0, 0.78, smoothstep(0.72, 1.0, x));
   lit *= glow;
   // Unlit (while it stutters) the glass is pale with a trace of its colored coating.
-  vec3 dead = vec3(0.16, 0.16, 0.18) + gas * 0.1 + col * 0.25;
+  vec3 dead = vec3(0.12, 0.12, 0.14) + gas * 0.08 + col * 0.25;
   vec3 tube = mix(dead, lit, clamp(on * 1.1 - 0.05, 0.0, 1.0));
-  // A thin reflection of the room on the side facing it.
-  tube += vec3(0.9, 0.94, 1.0) * exp(-pow((x - 0.62) / 0.09, 2.0)) * max(facing, 0.0) * 0.45;
+  // One sharp, narrow reflection of the room along the side facing it; the far side a shade darker.
+  float hiA = exp(-pow((x - 0.6) / 0.08, 2.0));
+  tube += vec3(0.95, 0.97, 1.0) * hiA * 0.5 * smoothstep(0.15, 0.6, facing);
+  tube *= 1.0 - 0.18 * x * smoothstep(0.0, 0.7, -facing);
   // The electrode: dark grey metal with a bright line along it, a dark ring where the gas starts.
   float lit2 = max(facing, 0.0);
-  vec3 sleeve = vec3(0.26, 0.26, 0.28) * (0.55 + 0.45 * (1.0 - x * x)) + vec3(0.85) * exp(-pow((x - 0.5) / 0.14, 2.0)) * (0.25 + 0.6 * lit2);
-  sleeve += gas * 0.2 * glow;
+  vec3 sleeve = vec3(0.22, 0.22, 0.24) * (0.55 + 0.45 * (1.0 - x * x)) + vec3(0.85) * exp(-pow((x - 0.5) / 0.12, 2.0)) * (0.2 + 0.6 * lit2);
+  sleeve += gas * 0.25 * glow;
   tube = mix(tube, sleeve, cap);
-  tube *= 1.0 - 0.6 * exp(-pow((fromEnd - EL) / 1.6, 2.0)) * (1.0 - cap);
-  // The clip: a band of dark metal a little wider than the tube, with a bright edge.
-  vec3 clipCol = vec3(0.16, 0.16, 0.18) + vec3(0.7) * exp(-pow((tpst.y + 0.12 * W) / (0.07 * W), 2.0)) * (0.3 + 0.7 * lit2);
-  float clipIn = clip * (1.0 - smoothstep(1.12 - aa, 1.12 + aa, x));
+  tube *= 1.0 - 0.55 * exp(-pow((fromEnd - EL) / 1.6, 2.0)) * (1.0 - cap);
   col = mix(col, tube, inTube);
-  col = mix(col, clipCol, clipIn * 0.95 * (none ? 0.0 : 1.0));
 
   // The name and the pips on the frame are lit as thin neon lettering: wherever the print is
-  // darker than the paper round it, in the border tube's gas.
+  // darker than the paper round it, in the border tube's gas. Only clear of the art window and
+  // the border tube, so the window's edge never becomes a second line.
+  vec2 a0 = uArt.xy * NEON_FACE;
+  vec2 a1 = uArt.zw * NEON_FACE;
+  vec2 out2 = max(a0 - uv * NEON_FACE, uv * NEON_FACE - a1);
+  float clear = smoothstep(0.024 * 900.0 + 0.8 * W, 0.024 * 900.0 + 1.3 * W, max(out2.x, out2.y));
   vec3 letters = uNeonInfo.z > -0.5 ? uNeonGas[int(uNeonInfo.z)] : uNeonInfo.y > 0.5 ? uNeonGas[0] : vec3(1.0, 0.2, 0.62);
-  float ink = (1.0 - art) * smoothstep(0.08, 0.24, luma(face(uv, 3.0).rgb) - L);
-  col = mix(col, mix(letters, vec3(1.0), 0.55), ink);
-  col += letters * smoothstep(0.03, 0.2, luma(face(uv, 4.0).rgb) - luma(face(uv, 1.0).rgb)) * (1.0 - art) * 0.4;
+  float ink = (1.0 - art) * clear * smoothstep(0.08, 0.24, luma(face(uv, 3.0).rgb) - L);
+  col = mix(col, mix(letters, vec3(1.0), 0.45) * 0.85, ink);
+  col += letters * smoothstep(0.03, 0.2, luma(face(uv, 4.0).rgb) - luma(face(uv, 1.0).rgb)) * (1.0 - art) * clear * 0.3;
   return col;
 }
 `;

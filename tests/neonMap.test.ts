@@ -1,7 +1,7 @@
 // Run with `npm test`. Neon's sign layout (src/gl/neonMap.ts) on synthetic faces.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NEON_MAX_TUBES, NEON_REACH, neonDesign, neonPosts, neonTubeMap, neonWallMap } from '../src/gl/neonMap.ts';
+import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, neonDesign, neonPosts, neonTubeMap, neonWallMap } from '../src/gl/neonMap.ts';
 
 // A 900 × 1260 card face read at 4 face px per cell, with the classic art window.
 const FW = 900;
@@ -66,7 +66,7 @@ test('a busy picture gives a few long tubes, never a tangle of short ones', () =
   }), w, h, FW, FH, art);
   const inner = d.tubes.filter((t) => !t.border);
   assert.ok(inner.length <= NEON_MAX_TUBES);
-  for (const t of inner) assert.ok(len(t.pts) >= 0.18 * 900 - 1, `a tube only ${len(t.pts)} long`);
+  for (const t of inner) assert.ok(len(t.pts) >= 0.15 * 1260 - 1, `a tube only ${len(t.pts)} long`);
 });
 
 test('a flat picture has only the border tube', () => {
@@ -107,9 +107,50 @@ test('the tube map measures distance and length along each tube; the wall map is
   assert.ok(wall[(Math.floor(560 / 10) * 90 + 45) * 4 + 2] < 0.2, 'dark far from the tubes');
 });
 
-test('posts sit along every tube, at least two each', () => {
+test('posts hold the long tubes sparingly and leave short ones alone', () => {
   const d = neonDesign(face((x, y) => (Math.hypot(x - 450, y - 560) < 250 ? [230, 30, 30] : [10, 10, 20])), w, h, FW, FH, art);
   const posts = neonPosts(d);
-  assert.ok(posts.length / 2 >= 2 * d.tubes.length);
+  const total = d.tubes.reduce((s, t) => s + t.len, 0);
+  // Never closer than about every 400 face px of tube, and never more than the shader holds.
+  assert.ok(posts.length / 2 >= 3 && posts.length / 2 <= total / 380, `${posts.length / 2} posts on ${total.toFixed(0)} px`);
   assert.ok(posts.length / 2 <= 40);
+  const short = { tubes: [{ pts: Float32Array.from([100, 100, 100 + NEON_NO_POST - 20, 100]), len: NEON_NO_POST - 20, gas: [1, 0, 0] as [number, number, number], border: false }], width: 20 };
+  assert.equal(neonPosts(short).length, 0);
+});
+
+test('a curl tighter than glass bends is cut out of a tube, and a horizon broken by it is joined again', () => {
+  // A wavy horizon: a bright band below a dark sky, whose edge makes one tight hook in the middle.
+  const d = neonDesign(face((x, y) => {
+    const edge = 700 + 40 * Math.sin(x / 120) + (Math.hypot(x - 450, y - 690) < 26 ? 60 : 0);
+    return y > edge ? [240, 120, 20] : [8, 6, 20];
+  }), w, h, FW, FH, art);
+  const inner = d.tubes.filter((t) => !t.border);
+  assert.equal(inner.length, 1, `${inner.length} tubes`);
+  assert.ok(inner[0].len > 0.6 * art.w, `one long horizon (${inner[0].len.toFixed(0)} px)`);
+});
+
+test('a stray short mark in a corner of the window is left out', () => {
+  const d = neonDesign(face((x, y) => {
+    if (Math.hypot(x - 450, y - 600) < 260) return [230, 30, 30];
+    if (x > 90 && x < 220 && y > 90 && y < 130) return [20, 200, 230];
+    return [8, 8, 16];
+  }), w, h, FW, FH, art);
+  for (const t of d.tubes.filter((u) => !u.border)) {
+    const cx = t.pts.reduce((s, v, i) => (i % 2 ? s : s + v), 0) / (t.pts.length / 2);
+    assert.ok(cx > 250, 'no tube in the top-left corner');
+  }
+});
+
+test('a small strong spot inside a shape (an eye) gets a ring of its own', () => {
+  const d = neonDesign(face((x, y) => {
+    if (Math.hypot(x - 430, y - 520) < 24) return [10, 10, 10];
+    return Math.hypot(x - 450, y - 600) < 300 ? [235, 225, 200] : [20, 60, 30];
+  }), w, h, FW, FH, art);
+  const ring = d.tubes.find((t) => {
+    if (t.border) return false;
+    for (let i = 0; i < t.pts.length; i += 2) if (Math.hypot(t.pts[i] - 430, t.pts[i + 1] - 520) > 90) return false;
+    return true;
+  });
+  assert.ok(ring, 'a ring round the spot');
+  assert.ok(ring.len > 150, `ring ${ring.len.toFixed(0)} px`);
 });

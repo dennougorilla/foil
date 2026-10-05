@@ -9,26 +9,30 @@ New finish **Neon / ネオン**, shader **92**, `id: 'neon'`, in the **Light** p
 showpiece (Galaxy → Aurora → Glow → Blacklight → Neon → **Shallows**). The pack placement is
 provisional: foil-openall is reorganising packs, so `src/packs.ts` was changed by one id only.
 
-The picture's main outlines become a neon sign in a dark room (since polish round 2):
+The picture's main shapes become a neon sign in a dark room (as of polish round 3):
 
 - The sign is laid out on the CPU from each new face (`src/gl/neonMap.ts`, pure and unit-tested in
   `tests/neonMap.test.ts`; GPU side in `src/gl/neonGL.ts`, a layer of the Light pack like Relief's
-  map in the Metal pack). Iso-lines of a blurred picture (brightness and two color-opponent
-  channels) are traced by marching squares, kept inside the art window, smoothed heavily, and the
-  strongest long runs taken greedily (score length^1.5 × contrast; at most 6, each at least 0.18 of
-  the short side); anything within 3.4 tube widths of a tube already taken, or doubling back along
-  itself, is cut away. Closed outlines open with a short gap at their lowest point. One gas per tube
-  from its brighter, more colorful side. A border tube runs round the art window in the frame with
-  one break near the top right, in a color that differs from the art tubes.
+  map in the Metal pack). The blurred picture (brightness and two color-opponent channels) is split
+  into 5 k-means color regions; each region's outline is traced by marching squares, kept inside
+  the art window, smoothed heavily, cut where it bends tighter than 1.5 tube widths, and the
+  strongest runs taken greedily (score length^1.5 × contrast² × 2.2 if closed; at most 6, each at
+  least 0.18 of the long side). A small strong spot (an eye) gets a ring first. Anything within 2.5
+  tube widths of a tube already taken, or doubling back along itself, is cut away; broken pieces of
+  one gas are joined; corner/edge stubs and lone short tubes are dropped. Closed outlines open with a
+  short gap at their lowest point. One gas per tube from its brighter, more colorful side. A border
+  tube runs round the art window in the frame with one break near the top right, in a color that
+  differs from the art tubes.
 - Two float maps go to the shader: the tube map (3 face px cells: distance to the nearest centre
-  line, arc length along it, tube index) and the wall map (10 px cells: the colored light the tubes
-  pool on the wall, a line of lamps at two heights, and the tube lighting it most). Uniforms
-  `uNeonGas[8]`, `uNeonLen[8]`, `uNeonPost[40]` (post positions), `uNeonInfo`; texture units 5 and 11.
-- The shader draws each tube as a white core (~30 % of the width), saturated glass with a darker rim,
-  a room reflection on the side facing the light and an inverse-square halo; electrode sleeves at the
-  ends; clips at posts, the posts as rods from wall to tube and a soft shadow round their feet. The
-  wall is the picture at ~10 % plus the pooled light. Tubes are offset by tilt (54 face px at full
-  tilt) against the wall, posts and pools.
+  line, arc length along it, tube index; reach 110 px) and the wall map (10 px cells: the colored
+  light the tubes pool on the wall, a line of lamps at two heights, and the tube lighting it most).
+  Uniforms `uNeonGas[8]`, `uNeonLen[8]`, `uNeonPost[40]` (post positions), `uNeonInfo`; texture
+  units 5 and 11.
+- The shader draws each tube (0.025 S wide) as a cream core (~15 % of the width) in a thick body of
+  saturated glass with a softer rim and one sharp highlight on the lit side, a tight and a wide
+  halo; electrode sleeves at the ends; posts as small clear discs with a contact shadow. The wall is
+  the picture at ~4–6 % plus the pooled light; the border tube burns at 62 %. Tubes are offset by
+  tilt (16 face px at full tilt) against the wall, posts and pools.
 - Flicker (`neonFlicker`): one tube per cycle (period ≈ 2.4 s fitted to `uLoop`); its pool dims too.
 - Core shader touched only by index: e == 92 covers the frame in full and gets Glow's faint glare.
 - The low-end "lite" version was dropped by the owner's call (the common quality mechanism covers it).
@@ -118,3 +122,26 @@ at most 6 + border. Three-layer glass, clear electrode sleeves, posts as rods wi
 near-black wall lit by inverse-square pools, a border tube with a break and a falloff along it,
 stronger parallax. The faint horizontal scanlines in earlier screenshots are the app's CRT overlay
 (the CRT toggle), not the finish; the round 2 shots turn it off.
+
+## Polish round 3 (2026-10-06, Mac)
+
+Judge after round 2: tubes read as thin vector lines (mostly white core, color only in the halo),
+the wall light covered too much, clips every 80–120 px and grey "thorn" posts when tilted, a double
+pink border that tore off the card edge (54 px slide), and tubes placed where outlines happen to be
+(meaningless loops, stray stubs, a partial bar over the sun, a broken hill, a scribble on the moon's
+water). Changes:
+
+- Layout (`neonMap.ts`): outlines of k-means color regions (5) instead of iso-lines of the shading;
+  closed outlines count double and score by length^1.5 x contrast^2; a ring round a small strong spot
+  (an eye) laid first; a minimum bend radius of 1.5 tube widths cuts curls; short straight bars,
+  corner/edge stubs and lone short tubes dropped; one-gas pieces whose ends face each other across
+  a short gap joined (never across another tube); minimum length 0.18 of the long side.
+- Look (`neon.ts`): tube 0.025 S wide (was 0.015), cream core ~15 %, saturated body, softer rim,
+  one sharp highlight on the lit side; tight + wide halos; wall ~4–6 % far from tubes; border tube
+  at 62 %; slide 16 px (was 54); posts as small clear discs with contact shadow, no clips; one post
+  per ~420 px (border 620), none under 300 px; the art window's edge no longer lit as lettering.
+- Tests: posts, curl/horizon join, corner stub, eye ring, shader reach constant.
+- Screens: production build in headless Chromium (Metal), sunset/moon/parrot/poppy, front and two
+  tilts, plus a GIF export. Still open: the moon sample keeps only the moon ring (the water no longer
+  becomes a scribble, but nothing replaces it); a short neck tube on the parrot.
+

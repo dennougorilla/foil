@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { EDITIONS, layerable } from '../src/editions.ts';
 import { OPEN_EDITIONS, packOf } from '../src/packs.ts';
 import { NEON_GLSL } from '../src/gl/neon.ts';
+import { NEON_REACH } from '../src/gl/neonMap.ts';
 
 test('Neon is a pack finish on shader 92, dithered, and can be layer 2', () => {
   const ed = EDITIONS.find((e) => e.id === 'neon');
@@ -26,6 +27,10 @@ test('Neon is the Light pack card before its showpiece', () => {
 test("Neon's uniforms carry its own prefix, so no other finish can clash with them", () => {
   const names = [...NEON_GLSL.matchAll(/uniform\s+\w+\s+(\w+)/g)].map((m) => m[1]);
   for (const n of names) assert.match(n, /^uNeon[A-Z]/);
+});
+
+test("the shader's tube reach is the tube map's", () => {
+  assert.ok(NEON_GLSL.includes(`#define NEON_REACH ${NEON_REACH.toFixed(1)}`));
 });
 
 test('the flicker runs on cycles that an exported loop holds a whole number of times', () => {
