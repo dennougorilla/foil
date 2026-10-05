@@ -41,12 +41,15 @@ from the Windows desktop to the Mac to take load off the desktop.
    Supporter pack in the shop ("expected two sealed packs"). Most are 30 s click timeouts that
    cascade. The binder and pack steps failed in two runs. First rerun them on a quiet machine
    against a freshly started dev server (don't edit files while it runs: HMR reloads break it).
-2. **Metal now holds six finishes**, which may be a real cause of the pack failures: Metal is the
-   first sealed pack, so "open a pack" opens it, and the step (and `tierOf`-based entrances, the
-   "全5種入り / ALL 5 INSIDE" counts, the haul layout, the six-cards-at-once frame budget) may assume
-   five. Check `scripts/e2e.mjs`'s pack steps for a fixed card count before anything else. If the
-   step needs five, either update the step or move Chameleon into a five-card pack (talk to
-   foil-openall, who owns the pack layout).
+2. **Metal now holds six finishes: fixed in the e2e script.** The app itself already handles six
+   (Studio has six). The only five-card assumptions were in `scripts/e2e.mjs`'s pack step: it
+   swiped exactly Relief, Gold, Platinum and Cosmo Holo, so Chameleon left the overlay stuck and
+   every later step (deck builder, replay, wide card, button opening, Supporter link) cascaded.
+   The step now swipes until the showpiece waits, counts what it dealt, and the haul and deck
+   counts follow that count. `scripts/shoot.mjs` lists Chameleon too. The earlier binder and
+   fine-tune failures come before the pack steps, so they are not explained by this; they were
+   most likely load (the Mac was also at load ~150 with several sessions' e2e running). e2e was
+   not rerun here (the owner's call: review first).
 3. Quality: realism stayed at 4 in every judge round (see below). The last tweak (wider color
    spread, deeper frame edge) was not judged. Worth trying: a stronger face/flop color pair (the
    flop showing the *other* color, as real ChromaFlair does), a crisper softbox edge, and judging
