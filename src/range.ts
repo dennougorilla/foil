@@ -128,6 +128,8 @@ export class RangeModel {
   }
 
   region(r: RangeRegion): Uint8Array {
+    // A card that is all picture has no art, frame or words of its own: those places are the whole card.
+    if (this.spec?.frameless && r !== 'none') return this.regions.all!;
     if (r === 'text') return this.textRegion();
     if (r === 'art' || r === 'frame') this.readMask();
     return this.regions[r] ?? this.regions.all!;

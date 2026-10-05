@@ -17,6 +17,15 @@
   letter-spacing: -0.02em;
 }
 
+/* A card that is all picture: the whole card or the brush. */
+.seg.seg-region.is-whole {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seg-region .region-btn[hidden] {
+  display: none;
+}
+
 @container (max-width: 300px) {
   .seg-region .region-btn {
     font-size: 12px;

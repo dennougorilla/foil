@@ -113,7 +113,7 @@ function artWell(ctx: CanvasRenderingContext2D, spec: FaceSpec, art: Rect) {
   ctx.save();
   shape(ctx, art, rad);
   ctx.clip();
-  paintArt(ctx, art, spec.image, spec.crop, 0);
+  paintArt(ctx, art, spec.image, spec.crop, 0, spec.crisp);
   ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.fillRect(art.x, art.y, art.w, px());
   ctx.fillRect(art.x, art.y, px(), art.h);
