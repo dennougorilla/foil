@@ -11,6 +11,9 @@ import { renderStill, type ExportInput } from '../exporter';
 import { fitIn, opaqueBounds } from './fit';
 import { formatBytes } from '../anim/apngUi';
 import { discard, fillOf, kept, list, persist, place, put, restore, stored, thumb, type Kept, type Meta, type Stored } from './db';
+import { packBrush, unpackBrush } from './brush';
+import { RANGE_H, RANGE_W } from '../gl/range';
+import type { Layers } from '../range';
 import { arrange, firstFree, layout, MAX_BYTES, MAX_CARDS, PAGES, PER_PAGE, pocketsOn, refusal, swap, type Layout } from './limits';
 
 type Placed = Meta & { slot: number };
@@ -104,8 +107,11 @@ export interface BinderHost {
   input: () => ExportInput;
   /** The person's picture on the card (null for a sample): its still, and its own file when it moves. */
   picture: () => { still: HTMLCanvasElement; file: Blob | null } | null;
+  /** The finish area's brush strokes on the card now, layer 1 and layer 2. */
+  brush: () => Layers[];
   /** Puts a kept card on the stage. */
-  play: (k: Kept, id: string) => Promise<void>;
+  /** Puts a kept card on the stage, with its brush strokes (null: none). */
+  play: (k: Kept, id: string, brush: Layers[] | null) => Promise<void>;
   /** The stage rests while the binder covers it. */
   pause: (on: boolean) => void;
   toast: (msg: string, error?: boolean) => void;
@@ -210,19 +216,22 @@ export function mountBinder(host: BinderHost) {
     const card = host.card();
     const input = host.input();
     const source = host.picture();
+    const brush = packBrush(host.brush());
+    // A full binder is said before the strokes are awaited; their failure then goes unseen.
+    brush.catch(() => {});
     try {
       const metas = await list();
       // A full binder needs no picture to say so.
       const full = refusal(fillOf(metas), 0);
       if (full) return open(full);
-      const [picture, thumb] = await Promise.all([keptPicture(source), thumbnail(input)]);
-      const bytes = thumb.size + (picture?.size ?? 0);
+      const [picture, thumb, strokes] = await Promise.all([keptPicture(source), thumbnail(input), brush]);
+      const bytes = thumb.size + (picture?.size ?? 0) + (strokes?.size ?? 0);
       const no = refusal(fillOf(metas), bytes);
       if (no) return open(no);
       const lay = layout(arrange(metas));
       const slot = at !== undefined && lay[at] === null ? at : firstFree(lay);
       const meta: Meta = { id: newId(), at: Date.now(), name: input.name, edition: input.edition.id, bytes, slot };
-      await put(meta, thumb, { card, picture });
+      await put(meta, thumb, { card, picture, brush: strokes });
       // Now there is something worth keeping, and the person has just asked to keep it.
       void persist().catch(() => {});
       const n = metas.length + 1;
@@ -499,8 +508,9 @@ export function mountBinder(host: BinderHost) {
         host.toast(t.playFailed, true);
         return;
       }
+      const brush = await unpackBrush(k.brush, RANGE_W * RANGE_H);
       close();
-      await host.play(k, id);
+      await host.play(k, id, brush);
     }
 
     // ---------- Undo: the bar over the foot ----------

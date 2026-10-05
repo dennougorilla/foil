@@ -11,8 +11,14 @@ of cards must not slow the page down, so nothing is read or drawn before it is l
   lettering, the finish area's region and band, and which picture (`sample`). The rest of the
   saved state (language, sound, the hand, which panel tab is open, the export format, the brush,
   the swatches) is about the app, not the card, and stays out. A setting added to the store later
-  joins the card unless it is listed as an app setting. The brush strokes of the finish area are
-  not kept (they are not kept across reloads either).
+  joins the card unless it is listed as an app setting.
+- **Its brush strokes**: what is painted in and out of the finish area, for both layers (the
+  strokes live beside the settings, not in them). Each layer is two 450×630 grids of one byte, so
+  1.1 MB in all, but mostly empty: they are kept deflated (`CompressionStream`), a few kilobytes
+  for a few strokes, and count towards the binder's 60 MB like the picture. A card with nothing
+  painted keeps none. Putting a card on the stage puts its strokes there too (Undo starts afresh),
+  and a card without strokes leaves the stage with none. Strokes that can't be read back, or that
+  no longer fit the area's grid, are dropped and the card comes back without them.
 - **Its picture**: a sample is kept as its number. The person's own picture is kept shrunk to
   1280 px on its long side as WebP; an animated picture keeps its own file when it is 8 MB or less
   (so it still moves), and its first frame otherwise. Flip Lenticular's other picture is not kept.
@@ -31,9 +37,9 @@ three stores so each can be read on its own:
 
 | Store | Key | Holds | Read when |
 |---|---|---|---|
-| `meta` | id | when it was kept, its name, finish, size in bytes and its pocket | the binder opens (a few hundred bytes a card) |
+| `meta` | id | when it was kept, its name, finish, size in bytes (thumbnail, picture and strokes) and its pocket | the binder opens (a few hundred bytes a card) |
 | `thumbs` | id | the thumbnail | its page is shown |
-| `cards` | id | the settings and the picture | the card is played |
+| `cards` | id | the settings, the picture and the brush strokes | the card is played |
 
 The binder's count is mirrored in `localStorage` (`foil:binder`) so the header chip shows it
 without opening the database or loading the binder's code. As everywhere in FOIL (see

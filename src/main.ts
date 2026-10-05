@@ -35,6 +35,7 @@ import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
 import type { Kept } from './binder/db';
+import type { Layers } from './range';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -1582,6 +1583,7 @@ function useBinder(): Promise<Binder> {
       card: () => cardOf(store.get()),
       input: exportInput,
       picture: () => (store.get().sample >= 0 ? null : { still: userImage ?? samples[0], file: userAnim ? userSource : null }),
+      brush: () => areas.paints.map((p) => p.layers),
       play: playCard,
       pause: (on) => stage.pause(on),
       toast: (msg, error) => toast(msg, error),
@@ -1631,13 +1633,13 @@ keepBtn.addEventListener('click', () => {
     .finally(() => keepBtn.removeAttribute('aria-busy'));
 });
 
-/** Puts a card from the binder on the stage: its picture and every setting of the card. */
 function setKept(id: string | null) {
   keptId = id;
   renderKeep();
 }
 
-async function playCard(k: Kept, id: string) {
+/** Puts a card from the binder on the stage: its picture, every setting of the card and its brush strokes. */
+async function playCard(k: Kept, id: string, brush: Layers[] | null) {
   const card = cleanCard(k.card);
   if (!available(card.edition!, packs.get())) card.edition = 'holo';
   if (card.layer2 && !available(card.layer2.edition, packs.get())) card.layer2 = null;
@@ -1659,6 +1661,7 @@ async function playCard(k: Kept, id: string) {
   }
   stage.flipTo(() => {
     store.set(card);
+    areas.restore(brush);
     redrawFace();
     buildThumbs();
     syncInputs();

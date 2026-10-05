@@ -701,14 +701,58 @@ const binderCount = async () => +(await page.textContent('#binderBtn .binder-cou
 const binderOpen = () => page.waitForSelector('.bd.is-in', { timeout: 15000 });
 const binderClosed = () => page.waitForSelector('.bd', { state: 'detached', timeout: 15000 });
 let kept = null;
+/** Painted cells of each layer's brush strokes, as saved for the stage (IndexedDB `foil`). */
+const brushCells = () =>
+  page.evaluate(
+    () =>
+      new Promise((res, rej) => {
+        const r = indexedDB.open('foil');
+        r.onerror = () => rej(r.error);
+        r.onsuccess = () => {
+          const t = r.result.transaction('images');
+          const st = t.objectStore('images');
+          const out = {};
+          for (const k of ['rangeBrush', 'rangeBrush2']) st.get(k).onsuccess = (e) => (out[k] = e.target.result ? [...e.target.result.add, ...e.target.result.erase].filter((v) => v).length : 0);
+          t.oncomplete = () => (r.result.close(), res(JSON.stringify(out)));
+        };
+      }),
+  );
+let keptBrush = '';
+/** One stroke across the card with the area brush, for the layer chosen in the Layers tab. */
+const paintStroke = async (from, to) => {
+  await tab('range');
+  await page.click('#pane-range .range-paint');
+  await page.waitForSelector('.brush', { state: 'visible' });
+  const b = await page.locator('#cardSlot').boundingBox();
+  await page.mouse.move(b.x + b.width * from[0], b.y + b.height * from[1]);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * to[0], b.y + b.height * to[1], { steps: 8 });
+  await page.mouse.up();
+  await page.click('.brush-done');
+  await page.waitForSelector('.brush', { state: 'hidden' });
+};
 
-await step('keep a card: it goes into the binder as a still picture, and Keep rests until the card changes', async () => {
+await step('keep a card: it goes into the binder as a still picture with its brush strokes, and Keep rests until the card changes', async () => {
   await page.fill('#nameInput', 'Kept meadow');
   await page.keyboard.press('Escape');
   await page.click('#keepBtn');
   await page.waitForFunction(() => document.querySelector('#binderBtn .binder-count')?.textContent === '1', null, { timeout: 30000 });
   expect((await page.getAttribute('#keepBtn', 'data-kept')) === 'true', 'Keep does not say the card is kept');
   kept = await state();
+  keptBrush = await brushCells();
+  expect(Object.values(JSON.parse(keptBrush)).some((n) => n > 0), `the card kept has no brush strokes to keep (${keptBrush})`);
+  // The strokes are kept with the card, deflated: a few kilobytes, not the grids' megabyte.
+  const size = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        const r = indexedDB.open('foil-binder');
+        r.onsuccess = () => {
+          const g = r.result.transaction('cards').objectStore('cards').getAll();
+          g.onsuccess = () => (r.result.close(), res(g.result.map((c) => (c.brush instanceof Blob ? c.brush.size : -1))));
+        };
+      }),
+  );
+  expect(size.length === 1 && size[0] > 0 && size[0] < 60000, `the brush strokes are not kept small with the card (${size})`);
   await page.click('#binderBtn');
   await binderOpen();
   expect((await page.locator('.bd-card').count()) === 1, 'the binder does not show one card');
@@ -725,12 +769,15 @@ await step('keep a card: it goes into the binder as a still picture, and Keep re
   await binderClosed();
 });
 
-await step('play a card from the binder: its picture and settings come back, the app settings stay', async () => {
+await step('play a card from the binder: its picture, settings and brush strokes come back, the app settings stay', async () => {
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('1');
   await page.fill('#nameInput', 'Something else');
   await page.click('.pill-rarity .rpip >> nth=0');
-  await page.waitForTimeout(200);
+  // Another stroke on the stage's card, which the kept card did not have.
+  await paintStroke([0.2, 0.75], [0.8, 0.2]);
+  await page.waitForTimeout(300);
+  expect((await brushCells()) !== keptBrush, 'the new stroke did not change the brush');
   expect((await page.getAttribute('#keepBtn', 'data-kept')) !== 'true', 'Keep still says kept after the card changed');
   await page.click('#binderBtn');
   await binderOpen();
@@ -745,6 +792,10 @@ await step('play a card from the binder: its picture and settings come back, the
     expect(JSON.stringify(now[k]) === JSON.stringify(kept[k]), `${k} did not come back (${JSON.stringify(now[k])} ≠ ${JSON.stringify(kept[k])})`);
   expect(now.lang === kept.lang && now.exportFormat === kept.exportFormat, 'an app setting changed');
   expect((await page.locator('#thumbs .thumb').count()) === 4, 'the kept picture is not the picture in step 1');
+  // The brush strokes came back with it, and only those.
+  let brush = '';
+  for (let i = 0; i < 20 && (brush = await brushCells()) !== keptBrush; i++) await page.waitForTimeout(150);
+  expect(brush === keptBrush, `the brush strokes did not come back (${brush} ≠ ${keptBrush})`);
 });
 
 await step('a card is thrown away from its own corner at once, and Undo brings it back', async () => {

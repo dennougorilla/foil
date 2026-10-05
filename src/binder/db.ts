@@ -14,7 +14,7 @@ export interface Meta {
   at: number;
   name: string;
   edition: EditionId;
-  /** Thumbnail plus picture. */
+  /** Thumbnail, picture and brush strokes. */
   bytes: number;
   /** Its pocket, 0–53; a card without one is given the first empty pocket (limits.ts arrange). */
   slot?: number;
@@ -25,6 +25,8 @@ export interface Kept {
   card: Card;
   /** The person's picture; null for a sample (its number is in the card). */
   picture: Blob | null;
+  /** The finish area's brush strokes, deflated (brush.ts); null when nothing is painted. */
+  brush: Blob | null;
 }
 
 let db: Promise<IDBDatabase> | null = null;
