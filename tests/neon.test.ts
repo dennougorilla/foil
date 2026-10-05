@@ -37,6 +37,12 @@ test('the flicker runs on cycles that an exported loop holds a whole number of t
   assert.match(NEON_GLSL, /uLoop/);
 });
 
+test("Neon's two maps sit on texture units of their own (12 and 13), clear of the core's and Glow's", () => {
+  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'gl', 'finishes', 'light.ts'), 'utf8');
+  const unit = +src.match(/neon\.bind\(p, (\d+),/)![1];
+  for (const u of [unit, unit + 1]) assert.ok(![0, 1, 2, 3, 4, 5, 6, 7, 8, 9].includes(u), `unit ${u}`);
+});
+
 test('the Light pack draws Neon on shader 92', () => {
   const src = readFileSync(join(import.meta.dirname, '..', 'src', 'gl', 'finishes', 'light.ts'), 'utf8');
   assert.match(src, /e == 92\) col = neon\(c, uv, uTilt, L, m\.r\)/);

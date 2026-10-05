@@ -108,17 +108,17 @@ export class NeonGL {
     this.info = [d.width, d.tubes.length, d.tubes.findIndex((t) => t.border), posts.length / 2];
   }
 
-  /** `neon`: the card being drawn is Neon, so its maps must be current. */
-  bind(p: Program, neon: boolean): void {
+  /** Binds the tube map to `unit` and the wall map to `unit + 1`; `neon`: the card being drawn is Neon, so its maps must be current. */
+  bind(p: Program, unit: number, neon: boolean): void {
     const { gl } = this;
     // On their own units: a refresh uploads and must not disturb the other textures.
-    gl.activeTexture(gl.TEXTURE5);
+    gl.activeTexture(gl.TEXTURE0 + unit);
     if (neon) this.refresh();
     gl.bindTexture(gl.TEXTURE_2D, this.tube);
-    gl.uniform1i(p.u.uNeonMap, 5);
-    gl.activeTexture(gl.TEXTURE11);
+    gl.uniform1i(p.u.uNeonMap, unit);
+    gl.activeTexture(gl.TEXTURE0 + unit + 1);
     gl.bindTexture(gl.TEXTURE_2D, this.wall);
-    gl.uniform1i(p.u.uNeonWall, 11);
+    gl.uniform1i(p.u.uNeonWall, unit + 1);
     gl.uniform3fv(p.u.uNeonGas, this.gas);
     gl.uniform1fv(p.u.uNeonLen, this.len);
     gl.uniform2fv(p.u.uNeonPost, this.posts);

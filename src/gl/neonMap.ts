@@ -1,6 +1,6 @@
-// Neon's sign, designed off the card face the way a glass bender works from a drawing: a few long
-// outlines of the picture, simplified into smooth bends, each bent from one tube of one gas, plus
-// a tube round the art window. The shader can't see a whole outline from one pixel, so the tubes
+// Neon's sign, designed off the card face the way a sign maker blocks in a picture: the subject's
+// silhouette as one long tube with few bends, two or three details inside it that mean something,
+// stylised strokes on a sparse picture, and a dim tube round the art window. The shader can't see a whole outline from one pixel, so the tubes
 // are laid out here and handed over as two maps:
 //
 // - the tube map (fine): distance to the nearest tube's centre line, how far along that tube the
@@ -26,6 +26,8 @@ export interface NeonTube {
   gas: [number, number, number];
   /** The tube bent round the art window. */
   border: boolean;
+  /** What the tube draws (the silhouette, a detail, a stroke, the frame). */
+  role?: NeonRole;
 }
 
 export interface NeonDesign {
@@ -34,7 +36,7 @@ export interface NeonDesign {
   width: number;
 }
 
-/** Tubes bent from the picture (the border tube comes on top). */
+/** Tubes bent from the picture (the border tube comes on top): the silhouette, three details or strokes, a horizon. */
 export const NEON_MAX_TUBES = 6;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -68,11 +70,12 @@ function blur(src: Float32Array, w: number, h: number, r: number, passes = 3): F
 /** Box radius whose three passes blur about `sigma` cells. */
 const boxFor = (sigma: number) => Math.max(1, Math.round((-1 + Math.sqrt(1 + 4 * sigma * sigma)) / 2));
 
-/** The neon colors a gas comes in; null for grey or very dark (no gas of its own). */
+/** The neon colors a gas comes in: white for light greys, null for dark greys (no gas of its own). */
 export function neonGasOf(r: number, g: number, b: number): [number, number, number] | null {
   const mx = Math.max(r, g, b);
   const mn = Math.min(r, g, b);
   const sat = mx > 0 ? (mx - mn) / mx : 0;
+  if (sat < 0.2 && mx > 0.7) return NEON_WHITE;
   if (sat < 0.2 || mx < 0.1) return null;
   const d = mx - mn;
   let hue = mx === r ? (g - b) / d : mx === g ? 2 + (b - r) / d : 4 + (r - g) / d;
@@ -87,6 +90,8 @@ export function neonGasOf(r: number, g: number, b: number): [number, number, num
   return NEON_PINK;
 }
 export const NEON_PINK: [number, number, number] = [1.0, 0.2, 0.62];
+/** A cool white tube (a moon, an eye's glint). */
+export const NEON_WHITE: [number, number, number] = [0.86, 0.93, 1.0];
 
 type Line = { pts: number[]; closed: boolean; contrast: number };
 
@@ -348,83 +353,6 @@ function unkink(p: number[], minR: number, step: number): number[][] {
   return out.filter((r) => r.length >= 8);
 }
 
-/**
- * Joins open tubes of one gas whose ends meet across a short break, heading towards each other
- * (a horizon cut in two), so the line is bent from one tube.
- */
-function joinBroken(tubes: NeonTube[], reach: number, step: number, clear: number) {
-  const dir = (p: Float32Array, end: boolean): [number, number, number, number] => {
-    const n = p.length / 2;
-    const i = end ? n - 1 : 0;
-    const j = end ? Math.max(0, n - 8) : Math.min(n - 1, 7);
-    const dx = p[i * 2] - p[j * 2];
-    const dy = p[i * 2 + 1] - p[j * 2 + 1];
-    const l = Math.hypot(dx, dy) || 1;
-    return [p[i * 2], p[i * 2 + 1], dx / l, dy / l];
-  };
-  for (let again = true; again; ) {
-    again = false;
-    search: for (let a = 0; a < tubes.length; a++)
-      for (let b = 0; b < tubes.length; b++) {
-        if (a === b) continue;
-        const A = tubes[a];
-        const B = tubes[b];
-        if (A.gas.join() !== B.gas.join()) continue;
-        for (const ea of [true, false])
-          for (const eb of [true, false]) {
-            const [ax, ay, adx, ady] = dir(A.pts, ea);
-            const [bx, by, bdx, bdy] = dir(B.pts, eb);
-            const gx = bx - ax;
-            const gy = by - ay;
-            const g = Math.hypot(gx, gy);
-            if (g > reach || g < 1) continue;
-            // Both ends must point across the gap at each other.
-            if ((adx * gx + ady * gy) / g < 0.45 || (bdx * gx + bdy * gy) / g > -0.45) continue;
-            const pa = Array.from(ea ? A.pts : reverse(A.pts));
-            const pb = Array.from(eb ? reverse(B.pts) : B.pts);
-            // The bridge: a cubic from A's end to B's along their directions.
-            const bridge: number[] = [];
-            const m = Math.max(2, Math.ceil(g / step));
-            const hnd = g * 0.4;
-            const c1x = ax + adx * hnd;
-            const c1y = ay + ady * hnd;
-            const c2x = bx + bdx * hnd;
-            const c2y = by + bdy * hnd;
-            for (let s = 1; s < m; s++) {
-              const u = s / m;
-              const v = 1 - u;
-              bridge.push(
-                v * v * v * ax + 3 * v * v * u * c1x + 3 * v * u * u * c2x + u * u * u * bx,
-                v * v * v * ay + 3 * v * v * u * c1y + 3 * v * u * u * c2y + u * u * u * by,
-              );
-            }
-            // Never across another tube.
-            const crosses = tubes.some((t, k) => {
-              if (k === a || k === b) return false;
-              for (let i = 0; i < bridge.length; i += 2)
-                for (let j = 0; j < t.pts.length; j += 4) if (Math.hypot(bridge[i] - t.pts[j], bridge[i + 1] - t.pts[j + 1]) < clear) return true;
-              return false;
-            });
-            if (crosses) continue;
-            const pts = resample(pa.concat(bridge, pb), false, step);
-            tubes[a] = { pts: Float32Array.from(pts), len: polyLen(pts), gas: B.len > A.len ? B.gas : A.gas, border: false };
-            tubes.splice(b, 1);
-            again = true;
-            break search;
-          }
-      }
-  }
-}
-
-function reverse(p: Float32Array): Float32Array {
-  const n = p.length / 2;
-  const out = new Float32Array(p.length);
-  for (let i = 0; i < n; i++) {
-    out[i * 2] = p[(n - 1 - i) * 2];
-    out[i * 2 + 1] = p[(n - 1 - i) * 2 + 1];
-  }
-  return out;
-}
 
 /** A rounded rectangle's outline from (x0, y0) to (x1, y1), corner radius r, as points, starting at `start` along its top edge and running clockwise. */
 function roundRect(x0: number, y0: number, x1: number, y1: number, r: number, step: number): number[] {
@@ -442,22 +370,246 @@ function roundRect(x0: number, y0: number, x1: number, y1: number, r: number, st
   return resample(p, true, step);
 }
 
+
+/** Connected components (4-neighbour) of the set cells of `mask`; `lab` is -1 off the mask. */
+function components(mask: Uint8Array, w: number, h: number): { lab: Int32Array; size: number[] } {
+  const lab = new Int32Array(w * h).fill(-1);
+  const size: number[] = [];
+  const stack: number[] = [];
+  for (let s = 0; s < w * h; s++) {
+    if (!mask[s] || lab[s] >= 0) continue;
+    const id = size.length;
+    let n = 0;
+    lab[s] = id;
+    stack.push(s);
+    while (stack.length) {
+      const i = stack.pop()!;
+      n++;
+      const x = i % w;
+      const y = (i - x) / w;
+      if (x > 0 && mask[i - 1] && lab[i - 1] < 0) (lab[i - 1] = id), stack.push(i - 1);
+      if (x < w - 1 && mask[i + 1] && lab[i + 1] < 0) (lab[i + 1] = id), stack.push(i + 1);
+      if (y > 0 && mask[i - w] && lab[i - w] < 0) (lab[i - w] = id), stack.push(i - w);
+      if (y < h - 1 && mask[i + w] && lab[i + w] < 0) (lab[i + w] = id), stack.push(i + w);
+    }
+    size.push(n);
+  }
+  return { lab, size };
+}
+
+/** The mask with every hole filled: whatever the outside cannot reach without crossing it. */
+function fillHoles(mask: Uint8Array, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(w * h).fill(1);
+  const stack: number[] = [];
+  const seed = (i: number) => {
+    if (!mask[i] && out[i]) {
+      out[i] = 0;
+      stack.push(i);
+    }
+  };
+  for (let x = 0; x < w; x++) seed(x), seed((h - 1) * w + x);
+  for (let y = 0; y < h; y++) seed(y * w), seed(y * w + w - 1);
+  while (stack.length) {
+    const i = stack.pop()!;
+    const x = i % w;
+    if (x > 0) seed(i - 1);
+    if (x < w - 1) seed(i + 1);
+    if (i >= w) seed(i - w);
+    if (i < w * (h - 1)) seed(i + w);
+  }
+  return out;
+}
+
+/** Share of a region's edge cells that lie on the edge of the window (a cropped subject touches it). */
+function edgeContact(mask: Uint8Array, w: number, h: number): number {
+  let edge = 0;
+  let onWindow = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!mask[i]) continue;
+      const border = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+      if (border) {
+        onWindow++;
+        edge++;
+      } else if (!mask[i - 1] || !mask[i + 1] || !mask[i - w] || !mask[i + w]) edge++;
+    }
+  return edge ? onWindow / edge : 0;
+}
+
+/** Douglas–Peucker: the few points that keep a line within `tol` of where it ran. */
+function simplify(p: number[], closed: boolean, tol: number): number[] {
+  const n = p.length / 2;
+  if (n < 3) return p.slice();
+  const keep = new Uint8Array(n);
+  const rec = (a: number, b: number) => {
+    const ax = p[a * 2];
+    const ay = p[a * 2 + 1];
+    const dx = p[b * 2] - ax;
+    const dy = p[b * 2 + 1] - ay;
+    const L = Math.hypot(dx, dy) || 1e-6;
+    let far = -1;
+    let fd = tol;
+    for (let i = a + 1; i < b; i++) {
+      const d = Math.abs((p[i * 2] - ax) * dy - (p[i * 2 + 1] - ay) * dx) / L;
+      if (d > fd) (fd = d), (far = i);
+    }
+    if (far < 0) return;
+    keep[far] = 1;
+    rec(a, far);
+    rec(far, b);
+  };
+  // A loop is split at its point farthest from its start.
+  let b = n - 1;
+  if (closed) {
+    let fd = 0;
+    for (let i = 1; i < n; i++) {
+      const d = Math.hypot(p[i * 2] - p[0], p[i * 2 + 1] - p[1]);
+      if (d > fd) (fd = d), (b = i);
+    }
+    rec(0, b);
+    rec(b, n - 1);
+  } else rec(0, b);
+  keep[0] = keep[b] = keep[n - 1] = 1;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) if (keep[i]) out.push(p[i * 2], p[i * 2 + 1]);
+  return out;
+}
+
+/** Chaikin's corner cutting: each pass rounds every corner (open lines keep their ends). */
+function chaikin(p: number[], closed: boolean, passes: number): number[] {
+  let q = p;
+  for (let k = 0; k < passes; k++) {
+    const n = q.length / 2;
+    const out: number[] = closed ? [] : [q[0], q[1]];
+    const segs = closed ? n : n - 1;
+    for (let i = 0; i < segs; i++) {
+      const j = (i + 1) % n;
+      out.push(0.75 * q[i * 2] + 0.25 * q[j * 2], 0.75 * q[i * 2 + 1] + 0.25 * q[j * 2 + 1]);
+      out.push(0.25 * q[i * 2] + 0.75 * q[j * 2], 0.25 * q[i * 2 + 1] + 0.75 * q[j * 2 + 1]);
+    }
+    if (!closed) out.push(q[q.length - 2], q[q.length - 1]);
+    q = out;
+  }
+  return q;
+}
+
+/** How much of each side of the window a region runs along: top, bottom, left, right (0..1). */
+function sidesOf(mask: Uint8Array, w: number, h: number): number[] {
+  const sides = [0, 0, 0, 0];
+  for (let x = 0; x < w; x++) (sides[0] += mask[x]), (sides[1] += mask[(h - 1) * w + x]);
+  for (let y = 0; y < h; y++) (sides[2] += mask[y * w]), (sides[3] += mask[y * w + w - 1]);
+  return [sides[0] / w, sides[1] / w, sides[2] / h, sides[3] / h];
+}
+
+/**
+ * The circle a closed outline's upper part follows (Kåsa's least-squares fit), as cx, cy, r; null
+ * when that part is not round (within 6 % of the radius) or covers less than about a third of a turn.
+ */
+function circleOf(p: number[]): [number, number, number] | null {
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (let i = 1; i < p.length; i += 2) (y0 = Math.min(y0, p[i])), (y1 = Math.max(y1, p[i]));
+  const top: number[] = [];
+  for (let i = 0; i < p.length; i += 2) if (p[i + 1] < y0 + 0.55 * (y1 - y0)) top.push(p[i], p[i + 1]);
+  const n = top.length / 2;
+  if (n < 12) return null;
+  let mx = 0;
+  let my = 0;
+  for (let i = 0; i < n; i++) (mx += top[i * 2]), (my += top[i * 2 + 1]);
+  mx /= n;
+  my /= n;
+  let suu = 0;
+  let svv = 0;
+  let suv = 0;
+  let suuu = 0;
+  let svvv = 0;
+  let suvv = 0;
+  let svuu = 0;
+  for (let i = 0; i < n; i++) {
+    const u = top[i * 2] - mx;
+    const v = top[i * 2 + 1] - my;
+    suu += u * u;
+    svv += v * v;
+    suv += u * v;
+    suuu += u * u * u;
+    svvv += v * v * v;
+    suvv += u * v * v;
+    svuu += v * u * u;
+  }
+  const det = suu * svv - suv * suv;
+  if (Math.abs(det) < 1e-6) return null;
+  const a = 0.5 * (suuu + suvv);
+  const b = 0.5 * (svvv + svuu);
+  const uc = (a * svv - b * suv) / det;
+  const vc = (b * suu - a * suv) / det;
+  const r = Math.sqrt(uc * uc + vc * vc + (suu + svv) / n);
+  const cx = uc + mx;
+  const cy = vc + my;
+  let err = 0;
+  let a0 = Infinity;
+  let a1 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    err += (Math.hypot(top[i * 2] - cx, top[i * 2 + 1] - cy) - r) ** 2;
+    const ang = Math.atan2(top[i * 2 + 1] - cy, top[i * 2] - cx);
+    a0 = Math.min(a0, ang);
+    a1 = Math.max(a1, ang);
+  }
+  if (Math.sqrt(err / n) > 0.06 * r || a1 - a0 < 0.6 * Math.PI) return null;
+  return [cx, cy, r];
+}
+
+/** x, y pairs of a straight line from a to b, `step` apart. */
+function straight(ax: number, ay: number, bx: number, by: number, step: number): number[] {
+  const L = Math.hypot(bx - ax, by - ay);
+  const m = Math.max(1, Math.round(L / step));
+  const out: number[] = [];
+  for (let k = 0; k <= m; k++) out.push(ax + ((bx - ax) * k) / m, ay + ((by - ay) * k) / m);
+  return out;
+}
+
+/** Where the horizontal line at y crosses a closed loop: its leftmost and rightmost crossing. */
+function spanAt(p: ArrayLike<number>, y: number): [number, number] | null {
+  let lo = Infinity;
+  let hi = -Infinity;
+  const n = p.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const y0 = p[i * 2 + 1];
+    const y1 = p[j * 2 + 1];
+    if ((y0 - y) * (y1 - y) > 0 || y0 === y1) continue;
+    const x = p[i * 2] + ((p[j * 2] - p[i * 2]) * (y - y0)) / (y1 - y0);
+    lo = Math.min(lo, x);
+    hi = Math.max(hi, x);
+  }
+  return hi > lo ? [lo, hi] : null;
+}
+
+/** The tube's role in the sign: the subject's silhouette, a detail inside it, a stylised stroke, or the frame. */
+export type NeonRole = 'outline' | 'detail' | 'stroke' | 'border';
+
+/** Details inside the silhouette (an eye, a beak, a face) and stylised strokes, at most. */
+const NEON_MAX_DETAILS = 3;
+
 /**
  * Lays out the sign. `rgba`: the face drawn at `w` × `h` (each cell `faceW / w` face px);
  * `art`: the art window in face px.
+ *
+ * Designed the way a sign maker blocks in a picture: first the subject (the largest region that
+ * stands out from the ground, or failing that the brightest, most colorful compact shape), whose
+ * outer silhouette becomes one long tube with few bends; then at most three details that mean
+ * something (a ring round an eye, the outline of a shape inside it, a long line where two colors
+ * meet); and on a sparse picture (a sun or a moon on an empty sky) a few stylised strokes: cut
+ * lines across a sun, dashes of water under a moon, the horizon.
  */
 export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW: number, faceH: number, art: FaceRect): NeonDesign {
   const S = Math.min(faceW, faceH);
-  const W = 0.025 * S; // tube width: a thick body of glass, as on a real sign
+  const W = 0.026 * S; // tube width: a thick body of glass, as on a real sign
   const sx = faceW / w;
   const sy = faceH / h;
   const STEP = 3;
-  // Nothing shorter than about a sixth of the card's height: a stub reads as a stray mark.
-  const minLen = 0.18 * Math.max(faceW, faceH);
-  // A closed loop round a small, strong shape (an eye, a moon) may be shorter: one such accent.
-  const minAccent = 0.2 * S;
-  // Glass bends no tighter than this (centre line), so a curl in an outline is cut, not followed.
-  const minBend = 1.5 * W;
+  // Glass bends no tighter than this (centre line).
+  const minBend = 1.6 * W;
   const tubes: NeonTube[] = [];
 
   // The art window in cells, a little inside its edge.
@@ -466,9 +618,18 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
   const aw = Math.max(0, Math.floor((art.x + art.w) / sx) - 1 - ax0);
   const ah = Math.max(0, Math.floor((art.y + art.h) / sy) - 1 - ay0);
   const n = aw * ah;
+  const toFace = (pts: number[]) => {
+    for (let i = 0; i < pts.length; i += 2) {
+      pts[i] = (pts[i] + ax0 + 0.5) * sx;
+      pts[i + 1] = (pts[i + 1] + ay0 + 0.5) * sy;
+    }
+    return pts;
+  };
+  const cellAt = (x: number, y: number) =>
+    Math.min(ah - 1, Math.max(0, Math.round(y / sy - 0.5 - ay0))) * aw + Math.min(aw - 1, Math.max(0, Math.round(x / sx - 0.5 - ax0)));
 
-  // What is outlined: brightness (saturated color counted as bright) and two color-opponent
-  // channels, so a red shape on a green ground of the same brightness still has an outline.
+  // Brightness (saturated color counted as bright) and two color-opponent channels, so a red
+  // shape on a green ground of the same brightness still stands apart.
   const tone = new Float32Array(n);
   const rg = new Float32Array(n);
   const yb = new Float32Array(n);
@@ -495,253 +656,294 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
       rg[i] = 0.5 * (r - g);
       yb[i] = 0.5 * ((r + g) / 2 - b);
     }
+  const cardGas = n ? neonGasOf(mr / n, mg / n, mb / n) : null;
+  const fallback = cardGas ?? NEON_PINK;
+
+  // Kept inside the art window by this much (centre line), so no tube grazes its edge.
+  const margin = 1.8 * W;
+  const inside = (x: number, y: number) => x > art.x + margin && x < art.x + art.w - margin && y > art.y + margin && y < art.y + art.h - margin;
 
   if (n > 64) {
-    // The picture is first split into a few regions of like color (the subject, its parts, the
-    // ground), as a sign designer would block it in; the tubes are the outlines of those regions,
-    // so they run round shapes (a beak, an eye, the sun) instead of wherever the shading changes.
     // Worked on a blurred picture, so pixel-art steps, dither and fine texture never matter.
-    const sigma = (0.012 * S) / sx;
-    const F = [blur(tone, aw, ah, boxFor(sigma)), blur(rg, aw, ah, boxFor(sigma)), blur(yb, aw, ah, boxFor(sigma))];
+    const F = [tone, rg, yb].map((f) => blur(f, aw, ah, boxFor((0.012 * S) / sx)));
     const FW8 = [1, 1.3, 1.1];
-    const lines: (Line & { len: number })[] = [];
-    // The step across an outline: the slope of the blurred picture over about a tube width.
-    const g = new Float32Array(n);
-    const reachG = Math.max(1, Math.round((0.6 * W) / sx));
-    for (let y = reachG; y < ah - reachG; y++)
-      for (let x = reachG; x < aw - reachG; x++) {
-        const i = y * aw + x;
-        let s2 = 0;
-        for (let c = 0; c < 3; c++) {
-          const f = F[c];
-          s2 += (FW8[c] * (f[i + reachG] - f[i - reachG])) ** 2 + (FW8[c] * (f[i + reachG * aw] - f[i - reachG * aw])) ** 2;
-        }
-        g[i] = 0.5 * Math.sqrt(s2);
+    const raw = regions(F, FW8, n, 5);
+    if (raw) {
+      const K = Math.max(...raw) + 1;
+      // Regions of like color, cleaned of specks: each cell goes to the region most of its neighbourhood is in.
+      const indR = boxFor((0.008 * S) / sx);
+      const ind = Array.from({ length: K }, (_, k) => blur(Float32Array.from(raw, (v) => (v === k ? 1 : 0)), aw, ah, indR));
+      const lab = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        let b = 0;
+        for (let k = 1; k < K; k++) if (ind[k][i] > ind[b][i]) b = k;
+        lab[i] = b;
       }
-    const REGIONS = 5;
-    const labels = regions(F, FW8, n, REGIONS);
-    if (labels) {
-      const ind = new Float32Array(n);
-      const rad = boxFor((0.01 * S) / sx);
-      for (let k = 0; k < REGIONS; k++) {
-        let any = 0;
-        for (let i = 0; i < n; i++) any += ind[i] = labels[i] === k ? 1 : 0;
-        if (any < 8 || any > n - 8) continue;
-        for (const l of isoLines(blur(ind, aw, ah, rad), g, aw, ah, 0.5)) {
-          if (l.contrast < 0.1) continue;
-          for (let i = 0; i < l.pts.length; i += 2) {
-            l.pts[i] = (l.pts[i] + ax0 + 0.5) * sx;
-            l.pts[i + 1] = (l.pts[i + 1] + ay0 + 0.5) * sy;
-          }
-          const len = polyLen(l.pts) + (l.closed ? Math.hypot(l.pts[0] - l.pts[l.pts.length - 2], l.pts[1] - l.pts[l.pts.length - 1]) : 0);
-          if (len >= (l.closed ? minAccent : minLen)) lines.push({ ...l, len });
-        }
-      }
-    }
-
-    // Kept well inside the art window, smoothed into broad bends, then the strongest long runs
-    // taken one by one; anything running alongside a tube already taken (the parallel outlines
-    // of one edge, the far side of a thin shape) is left out, and so is anything short.
-    const margin = 2.6 * W;
-    const inside = (x: number, y: number) =>
-      x > art.x + margin && x < art.x + art.w - margin && y > art.y + margin && y < art.y + art.h - margin;
-    type Cand = { pts: number[]; closed: boolean; score: number; contrast: number; ring?: boolean };
-    const cands: Cand[] = [];
-    const smoothPts = (0.026 * S) / STEP;
-    // A shape outlined all the way round (the subject's silhouette, an eye, the sun's disc) says
-    // more than a stretch of edge: it counts double.
-    const CLOSED = 2.2;
-    const worth = (l: { len: number; contrast: number; closed: boolean }) => l.len ** 1.5 * l.contrast ** 2 * (l.closed ? CLOSED : 1);
-    // Open runs, cut wherever the line bends tighter than glass can be bent.
-    const openRuns = (q: number[], contrast: number) => {
-      for (const r of unkink(q, minBend, STEP)) {
-        const L = polyLen(r);
-        if (L < minLen) continue;
-        // A short straight bar (a stripe's edge) is a partial mark, not a drawing.
-        const chord = Math.hypot(r[r.length - 2] - r[0], r[r.length - 1] - r[1]);
-        if (chord > 0.92 * L && L < 0.42 * S) continue;
-        cands.push({ pts: r, closed: false, score: worth({ len: L, contrast, closed: false }), contrast });
-      }
-    };
-    // Only the strongest few dozen are worth smoothing.
-    lines.sort((a, b) => worth(b) - worth(a));
-    for (const l of lines.slice(0, 48)) {
-      const all = inside(l.pts[0], l.pts[1]) && l.closed;
-      let p = resample(l.pts, l.closed, STEP);
-      if (all) {
-        let ok = true;
-        for (let i = 0; i < p.length && ok; i += 2) ok = inside(p[i], p[i + 1]);
-        if (ok) {
-          p = smooth(p, true, smoothPts);
-          const L = polyLen(p);
-          if (!kinked(p, minBend, STEP)) {
-            // A small loop is an accent only where the shape stands out strongly.
-            if (L >= minLen || l.contrast > 0.3) cands.push({ pts: p, closed: true, score: worth({ len: L, contrast: l.contrast, closed: true }), contrast: l.contrast });
-            continue;
-          }
-          if (L < minLen) continue;
-        }
-      }
-      if (l.len < minLen) continue;
-      // Open runs inside the margin.
-      let run: number[] = [];
-      const flush = () => {
-        if (run.length / 2 > 4 && polyLen(run) >= minLen) openRuns(smooth(run, false, smoothPts), l.contrast);
-        run = [];
-      };
-      const N = p.length / 2;
-      // A loop that leaves the window: start the walk where it is outside, so its inside part is one run.
-      let s0 = 0;
-      if (l.closed) for (let i = 0; i < N; i++) if (!inside(p[i * 2], p[i * 2 + 1])) { s0 = i; break; }
-      for (let k = 0; k < N; k++) {
-        const i = (s0 + k) % N;
-        if (inside(p[i * 2], p[i * 2 + 1])) run.push(p[i * 2], p[i * 2 + 1]);
-        else flush();
-      }
-      flush();
-    }
-    cands.sort((a, b) => b.score - a.score);
-
-    // The focal point: a small, strongly darker or lighter spot well inside the picture (an eye)
-    // gets a ring of its own, laid first so the outlines give way round it.
-    {
-      const D = blur(tone, aw, ah, boxFor((0.015 * S) / sx));
-      const D2 = blur(tone, aw, ah, boxFor((0.05 * S) / sx));
-      const edge = Math.round((0.14 * S) / sx);
-      let bi = -1;
-      let bv = 0;
-      for (let y = edge; y < ah - edge; y++)
-        for (let x = edge; x < aw - edge; x++) {
+      // The step across an outline: the slope of the blurred picture over about a tube width.
+      const g = new Float32Array(n);
+      const reachG = Math.max(1, Math.round((0.6 * W) / sx));
+      for (let y = reachG; y < ah - reachG; y++)
+        for (let x = reachG; x < aw - reachG; x++) {
           const i = y * aw + x;
-          const v = Math.abs(D[i] - D2[i]);
-          if (v > bv) {
-            bv = v;
-            bi = i;
+          let s2 = 0;
+          for (let c = 0; c < 3; c++) {
+            const f = F[c];
+            s2 += (FW8[c] * (f[i + reachG] - f[i - reachG])) ** 2 + (FW8[c] * (f[i + reachG * aw] - f[i - reachG * aw])) ** 2;
           }
+          g[i] = 0.5 * Math.sqrt(s2);
         }
-      if (bi >= 0 && bv > 0.11) {
-        const cx = ((bi % aw) + ax0 + 0.5) * sx;
-        const cy = (Math.floor(bi / aw) + ay0 + 0.5) * sy;
-        // The spot's edge: the circle round it where the picture steps most.
-        let br = 0;
-        let bg = 0;
-        for (let r = 0.022 * S; r <= 0.07 * S; r += 3) {
-          let sg = 0;
-          for (let k = 0; k < 32; k++) {
-            const a = (k / 32) * Math.PI * 2;
-            const gx = Math.round((cx + Math.cos(a) * r) / sx - 0.5 - ax0);
-            const gy = Math.round((cy + Math.sin(a) * r) / sy - 0.5 - ay0);
-            if (gx >= 0 && gy >= 0 && gx < aw && gy < ah) sg += g[gy * aw + gx];
+      const featDist = (a: number[], b: number[]) => Math.hypot(...a.map((v, c) => (v - b[c]) * FW8[c]));
+      const meanFeat = (mask: Uint8Array, want: number) => {
+        const m = [0, 0, 0];
+        let c = 0;
+        for (let i = 0; i < n; i++)
+          if (mask[i] === want) {
+            for (let k = 0; k < 3; k++) m[k] += F[k][i];
+            c++;
           }
-          if (sg / 32 > bg) {
-            bg = sg / 32;
-            br = r;
-          }
-        }
-        // A spot, not the corner of a larger shape: it stands out from its surround on every side.
-        const at = (x: number, y: number) => {
-          const gx = Math.min(aw - 1, Math.max(0, Math.round(x / sx - 0.5 - ax0)));
-          const gy = Math.min(ah - 1, Math.max(0, Math.round(y / sy - 0.5 - ay0)));
-          return D[gy * aw + gx];
-        };
-        const mid = at(cx, cy);
-        let all = true;
-        for (let k = 0; k < 16 && all; k++) {
-          const a = (k / 16) * Math.PI * 2;
-          all = Math.abs(at(cx + Math.cos(a) * br * 1.6, cy + Math.sin(a) * br * 1.6) - mid) > 0.08;
-        }
-        if (bg > 0.12 && all) {
-          const R = Math.max(br + 0.8 * W, 0.05 * S);
-          const ring: number[] = [];
-          const m = Math.ceil((2 * Math.PI * R) / STEP);
-          for (let k = 0; k < m; k++) ring.push(cx + Math.cos((k / m) * 2 * Math.PI) * R, cy + Math.sin((k / m) * 2 * Math.PI) * R);
-          if (ring.every((v, k) => (k % 2 ? v > art.y + margin && v < art.y + art.h - margin : v > art.x + margin && v < art.x + art.w - margin)))
-            cands.unshift({ pts: ring, closed: true, score: Infinity, contrast: bg, ring: true });
-        }
-      }
-    }
+        return c ? m.map((v) => v / c) : m;
+      };
 
-    // Cells near a tube already taken.
-    const mc = 4;
-    const mw = Math.ceil(faceW / mc);
-    const mh = Math.ceil(faceH / mc);
-    const taken = new Uint8Array(mw * mh);
-    const selfAt = new Int32Array(mw * mh);
-    const selfGen = new Int32Array(mw * mh);
-    let gen = 0;
-    const keep = 2.5 * W;
-    const stamp = (x: number, y: number, rad: number, fn: (j: number) => void) => {
-      const cx = x / mc;
-      const cy = y / mc;
-      const r = rad / mc;
-      for (let j = Math.max(0, Math.floor(cy - r)); j <= Math.min(mh - 1, Math.ceil(cy + r)); j++)
-        for (let i = Math.max(0, Math.floor(cx - r)); i <= Math.min(mw - 1, Math.ceil(cx + r)); i++)
-          if ((i - cx) ** 2 + (j - cy) ** 2 <= r * r) fn(j * mw + i);
-    };
-    const cellOf = (x: number, y: number) => Math.min(mh - 1, Math.max(0, Math.floor(y / mc))) * mw + Math.min(mw - 1, Math.max(0, Math.floor(x / mc)));
-    const lag = Math.ceil((keep * 2.2) / STEP);
-    const blurredRGB = [R, G, B].map((c) => blur(c, aw, ah, boxFor((0.006 * S) / sx)));
-    const colorAt = (x: number, y: number): [number, number, number] => {
-      const cx = Math.min(aw - 1, Math.max(0, Math.round(x / sx - 0.5 - ax0)));
-      const cy = Math.min(ah - 1, Math.max(0, Math.round(y / sy - 0.5 - ay0)));
-      const i = cy * aw + cx;
-      return [blurredRGB[0][i], blurredRGB[1][i], blurredRGB[2][i]];
-    };
-    let accents = 0;
-    for (const c of cands) {
-      if (tubes.length >= NEON_MAX_TUBES) break;
-      let p = c.pts;
-      const accent = (c.closed && polyLen(p) < minLen) || !!c.ring;
-      if (accent && accents > 0) continue;
-      if (c.closed) {
-        // A loop is bent from one tube whose two ends meet at its lowest point, where the electrodes
-        // are tucked out of sight: open it there with a short gap.
-        const N = p.length / 2;
-        let lo = 0;
-        for (let i = 0; i < N; i++) if (p[i * 2 + 1] > p[lo * 2 + 1]) lo = i;
-        const gap = Math.ceil(((c.ring ? 0.9 : 1.9) * W) / STEP);
-        const q: number[] = [];
-        for (let k = gap; k < N - gap; k++) {
-          const i = (lo + k) % N;
-          q.push(p[i * 2], p[i * 2 + 1]);
+      // ---- The subject ----
+      const subjectFrom = (m: Uint8Array): Uint8Array | null => {
+        const sm = blur(Float32Array.from(m), aw, ah, boxFor((0.015 * S) / sx));
+        const bin = Uint8Array.from(sm, (v) => (v > 0.5 ? 1 : 0));
+        const { lab: cl, size } = components(bin, aw, ah);
+        if (!size.length) return null;
+        let big = 0;
+        for (let k = 1; k < size.length; k++) if (size[k] > size[big]) big = k;
+        return fillHoles(Uint8Array.from(cl, (v) => (v === big ? 1 : 0)), aw, ah);
+      };
+      const areaOf = (m: Uint8Array) => m.reduce((s, v) => s + v, 0) / n;
+      // How round a shape is (1 for a disc), from the length of its outline.
+      const compactOf = (m: Uint8Array) => {
+        const ls = isoLines(blur(Float32Array.from(m), aw, ah, 1), new Float32Array(n), aw, ah, 0.5);
+        const L = ls.reduce((t, l) => t + polyLen(l.pts), 0);
+        return L > 0 ? (4 * Math.PI * areaOf(m) * n) / (L * L) : 0;
+      };
+
+      // The figure against the ground. The ground is told by its colors: those along the window's
+      // edge that are rare in its middle (a subject cropped by the window lines the edge too, but
+      // fills the middle). Whatever stands apart from all of them is the figure.
+      const edgeIdx: number[] = [];
+      const midIdx: number[] = [];
+      for (let y = 0; y < ah; y++)
+        for (let x = 0; x < aw; x++) {
+          if (x < 2 || y < 2 || x >= aw - 2 || y >= ah - 2) edgeIdx.push(y * aw + x);
+          if (x > aw * 0.3 && x < aw * 0.7 && y > ah * 0.3 && y < ah * 0.7) midIdx.push(y * aw + x);
         }
-        p = q;
+      const featAt = (i: number) => [F[0][i], F[1][i], F[2][i]];
+      const edgeF = [0, 1, 2].map((c) => Float32Array.from(edgeIdx, (i) => F[c][i]));
+      const edgeLab = regions(edgeF, FW8, edgeIdx.length, 5) ?? new Uint8Array(edgeIdx.length);
+      const KE = Math.max(...edgeLab) + 1;
+      const ec = Array.from({ length: KE }, () => [0, 0, 0, 0]);
+      edgeIdx.forEach((i, j) => {
+        const c = ec[edgeLab[j]];
+        for (let k = 0; k < 3; k++) c[k] += F[k][i];
+        c[3]++;
+      });
+      // How much fine detail each edge color carries: a defocused backdrop is smooth, a subject
+      // in focus is textured (feathers, fur, leaves) even where the window crops it.
+      const fineTone = blur(tone, aw, ah, boxFor((0.005 * S) / sx));
+      const detail = blur(Float32Array.from(tone, (v, i) => Math.abs(v - fineTone[i]) + Math.abs(v - F[0][i]) * 0.5), aw, ah, boxFor((0.012 * S) / sx));
+      const ed = new Array(KE).fill(0);
+      edgeIdx.forEach((i, j) => (ed[edgeLab[j]] += detail[i]));
+      const edgeCent = ec
+        .map((c, k) => ({ f: c.slice(0, 3).map((v) => v / (c[3] || 1)), share: c[3] / edgeIdx.length, mid: 0, detail: ed[k] / (c[3] || 1) }))
+        .filter((c) => c.share > 0);
+      for (const i of midIdx) {
+        const f = featAt(i);
+        for (const c of edgeCent) if (featDist(f, c.f) < 0.1) c.mid++;
       }
-      // Walk the line, splitting it wherever it comes near a tube already taken or doubles back
-      // alongside itself.
-      gen++;
-      const N = p.length / 2;
-      const runs: number[][] = [];
-      let run: number[] = [];
-      for (let i = 0; i < N; i++) {
-        const x = p[i * 2];
-        const y = p[i * 2 + 1];
-        const cell = cellOf(x, y);
-        // (A ring is a clean circle: its ends meeting across the gap are not it doubling back.)
-        const near = taken[cell] || (!c.ring && selfGen[cell] === gen && i - selfAt[cell] > lag);
-        if (near) {
-          if (run.length) runs.push(run);
-          run = [];
-        } else run.push(x, y);
-        if (i % 3 === 0)
-          stamp(x, y, keep, (j) => {
-            if (selfGen[j] !== gen) {
-              selfGen[j] = gen;
-              selfAt[j] = i;
-            }
+      const smoothest = Math.min(...edgeCent.filter((c) => c.share >= 0.08).map((c) => c.detail));
+      const blurredBack = smoothest < 0.02;
+      // Ground colors: common along the edge, rare in the middle and (behind a subject in focus)
+      // smooth. A color of the same hue as one that is not ground, only darker or paler, is the
+      // subject in shadow or in light where the window crops it, so it is not ground either.
+      const plain = (c: (typeof edgeCent)[number]) => c.share >= 0.08 && c.mid < 0.12 * midIdx.length && !(blurredBack && c.detail > 2 * smoothest + 0.01);
+      const hueOf = (f: number[]) => (Math.hypot(f[1], f[2]) > 0.06 ? Math.atan2(f[2], f[1]) : null);
+      const subjectHues = edgeCent.filter((c) => c.share >= 0.05 && !plain(c)).map((c) => hueOf(c.f)).filter((h): h is number => h !== null);
+      const sameHue = (c: (typeof edgeCent)[number]) => {
+        const h = hueOf(c.f);
+        return h !== null && subjectHues.some((m) => Math.abs(Math.atan2(Math.sin(h - m), Math.cos(h - m))) < 0.35);
+      };
+      let groundCent = edgeCent.filter((c) => plain(c) && !sameHue(c));
+      if (!groundCent.length) groundCent = [edgeCent.reduce((a, b) => (b.mid < a.mid ? b : a))];
+      const sal = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const f = featAt(i);
+        sal[i] = Math.min(...groundCent.map((c) => featDist(f, c.f)));
+      }
+      // Split at the level that best parts the two (Otsu), but never below a clear step.
+      let thr = 0.14;
+      {
+        const H = new Array(64).fill(0);
+        let mx = 1e-6;
+        for (let i = 0; i < n; i++) mx = Math.max(mx, sal[i]);
+        for (let i = 0; i < n; i++) H[Math.min(63, Math.floor((sal[i] / mx) * 64))]++;
+        let sum = 0;
+        for (let k = 0; k < 64; k++) sum += k * H[k];
+        let wB = 0;
+        let sB = 0;
+        let best = -1;
+        for (let k = 0; k < 64; k++) {
+          wB += H[k];
+          if (!wB || wB === n) continue;
+          sB += k * H[k];
+          const mB = sB / wB;
+          const mF = (sum - sB) / (n - wB);
+          const v = wB * (n - wB) * (mB - mF) ** 2;
+          if (v > best) (best = v), (thr = Math.min(0.24, Math.max(0.12, ((k + 1) / 64) * mx)));
+        }
+      }
+      const isGround = Uint8Array.from(sal, (v) => (v > thr ? 0 : 1));
+      // Refined a few times as two color models, figure and ground, each a few colors (so a dark
+      // part of the subject joins the subject's other colors), with neighbouring cells pulled the
+      // same way and the window's middle leaning to the figure, its edge to the ground.
+      {
+        const centres = (want: number) => {
+          const idx: number[] = [];
+          for (let i = 0; i < n; i += 2) if (isGround[i] === want) idx.push(i);
+          if (idx.length < 16) return [];
+          const sub = [0, 1, 2].map((c) => Float32Array.from(idx, (i) => F[c][i]));
+          const l = regions(sub, FW8, idx.length, 4) ?? new Uint8Array(idx.length);
+          const acc = Array.from({ length: Math.max(...l) + 1 }, () => [0, 0, 0, 0]);
+          idx.forEach((i, j) => {
+            const a = acc[l[j]];
+            for (let c = 0; c < 3; c++) a[c] += F[c][i];
+            a[3]++;
           });
+          return acc.filter((a) => a[3] > idx.length * 0.03).map((a) => a.slice(0, 3).map((v) => v / a[3]));
+        };
+        for (let it = 0; it < 3; it++) {
+          const fc = centres(0);
+          const bc = centres(1);
+          if (!fc.length || !bc.length) break;
+          const lean = new Float32Array(n);
+          for (let i = 0; i < n; i++) {
+            const f = featAt(i);
+            const x = i % aw;
+            const y = (i - x) / aw;
+            const r = Math.max(Math.abs(x / aw - 0.5), Math.abs(y / ah - 0.5)) * 2;
+            lean[i] = Math.min(...bc.map((c) => featDist(f, c))) - Math.min(...fc.map((c) => featDist(f, c))) + 0.08 * (0.6 - r);
+          }
+          const sm = blur(lean, aw, ah, boxFor((0.012 * S) / sx));
+          for (let i = 0; i < n; i++) isGround[i] = sm[i] > 0 ? 0 : 1;
+        }
       }
-      if (run.length) runs.push(run);
-      for (const r0 of runs) {
-        if (tubes.length >= NEON_MAX_TUBES) break;
-        // Pull the ends back from whatever cut them, so two tubes never touch.
-        const trim = Math.ceil((0.6 * W) / STEP) * 2;
-        const r = r0.length / 2 > trim * 2 + 4 && r0.length < p.length ? r0.slice(trim, r0.length - trim) : r0;
-        const len = polyLen(r);
-        if (len < (accent && r0.length === p.length ? Math.min(minAccent, len) : minLen)) continue;
-        if (accent) accents++;
-        for (let i = 0; i < r.length; i += 6) stamp(r[i], r[i + 1], c.ring ? 1.6 * W : keep, (j) => (taken[j] = 1));
-        // One gas per tube: the color of the shape it outlines, its brighter, more colorful side.
+      let figure = subjectFrom(Uint8Array.from(isGround, (v) => 1 - v));
+      // A figure is a shape, not a band of sky or sea: it may be cropped by two sides of the window, not three.
+      const sides = figure ? sidesOf(figure, aw, ah) : [];
+      if (figure && (areaOf(figure) < 0.05 || areaOf(figure) > 0.8 || edgeContact(figure, aw, ah) > 0.5 || sides.filter((v) => v > 0.25).length > 2)) figure = null;
+      // One that runs right across the window (left to right, or top to bottom) is a band of
+      // landscape round something, unless nothing else stands out.
+      const band = (sides[0] > 0.04 && sides[1] > 0.04) || (sides[2] > 0.04 && sides[3] > 0.04);
+
+      // The brightest, most colorful compact shape that stands out from what surrounds it (a sun, a
+      // moon, a lamp): the subject when there is no clear figure, or when the figure is a sprawl
+      // (a sun sitting on a ridge) round it.
+      let blob: Uint8Array | null = null;
+      {
+        let best = 0;
+        for (let k = 0; k < K; k++) {
+          const { lab: cl, size } = components(Uint8Array.from(lab, (v) => (v === k ? 1 : 0)), aw, ah);
+          for (let c = 0; c < size.length; c++) {
+            if (size[c] < 0.006 * n || size[c] > 0.5 * n) continue;
+            const m = Uint8Array.from(cl, (v) => (v === c ? 1 : 0));
+            const contact = edgeContact(m, aw, ah);
+            if (contact > 0.25) continue;
+            // Its color, and that of a ring round it.
+            let x0 = aw;
+            let y0 = ah;
+            let x1 = 0;
+            let y1 = 0;
+            let vr = 0;
+            let vg = 0;
+            let vb = 0;
+            for (let i = 0; i < n; i++)
+              if (m[i]) {
+                const x = i % aw;
+                const y = (i - x) / aw;
+                x0 = Math.min(x0, x);
+                x1 = Math.max(x1, x);
+                y0 = Math.min(y0, y);
+                y1 = Math.max(y1, y);
+                vr += R[i];
+                vg += G[i];
+                vb += B[i];
+              }
+            const pad = Math.round((0.05 * S) / sx);
+            const ring = new Uint8Array(n);
+            for (let y = Math.max(0, y0 - pad); y <= Math.min(ah - 1, y1 + pad); y++)
+              for (let x = Math.max(0, x0 - pad); x <= Math.min(aw - 1, x1 + pad); x++) if (!m[y * aw + x]) ring[y * aw + x] = 1;
+            const contrast = featDist(meanFeat(m, 1), meanFeat(ring, 1));
+            const mx = Math.max(vr, vg, vb) / size[c];
+            const sat = mx > 0 ? (mx - Math.min(vr, vg, vb) / size[c]) / mx : 0;
+            // Compact: it fills its box rather than snaking across the picture.
+            const fill = size[c] / ((x1 - x0 + 1) * (y1 - y0 + 1));
+            const score = contrast * (mx + 0.5 * sat) * Math.sqrt(size[c] / n) * fill * (1 - contact) ** 2;
+            if (score > best && contrast > 0.12) {
+              best = score;
+              // With the pieces of the same color right under it (a sun cut by bands of sky), as one shape.
+              const whole = m.slice();
+              for (let d = 0; d < size.length; d++) {
+                if (d === c || size[d] < 0.0015 * n) continue;
+                let ux = 0;
+                let uy = 0;
+                for (let i = 0; i < n; i++) if (cl[i] === d) (ux += i % aw), (uy += Math.floor(i / aw));
+                ux /= size[d];
+                uy /= size[d];
+                if (ux >= x0 && ux <= x1 && uy >= y0 && uy <= y1 + (x1 - x0)) for (let i = 0; i < n; i++) if (cl[i] === d) whole[i] = 1;
+              }
+              blob = subjectFrom(whole);
+            }
+          }
+        }
+      }
+      let subject = figure;
+      if (!figure || (band && blob)) subject = blob;
+      else if (blob && areaOf(blob) > 0.03 && compactOf(blob) > compactOf(figure) + 0.3) {
+        // The blob must sit within the figure.
+        let inF = 0;
+        let all = 0;
+        for (let i = 0; i < n; i++) if (blob[i]) (all++, (inF += figure[i]));
+        if (inF > 0.8 * all) subject = blob;
+      }
+
+      // Cells near a tube already laid, so no two tubes run into each other.
+      const mc = 4;
+      const mw = Math.ceil(faceW / mc);
+      const mh = Math.ceil(faceH / mc);
+      const taken = new Uint8Array(mw * mh);
+      const keep = 2.2 * W;
+      const stamp = (x: number, y: number, rad: number) => {
+        const cx = x / mc;
+        const cy = y / mc;
+        const r = rad / mc;
+        for (let j = Math.max(0, Math.floor(cy - r)); j <= Math.min(mh - 1, Math.ceil(cy + r)); j++)
+          for (let i = Math.max(0, Math.floor(cx - r)); i <= Math.min(mw - 1, Math.ceil(cx + r)); i++) if ((i - cx) ** 2 + (j - cy) ** 2 <= r * r) taken[j * mw + i] = 1;
+      };
+      const isTaken = (x: number, y: number) => taken[Math.min(mh - 1, Math.max(0, Math.floor(y / mc))) * mw + Math.min(mw - 1, Math.max(0, Math.floor(x / mc)))] === 1;
+      const lay = (pts: number[], gas: [number, number, number], role: NeonRole, rad = keep) => {
+        for (let i = 0; i < pts.length; i += 6) stamp(pts[i], pts[i + 1], rad);
+        tubes.push({ pts: Float32Array.from(pts), len: polyLen(pts), gas, border: false, role });
+      };
+
+      // One gas per tube: the color of the shape it outlines, from its brighter, more colorful side.
+      const blurredRGB = [R, G, B].map((c) => blur(c, aw, ah, boxFor((0.006 * S) / sx)));
+      const vividAt = (x: number, y: number, acc: number[]) => {
+        const i = cellAt(x, y);
+        const cr = blurredRGB[0][i];
+        const cg = blurredRGB[1][i];
+        const cb = blurredRGB[2][i];
+        const mx = Math.max(cr, cg, cb);
+        const v = mx > 0 ? (0.3 + (mx - Math.min(cr, cg, cb)) / mx) * mx * mx : 0;
+        acc[0] += cr * v;
+        acc[1] += cg * v;
+        acc[2] += cb * v;
+        acc[3] += v;
+      };
+      const gasOfSides = (r: number[]) => {
         const side = [
           [0, 0, 0, 0],
           [0, 0, 0, 0],
@@ -753,64 +955,463 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
           const tl = Math.hypot(tx, ty) || 1;
           tx /= tl;
           ty /= tl;
-          for (let s = 0; s < 2; s++) {
-            const sg = s ? -1 : 1;
-            const [cr, cg, cb] = colorAt(r[i] - ty * off * sg, r[i + 1] + tx * off * sg);
-            const mx = Math.max(cr, cg, cb);
-            const vivid = mx > 0 ? (0.3 + (mx - Math.min(cr, cg, cb)) / mx) * mx * mx : 0;
-            const sd = side[s];
-            sd[0] += cr * vivid;
-            sd[1] += cg * vivid;
-            sd[2] += cb * vivid;
-            sd[3] += vivid;
+          vividAt(r[i] - ty * off, r[i + 1] + tx * off, side[0]);
+          vividAt(r[i] + ty * off, r[i + 1] - tx * off, side[1]);
+        }
+        const b = side[0][3] >= side[1][3] ? side[0] : side[1];
+        const s = b[3] || 1;
+        return neonGasOf(b[0] / s, b[1] / s, b[2] / s) ?? fallback;
+      };
+
+      // ---- The silhouette: one long tube round the subject ----
+      let outline: number[] | null = null;
+      let outlineClosed = false;
+      const subjectGrown = new Uint8Array(n);
+      let gasMain = fallback;
+      if (subject) {
+        const sm = blur(Float32Array.from(subject), aw, ah, boxFor((0.02 * S) / sx));
+        const ones = new Float32Array(n).fill(1);
+        let longest: Line | null = null;
+        let longestLen = 0;
+        for (const l of isoLines(sm, ones, aw, ah, 0.5)) {
+          const L = polyLen(l.pts);
+          if (L > longestLen) (longest = l), (longestLen = L);
+        }
+        if (longest) {
+          const p = resample(toFace(longest.pts), longest.closed, STEP);
+          let all = longest.closed;
+          for (let i = 0; i < p.length && all; i += 2) all = inside(p[i], p[i + 1]);
+          if (all) {
+            // A whole shape: simplified to a few long strokes, their corners rounded into broad
+            // bends, smoothed further where glass still could not bend it.
+            const base = resample(chaikin(simplify(smooth(p, true, (0.008 * S) / STEP), true, 0.012 * S), true, 5), true, STEP);
+            let q = base;
+            for (const k of [0, 0.02, 0.035, 0.05, 0.07]) {
+              q = k ? smooth(base, true, (k * S) / STEP) : base;
+              if (!kinked(q, minBend, STEP)) break;
+            }
+            if (!kinked(q, minBend, STEP) && polyLen(q) > 0.3 * S) {
+              outline = q;
+              outlineClosed = true;
+            }
+            // A round shape (a sun, a moon) is bent as a true circle, from the arc of its upper
+            // part, so a sun cut off by bands of sky or a ridge still gets its whole disc.
+            const circle = circleOf(p);
+            if (circle) {
+              const [cx, cy, r] = circle;
+              const ring: number[] = [];
+              const m = Math.ceil((2 * Math.PI * r) / STEP);
+              for (let k = 0; k < m; k++) ring.push(cx + Math.cos((k / m) * 2 * Math.PI) * r, cy + Math.sin((k / m) * 2 * Math.PI) * r);
+              if (r > 0.08 * S && r < 0.4 * S && ring.every((v, k) => (k % 2 ? v > art.y + margin && v < art.y + art.h - margin : v > art.x + margin && v < art.x + art.w - margin))) {
+                outline = ring;
+                outlineClosed = true;
+              }
+            }
+          } else {
+            // A cropped subject: the part of its outline inside the window, as one open tube. Where
+            // it only grazes the window's edge it is pulled in; where it runs along it, it is cut.
+            const N = p.length / 2;
+            {
+              const out = new Uint8Array(N);
+              for (let i = 0; i < N; i++) out[i] = inside(p[i * 2], p[i * 2 + 1]) ? 0 : 1;
+              const brief = Math.round((0.12 * S) / STEP);
+              for (let i = 0; i < N; ) {
+                if (!out[i]) {
+                  i++;
+                  continue;
+                }
+                let j = i;
+                while (j < N && out[j]) j++;
+                const ends = i > 0 && j < N;
+                if (ends && j - i < brief)
+                  for (let k = i; k < j; k++) {
+                    p[k * 2] = Math.min(art.x + art.w - margin - 1, Math.max(art.x + margin + 1, p[k * 2]));
+                    p[k * 2 + 1] = Math.min(art.y + art.h - margin - 1, Math.max(art.y + margin + 1, p[k * 2 + 1]));
+                  }
+                i = j;
+              }
+            }
+            let s0 = 0;
+            if (longest.closed) for (let i = 0; i < N; i++) if (!inside(p[i * 2], p[i * 2 + 1])) { s0 = i; break; }
+            const runs: number[][] = [];
+            let run: number[] = [];
+            for (let k = 0; k < N; k++) {
+              const i = (s0 + k) % N;
+              if (inside(p[i * 2], p[i * 2 + 1])) run.push(p[i * 2], p[i * 2 + 1]);
+              else if (run.length) runs.push(run), (run = []);
+            }
+            if (run.length) runs.push(run);
+            let best: number[] | null = null;
+            for (const r of runs) {
+              if (r.length < 16) continue;
+              const base = resample(chaikin(simplify(smooth(r, false, (0.015 * S) / STEP), false, 0.022 * S), false, 5), false, STEP);
+              // Smoothed until glass can bend it whole; a curl that never smooths out is cut.
+              let top: number[] | null = null;
+              for (const k of [0, 0.02, 0.035, 0.05, 0.07, 0.1]) {
+                const q = k ? smooth(base, false, (k * S) / STEP) : base;
+                const pieces = unkink(q, minBend, STEP);
+                top = pieces.reduce<number[] | null>((a, b) => (!a || polyLen(b) > polyLen(a) ? b : a), null);
+                if (pieces.length === 1) break;
+              }
+              // Of the pieces of a cropped outline, the upper one reads as the subject's silhouette
+              // (a head and shoulders cut off by the bottom of the window).
+              const worth = (q: number[]) => {
+                let my = 0;
+                for (let i = 1; i < q.length; i += 2) my += q[i];
+                return polyLen(q) * (0.6 + 0.8 * (1 - (my / (q.length / 2) - art.y) / art.h));
+              };
+              if (top && (!best || worth(top) > worth(best))) best = top;
+            }
+            if (best && polyLen(best) > 0.35 * S) outline = best;
           }
         }
-        const best = side[0][3] >= side[1][3] ? side[0] : side[1];
-        const wsum = best[3] || 1;
-        const gas = neonGasOf(best[0] / wsum, best[1] / wsum, best[2] / wsum);
-        tubes.push({ pts: Float32Array.from(r), len, gas: gas ?? [-1, -1, -1], border: false });
+        // The silhouette's gas: the subject's own most vivid color.
+        const acc = [0, 0, 0, 0];
+        for (let i = 0; i < n; i += 3)
+          if (subject[i]) {
+            const mx = Math.max(R[i], G[i], B[i]);
+            const v = mx > 0 ? (0.3 + (mx - Math.min(R[i], G[i], B[i])) / mx) * mx * mx : 0;
+            acc[0] += R[i] * v;
+            acc[1] += G[i] * v;
+            acc[2] += B[i] * v;
+            acc[3] += v;
+          }
+        if (acc[3] > 0) gasMain = neonGasOf(acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3]) ?? fallback;
+        // Details are looked for inside the subject (grown a little, so its own edge counts).
+        // Details are looked for well inside the subject, clear of its silhouette tube.
+        const shrunk = blur(Float32Array.from(subject), aw, ah, boxFor((0.03 * S) / sx));
+        for (let i = 0; i < n; i++) subjectGrown[i] = shrunk[i] > 0.75 ? 1 : 0;
+      }
+      if (outline) {
+        let p = outline;
+        if (outlineClosed) {
+          // Bent from one tube whose two ends meet at its lowest point, where the electrodes are
+          // tucked out of sight: opened there with a short gap.
+          const N = p.length / 2;
+          let lo = 0;
+          for (let i = 0; i < N; i++) if (p[i * 2 + 1] > p[lo * 2 + 1]) lo = i;
+          const gap = Math.ceil((1.4 * W) / STEP);
+          const q: number[] = [];
+          for (let k = gap; k < N - gap; k++) {
+            const i = (lo + k) % N;
+            q.push(p[i * 2], p[i * 2 + 1]);
+          }
+          p = q;
+        }
+        lay(p, gasMain, 'outline');
+      }
+
+      // ---- Details that mean something ----
+      type Cand = { pts: number[]; closed: boolean; score: number; ring?: boolean };
+      const cands: Cand[] = [];
+      const inSubject = (x: number, y: number) => !subject || subjectGrown[cellAt(x, y)] === 1;
+      // An eye: a small, strongly darker or lighter spot well inside the subject gets a ring.
+      {
+        const D = blur(tone, aw, ah, boxFor((0.015 * S) / sx));
+        const D2 = blur(tone, aw, ah, boxFor((0.05 * S) / sx));
+        const edge = Math.round((0.12 * S) / sx);
+        let bi = -1;
+        let bv = 0;
+        for (let y = edge; y < ah - edge; y++)
+          for (let x = edge; x < aw - edge; x++) {
+            const i = y * aw + x;
+            if (subject && !subject[i]) continue;
+            const v = Math.abs(D[i] - D2[i]);
+            if (v > bv) (bv = v), (bi = i);
+          }
+        if (bi >= 0 && bv > 0.11) {
+          const cx = ((bi % aw) + ax0 + 0.5) * sx;
+          const cy = (Math.floor(bi / aw) + ay0 + 0.5) * sy;
+          let br = 0;
+          let bg = 0;
+          for (let r = 0.022 * S; r <= 0.07 * S; r += 3) {
+            let sg = 0;
+            for (let k = 0; k < 32; k++) sg += g[cellAt(cx + Math.cos((k / 32) * Math.PI * 2) * r, cy + Math.sin((k / 32) * Math.PI * 2) * r)];
+            if (sg / 32 > bg) (bg = sg / 32), (br = r);
+          }
+          // A spot, not the corner of a larger shape: it stands out from its surround on every side.
+          const mid = D[cellAt(cx, cy)];
+          let all = true;
+          for (let k = 0; k < 16 && all; k++) {
+            const a = (k / 16) * Math.PI * 2;
+            all = Math.abs(D[cellAt(cx + Math.cos(a) * br * 1.6, cy + Math.sin(a) * br * 1.6)] - mid) > 0.08;
+          }
+          if (bg > 0.12 && all) {
+            const Rr = Math.max(br + 0.8 * W, 0.05 * S);
+            const ring: number[] = [];
+            const m = Math.ceil((2 * Math.PI * Rr) / STEP);
+            for (let k = 0; k < m; k++) ring.push(cx + Math.cos((k / m) * 2 * Math.PI) * Rr, cy + Math.sin((k / m) * 2 * Math.PI) * Rr);
+            let ok = true;
+            for (let i = 0; i < ring.length && ok; i += 2) ok = inside(ring[i], ring[i + 1]) && !isTaken(ring[i], ring[i + 1]);
+            if (ok) cands.push({ pts: ring, closed: true, score: Infinity, ring: true });
+          }
+        }
+      }
+      // Shapes inside the subject and long lines where two colors meet: the outlines of the color
+      // regions, kept only where they fall inside the subject.
+      const lines: { pts: number[]; closed: boolean; contrast: number }[] = [];
+      for (let k = 0; k < K; k++) {
+        const m = Float32Array.from(lab, (v) => (v === k ? 1 : 0));
+        for (const l of isoLines(blur(m, aw, ah, boxFor((0.012 * S) / sx)), g, aw, ah, 0.5)) {
+          if (l.contrast < 0.12) continue;
+          const pts = toFace(l.pts);
+          if (polyLen(pts) < 0.25 * S) continue;
+          lines.push({ pts, closed: l.closed, contrast: l.contrast });
+        }
+      }
+      // Bent like the silhouette: a few long strokes with rounded corners.
+      const bend = (q: number[], closed: boolean) =>
+        smooth(resample(chaikin(simplify(smooth(q, closed, (0.015 * S) / STEP), closed, 0.02 * S), closed, 5), closed, STEP), closed, (0.015 * S) / STEP);
+      for (const l of lines) {
+        const p = resample(l.pts, l.closed, STEP);
+        // A closed shape inside the subject, round enough to read as a shape (a face, a cheek, a sun).
+        // A thin one (a stripe, a glint) is neither a shape nor a line.
+        if (l.closed) {
+          let A = 0;
+          for (let i = 0, N = p.length / 2; i < N; i++) {
+            const j = (i + 1) % N;
+            A += p[i * 2] * p[j * 2 + 1] - p[j * 2] * p[i * 2 + 1];
+          }
+          const L = polyLen(p);
+          if ((4 * Math.PI * Math.abs(A / 2)) / (L * L) < 0.25) continue;
+        }
+        let whole = l.closed;
+        for (let i = 0; i < p.length && whole; i += 2) whole = inside(p[i], p[i + 1]) && inSubject(p[i], p[i + 1]);
+        if (whole) {
+          const q = bend(p, true);
+          const L = polyLen(q);
+          let A = 0;
+          for (let i = 0, N = q.length / 2; i < N; i++) {
+            const j = (i + 1) % N;
+            A += q[i * 2] * q[j * 2 + 1] - q[j * 2] * q[i * 2 + 1];
+          }
+          const compact = (4 * Math.PI * Math.abs(A / 2)) / (L * L);
+          const diam = 2 * Math.sqrt(Math.abs(A / 2) / Math.PI);
+          if (compact > 0.45 && diam > 0.1 * S && diam < 0.7 * S && !kinked(q, minBend, STEP)) {
+            cands.push({ pts: q, closed: true, score: L * l.contrast ** 2 * 2.5 });
+            continue;
+          }
+        }
+        // Otherwise only long runs inside the subject count; a short open arc means nothing.
+        const N = p.length / 2;
+        let run: number[] = [];
+        const flush = () => {
+          if (run.length / 2 > 8 && polyLen(run) > 0.3 * S)
+            for (const r of unkink(bend(run, false), minBend, STEP)) {
+              const L = polyLen(r);
+              if (L < 0.4 * S) continue;
+              // A straight bar (a stripe's edge) is a partial mark, not a drawing.
+              const chord = Math.hypot(r[r.length - 2] - r[0], r[r.length - 1] - r[1]);
+              if (chord > 0.8 * L && L < 0.8 * S) continue;
+              // Nor is a hairpin (both sides of a thin stripe), which folds back along itself.
+              const N2 = r.length / 2;
+              let fold = Infinity;
+              for (let i = 0; i < N2 * 0.4; i += 2) for (let j = Math.ceil(N2 * 0.6); j < N2; j += 2) fold = Math.min(fold, Math.hypot(r[i * 2] - r[j * 2], r[i * 2 + 1] - r[j * 2 + 1]));
+              if (fold < 2.5 * W) continue;
+              cands.push({ pts: r, closed: false, score: L * l.contrast ** 2 });
+            }
+          run = [];
+        };
+        let s0 = 0;
+        if (l.closed) for (let i = 0; i < N; i++) if (!(inside(p[i * 2], p[i * 2 + 1]) && inSubject(p[i * 2], p[i * 2 + 1]))) { s0 = i; break; }
+        for (let k = 0; k < N; k++) {
+          const i = (s0 + k) % N;
+          if (inside(p[i * 2], p[i * 2 + 1]) && inSubject(p[i * 2], p[i * 2 + 1])) run.push(p[i * 2], p[i * 2 + 1]);
+          else flush();
+        }
+        flush();
+      }
+      cands.sort((a, b) => b.score - a.score);
+      let details = 0;
+      for (const c of cands) {
+        if (details >= NEON_MAX_DETAILS) break;
+        let p = c.pts;
+        if (c.closed) {
+          // Its electrodes side by side at its lowest point.
+          const N = p.length / 2;
+          let lo = 0;
+          for (let i = 0; i < N; i++) if (p[i * 2 + 1] > p[lo * 2 + 1]) lo = i;
+          const gap = Math.ceil(((c.ring ? 0.9 : 1.3) * W) / STEP);
+          const q: number[] = [];
+          for (let k = gap; k < N - gap; k++) {
+            const i = (lo + k) % N;
+            q.push(p[i * 2], p[i * 2 + 1]);
+          }
+          p = q;
+        }
+        // Cut where it comes near a tube already laid; keep only its longest piece.
+        let best: number[] = [];
+        let run: number[] = [];
+        for (let i = 0; i < p.length; i += 2) {
+          if (isTaken(p[i], p[i + 1])) {
+            if (run.length > best.length) best = run;
+            run = [];
+          } else run.push(p[i], p[i + 1]);
+        }
+        if (run.length > best.length) best = run;
+        const whole = best.length === p.length;
+        // A piece of a ring or a shape is no longer that shape; a piece of a line must still be long.
+        if (c.closed && !whole) continue;
+        const trim = whole ? 0 : Math.ceil((0.6 * W) / STEP) * 2;
+        const r = trim && best.length / 2 > trim * 2 + 4 ? best.slice(trim, best.length - trim) : best;
+        if (!c.closed && polyLen(r) < 0.4 * S) continue;
+        // What is left must still be a drawing, not a straight bar.
+        if (!c.closed && Math.hypot(r[r.length - 2] - r[0], r[r.length - 1] - r[1]) > 0.8 * polyLen(r) && polyLen(r) < 0.6 * S) continue;
+        if (r.length < 8) continue;
+        let gas = gasOfSides(r);
+        // An eye ring in the outline's own color would read as part of it: it takes white light.
+        if (c.ring && gas.join() === gasMain.join()) gas = NEON_WHITE;
+        lay(r, gas, 'detail', c.ring ? 1.6 * W : keep);
+        details++;
+      }
+
+      // ---- Sparse pictures: a few stylised strokes instead of an empty sky ----
+      const subjectShare = subject ? areaOf(subject) : 0;
+      const lineDetails = tubes.filter((t) => t.role === 'detail' && t.len > 0.4 * S).length;
+      // Only round a shape big enough to be the picture's subject (not an eye on a busy picture),
+      // and only where it is a light in a darker sky: clearly brighter than the rest.
+      let inT = 0;
+      let inN = 0;
+      let outT = 0;
+      for (let i = 0; i < n; i++)
+        if (subject && subject[i]) (inT += F[0][i]), inN++;
+        else outT += F[0][i];
+      const quiet = inN > 0 && inN < n && inT / inN > outT / (n - inN) + 0.25;
+      if (outline && outlineClosed && quiet && subjectShare > 0.03 && subjectShare < 0.16 && lineDetails === 0) {
+        const p = outline;
+        let cx = 0;
+        let cy = 0;
+        let y0 = Infinity;
+        let y1 = -Infinity;
+        let x0 = Infinity;
+        let x1 = -Infinity;
+        for (let i = 0; i < p.length; i += 2) {
+          cx += p[i];
+          cy += p[i + 1];
+          x0 = Math.min(x0, p[i]);
+          x1 = Math.max(x1, p[i]);
+          y0 = Math.min(y0, p[i + 1]);
+          y1 = Math.max(y1, p[i + 1]);
+        }
+        cx /= p.length / 2;
+        cy /= p.length / 2;
+        const D = Math.max(x1 - x0, y1 - y0);
+        const warm = gasMain[0] > 0.9 && gasMain[2] < 0.3;
+        // The horizon (or a ridge, the sea's edge): the strongest long, flat line below the
+        // subject's middle.
+        let hz: number[] | null = null;
+        let hzScore = 0;
+        for (const l of lines) {
+          if (l.closed) continue;
+          const q = resample(l.pts, false, STEP);
+          let run: number[] = [];
+          const consider = () => {
+            if (run.length / 2 >= 8)
+              for (const r of unkink(smooth(run, false, (0.04 * S) / STEP), minBend, STEP)) {
+                let rx0 = Infinity;
+                let rx1 = -Infinity;
+                let ry0 = Infinity;
+                let ry1 = -Infinity;
+                let my = 0;
+                for (let i = 0; i < r.length; i += 2) {
+                  rx0 = Math.min(rx0, r[i]);
+                  rx1 = Math.max(rx1, r[i]);
+                  ry0 = Math.min(ry0, r[i + 1]);
+                  ry1 = Math.max(ry1, r[i + 1]);
+                  my += r[i + 1];
+                }
+                if (rx1 - rx0 < 0.6 * art.w || ry1 - ry0 > 0.3 * (rx1 - rx0) || my / (r.length / 2) < cy) continue;
+                if ((rx1 - rx0) * l.contrast > hzScore) (hzScore = (rx1 - rx0) * l.contrast), (hz = r);
+              }
+            run = [];
+          };
+          for (let i = 0; i < q.length; i += 2) {
+            if (inside(q[i], q[i + 1])) run.push(q[i], q[i + 1]);
+            else consider();
+          }
+          consider();
+        }
+        const hyAt = (x: number) => {
+          if (!hz) return Infinity;
+          let by = Infinity;
+          let bd = Infinity;
+          for (let i = 0; i < hz.length; i += 2)
+            if (Math.abs(hz[i] - x) < bd) (bd = Math.abs(hz[i] - x)), (by = hz[i + 1]);
+          return bd < 3 * STEP ? by : Infinity;
+        };
+        let strokes = 0;
+        if (warm) {
+          // A sun. Where the horizon crosses its disc it is setting: its circle stops just above
+          // the horizon, which runs on underneath.
+          let floor = Infinity;
+          const sun = tubes.find((t) => t.role === 'outline');
+          if (sun && hz) {
+            const N = p.length / 2;
+            // Cut level: the horizon's highest point under the disc, so the arc ends level.
+            let top = Infinity;
+            for (let x = x0; x <= x1; x += STEP) top = Math.min(top, hyAt(x));
+            const keepPt = Array.from({ length: N }, (_, i) => p[i * 2 + 1] < top - 1.4 * W);
+            if (keepPt.some((k) => !k)) {
+              let start = keepPt.findIndex((k, i) => k && !keepPt[(i + N - 1) % N]);
+              if (start < 0) start = 0;
+              const arc: number[] = [];
+              for (let k = 0; k < N && keepPt[(start + k) % N]; k++) arc.push(p[((start + k) % N) * 2], p[((start + k) % N) * 2 + 1]);
+              if (polyLen(arc) > 0.3 * S) {
+                sun.pts = Float32Array.from(arc);
+                sun.len = polyLen(arc);
+                floor = top;
+              }
+            }
+          }
+          // Cut lines across its lower half, as on a retro sunset sign.
+          // Spread evenly between its middle and the horizon (or its lower edge), well apart.
+          const r = (y1 - y0) / 2;
+          const lo = cy + 0.18 * r;
+          const hi = Math.min(cy + 0.75 * r, floor - 1.7 * W);
+          const count = Math.min(3, Math.floor((hi - lo) / (1.9 * W)) + 1);
+          for (let k = 0; k < count && hi >= lo; k++) {
+            const y = count > 1 ? lo + ((hi - lo) * k) / (count - 1) : (lo + hi) / 2;
+            const span = spanAt(p, y);
+            if (!span) continue;
+            const a = span[0] + 1.5 * W;
+            const b = span[1] - 1.5 * W;
+            if (b - a < 2.5 * W) continue;
+            lay(straight(a, y, b, y, STEP), gasMain, 'stroke', 1.2 * W);
+            strokes++;
+          }
+          if (floor < Infinity) strokes++;
+        } else if (cy < art.y + art.h * 0.6) {
+          // A moon (or a lamp) over water: dashes of reflected light under it.
+          const water: [number, number, number] = [0.1, 0.86, 1.0];
+          let y = y1 + 0.09 * S;
+          for (const f of [0.75, 0.5, 0.28]) {
+            const half = (f * D) / 2;
+            if (!inside(cx - half, y) || !inside(cx + half, y) || y > art.y + art.h - 0.08 * S) break;
+            const pts = straight(cx - half, y, cx + half, y, STEP);
+            if (pts.some((v, i) => i % 2 === 0 && (isTaken(v, pts[i + 1]) || Math.abs(pts[i + 1] - hyAt(v)) < 2 * W))) break;
+            lay(pts, water, 'stroke', 1.6 * W);
+            strokes++;
+            y += 0.075 * S;
+          }
+        }
+        // The horizon goes in only as part of such a scene, and in one piece.
+        if (hz && strokes) {
+          const h: number[] = hz;
+          let clear = true;
+          for (const t of tubes) for (let i = 0; i < t.pts.length && clear; i += 6) clear = Math.abs(t.pts[i + 1] - hyAt(t.pts[i])) > 0.9 * W;
+          if (clear) lay(h, gasOfSides(h), 'stroke');
+        }
       }
     }
-    joinBroken(tubes, 2.4 * keep, STEP, keep);
-    // A short tube off in a corner of the window or hugging its edge, away from the subject, reads as a stray.
-    for (let i = tubes.length - 1; i >= 0; i--) {
-      const t = tubes[i];
-      if (t.len > 0.42 * S) continue;
-      let cx = 0;
-      let cy = 0;
-      for (let k = 0; k < t.pts.length; k += 2) {
-        cx += t.pts[k];
-        cy += t.pts[k + 1];
-      }
-      cx /= t.pts.length / 2;
-      cy /= t.pts.length / 2;
-      const ex = Math.min(cx - art.x, art.x + art.w - cx) / art.w;
-      const ey = Math.min(cy - art.y, art.y + art.h - cy) / art.h;
-      if ((ex < 0.24 && ey < 0.24) || Math.min(ex, ey) < 0.15) tubes.splice(i, 1);
-    }
-    // So does a short tube standing off on its own, away from every longer one.
-    const apartFrom = (a: NeonTube, b: NeonTube) => {
-      let m = Infinity;
-      for (let i = 0; i < a.pts.length; i += 6)
-        for (let j = 0; j < b.pts.length; j += 6) m = Math.min(m, Math.hypot(a.pts[i] - b.pts[j], a.pts[i + 1] - b.pts[j + 1]));
-      return m;
-    };
-    const lone = tubes.filter((t) => t.len < 0.42 * S && tubes.some((u) => u.len > t.len) && tubes.every((u) => u.len <= t.len || apartFrom(t, u) > 0.2 * S));
-    for (const t of lone) tubes.splice(tubes.indexOf(t), 1);
   }
 
-  // Grey tubes take the color of the whole card, or pink.
-  const cardGas = n ? neonGasOf(mr / n, mg / n, mb / n) : null;
-  const fallback = cardGas ?? NEON_PINK;
-  for (const t of tubes) if (t.gas[0] < 0) t.gas = fallback;
-
   // The border: one tube bent round the art window in the frame, its two ends side by side in a
-  // short break near the top right, where its electrodes sit.
+  // short break near the top right, where its electrodes sit. It frames the sign, so it is drawn
+  // dimmer and paler (see neon.ts).
   const room = Math.min(art.x, art.y, faceW - art.x - art.w, faceH - art.y - art.h);
   if (room > 1.6 * W) {
     const o = Math.min(room * 0.42, 0.024 * S);
     const p = roundRect(art.x - o, art.y - o, art.x + art.w + o, art.y + art.h + o, 0.035 * S, STEP);
-    // The path starts at the top right corner's start; begin the tube just after the break.
     const N = p.length / 2;
     const breakAt = Math.floor(N - (0.16 * S) / STEP);
     const gap = Math.ceil((2.4 * W) / STEP);
@@ -819,10 +1420,10 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
       const i = (breakAt + k) % N;
       q.push(p[i * 2], p[i * 2 + 1]);
     }
-    // The art tubes' colors are the picture's; the border takes a color that sets them off.
+    // A color that sets off the picture's tubes.
     const apart = (c: number[]) => Math.min(9, ...tubes.map((t) => Math.hypot(c[0] - t.gas[0], c[1] - t.gas[1], c[2] - t.gas[2])));
     const border = [fallback, NEON_PINK, [0.1, 0.86, 1.0] as [number, number, number]].find((c) => apart(c) > 0.5) ?? fallback;
-    tubes.push({ pts: Float32Array.from(q), len: polyLen(q), gas: border, border: true });
+    tubes.push({ pts: Float32Array.from(q), len: polyLen(q), gas: border, border: true, role: 'border' });
   }
   return { tubes, width: W };
 }

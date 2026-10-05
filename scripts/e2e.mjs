@@ -2173,7 +2173,7 @@ await step('Rainy Window fogs the picture but keeps it, a wipe clears it, its dr
   await still.close();
 });
 
-await step('Neon lights the outlines in a dark room, keeps the picture, and its loop closes', async () => {
+await step('Neon lights a sign on a dark board, keeps the picture as a faint tint, and its loop closes', async () => {
   const r = await page.evaluate(async () => {
     const { createScene } = await import('/src/exporter.ts');
     await (await import('/src/gl/finishes/registry.ts')).loadPack('light');
@@ -2256,7 +2256,8 @@ await step('Neon lights the outlines in a dark room, keeps the picture, and its 
   expect(r.plainBright === 0, `the test picture should have no near-white pixels (${f(r.plainBright)})`);
   expect(r.tubes > 0.01, `Neon draws no white-hot tubes along the outlines (${f(r.tubes)})`);
   expect(r.dim < 0.75, `Neon does not dim the room (${f(r.dim)})`);
-  expect(r.keep > 0.4, `Neon loses the picture (${f(r.keep)})`);
+  // The picture is only a faint tint on the board now (about 12 %): the bar is low and still untested.
+  expect(r.keep > 0.2, `Neon loses the picture (${f(r.keep)})`);
   expect(r.seam < 0.6, `Neon jumps where its loop closes (${f(r.seam)})`);
 });
 

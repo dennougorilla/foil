@@ -1,7 +1,7 @@
 // Run with `npm test`. Neon's sign layout (src/gl/neonMap.ts) on synthetic faces.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, neonDesign, neonPosts, neonTubeMap, neonWallMap } from '../src/gl/neonMap.ts';
+import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, NEON_WHITE, neonDesign, neonPosts, neonTubeMap, neonWallMap, type NeonTube } from '../src/gl/neonMap.ts';
 
 // A 900 × 1260 card face read at 4 face px per cell, with the classic art window.
 const FW = 900;
@@ -66,7 +66,9 @@ test('a busy picture gives a few long tubes, never a tangle of short ones', () =
   }), w, h, FW, FH, art);
   const inner = d.tubes.filter((t) => !t.border);
   assert.ok(inner.length <= NEON_MAX_TUBES);
-  for (const t of inner) assert.ok(len(t.pts) >= 0.15 * 1260 - 1, `a tube only ${len(t.pts)} long`);
+  for (const t of inner) if (t.role === 'detail') assert.ok(len(t.pts) >= 0.2 * 900 - 1, `a detail only ${len(t.pts)} long`);
+  assert.ok(inner.filter((t) => t.role === 'outline').length <= 1, 'one silhouette');
+  assert.ok(inner.filter((t) => t.role === 'detail').length <= 3, 'three details at most');
 });
 
 test('a flat picture has only the border tube', () => {
@@ -118,15 +120,64 @@ test('posts hold the long tubes sparingly and leave short ones alone', () => {
   assert.equal(neonPosts(short).length, 0);
 });
 
-test('a curl tighter than glass bends is cut out of a tube, and a horizon broken by it is joined again', () => {
-  // A wavy horizon: a bright band below a dark sky, whose edge makes one tight hook in the middle.
+test('a cropped subject is one open tube round the top of its silhouette', () => {
+  // A red head cut off by the bottom of the window, on a plain green ground.
+  const inHead = (x: number, y: number) => ((x - 450) / 300) ** 2 + ((y - 1000) / 560) ** 2 < 1;
+  const d = neonDesign(face((x, y) => (inHead(x, y) ? [210, 40, 30] : [40, 110, 50])), w, h, FW, FH, art);
+  const outline = d.tubes.filter((t) => t.role === 'outline');
+  assert.equal(outline.length, 1);
+  const p = outline[0].pts;
+  assert.ok(Math.hypot(p[0] - p[p.length - 2], p[1] - p[p.length - 1]) > 300, 'open, its ends far apart');
+  for (let i = 0; i < p.length; i += 2) {
+    const r = Math.hypot((p[i] - 450) / 300, (p[i + 1] - 1000) / 560);
+    assert.ok(Math.abs(r - 1) < 0.12, `off the silhouette at ${p[i].toFixed(0)}, ${p[i + 1].toFixed(0)}`);
+  }
+  assert.ok(outline[0].len > 900, `${outline[0].len.toFixed(0)} px`);
+  assert.deepEqual(outline[0].gas, [1.0, 0.16, 0.12]);
+});
+
+test('a sun setting behind a ridge: an arc above the horizon, cut lines across it, and the horizon', () => {
+  const ridge = (x: number) => 690 + 30 * Math.sin(x / 90);
   const d = neonDesign(face((x, y) => {
-    const edge = 700 + 40 * Math.sin(x / 120) + (Math.hypot(x - 450, y - 690) < 26 ? 60 : 0);
-    return y > edge ? [240, 120, 20] : [8, 6, 20];
+    if (y > ridge(x)) return [25, 10, 35];
+    if (Math.hypot(x - 450, y - 560) < 170) return [255, 200, 70];
+    return [150, 50, 90];
   }), w, h, FW, FH, art);
-  const inner = d.tubes.filter((t) => !t.border);
-  assert.equal(inner.length, 1, `${inner.length} tubes`);
-  assert.ok(inner[0].len > 0.6 * art.w, `one long horizon (${inner[0].len.toFixed(0)} px)`);
+  const sun = d.tubes.find((t) => t.role === 'outline')!;
+  assert.ok(sun, 'the sun');
+  for (let i = 0; i < sun.pts.length; i += 2) {
+    assert.ok(Math.abs(Math.hypot(sun.pts[i] - 450, sun.pts[i + 1] - 560) - 170) < 20, 'a circle round the sun');
+    assert.ok(sun.pts[i + 1] < ridge(sun.pts[i]) - d.width, 'stopping above the horizon');
+  }
+  const strokes = d.tubes.filter((t) => t.role === 'stroke');
+  const flat = (t: NeonTube) => Math.abs(t.pts[1] - t.pts[t.pts.length - 1]) < 1;
+  const cuts = strokes.filter((t) => flat(t) && Math.abs(t.pts[0] - 450) < 170);
+  assert.ok(cuts.length >= 1, 'cut lines across the sun');
+  for (const c of cuts) assert.ok(c.pts[1] > 560 && c.pts[1] < 690, 'in its lower half, above the horizon');
+  const horizon = strokes.find((t) => !flat(t));
+  assert.ok(horizon && horizon.len > 0.6 * art.w, 'the horizon');
+});
+
+test('a moon on a night sky: a white circle with dashes of water under it', () => {
+  const d = neonDesign(face((x, y) => (Math.hypot(x - 500, y - 400) < 120 ? [235, 235, 225] : y > 800 ? [12, 24, 60] : [10, 14, 38])), w, h, FW, FH, art);
+  const moon = d.tubes.find((t) => t.role === 'outline')!;
+  assert.deepEqual(moon.gas, NEON_WHITE);
+  for (let i = 0; i < moon.pts.length; i += 2) assert.ok(Math.abs(Math.hypot(moon.pts[i] - 500, moon.pts[i + 1] - 400) - 120) < 25, 'a circle round the moon');
+  const dashes = d.tubes.filter((t) => t.role === 'stroke' && Math.abs(t.pts[1] - t.pts[t.pts.length - 1]) < 1);
+  assert.ok(dashes.length >= 2, `${dashes.length} dashes`);
+  for (const t of dashes) assert.ok(t.pts[1] > 520 && Math.abs((t.pts[0] + t.pts[t.pts.length - 2]) / 2 - 500) < 30, 'under the moon');
+});
+
+test('a busy picture gets no stylised strokes', () => {
+  let seed = 3;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const blobs = Array.from({ length: 80 }, () => [rnd() * 900, rnd() * 1260, 10 + rnd() * 40, rnd() * 255]);
+  const d = neonDesign(face((x, y) => {
+    let v = 60;
+    for (const [bx, by, r, c] of blobs) if (Math.hypot(x - bx, y - by) < r) v = c;
+    return [v, 255 - v, v * 0.5];
+  }), w, h, FW, FH, art);
+  assert.equal(d.tubes.filter((t) => t.role === 'stroke').length, 0);
 });
 
 test('a stray short mark in a corner of the window is left out', () => {

@@ -9,7 +9,8 @@ New finish **Neon / ネオン**, shader **92**, `id: 'neon'`, in the **Light** p
 showpiece (Galaxy → Aurora → Glow → Blacklight → Neon → **Shallows**). The pack placement is
 provisional: foil-openall is reorganising packs, so `src/packs.ts` was changed by one id only.
 
-The picture's main shapes become a neon sign in a dark room (as of polish round 3):
+The picture's main shapes become a neon sign in a dark room. This list is as of polish round 3 and
+kept as history; the second polish cycle (at the end of this note) replaced the layout and the look:
 
 - The sign is laid out on the CPU from each new face (`src/gl/neonMap.ts`, pure and unit-tested in
   `tests/neonMap.test.ts`; GPU side in `src/gl/neonGL.ts`, a layer of the Light pack like Relief's
@@ -27,7 +28,7 @@ The picture's main shapes become a neon sign in a dark room (as of polish round 
   line, arc length along it, tube index; reach 110 px) and the wall map (10 px cells: the colored
   light the tubes pool on the wall, a line of lamps at two heights, and the tube lighting it most).
   Uniforms `uNeonGas[8]`, `uNeonLen[8]`, `uNeonPost[40]` (post positions), `uNeonInfo`; texture
-  units 5 and 11.
+  units 12 and 13 since the second cycle (as in review-v015's Lab module; 5 is Relief's, 6 Glow's).
 - The shader draws each tube (0.025 S wide) as a cream core (~15 % of the width) in a thick body of
   saturated glass with a softer rim and one sharp highlight on the lit side, a tight and a wide
   halo; electrode sleeves at the ends; posts as small clear discs with a contact shadow. The wall is
@@ -145,3 +146,38 @@ water). Changes:
   tilts, plus a GIF export. Still open: the moon sample keeps only the moon ring (the water no longer
   becomes a scribble, but nothing replaces it); a short neck tube on the parrot.
 
+
+## Second polish cycle, round 1 (2026-10-06, Mac)
+
+The first cycle plateaued (judge: realism 6 / premium 6 / picture 3) because tracing the picture's
+edges gives meaningless strokes. The owner asked to change the approach: Neon is now designed
+signage. Merged origin/main (v0.15.0) first: Neon joins the reorganised Light pack before Shallows
+(37 finishes; a v0.14 save now sees Light sealed again for Neon, as Metal and Nature are).
+
+- Layout (`neonMap.ts`, once per picture, cached by NeonGL as before):
+  - Ground = edge colors (k-means on the window's edge cells) that are rare in the middle box, smooth
+    when the backdrop is defocused, and not a shade of a subject hue. Saliency = distance to the
+    nearest ground color, split at Otsu (clamped 0.12–0.24), refined three times as two 4-color
+    models with a centre prior, largest component, holes filled.
+  - Subject = that figure, unless it is missing, too big, cropped by three sides or a band running
+    across the window; then the brightest, most colorful compact blob (a sun, a moon).
+  - Silhouette = one tube: Douglas–Peucker + Chaikin, smoothed until glass can bend it; closed with
+    a 2.8 W electrode gap at its lowest point, or (cropped) one open tube preferring the upper run;
+    a round outline is bent as a fitted circle (Kåsa fit of its upper part).
+  - Details (max 3): eye ring (spot inside the subject), round closed shapes inside it (compact >
+    0.45), long lines (>= 0.4 S) inside it; straight bars, hairpins, short arcs rejected.
+  - Sparse picture (subject 3–16 % of the window and clearly brighter than the rest): a warm sun gets
+    cut lines and, where a ridge crosses it, sets (arc stops above the horizon, horizon laid); a cool
+    moon gets cyan water dashes. A busy picture gets none.
+- Look (`neon.ts`): near-black board with grain and mottling; picture as a 12 % pale blurred tint;
+  spill from the wall map in the gas color; contact shadow cast away from the room light; glass with
+  a cylindrical body, one gaussian hot core (sigma 0.3 of the radius), no rim, one specular streak
+  sliding with tilt; ends painted black (1.3 W, shorter on short tubes); per-tube brightness
+  variation; border tube at 40 % and desaturated; standoff 11 face px.
+- Tests: new layout tests (cropped subject, setting sun, moon with water, busy picture gets no
+  strokes), texture units. e2e not run (the Neon step's `keep` bar lowered to 0.2, untested).
+- Analysis cost: about 250–350 ms per new picture on the dev server (no minification), more than
+  before (k-means for edge colors and the refinement); the stage re-reads a changing face at most
+  every 160 ms, so a crop drag on Neon can stutter. Worth trimming if the direction is kept.
+- Known weak spots: a subject whose shadowed part matches a dark backdrop (the parrot's crown) is
+  partly lost; a figure split by a crease (a poppy's two petals) keeps only the larger part.

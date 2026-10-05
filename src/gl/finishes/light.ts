@@ -69,11 +69,12 @@ ${NEON_GLSL}
   else if (e == 92) col = neon(c, uv, uTilt, L, m.r);
 `,
   // Glow keeps the light shone on it in a touch field, like Warmth's heat (see touch/).
-  // Neon lays its sign out from each new face (see neonGL.ts).
+  // Neon lays its sign out once per picture (see neonGL.ts), its two maps on units 12 and 13
+  // (0–4 and 7–9 are the core's, 6 Glow's touch field).
   layers: (gl, live) => {
     const heat = new HeatLayer(gl);
     const neon = new NeonGL(gl, live);
-    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }, { setFace: (face) => neon.setFace(face), bind: (p, d) => neon.bind(p, d.edition === NEON) }];
+    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }, { setFace: (face) => neon.setFace(face), bind: (p, d) => neon.bind(p, 12, d.edition === NEON) }];
   },
 };
 export default finishes;
