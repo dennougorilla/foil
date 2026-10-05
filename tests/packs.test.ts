@@ -37,7 +37,7 @@ test('every other finish is in exactly one pack, and no pack holds an open one',
 test('the four theme packs and the supporter pack, showpiece last', () => {
   const packs = Object.fromEntries(PACKS.map((p) => [p.id, [...p.finishes]]));
   assert.deepEqual(packs, {
-    metal: ['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
+    metal: ['relief', 'gold', 'platinum', 'cosmoholo', 'liquidmetal', 'crystal'],
     light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
     nature: ['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
@@ -102,12 +102,12 @@ test('the deck is every owned finish not in the hand; the builder lists everythi
   const hand = ['base', 'relief', 'holo', 'poly', 'negative', 'prism', 'glitch'] as const;
   assert.deepEqual(deckOf([...hand], M), [
     { group: 'open', finishes: ['foil'] },
-    { group: 'metal', finishes: ['gold', 'platinum', 'cosmoholo', 'crystal'] },
+    { group: 'metal', finishes: ['gold', 'platinum', 'cosmoholo', 'liquidmetal', 'crystal'] },
   ]);
   assert.deepEqual(deckOf([...OPEN_EDITIONS], { opened: [], supporter: false }), []);
   assert.deepEqual(ownedGroups(M), [
     { group: 'open', finishes: [...OPEN_EDITIONS] },
-    { group: 'metal', finishes: ['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'] },
+    { group: 'metal', finishes: ['relief', 'gold', 'platinum', 'cosmoholo', 'liquidmetal', 'crystal'] },
   ]);
 });
 
@@ -147,5 +147,5 @@ test('a finish can be used once it is open or its pack is opened', () => {
 
 test('the showpiece gets the biggest entrance, the card before it the next', () => {
   const metal = PACKS[0];
-  assert.deepEqual(metal.finishes.map((_, i) => tierOf(metal, i)), [1, 1, 1, 2, 3]);
+  assert.deepEqual(metal.finishes.map((_, i) => tierOf(metal, i)), [1, 1, 1, 1, 2, 3]);
 });

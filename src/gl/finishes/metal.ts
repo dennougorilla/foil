@@ -1,7 +1,8 @@
-// Metal & Gem pack: Relief, Gold, Platinum, Cosmo Holo and Crystal (the showpiece). See docs/packs.md.
+// Metal & Gem pack: Relief, Gold, Platinum, Cosmo Holo, Liquid Metal and Crystal (the showpiece). See docs/packs.md.
 import { RELIEF_GLSL, ReliefGL } from '../../relief';
 import { PLATINUM_GLSL } from '../platinum';
 import { COSMOHOLO_GLSL } from '../cosmoholo';
+import { LIQUID_METAL_GLSL, LiquidMetalLayer } from '../liquidMetal';
 import type { FinishModule } from './types';
 
 /** Relief's shader index (see src/editions.ts). */
@@ -42,6 +43,7 @@ vec3 crystal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
 ${RELIEF_GLSL}
 ${PLATINUM_GLSL}
 ${COSMOHOLO_GLSL}
+${LIQUID_METAL_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 5) col = gold(c, uv, uTilt, L);
@@ -49,10 +51,16 @@ ${COSMOHOLO_GLSL}
   else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
   else if (e == 24) col = platinum(c, uv, uTilt, L, m.r);
   else if (e == 18) col = cosmoholo(c, uv, uTilt, L);
+  else if (e == 98) col = liquidMetal(c, uv, uTilt, L, lod, m.r);
 `,
   layers: (gl, live) => {
     const relief = new ReliefGL(gl, live);
-    return [{ setFace: (face) => relief.setFace(face), bind: (p, d) => relief.bind(p, 5, d.edition === RELIEF) }];
+    // Liquid Metal's ripples are a touch field, like Warmth's heat (see touch/).
+    const liquid = new LiquidMetalLayer(gl);
+    return [
+      { setFace: (face) => relief.setFace(face), bind: (p, d) => relief.bind(p, 5, d.edition === RELIEF) },
+      { bind: (p, d) => liquid.bind(p, 6, d.heat) },
+    ];
   },
 };
 export default finishes;
