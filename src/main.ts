@@ -1864,6 +1864,7 @@ function useArrange() {
       dict: () => t,
       runs: () => lastRuns,
       openPrint: (f, at) => void usePrint().then((p) => p.open(f, at), () => toast(t.loadFailed, true)),
+      closePrint: () => void printLoad?.then((p) => p.close(), () => {}),
     }),
   );
   arrangeLoad.catch(() => {
