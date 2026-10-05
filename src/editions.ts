@@ -85,7 +85,7 @@ export const EDITIONS: Edition[] = [
   { id: 'shallows', shader: 17, color: '#7fe3f0', swirl: ['#03141c', '#0e6a80', '#bff4f0'], value: 6 },
   { id: 'platinum', shader: 24, color: '#dfe6ee', swirl: ['#0a0d12', '#2b3440', '#aeb9c6'], value: 7, dither: true },
   // Shader in src/gl/engraving.ts.
-  { id: 'engraving', shader: 106, color: '#d98a54', swirl: ['#140a06', '#6e3a1c', '#e0a070'], value: 7, dither: true },
+  { id: 'engraving', shader: 106, color: '#d98a54', swirl: ['#140a06', '#6e3a1c', '#e0a070'], value: 7 },
   { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
   { id: 'stainedglass', shader: 26, color: '#e8a33c', swirl: ['#0a0710', '#3a1f4a', '#c0532e'], value: 6 },
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },

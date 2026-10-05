@@ -17,3 +17,7 @@ test('Engraving draws with shader 106 in the Metal pack, before its showpiece', 
   assert.equal(EDITIONS.find((x) => x.id === 'engraving')?.shader, 106);
   assert.deepEqual(PACKS.find((p) => p.id === 'metal')!.finishes.slice(-2), ['engraving', 'crystal']);
 });
+
+test('Engraving GIFs are not dithered: its copper is one ramp that fits 256 colours, and dither noise on fine lines only adds bytes', () => {
+  assert.equal(EDITIONS.find((x) => x.id === 'engraving')?.dither, undefined);
+});
