@@ -3,7 +3,7 @@ import './tag.css';
 import { cardOf, CARD_KEYS, CARD_TYPE_MAX, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { dictOf, loadDict, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop } from './card/face';
+import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop, type FaceSpec } from './card/face';
 import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, setFit, shapeById, SHAPES } from './card/shape';
 import { isPixelArt, PIXEL_ART_MAX } from './card/pixelArt';
@@ -242,12 +242,13 @@ function redrawFace() {
       .finally(() => (paintWaiting = false));
   }
   faceVersion++;
-  lastRuns = drawFace(face, mask, spec);
   // A moving picture's next frame keeps the palette the face was last given.
   if (!framing) facePalette = `face${++paletteRun}`;
-  pixelArt(face, facePalette, mask);
+  lastRuns = paintFace(face, mask, spec, facePalette);
   setTextRuns(face.width, face.height, lastRuns);
-  const { font, text } = spec.message;
+  // Under pixel art every word is printed in the pixel typeface.
+  const font = wordsOnGrid() ? 'dot' : spec.message.font;
+  const { text } = spec.message;
   const ask = text.trim() ? `${font}|${text}` : '';
   if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
   fontAsked = ask;
@@ -296,6 +297,22 @@ function pixelArt(canvas: HTMLCanvasElement, keep: string, artMask?: HTMLCanvasE
       () => toast(t.loadFailed, true),
     );
   dot.dotFace(canvas, d, keep || `own${++paletteRun}`, artMask && { mask: artMask, block: artBlock(d, s.pixel), frameOnly: scope === 'frame' });
+}
+
+/** Whether the face's words are printed on the pixel art's grid: pixel art is on and its code is here. */
+const wordsOnGrid = () => !!(store.get().dot && dot);
+
+/**
+ * Paints a face and its mask, as pixel art when that is on: the face is converted without its words,
+ * which are then printed crisp on its grid (docs/features.md, Card → Pixel art). Returns the text for
+ * the lettering map.
+ */
+function paintFace(f: HTMLCanvasElement, m: HTMLCanvasElement, spec: FaceSpec, keep: string): TextRun[] {
+  const d = store.get().dot;
+  const hold = wordsOnGrid();
+  const { runs, words } = drawFace(f, m, { ...spec, holdWords: hold });
+  pixelArt(f, keep, m);
+  return hold && d && dot ? dot.printWords(f, words, d.size) : runs;
 }
 
 // ---------- Text ----------
@@ -1445,10 +1462,7 @@ function animatedExport(anim: Anim) {
   const keep = `file${++paletteRun}`;
   return {
     loopMs: anim.duration,
-    faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) => {
-      drawFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] });
-      pixelArt(f, keep, m);
-    },
+    faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) => void paintFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] }, keep),
   };
 }
 

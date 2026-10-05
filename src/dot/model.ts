@@ -1,6 +1,7 @@
-// Pixel art: the whole card (face, frame, words, picture, back), or the frame only around a picture
-// left as it is, drawn as chunky pixels with few colours, and the finish's light in the same grain (docs/features.md, Card). These are the choices; the
-// conversion of the face loads on demand (dot.ts).
+// Pixel art: the whole card (face, frame, picture, back), or the frame only around a picture left as
+// it is, drawn as chunky pixels with few colours, and the finish's light in the same grain; the words are
+// printed crisp on its grid afterwards (docs/features.md, Card). These are the choices; the conversion
+// of the face and the printing of its words load on demand (dot.ts).
 
 /** Pixels across the card's short side. */
 export const DOT_SIZES = [56, 72, 96, 128] as const;
@@ -42,7 +43,7 @@ export function sanitizeDot(v: unknown): Dot | null {
   return { size: d.size as DotSize, colors: d.colors as DotColors, outline: d.outline === true, dither: d.dither === true };
 }
 
-/** Where pixel art goes: the whole card, or the frame only (frame, nameplate, words and back; the picture stays as it is). */
+/** Where pixel art goes: the whole card, or the frame only (frame, nameplate and back; the picture stays as it is). The words are printed on its grid afterwards either way (dot/words.ts). */
 export const DOT_SCOPES = ['card', 'frame'] as const;
 export type DotScope = (typeof DOT_SCOPES)[number];
 
