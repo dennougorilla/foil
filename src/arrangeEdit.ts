@@ -467,12 +467,20 @@ export function mountArrange(o: Options): void {
       }
     }
   }
+  // The pieces follow the card while Free is on; once it is off, the outlines are cleared and the loop rests.
+  let looping = false;
   const loop = () => {
     if (selected) draw();
     drawIdle();
+    looping = free() || !!selected;
+    if (looping) requestAnimationFrame(loop);
+  };
+  const wake = () => {
+    if (looping) return;
+    looping = true;
     requestAnimationFrame(loop);
   };
-  requestAnimationFrame(loop);
+  wake();
 
   // ---------- Starting Free where Auto had each piece ----------
   const measure = document.createElement('canvas').getContext('2d')!;
@@ -500,7 +508,10 @@ export function mountArrange(o: Options): void {
   }
 
   store.on((s, changed) => {
-    if (changed.has('arrange') && s.arrange === 'free') seed();
+    if (changed.has('arrange') && s.arrange === 'free') {
+      seed();
+      wake();
+    }
     if (s.arrange === 'free' && ['shape', 'name', 'message', 'text', 'layout', 'cardType'].some((k) => changed.has(k as keyof typeof s))) requestAnimationFrame(refit);
     if (changed.has('lang')) labels();
     // A piece that can no longer move is let go.

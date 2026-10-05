@@ -205,6 +205,8 @@ await step('the motion button above the deck switches the idle motion in one tap
   const b = await page.locator(btn).boundingBox();
   expect(b.y + b.height <= deck.y && Math.abs(b.x + b.width / 2 - (deck.x + deck.width / 2)) < 30, 'the motion button is not just above the deck');
   await page.click(btn);
+  // The tray's code may still be on its way (it loads on first use).
+  await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 }).catch(() => {});
   expect((await page.getAttribute(btn, 'aria-expanded')) === 'true' && (await page.isVisible('.qm-tray')), 'the tray did not open');
   const names = await page.locator('.qm-opt span').allTextContents();
   expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);

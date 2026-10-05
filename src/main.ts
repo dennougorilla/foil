@@ -3,7 +3,7 @@ import './tag.css';
 import { cardOf, CARD_KEYS, CARD_TYPE_MAX, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
 import { dictOf, loadDict, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
-import { clampCrop, cropRect, drawFace, drawFlip, faceArt, type Crop } from './card/face';
+import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop } from './card/face';
 import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
 import { CARD_LAYOUTS } from './card/tcg';
@@ -88,6 +88,8 @@ try {
   throw err;
 }
 let t: Dict = await dict;
+// A trading card from last visit: its painter is fetched at once.
+if (store.get().layout === 'tcg') void loadTcgFace().catch(() => {});
 
 // ---------- Images ----------
 
@@ -189,8 +191,10 @@ let fontAsked = '';
 let lastRuns: TextRun[] = [];
 
 function redrawFace() {
-  faceVersion++;
   const spec = faceSpec(currentImage());
+  // A trading card's painter comes with its first use; the face is painted once it is here.
+  if (!canPaint(spec)) return void loadTcgFace().then(redrawFace, () => toast(t.loadFailed, true));
+  faceVersion++;
   lastRuns = drawFace(face, mask, spec);
   setTextRuns(face.width, face.height, lastRuns);
   const { font, text } = spec.message;
@@ -954,6 +958,7 @@ rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
 rovingKeys($('layoutSeg'));
+$('layoutSeg').addEventListener('pointerenter', () => void loadTcgFace().catch(() => {}), { once: true });
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
 mountProof($('finishProof'));
@@ -2116,6 +2121,7 @@ addEventListener('load', () => {
     void useAdjust().catch(() => {});
     void useExporter().catch(() => {});
     void import('./tune/quickTray').catch(() => {});
+    void loadTcgFace().catch(() => {});
   });
 });
 

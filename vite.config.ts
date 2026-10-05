@@ -80,7 +80,12 @@ export default defineConfig({
       },
     },
   ],
+  // The GIF encoder is only reached from its worker, which the dev server finds late and reloads the
+  // page for; bundle it up front instead.
+  optimizeDeps: { include: ['gifenc'] },
   build: {
+    // Every browser FOIL runs in (WebGL 2) preloads modules itself; older ones just skip the hint.
+    modulePreload: { polyfill: false },
     rolldownOptions: {
       output: { codeSplitting: { groups: [{ name: firstLoad }] } },
     },
