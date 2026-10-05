@@ -1,12 +1,14 @@
 // Snow Globe: the art window is a pane of clear liquid with thousands of glitter and gold-leaf
-// flakes in it. The flakes live on the GPU: a transform-feedback pass moves them through a
-// simple fluid (a swirl, a slosh, some turbulence, a slow convection), and a point pass draws
-// them on the card as tumbling flakes that catch the light. The liquid and glass themselves are
-// drawn by the card shader (SNOWGLOBE_GLSL below, in the Nature pack's program).
+// flakes in it, drawn as GPU points that tumble and catch the light over the card. The liquid and
+// glass themselves are drawn by the card shader (SNOWGLOBE_GLSL below, in the Nature pack's program).
 //
-// Shaking comes from the card itself (tossing, flicking the tilt, a click's wobble), a pointer
-// sweeping across the art, and on phones the motion sensor. Exports and reduced motion never
-// take input: the flakes only move while the shader clock moves.
+// Left alone the glitter is a function of the moment in the loop (docs/motion.md): a bed of leaf and
+// glitter lies on the floor, rocking, and the rest drifts with the liquid's slow convection, each
+// flake fading in and out once a life, the lives a whole fraction of the loop. So a file closes
+// without a seam and the stage left alone shows the same flakes. A hand stirs it (a drag or toss of
+// the card, a pointer sweeping across the art, a shaken phone): a transform-feedback pass moves each
+// flake away from its place through a simple fluid (a swirl, a slosh, turbulence), and once the
+// liquid calms the flakes drift back into the loop. Exports and reduced motion never take input.
 import { artOf } from '../card/face';
 import { cardK } from '../card/shape';
 import type { CardDraw } from './renderers';
@@ -18,6 +20,11 @@ export const SNOWGLOBE_SHADER = 60;
 export const SNOWGLOBE_GLSL = /* glsl */ `
 // Snow Globe: the art seen through a curved pane of clear liquid. The glitter in it is drawn as
 // GPU particles on top of the card (below). g is the card uv (not the pattern).
+// The water moves round in circles once a loop (six seconds when there is none), so a file closes.
+vec2 sgFlow(float speed, float phase) {
+  float w = 6.2831853 / (uLoop > 0.0 ? uLoop : 6.0);
+  return speed / w * vec2(cos(w * uTime + phase), sin(w * uTime + phase));
+}
 vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
   vec4 W = uArt; // art window: left, top, right, bottom
   vec2 a = (g - W.xy) / (W.zw - W.xy);
@@ -27,7 +34,7 @@ vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
   vec2 q = (a - 0.5) * 2.0 * win;
   float r2 = dot(q, q) / 2.8;
   // The liquid lens magnifies a touch toward the middle and never quite stops moving.
-  vec2 wob = vec2(vnoise(g * 5.0 + vec2(uTime * 0.2, 0.0)), vnoise(g * 5.0 + vec2(5.2, -uTime * 0.17))) - 0.5;
+  vec2 wob = vec2(vnoise(g * 5.0 + sgFlow(0.2, 0.0)), vnoise(g * 5.0 + vec2(5.2, 0.0) + sgFlow(0.17, 2.1))) - 0.5;
   vec2 s = g - (g - (W.xy + W.zw) * 0.5) * 0.07 * (1.0 - min(r2, 1.0)) + wob * 0.006 + t * 0.005;
   vec3 col = mix(c, face(tunePattern(s), lod).rgb, art);
   // Clear water with a faint cool cast, deeper toward the walls.
@@ -35,7 +42,7 @@ vec3 snowglobe(vec3 c, vec2 g, vec2 t, float L, float lod, float art) {
   col = mix(col, col * vec3(0.9, 0.97, 1.05) + vec3(0.0, 0.012, 0.03), 0.7);
   col *= 1.0 - 0.3 * smoothstep(0.14, 0.0, edge);
   // Light through the moving water, rippling over the lower half.
-  float caus = 1.0 - abs(vnoise(g * vec2(9.0, 7.0) + vec2(uTime * 0.25, uTime * 0.1)) * 2.0 - 1.0);
+  float caus = 1.0 - abs(vnoise(g * vec2(9.0, 7.0) + sgFlow(0.27, 4.0)) * 2.0 - 1.0);
   col += vec3(0.75, 0.9, 1.0) * pow(caus, 6.0) * 0.12 * smoothstep(0.35, 1.0, a.y);
   // The pane bulges like a dome: a thin highlight follows its curve in one corner and a soft
   // sheet of reflected light fills in behind it, both swinging round as the card turns.
@@ -72,19 +79,15 @@ float rnd(int id, int salt) {
 }
 `;
 
-const SIM_VS = /* glsl */ `#version 300 es
-precision highp float;
-precision highp int;
-in vec4 aState;          // position (art uv, y down), velocity (art widths/s)
-uniform float uDt;
-uniform float uTime;
-uniform vec2 uKick;      // the glass was jolted: flakes lag behind it (art widths/s)
-uniform float uSpin;     // swirl of the liquid
-uniform float uStir;     // turbulence, 0 calm .. ~1.5 shaken hard
-uniform vec2 uGrav;      // card-local down
-uniform vec4 uPoke;      // a pointer sweeping through: position (art uv), velocity
-uniform float uA;        // height of the art window in widths; the sim runs in these square units
-out vec4 vState;
+/**
+ * Where each flake is left alone, `uTau` seconds into a loop `uLoopT` long: shared by the drawing
+ * and the stirring. Square units: x across the art window 0..1, y down it 0..A.
+ */
+const FLAKES = /* glsl */ `
+uniform float uTau;      // seconds into the loop
+uniform float uLoopT;    // the loop's length
+uniform float uLives;    // a drifting flake's lives per loop, a whole number
+uniform float uA;        // height of the art window in widths
 #define A uA
 ${HASH}
 float hash(vec2 p) {
@@ -97,44 +100,89 @@ float noise(vec2 p) {
   vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
 }
-// The liquid's stream function. It fades to zero at the glass, so the flow runs along the walls
-// and never into them: one big swirl, turbulence while shaken, and a lazy convection cell that
-// keeps the light glitter turning over while nobody touches it.
-float stream(vec2 P) {
-  float wall = sin(3.14159 * clamp(P.x, 0.0, 1.0)) * sin(3.14159 * clamp(P.y / A, 0.0, 1.0));
+// The liquid's stream functions fade to zero at the glass, so the flow runs along the walls and
+// never into them. Calm, a lazy convection keeps the light glitter turning over; turbulence
+// reaches close to the glass so nothing gets stranded against it.
+float wallOf(vec2 P) { return sin(3.14159 * clamp(P.x, 0.0, 1.0)) * sin(3.14159 * clamp(P.y / A, 0.0, 1.0)); }
+float turb(vec2 P, float t) {
   vec2 p = P * 1.3;
-  float t = uTime * 0.25;
-  float turb = noise(p * 2.4 + vec2(0.0, t)) + 0.5 * noise(p * 5.1 + vec2(t * 0.7, 3.1));
-  // Turbulence reaches close to the glass so nothing gets stranded against it.
-  float near = pow(wall, 0.35);
-  return uSpin * 0.1 * wall * wall + near * (turb * (0.006 + 0.1 * uStir) + 0.011);
+  return noise(p * 2.4 + vec2(0.0, t)) + 0.5 * noise(p * 5.1 + vec2(t * 0.7, 3.1));
 }
-vec2 flow(vec2 P) {
-  const float e = 0.01;
-  float dy = stream(P + vec2(0.0, e)) - stream(P - vec2(0.0, e));
-  float dx = stream(P + vec2(e, 0.0)) - stream(P - vec2(e, 0.0));
-  return vec2(dy, -dx) / (2.0 * e);
+float calmStream(vec2 P) { return pow(wallOf(P), 0.35) * (turb(P, 0.0) * 0.006 + 0.011); }
+#define CURL(f, P) (vec2(f(P + vec2(0.0, 0.01)) - f(P - vec2(0.0, 0.01)), f(P - vec2(0.01, 0.0)) - f(P + vec2(0.01, 0.0))) / 0.02)
+float leafOf(int id) { return step(0.82, rnd(id, 2)); }
+// All the leaf lies in the bed on the floor, and a quarter of the glitter with it.
+bool bedded(int id) { return leafOf(id) > 0.5 || rnd(id, 17) < 0.25; }
+float floorY(int id) { return A - 0.006 - 0.035 * rnd(id, 6); }
+struct Home {
+  vec2 P;        // where the flake is
+  float shown;   // how much of it shows: a drifting flake fades in and out once a life
+  float age;     // seconds into its life
+  float life;    // which of its lives this is
+};
+Home home(int id) {
+  Home h;
+  if (bedded(id)) {
+    h.P = vec2(0.008 + 0.984 * rnd(id, 20), floorY(id));
+    h.shown = 1.0;
+    h.age = 0.0;
+    h.life = 0.0;
+    return h;
+  }
+  float span = uLoopT / uLives;
+  float k = uTau / span + rnd(id, 21);
+  h.life = mod(floor(k), uLives);
+  float u = fract(k);
+  int s = 30 + int(h.life) * 2;
+  vec2 P0 = vec2(0.03 + 0.94 * rnd(id, s), 0.03 + (A - 0.08) * rnd(id, s + 1));
+  // Fine glitter barely sinks: it rides the convection.
+  vec2 v = CURL(calmStream, P0) + vec2(0.0, mix(0.006, 0.03, rnd(id, 3)));
+  h.age = u * span;
+  h.P = clamp(P0 + v * h.age, vec2(0.008), vec2(0.992, A - 0.008));
+  h.shown = smoothstep(0.0, 0.2, u) * smoothstep(1.0, 0.8, u);
+  return h;
+}
+`;
+
+const SIM_VS = /* glsl */ `#version 300 es
+precision highp float;
+precision highp int;
+in vec4 aState;          // how far the flake was stirred from its place, and its velocity (art widths, art widths/s)
+uniform float uDt;
+uniform float uTime;
+uniform vec2 uKick;      // the glass was jolted: flakes lag behind it (art widths/s)
+uniform float uSpin;     // swirl of the liquid
+uniform float uStir;     // turbulence, 0 calm .. ~1.5 shaken hard
+uniform vec4 uPoke;      // a pointer sweeping through: position (art uv), velocity
+out vec4 vState;
+${FLAKES}
+// Stirred, the liquid swirls as a whole and churns.
+float stirStream(vec2 P) {
+  float wall = wallOf(P);
+  return uSpin * 0.1 * wall * wall + pow(wall, 0.35) * turb(P, uTime * 0.25) * 0.1 * uStir;
 }
 void main() {
   int id = gl_VertexID;
-  vec2 P = vec2(aState.x, aState.y * A);
+  Home h = home(id);
+  vec2 P = h.P + aState.xy;
   vec2 v = aState.zw;
-  // Fine glitter barely sinks and keeps drifting; leaf flakes settle within a few seconds.
-  float leaf = step(0.82, rnd(id, 2));
-  float sink = mix(mix(0.006, 0.03, rnd(id, 3)), mix(0.05, 0.09, rnd(id, 4)), leaf);
+  float leaf = leafOf(id);
   float follow = mix(mix(6.0, 10.0, rnd(id, 5)), 2.5, leaf);
 
-  vec2 U = flow(P);
+  vec2 U = CURL(stirStream, P);
   v += uKick * mix(0.6, 1.0, max(leaf, rnd(id, 15)));
   vec2 pp = vec2(uPoke.x, uPoke.y * A);
   vec2 dp = P - pp;
   U += uPoke.zw * exp(-dot(dp, dp) / 0.012);
+  // Each flake is drawn back to its place: barely while the liquid churns, firmly once it is calm.
+  float calm = 1.0 - min(1.0, uStir + abs(uSpin) * 0.3);
+  U += (h.P - P) * mix(0.15, 1.6, calm);
 
-  v += (U + uGrav * sink - v) * min(follow * uDt, 1.0);
+  v += (U - v) * min(follow * uDt, 1.0);
   P += v * uDt;
 
   // Glass walls; the floor is a loose bed a few flakes deep.
-  float floorY = A - 0.006 - 0.035 * rnd(id, 6);
+  float floorY = floorY(id);
   if (P.y > floorY) {
     P.y = floorY;
     // Stirred, the bed is lifted off the floor a flake at a time.
@@ -144,7 +192,7 @@ void main() {
   if (P.y < 0.008) { P.y = 0.008; v.y = abs(v.y) * 0.3; }
   if (P.x < 0.008) { P.x = 0.008; v.x = abs(v.x) * 0.3; }
   if (P.x > 0.992) { P.x = 0.992; v.x = -abs(v.x) * 0.3; }
-  vState = vec4(P.x, P.y / A, v);
+  vState = vec4(P - h.P, v);
 }
 `;
 
@@ -157,14 +205,13 @@ void main() { o = vec4(0.0); }
 const DRAW_VS = /* glsl */ `#version 300 es
 precision highp float;
 precision highp int;
-in vec4 aState;
+in vec4 aState;          // how far a hand stirred the flake from its place (see SIM_VS); zero left alone
 uniform vec2 uRes;
 uniform vec2 uCenter;
 uniform vec2 uSize;
 uniform vec3 uRot;
 uniform float uScale;
 uniform float uDpr;
-uniform float uTime;
 uniform float uShow;     // share of the flakes drawn
 uniform vec2 uTilt;
 uniform vec2 uLight;
@@ -177,12 +224,14 @@ out float vGlint;
 out vec2 vAxis;          // flake orientation (cos, sin)
 out float vSquash;       // how edge-on the flake is
 out float vCover;        // opacity of the flake
-${HASH}
+${FLAKES}
 vec3 hue(float h) { return clamp(abs(fract(h + vec3(0.0, 2.0, 1.0) / 3.0) * 6.0 - 3.0) - 1.0, 0.0, 1.0); }
 void main() {
   int id = gl_VertexID;
-  vec2 cuv = ART_UV.xy + aState.xy * ART_UV.zw;
-  bool shown = rnd(id, 1) < uShow && textureLod(uMask, cuv, 0.0).r > 0.5;
+  Home h = home(id);
+  vec2 P = clamp(h.P + aState.xy, vec2(0.0), vec2(1.0, A));
+  vec2 cuv = ART_UV.xy + vec2(P.x, P.y / A) * ART_UV.zw;
+  bool shown = rnd(id, 1) < uShow && h.shown > 0.0 && textureLod(uMask, cuv, 0.0).r > 0.5;
   // Same projection as the card itself (CARD_VS).
   vec3 p = vec3((cuv - 0.5) * uSize * uScale, 0.0);
   vec3 n = vec3(0.0, 0.0, 1.0);
@@ -200,15 +249,25 @@ void main() {
   vec2 s = uCenter + p.xy / w;
   gl_Position = vec4(vec2(s.x / uRes.x * 2.0 - 1.0, 1.0 - s.y / uRes.y * 2.0) * w, 0.0, w);
 
-  float leaf = step(0.82, rnd(id, 2));
+  float leaf = leafOf(id);
   float size = mix(mix(0.0028, 0.0055, rnd(id, 7)), mix(0.008, 0.014, rnd(id, 8)), leaf) * min(uSize.x, uSize.y) * (7.0 / 5.0) * uScale / w; // sized as on the trading card's height
   // The sprite leaves room around the flake for its glint to flare.
   gl_PointSize = max(size * 3.0 * uDpr, 2.0);
 
-  // Each flake tumbles, faster while the liquid carries it.
+  // A drifting flake tumbles through its life; one in the bed rocks to and fro once a loop. Both
+  // tumble faster while a stirred liquid carries them.
   float speed = length(aState.zw);
-  float a = rnd(id, 9) * 6.2832 + uTime * mix(0.3, 1.4, rnd(id, 10)) + speed * 2.0;
-  float b = rnd(id, 11) * 6.2832 + uTime * mix(0.2, 1.1, rnd(id, 12)) + speed * 3.0;
+  float a, b;
+  if (bedded(id)) {
+    float w = 6.2832 * uTau / uLoopT;
+    a = rnd(id, 9) * 6.2832 + mix(0.4, 1.0, rnd(id, 10)) * sin(w + rnd(id, 18) * 6.2832);
+    b = rnd(id, 11) * 6.2832 + mix(0.4, 1.0, rnd(id, 12)) * sin(w + rnd(id, 19) * 6.2832);
+  } else {
+    a = rnd(id, 9) * 6.2832 + h.life * 1.7 + h.age * mix(0.3, 1.4, rnd(id, 10));
+    b = rnd(id, 11) * 6.2832 + h.life * 2.3 + h.age * mix(0.2, 1.1, rnd(id, 12));
+  }
+  a += speed * 2.0;
+  b += speed * 3.0;
   vec3 fn = normalize(vec3(cos(a) * sin(b), sin(a) * sin(b), 0.6 + abs(cos(b))));
   vAxis = vec2(cos(a), sin(a));
   vSquash = clamp(fn.z, 0.25, 1.0);
@@ -223,8 +282,9 @@ void main() {
             : kind < 0.93 ? vec3(0.86, 0.92, 1.0)     // silver
             : hue(rnd(id, 14) + dot(fn.xy, vec2(0.8, 0.5)) + uTilt.x * 0.3) * 0.6 + 0.4; // iridescent
   // Fine glitter mostly shows when it catches the light; leaf reads as gold even in shade.
-  vCol = base * mix(0.1 + 0.3 * max(dot(fn, L), 0.0), 0.3 + 0.5 * max(dot(fn, L), 0.0), leaf);
-  vCover = mix(0.55, 0.95, leaf);
+  vCol = base * mix(0.1 + 0.3 * max(dot(fn, L), 0.0), 0.3 + 0.5 * max(dot(fn, L), 0.0), leaf) * h.shown;
+  vGlint *= h.shown;
+  vCover = mix(0.55, 0.95, leaf) * h.shown;
 }
 `;
 
@@ -317,6 +377,12 @@ function listen() {
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const MAX_DT = 1 / 20;
+/** The loop when the card has none (speed 0: the clock stands still anyway). */
+const NO_LOOP = 6;
+/** A drifting flake lives about this long (s), a whole fraction of the loop. */
+const LIFE = 6;
+/** Calm this long (s), a stirred globe is back in its loop: the flakes are put home and stirring stops. */
+const SETTLE = 4;
 
 export interface GlobeView {
   canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -343,28 +409,27 @@ export class SnowGlobe {
   private impulse: [number, number] = [0, 0];
   private spin = 0;
   private stir = 0;
-  private grav: [number, number] = [0, 1];
   private poke: [number, number, number, number] = [0, 0, 0, 0];
-  // The main card's last pose, to feel how it is being moved.
+  /** A hand stirred the flakes away from their places, and they are not all back yet. */
+  private stirred = false;
+  private calmFor = 0;
+  // The hand's last pose on the main card, to feel how it is being moved.
   private prev: { t: number; x: number; y: number; rx: number; ry: number; rz: number; vx: number; vy: number; wx: number; wy: number; wz: number } | null = null;
 
   constructor(
     private gl: WebGL2RenderingContext,
-    /** Exports: no input, the flakes just drift. */
+    /** Exports: no input, the flakes keep to the loop. */
     private settled: boolean,
   ) {
     this.sim = compile(gl, SIM_VS, SIM_FS, ['vState']);
     this.draw_ = compile(gl, DRAW_VS, DRAW_FS);
-    this.su = uniforms(gl, this.sim, ['uDt', 'uTime', 'uKick', 'uSpin', 'uStir', 'uGrav', 'uPoke', 'uA']);
+    const loop = ['uTau', 'uLoopT', 'uLives', 'uA'];
+    this.su = uniforms(gl, this.sim, ['uDt', 'uTime', 'uKick', 'uSpin', 'uStir', 'uPoke', ...loop]);
     this.du = uniforms(gl, this.draw_, [
-      'uRes', 'uCenter', 'uSize', 'uRot', 'uScale', 'uDpr', 'uTime', 'uShow', 'uTilt', 'uLight', 'uMask', 'uAlpha', 'uArtUv', 'uCardK',
+      'uRes', 'uCenter', 'uSize', 'uRot', 'uScale', 'uDpr', 'uShow', 'uTilt', 'uLight', 'uMask', 'uAlpha', 'uArtUv', 'uCardK', ...loop,
     ]);
-    // Start mid-drift: most flakes hang in the liquid, a bed of them lies on the floor.
+    // Every flake at its place: nothing stirred yet.
     const data = new Float32Array(COUNT * 4);
-    for (let i = 0; i < COUNT; i++) {
-      data[i * 4] = 0.02 + Math.random() * 0.96;
-      data[i * 4 + 1] = Math.random() < 0.3 ? 0.94 + Math.random() * 0.05 : 0.02 + Math.random() * 0.94;
-    }
     this.bufs = [0, 1].map(() => {
       const b = gl.createBuffer()!;
       gl.bindBuffer(gl.ARRAY_BUFFER, b);
@@ -392,15 +457,24 @@ export class SnowGlobe {
     this.art = artUv(face);
   }
 
+  /** The loop's uniforms: the moment in it, its length and the drifting flakes' lives in it. */
+  private loopUniforms(u: Record<string, WebGLUniformLocation | null>, loop: number) {
+    const { gl } = this;
+    const L = loop > 0 ? loop : NO_LOOP;
+    gl.uniform1f(u.uTau, ((this.time % L) + L) % L);
+    gl.uniform1f(u.uLoopT, L);
+    gl.uniform1f(u.uLives, Math.max(1, Math.round(L / LIFE)));
+    gl.uniform1f(u.uA, this.art.A);
+  }
+
   /** Draws the flakes over a card that was just drawn; the mask must still be bound to unit 1. */
   draw(view: GlobeView, d: CardDraw, time: number): void {
     const { gl } = this;
-    const main = d.plate !== false && !this.settled;
-    if (main) this.feel(view, d);
+    if (d.hand && !this.settled) this.feel(view, d, d.hand);
     if (time !== this.time) {
       const dt = Number.isNaN(this.time) ? 0 : clamp(time - this.time, 0, MAX_DT);
       this.time = time;
-      if (dt > 0) this.step(dt);
+      if (dt > 0 && !this.settled) this.step(dt, d.loop ?? 0);
     }
 
     gl.useProgram(this.draw_);
@@ -412,7 +486,7 @@ export class SnowGlobe {
     gl.uniform3f(u.uRot, d.rx, d.ry, d.rz);
     gl.uniform1f(u.uScale, d.scale);
     gl.uniform1f(u.uDpr, view.dpr);
-    gl.uniform1f(u.uTime, time);
+    this.loopUniforms(u, d.loop ?? 0);
     // Thumbnails carry a lighter sprinkle so the flakes stay readable at that size.
     gl.uniform1f(u.uShow, clamp(d.intensity, 0, 1) * (d.plate === false ? 0.35 : 1));
     gl.uniform2f(u.uTilt, d.tilt[0], d.tilt[1]);
@@ -424,13 +498,14 @@ export class SnowGlobe {
     gl.drawArrays(gl.POINTS, 0, COUNT);
   }
 
-  private step(dt: number) {
+  /** Moves the stirred flakes on by `dt`; once the liquid has been calm a while they are home again. */
+  private step(dt: number, loop: number) {
     const { gl } = this;
     // The liquid calms down slowly; the flakes take even longer to settle.
     this.spin *= Math.exp(-dt / 2.4);
     this.stir *= Math.exp(-dt / 1.8);
     const s = input.shake;
-    if (!this.settled && (s[0] || s[1])) {
+    if (s[0] || s[1]) {
       // Phone shaken: the liquid lags behind the glass.
       const m = Math.hypot(s[0], s[1]);
       if (m > 1.5) {
@@ -438,19 +513,31 @@ export class SnowGlobe {
       }
       s[0] = s[1] = 0;
     }
+    if (!this.stirred) return;
+    this.calmFor = Math.abs(this.spin) < 0.05 && this.stir < 0.02 ? this.calmFor + dt : 0;
+    if (this.calmFor > SETTLE) {
+      // Back in the loop: what is left of the stirring is too small to see, and goes.
+      const zero = new Float32Array(COUNT * 4);
+      for (const b of this.bufs) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, zero);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      this.stirred = false;
+      return;
+    }
     const src = this.cur;
     const dst = 1 - src;
     gl.useProgram(this.sim);
     const u = this.su;
     gl.uniform1f(u.uDt, dt);
     gl.uniform1f(u.uTime, this.time);
+    this.loopUniforms(u, loop);
     gl.uniform2f(u.uKick, this.impulse[0], this.impulse[1]);
     this.impulse = [0, 0];
     gl.uniform1f(u.uSpin, this.spin);
     gl.uniform1f(u.uStir, this.stir);
-    gl.uniform2f(u.uGrav, this.grav[0], this.grav[1]);
     gl.uniform4f(u.uPoke, ...this.poke);
-    gl.uniform1f(u.uA, this.art.A);
     this.poke = [0, 0, 0, 0];
     gl.bindVertexArray(this.simVao[src]);
     // The buffer written to may not stay bound anywhere else.
@@ -473,28 +560,28 @@ export class SnowGlobe {
     this.impulse[1] = clamp(this.impulse[1] + iy, -1.5, 1.5);
     this.spin = clamp(this.spin + spin, -7, 7);
     this.stir = clamp(this.stir + stir, 0, 1.5);
+    this.stirred = true;
   }
 
-  /** Reads how the main card moved since the last frame and stirs the liquid to match. */
-  private feel(view: GlobeView, d: CardDraw) {
+  /**
+   * Reads how the hand moved the main card since the last frame and stirs the liquid to match.
+   * Only the hand's part of the pose counts: the motion alone leaves the glitter to its loop.
+   */
+  private feel(view: GlobeView, d: CardDraw, hand: NonNullable<CardDraw['hand']>) {
     const t = performance.now() / 1000;
-    const x = d.cx / d.h;
-    const y = d.cy / d.h;
+    const { x, y, rx, ry, rz } = hand;
     const p = this.prev;
-    this.grav = [Math.sin(d.rz), Math.cos(d.rz)];
     if (!p || t - p.t > 0.25) {
-      // Just picked: give it a shake so it lands swirling.
-      if (!p || t - p.t > 0.6) this.kick(0, -0.5, (Math.random() < 0.5 ? -1 : 1) * 4, 1.1);
-      this.prev = { t, x, y, rx: d.rx, ry: d.ry, rz: d.rz, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0 };
+      this.prev = { t, x, y, rx, ry, rz, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0 };
       return;
     }
     const dt = t - p.t;
     if (dt < 1 / 240) return;
     const vx = (x - p.x) / dt;
     const vy = (y - p.y) / dt;
-    const wx = (d.rx - p.rx) / dt;
-    const wy = (d.ry - p.ry) / dt;
-    const wz = (d.rz - p.rz) / dt;
+    const wx = (rx - p.rx) / dt;
+    const wy = (ry - p.ry) / dt;
+    const wz = (rz - p.rz) / dt;
     // Changes in the card's velocity: the liquid inside keeps going the old way.
     const ax = vx - p.vx;
     const ay = vy - p.vy;
@@ -505,7 +592,7 @@ export class SnowGlobe {
     if (jolt > 0.02) {
       this.kick(clamp(-ax * 0.8 + by * 0.08, -0.6, 0.6), clamp(-ay * 0.8 - bx * 0.08, -0.6, 0.6), clamp(-bz * 1.2, -2, 2), Math.min(jolt, 0.3));
     }
-    Object.assign(p, { t, x, y, rx: d.rx, ry: d.ry, rz: d.rz, vx, vy, wx, wy, wz });
+    Object.assign(p, { t, x, y, rx, ry, rz, vx, vy, wx, wy, wz });
 
     // A pointer sweeping across the art drags the liquid with it.
     if (!(view.canvas instanceof HTMLCanvasElement) || performance.now() - input.at > 100) return;
@@ -521,7 +608,9 @@ export class SnowGlobe {
     const k = 1 / (cw * art[2]);
     const pvx = clamp(input.vx * k, -4, 4);
     const pvy = clamp(input.vy * k, -4, 4);
+    if (!pvx && !pvy) return;
     this.poke = [ax2, ay2, pvx, pvy];
     this.stir = Math.min(1.5, this.stir + Math.hypot(pvx, pvy) * dt * 0.25);
+    this.stirred = true;
   }
 }

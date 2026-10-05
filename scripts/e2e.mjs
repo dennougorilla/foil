@@ -1306,6 +1306,61 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
   }
 });
 
+await step("Snow Globe's glitter closes its loop: the frame after the last is the first, whatever came before", async () => {
+  const r = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('nature');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    x.fillStyle = '#203048';
+    x.fillRect(0, 0, 600, 800);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    back.width = 900;
+    back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Snow', shape: 'card', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
+    drawBack(back, 'card');
+    const W = 360;
+    const H = 450;
+    // The card held flat (no motion), so only the glitter moves; the loop is the orbiting light's six seconds.
+    const tune = { ...TUNE_DEFAULTS, idle: 'none', light: 'orbit' };
+    const scene = () => createScene({ face, mask, back, edition: editionById('snowglobe'), intensity: 1, pixel: 0, name: 't', tune }, W, H, true, true, false);
+    const shot = (s, p) => {
+      s.draw(p, 40);
+      return s.ctx.getImageData(0, 0, W, H).data;
+    };
+    const diff = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i++) n += Math.abs(a[i] - b[i]);
+      return n / a.length;
+    };
+    // One loop frame by frame, as a GIF is made, then the frame after its last.
+    const N = 30;
+    const s = scene();
+    const frames = [];
+    for (let i = 0; i <= N; i++) frames.push(shot(s, i / N));
+    s.dispose();
+    const steps = frames.slice(1, N).map((f, i) => diff(frames[i], f));
+    // A frame reached straight away, with no frames before it (the stage shows the loop whatever happened earlier).
+    const fresh = scene();
+    const mid = shot(fresh, 0.5);
+    fresh.dispose();
+    return { seam: diff(frames[N], frames[0]), wrap: diff(frames[N - 1], frames[0]), step: Math.max(...steps), moves: Math.max(...steps.slice(0, 10)), history: diff(mid, frames[N / 2]) };
+  });
+  const f = (v) => v.toFixed(3);
+  expect(r.moves > 0.05, `the glitter does not move along the loop (${f(r.moves)})`);
+  expect(r.seam < 0.01, `the frame after the last is not the first (${f(r.seam)})`);
+  expect(r.wrap <= r.step * 1.5, `the loop jumps where it closes (${f(r.wrap)} against steps up to ${f(r.step)})`);
+  expect(r.history < 0.01, `a frame depends on the frames drawn before it (${f(r.history)})`);
+});
+
 await step('phones: the live preview rides in the Save box, never over the controls', async () => {
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const p = await phone.newPage();

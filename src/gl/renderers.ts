@@ -108,8 +108,13 @@ export interface CardDraw {
   plate?: boolean;
   /** 0..1: overlay showing where the finish lands. */
   rangeView?: number;
-  /** Length of an exported loop in shader seconds, so a finish's own motion can close on itself; 0 or absent live. */
+  /** Length of the loop in shader seconds, so a finish's own motion can close on itself; 0 or absent when nothing moves on its own. */
   loop?: number;
+  /**
+   * The part of the main card's pose a hand gave it (position in card heights, rotation), the motion
+   * left out; only the stage's main card has one. Snow Globe's liquid feels it.
+   */
+  hand?: { x: number; y: number; rx: number; ry: number; rz: number };
   /** Where the card was touched, for finishes that react to it. */
   heat?: HeatSource;
   /** Which face to draw (see setFace); the card's own when absent. */

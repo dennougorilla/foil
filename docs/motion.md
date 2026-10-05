@@ -22,6 +22,10 @@ version of any motion and no export-only motion.
 - Blacklight's lamp drifts round the art in six seconds and glows dimmer while nobody holds it, on the
   stage and in a file alike; under the pointer it turns up to full. Under a Light motion the lamp is
   the light whatever the light setting; otherwise a fixed light holds it still.
+- Snow Globe's glitter drifts on the loop too: where each flake is follows from the moment in the loop,
+  so the stage left alone and the file show the same flakes in the same places. Only a hand stirs it
+  (a drag or toss, the pointer sweeping across the art, a shaken phone; never the motion itself); the
+  stirred glitter then settles back into the drift.
 - Reduced motion stops the motion on the stage (the card faces you); exports still move.
 
 ## Groups and loop lengths

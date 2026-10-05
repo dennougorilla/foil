@@ -678,6 +678,7 @@ export class Stage {
           star: pose.star,
           // The finishes' own motion closes on the loop's length, as in the file.
           loop: tune.speed > 0 ? loopCycle(tune, !!ed.torch) : 0,
+          hand: { x: this.ox.x / r.h, y: this.oy.x / r.h, rx: this.rx.x * tk, ry: this.ry.x * tk + flipAngle, rz: this.rz.x * tk },
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
