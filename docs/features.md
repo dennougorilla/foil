@@ -12,7 +12,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 - The side panel is a game's side table, in the same grammar as the rest of FOIL (and of the game it is modelled on): a slate board with a light rim, a black outline and a deep drop, and on it three dark, sunken boxes for the main flow, each under a small colored label with its number: **1 Choose a picture** (samples, open a file, crop and zoom), **2 Choose a finish** (a live proof of the card, its finish, and a way to the hand), **3 Export** — the format (PNG, GIF or APNG, each saying what it makes) and Save, in a box pinned to the bottom, with **Keep** (into the binder) and **Share** as two small slabs beside its label.
 - Each step owns one color (blue for the picture, orange for the finish and Fine-tune, red for Save), and buttons are thick slabs in those colors with a dark underside: they swell and wobble a little under the pointer and sink when pressed (still under reduced motion). The bright slab marks the one next step: while a sample is showing, opening your own picture is blue and Save rests in slate; once the picture is yours, Save is red, and when the file is saved it turns green for a moment with a gold "done" tag and the file's name. Values sit large in dark pockets and pop whenever they change (a drag, a choice or a reset).
-- Everything finer sits behind **Fine-tune**, a slate slab that stays closed until you open it (and remembers that). Open, steps 1 and 2 fold into one line each (the picture or a proof of the card, its name, and **Change** to go back to the step) and Fine-tune holds four tabs: **Card** (finish strength, frame, shape, layout, pixelation), **Shine**, **Lettering** (the message, the nameplate, how all the card's text is printed, and placement) and **Layers** (which finishes the card wears and where each goes). The open tab is orange and stands up off the row, and a green gem on a tab means something in it differs from the defaults. On phones, a live view of the card rides in the Save box while you tune Shine.
+- Everything finer sits behind **Fine-tune**, a slate slab that stays closed until you open it (and remembers that). Open, steps 1 and 2 fold into one line each (the picture or a proof of the card, its name, and **Change** to go back to the step) and Fine-tune holds four tabs: **Card** (finish strength, frame, shape, layout, pixelation, backdrop), **Shine**, **Lettering** (the message, the nameplate, how all the card's text is printed, and placement) and **Layers** (which finishes the card wears and where each goes). The open tab is orange and stands up off the row, and a green gem on a tab means something in it differs from the defaults. On phones, a live view of the card rides in the Save box while you tune Shine.
 
 ## Hand, deck and packs
 
@@ -117,6 +117,11 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 - Every card wears one back, drawn in big pixels like the packs: FOIL's four letter tiles on a dark plate in a gold cartouche, over a red engraved lattice inside the same paper border as the face. It takes the card's shape. Its gold catches a stepped glint as the card tilts or turns. The pack's face-down showpiece, the deck's pile and a card still being dealt in the deck screen wear the same back.
 
+## Backdrop
+
+- Fine-tune → Card → **Backdrop** sets what is behind the card, on the stage and in every moving file: **Swirl** (the default, in the finish's colors), **Felt** (a green card table under a lamp), **Studio** (a paper sweep with a spotlight behind the card), **Velvet** (a jeweller's showcase), **Bokeh** (soft lights in the finish's colors), **Stars** (a twinkling night sky with a shooting star), **Confetti**, **Plain** (one color you pick) and **Clear** (no backdrop in a file; a checkerboard on the stage).
+- The backdrop moves with the card's loop, the same on the stage and in the file, and goes round whole in one loop so the file closes without a seam. Reduced motion holds it still on the stage. Each one, what it is for and how it is drawn: [`backdrops.md`](backdrops.md).
+
 ## Layers
 
 - Layer two finishes, like layers in a photo app (Fine-tune → **Layers**): each layer has its own finish and its own place on the card, and a little pixel card in the list lights up exactly where each one lands. Sakura on the art and Kintsugi on the frame, or Holographic on the whole card with Gold's shine over the highlights.
@@ -139,14 +144,14 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ### PNG, GIF and APNG
 
-- Save a transparent PNG, a looping GIF or a full-color transparent APNG loop. The PNG is the card's own pixels (900×1260 for the trading card, the short side always 900) with a small clear margin. The GIF (480×600 for the trading card) and the APNG are upright for upright shapes, on their side for wide ones and square for the square card.
+- Save a transparent PNG, a looping GIF or a full-color APNG loop. The GIF and the APNG show the card on its backdrop (Fine-tune → Card), moving as on the stage; with the Clear backdrop they are transparent. The PNG is the card alone on a clear background. The PNG is the card's own pixels (900×1260 for the trading card, the short side always 900) with a small clear margin. The GIF (480×600 for the trading card) and the APNG are upright for upright shapes, on their side for wide ones and square for the square card.
 - A loop is the card exactly as it moves on the stage when nobody touches it — the motion, the speed and size, the light and its sheen as set — one loop of the motion long (see [`motion.md`](motion.md); 6 seconds while the light orbits or Blacklight's lamp drifts), so it closes without a seam. With an animated picture, its own loop plays a whole number of times inside (slightly retimed to fit); at speed zero the card holds still and the loop follows the picture's timing.
 - The loop options say so in one line, and how touch finishes are exported: a file has no hand in it, so an unseen finger strokes the busiest part of the picture once per loop.
 - Relief, Platinum, Glow and Blacklight GIFs are dithered so their smooth gradients don't band in 256 colors (with layers, the GIF is dithered if either finish asks for it).
 
 ### GIF options
 
-- The GIF can also drop the backdrop (GIF and APNG options under the formats, closed by default). GIF transparency is one bit, so a clear GIF has no shadow and a hard edge; the edge pixels keep the card's border color (Auto) or blend into a matte you pick (white, black or any color) to suit where it will sit. For a soft shadow and edges, save an APNG.
+- The GIF and APNG options under the formats (closed by default) name the motion and the backdrop, each with a link to change it. With the Clear backdrop a GIF is transparent: GIF transparency is one bit, so a clear GIF has no shadow and a hard edge; the edge pixels keep the card's border color (Auto) or blend into a matte you pick (white, black or any color) to suit where it will sit. For a soft shadow and edges, save an APNG.
 
 ## Binder and Share
 
@@ -170,4 +175,4 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Language and accessibility
 
 - English / 日本語, sound effects and a CRT filter can be toggled in the header.
-- FOIL respects `prefers-reduced-motion`: the card's motion, the device tilt and moving finishes hold still on screen (exports still move).
+- FOIL respects `prefers-reduced-motion`: the card's motion, the device tilt, the backdrop and moving finishes hold still on screen (exports still move).

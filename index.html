@@ -238,6 +238,14 @@
                 <output id="pixelOut" for="pixel"></output>
                 <input type="range" id="pixel" min="0" max="6" step="1" />
               </div>
+              <div class="field" id="backdropField">
+                <span class="field-label" id="backdropLabel" data-t="backdrop"></span>
+                <div class="seg seg-backdrops" id="backdropSeg" role="radiogroup" aria-labelledby="backdropLabel"></div>
+                <p class="backdrop-color" id="backdropColorRow" hidden>
+                  <button class="link" id="backdropColorBtn" type="button"><i class="backdrop-dot" aria-hidden="true"></i><span data-t="backdropColor"></span></button>
+                  <input class="matte-picker" id="backdropPicker" type="color" tabindex="-1" aria-hidden="true" />
+                </p>
+              </div>
             </div>
             <div class="pane" id="pane-light" role="tabpanel" hidden></div>
             <div class="pane" id="pane-text" role="tabpanel" hidden></div>
@@ -258,9 +266,9 @@
                 <p class="hint save-note" id="saveMotionNote"></p>
                 <p class="hint save-note" id="saveTouchNote" hidden></p>
               </div>
-              <div class="field" id="gifBgField">
-                <span class="field-label" id="gifBgLabel" data-t="gifBg"></span>
-                <div class="seg seg-two" id="gifBgSeg" role="radiogroup" aria-labelledby="gifBgLabel"></div>
+              <div class="field">
+                <span class="field-label" data-t="backdrop"></span>
+                <p class="save-motion"><b id="saveBackdropName"></b><button class="link" id="saveBackdropPick" type="button" data-t="saveMotionPick"></button></p>
               </div>
               <div class="field" id="matteField">
                 <span class="field-label" id="matteLabel" data-t="matte"></span>

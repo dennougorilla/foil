@@ -15,7 +15,7 @@ imports is bundled into the one entry chunk (`vite.config.ts`, `firstLoad`), and
 the language the page opens in (saved choice, then `?lang=`) beside it. It carries what the first view
 shows and what a first tap needs at once:
 
-- the stage (the card, the hand, the backdrop) and the core card shader with the seven open finishes;
+- the stage (the card, the hand, the swirl backdrop) and the core card shader with the seven open finishes;
 - the classic card face (picture, frame, nameplate, message) and the card back;
 - where the finish lands on the card (`areas.ts`: regions, brightness, saved brush strokes);
 - the side panel's three steps (picture and crop, finish, Save and its format, the APNG size note),
@@ -39,6 +39,7 @@ pointer or focus reaches the control that opens them, so opening one does not wa
 | Making a file: PNG and GIF (`exporter.ts`), APNG (`anim/apngExport.ts`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
+| The backdrops other than the swirl (`gl/backdrops.ts`; the stage keeps the old one until the new one is ready) | another backdrop is picked, or was left picked | pointing at the backdrop tiles |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
 | The binder, the pack shop and its opening, View deck, a pack's finishes, Shadowbox's depth model | as before (see `binder.md`, `packs.md`) | as before |
 

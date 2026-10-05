@@ -8,6 +8,7 @@ import type { MessageFont, MessagePlace } from '../message';
 import type { IdleMode, Metal, MotionGroup } from '../tune/model';
 import type { ExportFormat, PanelTab } from '../state';
 import type { RangeRegion } from '../featureState';
+import type { BackdropId } from '../backdrop';
 import type { PackId } from '../packs';
 
 const ja = {
@@ -77,7 +78,7 @@ const ja = {
   tabs: { card: 'カード', light: '輝き', text: '文字', range: 'レイヤー' } satisfies Record<PanelTab, string>,
   recapGo: '変える',
   adjustClose: '閉じる',
-  formatKind: { png: '静止・透過', gif: '動く・軽い', apng: '動く・透過' } satisfies Record<ExportFormat, string>,
+  formatKind: { png: '静止・透過', gif: '動く・軽い', apng: '動く・高画質' } satisfies Record<ExportFormat, string>,
   moreBelow: '▼ 下に続きます',
   format: { png: 'PNG', gif: 'GIF', apng: 'APNG' } satisfies Record<ExportFormat, string>,
   formatLabel: '書き出す形式',
@@ -90,8 +91,6 @@ const ja = {
   saveMotionPick: '選ぶ',
   saveMotionNote: '画面のカードの動きのまま書き出します。手で触れて傾けた動きは入りません。',
   saveTouchNote: 'この加工は触れて変わるので、書き出しでは見えない指がループごとに絵をひとなでします。',
-  gifBg: '背景',
-  gifBgName: { swirl: 'うずまき', clear: '透過' },
   matte: '縁の色',
   matteName: { auto: '自動', '#ffffff': '白', '#000000': '黒', custom: '好きな色' } as Record<string, string>,
   matteHelp: { auto: 'カードの縁の色のまま切り抜きます', white: '白い背景に置くときに', black: '黒い背景に置くときに', custom: '置く場所の背景色に合わせると縁がなじみます' },
@@ -112,6 +111,30 @@ const ja = {
   rarity: 'レアリティ',
   frame: '枠',
   shape: '形',
+  backdrop: '背景',
+  backdropName: {
+    swirl: 'うずまき',
+    felt: 'フェルト',
+    studio: 'スタジオ',
+    velvet: 'ベルベット',
+    bokeh: 'ボケ',
+    stars: '星空',
+    confetti: '紙吹雪',
+    plain: '無地',
+    clear: '透明',
+  } satisfies Record<BackdropId, string>,
+  backdropHelp: {
+    swirl: '加工の色で描いた、うずまく絵の具',
+    felt: 'ランプの下の、緑のフェルトのカードテーブル',
+    studio: '撮影スタジオの背景紙とスポットライト',
+    velvet: '宝石店のショーケースのような深紅のベルベット',
+    bokeh: '暗い部屋に、加工の色のやわらかな光のボケ',
+    stars: 'またたく星空と、ループに一度の流れ星',
+    confetti: 'お祝いの紙吹雪が舞い落ちる',
+    plain: '好きな色を一色',
+    clear: '書き出しは背景なし (画面ではチェック柄)',
+  } satisfies Record<BackdropId, string>,
+  backdropColor: '色を変える',
   intensity: '効果の強さ',
   pixel: 'ピクセル化',
   off: 'オフ',

@@ -19,7 +19,8 @@
 - **レイヤー。** 1 枚のカードに 2 つの加工を重ねられます。それぞれ絵・枠・名前・明るい所などかける場所を選べ、ブラシで塗ることもできます。
 - **バインダー。** 作ったカードを 6 ページのバインダーにしまえます。このブラウザの中だけに残り、ポケット間をドラッグで並べ替えたり、いつでも画面に戻したりできます。
 - **共有。** スマホなら、カードを動く GIF にしてそのまま共有シートへ (X や LINE など)。
-- **書き出し。** 背景透過の PNG、ループする GIF、フルカラーで透過できる APNG で保存できます。4 つのグループ・20 種の動きから選んだ画面の動きが、そのままループになります。
+- **書き出し。** 背景透過の PNG、ループする GIF、フルカラーの APNG で保存できます。4 つのグループ・20 種の動きから選んだ画面の動きが、そのままループになります。
+- **背景。** うずまき、フェルトのテーブル、撮影スタジオ、ベルベット、ボケ、星空、紙吹雪、無地 (色を選べる)、透明から選べます。書き出しにも同じ背景が、ループに合わせて動いて入ります。
 - **スマホ。** 端末を傾けるとカードも傾きます。縦持ちではカードが画面いっぱいに出ます。
 
 細かい仕様は加工ごとに [`docs/features.md`](docs/features.md) (英語) にまとめています。
@@ -58,7 +59,7 @@ npm run og       # 開発サーバーを起動した状態で: public/og.png と
 node scripts/layering-check.mjs [--measure]   # 開発サーバーを起動した状態で: 加工 1 つの見た目が 1 ピクセルも変わっていないこと (基準 URL と比較) と、2 つ目の加工のコストを測る
 ```
 
-描画は WebGL2 です (うずまきの背景、カード、粒子)。カードシェーダーの核と、はじめの 7 種の加工は `src/gl/shaders.ts` に、各パックの加工は `src/gl/finishes/` にあります (加工の足し方は [`docs/packs.md`](docs/packs.md))。カードの面は `src/card/face.ts` で組み立て、形の一覧は `src/card/shape.ts` にあります。シェーダーは 5 : 7 のカードを前提にしません。`uCardK` は面の大きさを短辺を 1 とした単位で表し (トレカでは (1, 1.4))、`uArt` は面の uv で表した絵の窓です。設計メモ: [`docs/tcg.md`](docs/tcg.md) (トレカのレイアウト)、[`docs/arrange.md`](docs/arrange.md) (文字の自由配置)、[`docs/layering.md`](docs/layering.md) (レイヤー)、[`docs/binder.md`](docs/binder.md) (バインダー)。
+描画は WebGL2 です (背景、カード、粒子)。カードシェーダーの核と、はじめの 7 種の加工は `src/gl/shaders.ts` に、各パックの加工は `src/gl/finishes/` にあります (加工の足し方は [`docs/packs.md`](docs/packs.md))。カードの面は `src/card/face.ts` で組み立て、形の一覧は `src/card/shape.ts` にあります。シェーダーは 5 : 7 のカードを前提にしません。`uCardK` は面の大きさを短辺を 1 とした単位で表し (トレカでは (1, 1.4))、`uArt` は面の uv で表した絵の窓です。設計メモ: [`docs/tcg.md`](docs/tcg.md) (トレカのレイアウト)、[`docs/arrange.md`](docs/arrange.md) (文字の自由配置)、[`docs/layering.md`](docs/layering.md) (レイヤー)、[`docs/binder.md`](docs/binder.md) (バインダー)、[`docs/backdrops.md`](docs/backdrops.md) (背景)。
 
 `main` への push とプルリクエストは `.github/workflows/ci.yml` で型チェックとビルドをします。デプロイはしません。
 

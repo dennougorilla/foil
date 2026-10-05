@@ -34,6 +34,8 @@ import { addToHand, available, firstSealed, normalizeHand, OPEN_EDITIONS, ownedG
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
+import { BACKDROPS } from './backdrop';
+import { loadBackdrops } from './gl/renderers';
 import type { Kept } from './binder/db';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -273,6 +275,7 @@ function applyText() {
   $('pickBtn').title = t.pickSub.replace('Ctrl+V', pasteKey);
   renderCardHint();
   buildSegments();
+  buildBackdrops();
   buildThumbs();
   buildTabs();
   buildFormats();
@@ -446,6 +449,49 @@ function buildSegments() {
     };
     ls.appendChild(b);
   }
+}
+
+/**
+ * The backdrop tiles (docs/backdrops.md): a small picture of each and its name, the swirl and the
+ * bokeh in the finish's own colors, Plain in its color, which a button under the tiles changes.
+ */
+function buildBackdrops() {
+  const s = store.get();
+  const bs = $('backdropSeg');
+  bs.textContent = '';
+  const [c1, c2, c3] = editionById(s.edition).swirl;
+  bs.style.cssText = `--c1:${c1};--c2:${c2};--c3:${c3};--plain:${s.backdropColor}`;
+  for (const id of BACKDROPS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = id;
+    b.setAttribute('role', 'radio');
+    b.innerHTML = '<i class="bd-pic" aria-hidden="true"></i><span></span>';
+    b.lastElementChild!.textContent = t.backdropName[id];
+    b.title = t.backdropHelp[id];
+    radio(b, s.backdrop === id);
+    b.onclick = () => {
+      if (store.get().backdrop === id) return;
+      sfx.tick();
+      store.set({ backdrop: id });
+    };
+    bs.appendChild(b);
+  }
+  $('backdropColorRow').hidden = s.backdrop !== 'plain';
+  $('backdropColorRow').style.setProperty('--plain', s.backdropColor);
+}
+
+/** Opens Fine-tune at the Card tab with the backdrop tiles in view (from the GIF and APNG options). */
+function showBackdrops() {
+  void openAdjust('card').then((a) => {
+    if (!a) return;
+    const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    requestAnimationFrame(() => {
+      $('backdropField').scrollIntoView({ block: 'center', behavior });
+      $('backdropSeg').querySelector<HTMLButtonElement>('[aria-checked=true]')?.focus({ preventScroll: true });
+    });
+  }, () => {});
 }
 
 /** The card takes a new shape: its slot, its back, the crop window and every face follow. */
@@ -973,6 +1019,19 @@ rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
 rovingKeys($('layoutSeg'));
+rovingKeys($('backdropSeg'));
+$('backdropSeg').addEventListener('pointerenter', () => void loadBackdrops().catch(() => {}), { once: true });
+$('backdropColorBtn').addEventListener('click', () => {
+  sfx.tick();
+  const picker = $<HTMLInputElement>('backdropPicker');
+  picker.value = store.get().backdropColor;
+  try {
+    picker.showPicker();
+  } catch {
+    picker.click();
+  }
+});
+$<HTMLInputElement>('backdropPicker').addEventListener('input', (e) => store.set({ backdropColor: (e.target as HTMLInputElement).value }));
 $('layoutSeg').addEventListener('pointerenter', () => void loadTcgFace().catch(() => {}), { once: true });
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
@@ -999,7 +1058,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic' || s.backdrop !== 'swirl';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1085,7 +1144,7 @@ function syncAdjust() {
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic' });
+  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1170,6 +1229,7 @@ function exportInput() {
     layer: layerOf(s),
     layers: depth?.current(),
     flip: flipImage ? flip : undefined,
+    backdrop: { id: s.backdrop, color: s.backdropColor },
   };
 }
 
@@ -1229,12 +1289,12 @@ function renderSave() {
   const sh = shapeById(store.get().shape);
   const gif = exportFrame(sh.h / sh.w, GIF_SAVE.w, GIF_SAVE.h);
   const size = f === 'png' ? `${sh.w}×${sh.h}` : `${gif.W}×${gif.H}`;
-  saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
+  saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().backdrop === 'clear' ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
   for (const el of saveBtn.querySelectorAll('.save-meta > *')) el.textContent = '';
   saveBtn.removeAttribute('title');
 }
 
-// GIF options: closed until asked for; the defaults keep the swirl backdrop.
+// GIF and APNG options: closed until asked for. They name the motion and the backdrop; a clear GIF picks its edge.
 const MATTES = ['auto', '#ffffff', '#000000'];
 
 function buildSaveOpts() {
@@ -1249,34 +1309,17 @@ function buildSaveOpts() {
   const secs = exportLoop(s.tune, userAnim && s.sample < 0 ? userAnim.duration : undefined, !!ed.torch).loopMs / 1000;
   const motion = t.tune.idleMode[s.tune.idle];
   const loop = t.tune.loopLen.replace('{s}', String(Math.round(secs * 10) / 10));
-  $('saveOptsSummary').textContent = [`${t.saveMotion}: ${motion}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
+  $('saveOptsSummary').textContent = `${t.saveMotion}: ${motion} · ${t.backdrop}: ${t.backdropName[s.backdrop]}`;
   $('saveMotionName').textContent = motion;
   $('saveMotionLen').textContent = loop;
   $('saveMotionNote').textContent = t.saveMotionNote;
   const touch = !!(ed.touch || (s.layer2 && editionById(s.layer2.edition).touch));
   $('saveTouchNote').hidden = !touch;
   $('saveTouchNote').textContent = t.saveTouchNote;
-  $('gifBgField').hidden = !gif;
-  const bg = $('gifBgSeg');
-  bg.textContent = '';
-  for (const clear of [false, true]) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'seg-btn';
-    b.dataset.v = clear ? 'clear' : 'swirl';
-    b.setAttribute('role', 'radio');
-    b.textContent = clear ? t.gifBgName.clear : t.gifBgName.swirl;
-    radio(b, s.gifClear === clear);
-    b.onclick = () => {
-      if (store.get().gifClear === clear) return;
-      sfx.tick();
-      store.set({ gifClear: clear });
-      revealSaveOpts();
-    };
-    bg.appendChild(b);
-  }
-  $('matteField').hidden = !gif || !s.gifClear;
-  $('gifClearNote').hidden = !gif || !s.gifClear;
+  $('saveBackdropName').textContent = t.backdropName[s.backdrop];
+  const clear = gif && s.backdrop === 'clear';
+  $('matteField').hidden = !clear;
+  $('gifClearNote').hidden = !clear;
   const ms = $('matteSeg');
   ms.textContent = '';
   const custom = !MATTES.includes(s.gifMatte);
@@ -1329,7 +1372,10 @@ $('toApng').addEventListener('click', () => {
   saveBtn.focus();
 });
 $('saveMotionPick').addEventListener('click', () => quickMotion.open());
-rovingKeys($('gifBgSeg'));
+$('saveBackdropPick').addEventListener('click', () => {
+  sfx.tick();
+  showBackdrops();
+});
 rovingKeys($('matteSeg'));
 
 /**
@@ -1404,7 +1450,7 @@ async function makeFile(format: 'png' | 'gif' | 'share', label: string, progress
       small.textContent = encoding ? t.encoding : label;
       progress(p);
     },
-    { clear: store.get().gifClear, matte: store.get().gifMatte, size: format === 'share' ? GIF_SHARE : undefined },
+    { matte: store.get().gifMatte, size: format === 'share' ? GIF_SHARE : undefined },
   );
 }
 
@@ -2027,6 +2073,7 @@ store.on((s, changed) => {
     deck.render();
   }
   if (['rarity', 'frame', 'shape', 'frameColor', 'frameSwatches'].some((k) => changed.has(k as keyof State))) buildSegments();
+  if (['backdrop', 'backdropColor', 'edition'].some((k) => changed.has(k as keyof State))) buildBackdrops();
   if (changed.has('arrange')) {
     renderCardHint();
     if (s.arrange === 'free') useArrange();
@@ -2050,7 +2097,7 @@ store.on((s, changed) => {
   if (['sample', 'name', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
-  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'shape', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
+  if (['exportFormat', 'saveOptsOpen', 'backdrop', 'gifMatte', 'shape', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }
@@ -2060,7 +2107,7 @@ store.on((s, changed) => {
     droppedId = null;
     if (isKept()) setKept(null);
   }
-  if (shareReady && [...CARD_KEYS, 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
+  if (shareReady && [...CARD_KEYS, 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
