@@ -18,8 +18,8 @@ English · [日本語](README.ja.md)
 - **Message and trading-card layout.** Up to four lines of text in four typefaces, a trading-card layout with a type line and card text, a print of its own for each piece of text (ink, deboss, emboss, hot foil, spot UV), and free placement by drag.
 - **Layers.** Put two finishes on one card, each in its own place (art, frame, name, highlights, or painted with a brush).
 - **Binder.** Keep cards in a binder of six pages that lives in this browser; drag them between pockets and bring any of them back to the stage.
-- **Share.** On phones, send the card as a moving GIF straight to the share sheet (X, LINE and the like).
-- **Export.** Save a transparent PNG, a looping GIF or a full-color transparent APNG. The loop is what the card does on screen: pick one of 20 motions in four groups and the file moves just like that.
+- **Share.** On phones, send the card as a moving GIF straight to the share sheet (X, LINE and the like), or as an MP4 video for Instagram.
+- **Export.** Save a looping GIF, a full-color transparent APNG or an MP4 video (for Instagram, which takes neither GIF nor APNG). The loop is what the card does on screen: pick one of 20 motions in four groups and the file moves just like that.
 - **Phones.** The card tilts with the device's motion sensor, and a phone held upright shows the card first, nearly edge to edge.
 
 Every detail, finish by finish: [`docs/features.md`](docs/features.md).
@@ -41,7 +41,7 @@ Every detail, finish by finish: [`docs/features.md`](docs/features.md).
 
 - Your pictures never leave your browser. FOIL is a static site with no server of its own: no accounts, no uploads, no analytics.
 - Settings, opened packs, your current picture and the binder are kept in this browser's storage (localStorage and IndexedDB) and nowhere else.
-- Share hands the GIF straight from the page to your device's share sheet. Nothing is uploaded and the card is never put in a link.
+- Share hands the GIF (or MP4) straight from the page to your device's share sheet. Nothing is uploaded and the card is never put in a link.
 - The page loads its interface typefaces from Google Fonts, and the message typefaces too once a message is used.
 - Shadowbox and 3D Lenticular download a depth model (about 19–27 MB) from Hugging Face the first time one of them is chosen. The file is pinned to one revision and checked against its SHA-256; the picture itself is read on your device.
 

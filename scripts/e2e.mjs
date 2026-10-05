@@ -89,7 +89,7 @@ await step('the binder loads nothing before it is used, and Share shows only whe
   expect(binder.length === 0, `loaded early: ${binder.join(', ')}`);
   expect(await page.isVisible('#keepBtn'), 'no Keep button in the Save box');
   expect(await page.evaluate(() => !!document.getElementById('keepBtn').closest('.sec-export')), 'Keep is not in the Save box');
-  const files = await page.evaluate(() => !!navigator.canShare?.({ files: [new File([''], 'card.png', { type: 'image/png' })] }));
+  const files = await page.evaluate(() => !!navigator.canShare?.({ files: [new File([''], 'card.gif', { type: 'image/gif' })] }));
   expect((await page.isVisible('#shareBtn')) === files, `Share is ${files ? 'hidden although' : 'shown although no'} share sheet takes files`);
   expect((await page.textContent('#binderBtn .binder-count')) === '0', 'the binder chip does not count an empty binder');
 });
@@ -262,15 +262,30 @@ await step('lettering from the name tag', async () => {
   expect((await state()).text.style === 'foil', 'lettering style not applied');
 });
 
-/** Saves a PNG and returns its bytes (base64). */
-const savePng = async () => {
-  await page.click('#formatSeg [role=radio][data-format=png]');
-  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#saveBtn')]);
+/** Picks a motion from the tray above the deck. */
+const pickMotion = async (v) => {
+  await page.click('#deckDock .qm-btn');
+  await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 });
+  await page.click(`.qm-opt[data-value=${v}]`);
+  await page.keyboard.press('Escape');
+  expect((await state()).tune.idle === v, `the motion did not become ${v}`);
+};
+/** The motion to go back to once the still saves below are done. */
+let motionBefore = 'sway';
+/**
+ * Saves an APNG and returns its bytes (base64); read as an image it is its first frame, lossless.
+ * Under no motion the trading card sits square in the middle of it.
+ */
+const saveStill = async () => {
+  await page.click('#formatSeg [role=radio][data-format=apng]');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
   const png = readFileSync(await dl.path()).toString('base64');
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
   return png;
 };
-/** Mean colour difference (0–255) of two PNGs inside each rect, given as fractions of the image [x0, y0, x1, y1]. */
+/** A point of the card (fractions of it) as fractions of the APNG's frame: 320 × 400, the card 203.2 × 284.4 in its middle. */
+const onCard = (x, y) => [(160 + (x - 0.5) * 203.2) / 320, (200 + (y - 0.5) * 284.4) / 400];
+/** Mean colour difference (0–255) of two stills inside each rect, given as fractions of the card [x0, y0, x1, y1]. */
 const pngDiff = (a, b, rects) =>
   page.evaluate(async ([a, b, rects]) => {
     const load = async (s) => {
@@ -289,20 +304,22 @@ const pngDiff = (a, b, rects) =>
       for (let i = 0; i < p.length; i += 4) d += Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]);
       return d / (p.length / 4) / 3;
     });
-  }, [a, b, rects]);
-// Card regions (fractions of the saved PNG): a message at the bottom of the art, the top of the art, the nameplate.
+  }, [a, b, rects.map(([x0, y0, x1, y1]) => [...onCard(x0, y0), ...onCard(x1, y1)])]);
+// Card regions (fractions of the card): a message at the bottom of the art, the top of the art, the nameplate.
 const MSG = [0.25, 0.68, 0.75, 0.8];
 const TOP = [0.25, 0.12, 0.75, 0.3];
 const PLATE = [0.15, 0.9, 0.6, 0.95];
 
 await step('a ready phrase puts a message on the card and in every export; the nameplate can go', async () => {
-  // Base and plain ink, so only the words differ between the saves.
+  // Base and plain ink, so only the words differ between the saves; no motion, so the card sits still in them.
+  motionBefore = (await state()).tune.idle;
+  await pickMotion('none');
   await page.locator('#cardSlot').focus();
   await page.keyboard.press('1');
   await tab('text');
   await page.click('.lt-style[data-style=ink]');
   expect(!(await page.isVisible('.msg-detail')), 'place and typeface show before there are any words');
-  const bare = await savePng();
+  const bare = await saveStill();
   await page.click('.msg-phrase >> nth=0');
   await page.click('.msg-places [data-v=bottom]');
   await page.click('.msg-fonts [data-v=serif]');
@@ -310,7 +327,7 @@ await step('a ready phrase puts a message on the card and in every export; the n
   expect(s.message.text === 'Happy\nBirthday' && s.message.place === 'bottom' && s.message.font === 'serif', `message saved as ${JSON.stringify(s.message)}`);
   expect((await page.inputValue('#messageInput')) === 'Happy\nBirthday', 'the tag beside the card does not show the message');
   await page.waitForFunction(() => document.fonts.check('800 40px "Shippori Mincho"', 'Happy'), null, { timeout: 15000 });
-  const said = await savePng();
+  const said = await saveStill();
   const [msg, top] = await pngDiff(bare, said, [MSG, TOP]);
   expect(msg > 12 && top < 1, `the message did not land at the bottom of the art (bottom ${msg.toFixed(1)}, top ${top.toFixed(1)})`);
 
@@ -322,13 +339,13 @@ await step('a ready phrase puts a message on the card and in every export; the n
   // Message only: the nameplate leaves the band plain.
   await page.click('.msg-plate [data-v=off]');
   expect((await state()).plate === false, 'nameplate still on');
-  const only = await savePng();
+  const only = await saveStill();
   const [plate, kept] = await pngDiff(said, only, [PLATE, MSG]);
   expect(plate > 4 && kept < 1, `turning the nameplate off (plate ${plate.toFixed(1)}, message ${kept.toFixed(1)})`);
 
   // Hot foil prints the message too: metal, not the flat ink.
   await page.click('.lt-style[data-style=foil]');
-  const foil = await savePng();
+  const foil = await saveStill();
   const [metal] = await pngDiff(only, foil, [MSG]);
   expect(metal > 6, `the foil did not reach the message (${metal.toFixed(1)})`);
   await page.click('.msg-plate [data-v=on]');
@@ -344,10 +361,10 @@ await step('the trading-card layout: the message fills the effect box, and each 
   expect((await state()).cardType === 'Birthday card', 'type line not saved');
   // The effect box holds the message; without one the box goes and the picture runs down to the footer.
   const EFFECT = [0.25, 0.74, 0.75, 0.9];
-  const said = await savePng();
+  const said = await saveStill();
   const keep = (await state()).message.text;
   await page.fill('#messageInput', '');
-  const blank = await savePng();
+  const blank = await saveStill();
   const [box] = await pngDiff(said, blank, [EFFECT]);
   expect(box > 1, `the effect box did not change with the message (${box.toFixed(1)})`);
   await page.fill('#messageInput', keep);
@@ -378,7 +395,7 @@ await step('the trading-card layout: the message fills the effect box, and each 
 await step('free placement: drag the words on the card, a tap still opens their print, Auto puts them back', async () => {
   await tab('text');
   await page.fill('#messageInput', 'Happy\nBirthday');
-  const auto = await savePng();
+  const auto = await saveStill();
   await page.click('.msg-arrange [data-v=free]');
   await page.waitForFunction(() => !!JSON.parse(localStorage.getItem('foil:v1')).placements?.message, null, { timeout: 5000 });
   const p0 = (await state()).placements.message;
@@ -396,7 +413,7 @@ await step('free placement: drag the words on the card, a tap still opens their 
   expect(p1.y < p0.y - 0.15 && p1.x < p0.x - 0.05, `the message did not follow the drag (${JSON.stringify(p0)} → ${JSON.stringify(p1)})`);
   expect(p1.x > 0 && p1.x < 1 && p1.y > 0 && p1.y < 1, 'the message left the card');
   // Exports draw it where it now is.
-  const moved = await savePng();
+  const moved = await saveStill();
   const [top] = await pngDiff(auto, moved, [[0.1, 0.1, 0.9, 0.35]]);
   expect(top > 1, `the export does not show the moved message (${top.toFixed(1)})`);
   // A short tap opens its print menu instead of moving it.
@@ -429,7 +446,8 @@ await step('finish area tab and brush', async () => {
 });
 
 /** Pixels of a saved PNG at the given points, read back through the page. */
-const pngAt = (path, points) =>
+/** The colours of a still at points of the card. */
+const pngAt = (b64, points) =>
   page.evaluate(
     async ({ b64, points }) => {
       const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
@@ -438,16 +456,10 @@ const pngAt = (path, points) =>
       x.drawImage(img, 0, 0);
       return points.map(([px, py]) => [...x.getImageData(Math.round(px * img.width), Math.round(py * img.height), 1, 1).data]);
     },
-    { b64: readFileSync(path).toString('base64'), points },
+    { b64, points: points.map(([x, y]) => onCard(x, y)) },
   );
-const savePngPath = async () => {
-  await page.click('#formatSeg [role=radio][data-format=png]');
-  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#saveBtn')]);
-  await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
-  return dl.path();
-};
 
-await step('layers: layer 2 from owned finishes, each layer its own area, the overlap blend, and the PNG shows both', async () => {
+await step('layers: layer 2 from owned finishes, each layer its own area, the overlap blend, and a file shows both', async () => {
   await tab('range');
   if (await page.isVisible('#pane-range .range-reset')) await page.click('#pane-range .range-reset');
   expect((await page.locator('.layer-row').count()) === 1 && (await page.isVisible('.layer-add')), 'one layer and a + slot to start with');
@@ -473,21 +485,23 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   await page.click('.seg-blend [data-b=over]');
   expect((await state()).layer2.blend === 'over', 'the blend did not change');
   await page.click('.seg-blend [data-b=light]');
-  // The PNG (948 × 1308, 24 px of padding): a point in the art and one on the side of the frame.
+  // A point in the art and one on the side of the frame.
   const points = [[0.5, 0.42], [0.042, 0.42]];
-  const layered = await pngAt(await savePngPath(), points);
+  const layered = await pngAt(await saveStill(), points);
   await page.click('.layer-row[data-n="2"] .layer-x');
   expect((await state()).layer2 === null && (await page.locator('.layer-row').count()) === 1, '× did not remove layer 2');
-  const single = await pngAt(await savePngPath(), points);
+  const single = await pngAt(await saveStill(), points);
   const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
   expect(d(layered[0], single[0]) === 0, `the art changed: ${layered[0]} vs ${single[0]}`);
   expect(d(layered[1], single[1]) > 24, `the frame did not take layer 2: ${layered[1]} vs ${single[1]}`);
   // Left on (whole card, adding its light) for the exports below, so GIF and APNG are made with two layers.
   await page.click('.layer-add');
   await page.click(`.layer-chip[data-v=${pick}]`);
+  // The stills are done: the card moves again.
+  await pickMotion(motionBefore);
 });
 
-for (const [format, ext] of [['png', '.png'], ['gif', '.gif'], ['apng', '-anim.png']]) {
+for (const [format, ext] of [['gif', '.gif'], ['apng', '-anim.png']]) {
   await step(`export ${format}`, async () => {
     await page.click(`#formatSeg [role=radio][data-format=${format}]`);
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 240000 }), page.click('#saveBtn')]);
@@ -517,10 +531,11 @@ await step('GIF with a clear background is really clear', async () => {
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
 });
 
-await step('a GIF moves exactly as the card does on the stage, for every motion', async () => {
-  // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
-  // exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
-  await page.evaluate(async () => {
+// Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
+// exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
+// The stage's idle clock is frozen meanwhile.
+const recordDraws = () =>
+  page.evaluate(async () => {
     const { CardRenderer } = await import('/src/gl/renderers.ts');
     const { motion, LiveMotion } = await import('/src/tune/motion.ts');
     const live = document.getElementById('cards');
@@ -546,6 +561,49 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
       return LiveMotion.prototype.step.call(this, 0, ...rest);
     };
   });
+/** Lets the stage's clock and the renderer go again. */
+const stopRecording = () =>
+  page.evaluate(async () => {
+    const { motion } = await import('/src/tune/motion.ts');
+    const { CardRenderer } = await import('/src/gl/renderers.ts');
+    delete motion.step;
+    CardRenderer.prototype.drawCard = window.__drawCard;
+  });
+/** The pose, sheen and light of a drawn card, relative to its centre `ox`, `oy` and its height. */
+const norm = (d, ox, oy) => ({
+  dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale,
+  t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint,
+  b0: d.beam[0], b3: d.beam[3], s1: d.spot[1], dim: d.dim, st: d.star[2],
+});
+/** The biggest gap between exported frames and the stage held at the same moment of its idle cycle. */
+async function driftFromStage(frames) {
+  // The pointer leaves the card and the card settles.
+  await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
+  await page.waitForTimeout(1500);
+  // Each exported frame against the stage held at the same moment of its idle cycle.
+  let worst = { d: 0, at: '' };
+  for (const f of frames.filter((_, i, a) => i % Math.ceil(a.length / 12) === 0)) {
+    // An exported frame's loop time is its moment in idle seconds.
+    const sAt = f.time;
+    const got = await page.evaluate(async (sAt) => {
+      const { motion } = await import('/src/tune/motion.ts');
+      motion.idleTime = sAt;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return window.__draws.live;
+    }, sAt);
+    expect(Math.abs(got.s - sAt) < 1e-9, 'the stage clock moved while frozen');
+    const a = norm(got, got.ox, got.oy);
+    const b = norm(f, f.W / 2, f.H / 2);
+    for (const k of Object.keys(a)) {
+      const d = Math.abs(a[k] - b[k]);
+      if (d > worst.d) worst = { d, at: `${k} at ${sAt.toFixed(2)}s: stage ${a[k].toFixed(4)}, export ${b[k].toFixed(4)}` };
+    }
+  }
+  return worst;
+}
+
+await step('a GIF moves exactly as the card does on the stage, for every motion', async () => {
+  await recordDraws();
   await tab('light');
   try {
   // Every motion in the list (docs/motion.md), under each light setting and a few speeds.
@@ -572,11 +630,6 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
     ['bounce', 'pointer', 2],
     ['none', 'orbit', 1],
   ];
-  const norm = (d, ox, oy) => ({
-    dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale,
-    t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint,
-    b0: d.beam[0], b3: d.beam[3], s1: d.spot[1], dim: d.dim, st: d.star[2],
-  });
   for (const [n, [idle, light, speed]] of cases.entries()) {
     await page.click(`#pane-light [data-key=light] [role=radio][data-value=${light}]`);
     await page.click(`#pane-light [data-key=idle] [role=radio][data-value=${idle}]`);
@@ -615,42 +668,140 @@ await step('a GIF moves exactly as the card does on the stage, for every motion'
         return window.__draws.frames;
       });
     }
-    // The pointer leaves the card and the card settles.
-    await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
-    await page.waitForTimeout(1500);
-    // Each exported frame against the stage held at the same moment of its idle cycle.
-    let worst = { d: 0, at: '' };
-    for (const f of frames.filter((_, i, a) => i % Math.ceil(a.length / 12) === 0)) {
-      // An exported frame's loop time is its moment in idle seconds.
-      const sAt = f.time;
-      const got = await page.evaluate(async (sAt) => {
-        const { motion } = await import('/src/tune/motion.ts');
-        motion.idleTime = sAt;
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        return window.__draws.live;
-      }, sAt);
-      expect(Math.abs(got.s - sAt) < 1e-9, 'the stage clock moved while frozen');
-      const a = norm(got, got.ox, got.oy);
-      const b = norm(f, f.W / 2, f.H / 2);
-      for (const k of Object.keys(a)) {
-        const d = Math.abs(a[k] - b[k]);
-        if (d > worst.d) worst = { d, at: `${k} at ${sAt.toFixed(2)}s: stage ${a[k].toFixed(4)}, export ${b[k].toFixed(4)}` };
-      }
-    }
+    const worst = await driftFromStage(frames);
     expect(worst.d < 2e-3, `${idle}/${light}/${speed}: the export drifts from the stage (${worst.at})`);
   }
   } finally {
-    await page.evaluate(async () => {
-      const { motion } = await import('/src/tune/motion.ts');
-      const { CardRenderer } = await import('/src/gl/renderers.ts');
-      delete motion.step;
-      CardRenderer.prototype.drawCard = window.__drawCard;
-    });
+    await stopRecording();
     await page.click('#pane-light .tune-reset-all');
   }
 });
 
-/** Width and height of a downloaded PNG (or APNG), from its header. */
+/** What an MP4 holds, read from its boxes: frame size, codec, frame and key-frame counts, length, tracks, and which of index and data comes first. */
+function mp4Info(buf) {
+  const info = { tracks: 0, first: null };
+  const walk = (from, to) => {
+    for (let at = from; at + 8 <= to; ) {
+      let size = buf.readUInt32BE(at);
+      const type = buf.toString('latin1', at + 4, at + 8);
+      if (size === 1) size = Number(buf.readBigUInt64BE(at + 8));
+      if (size === 0) size = to - at;
+      const body = at + 8;
+      if (!info.first && (type === 'moov' || type === 'mdat')) info.first = type;
+      if (type === 'trak') info.tracks++;
+      if (['moov', 'trak', 'mdia', 'minf', 'stbl'].includes(type)) walk(body, at + size);
+      if (type === 'mdhd') {
+        const v1 = buf[body] === 1;
+        info.timescale = buf.readUInt32BE(body + (v1 ? 20 : 12));
+        info.duration = v1 ? Number(buf.readBigUInt64BE(body + 24)) : buf.readUInt32BE(body + 16);
+      }
+      if (type === 'stsd') {
+        const entry = body + 8;
+        info.codec = buf.toString('latin1', entry + 4, entry + 8);
+        info.width = buf.readUInt16BE(entry + 32);
+        info.height = buf.readUInt16BE(entry + 34);
+      }
+      if (type === 'stsz') info.frames = buf.readUInt32BE(body + 8);
+      if (type === 'stss') info.keys = buf.readUInt32BE(body + 4);
+      at += size;
+    }
+  };
+  walk(0, buf.length);
+  return info;
+}
+
+await step('an MP4 for Instagram: H.264 at 30 fps in 4 : 5, several loops and at least six seconds, moving as the stage does frame for frame', async () => {
+  await recordDraws();
+  await tab('light');
+  try {
+    await page.click('#pane-light [data-key=light] [role=radio][data-value=pointer]');
+    await page.click('#pane-light [data-key=idle] [role=radio][data-value=jelly]');
+    await page.locator('#tune-speed').fill('1');
+    await page.waitForTimeout(300);
+    const plan = await page.evaluate(async () => {
+      const { mp4Plan } = await import('/src/anim/mp4Plan.ts');
+      return mp4Plan(JSON.parse(localStorage.getItem('foil:v1')).tune, 1260 / 900);
+    });
+    expect(plan.loops === 2, `Jelly's three-second loop plays ${plan.loops} times`);
+    // Frames at different moments of the loop, one of them in the second loop, kept small as the
+    // exporter hands them to the encoder.
+    const perLoop = plan.frames / plan.loops;
+    const picks = [0, 0.2, 0.4, 0.6, 0.8, 1.5].map((q) => Math.round(q * perLoop));
+    await page.evaluate((picks) => {
+      window.__src = {};
+      const VF = (window.__VideoFrame = VideoFrame);
+      window.VideoFrame = class extends VF {
+        constructor(src, init) {
+          super(src, init);
+          const i = Math.round((init.timestamp * 30) / 1e6);
+          if (!picks.includes(i)) return;
+          const c = new OffscreenCanvas(216, 270);
+          c.getContext('2d').drawImage(src, 0, 0, 216, 270);
+          window.__src[i] = [...c.getContext('2d').getImageData(0, 0, 216, 270).data];
+        }
+      };
+    }, picks);
+    await page.click('#formatSeg [role=radio][data-format=mp4]');
+    const label = await page.textContent('#saveBtn');
+    expect(/1080×1350/.test(label) && /\d s|\ds\b/.test(label), `Save does not name the size and length: ${label}`);
+    await page.evaluate(() => (window.__draws.frames = []));
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 400000 }), page.click('#saveBtn')]);
+    expect(dl.suggestedFilename().endsWith('.mp4'), `unexpected file ${dl.suggestedFilename()}`);
+    await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
+    const buf = readFileSync(await dl.path());
+    const mp4 = mp4Info(buf);
+    const secs = mp4.duration / mp4.timescale;
+    expect(mp4.codec === 'avc1' && mp4.width === 1080 && mp4.height === 1350, `not 1080×1350 H.264: ${JSON.stringify(mp4)}`);
+    expect(mp4.tracks === 1 && mp4.first === 'moov', `expected one video track with its index first: ${JSON.stringify(mp4)}`);
+    expect(mp4.frames === plan.frames && Math.abs(secs - plan.frames / 30) < 1e-6, `${mp4.frames} frames over ${secs} s, planned ${plan.frames}`);
+    expect(secs >= 6 && secs < 12 && plan.loops * plan.loopMs >= 6000, `${secs} s, ${plan.loops} loops of ${plan.loopMs} ms`);
+    expect(mp4.keys >= Math.ceil(mp4.frames / 60), `only ${mp4.keys} key frames`);
+    // The browser plays it, and each picked frame of the video is the frame drawn for it.
+    const seen = await page.evaluate(
+      async ({ b64, picks }) => {
+        const v = document.createElement('video');
+        v.muted = true;
+        v.src = URL.createObjectURL(await (await fetch(`data:video/mp4;base64,${b64}`)).blob());
+        await new Promise((r, j) => ((v.onloadedmetadata = r), (v.onerror = () => j(new Error(`the video does not play: ${v.error?.message}`)))));
+        const c = new OffscreenCanvas(216, 270);
+        const x = c.getContext('2d');
+        const diff = (a, b) => {
+          let d = 0;
+          for (let k = 0; k < a.length; k += 4) d += Math.abs(a[k] - b[k]) + Math.abs(a[k + 1] - b[k + 1]) + Math.abs(a[k + 2] - b[k + 2]);
+          return d / ((a.length / 4) * 3);
+        };
+        const rows = [];
+        for (const i of picks) {
+          v.currentTime = (i + 0.5) / 30;
+          await new Promise((r) => (v.onseeked = r));
+          x.drawImage(v, 0, 0, 216, 270);
+          const got = x.getImageData(0, 0, 216, 270).data;
+          rows.push(picks.map((j) => diff(got, window.__src[j])));
+        }
+        return { w: v.videoWidth, h: v.videoHeight, d: v.duration, rows };
+      },
+      { b64: buf.toString('base64'), picks },
+    );
+    expect(seen.w === 1080 && seen.h === 1350 && Math.abs(seen.d - secs) < 0.05, `the player reads ${JSON.stringify({ ...seen, rows: undefined })}`);
+    for (const [n, row] of seen.rows.entries()) {
+      const others = row.filter((_, k) => k !== n);
+      expect(row[n] < 4, `frame ${picks[n]} differs from the frame drawn for it by ${row[n].toFixed(2)}`);
+      expect(others.every((d) => d > row[n] * 1.5), `frame ${picks[n]} looks as much like another frame: ${row.map((d) => d.toFixed(2)).join(' ')}`);
+    }
+    // The recorded frames: the whole video, each against the stage at the same moment.
+    const frames = await page.evaluate(() => window.__draws.frames);
+    expect(frames.length === mp4.frames && frames.every((f) => f.W === 1080 && f.H === 1350), `drew ${frames.length} frames for a ${mp4.frames}-frame video`);
+    const worst = await driftFromStage(frames);
+    expect(worst.d < 2e-3, `the MP4 drifts from the stage (${worst.at})`);
+  } finally {
+    await page.evaluate(() => (window.VideoFrame = window.__VideoFrame));
+    await stopRecording();
+    await page.click('#pane-light .tune-reset-all');
+    await page.click('#formatSeg [role=radio][data-format=gif]');
+  }
+});
+
+/** Width and height of a downloaded APNG, from its header. */
 const pngSize = async (dl) => {
   const b = readFileSync(await dl.path());
   return [b.readUInt32BE(16), b.readUInt32BE(20)];
@@ -672,15 +823,16 @@ await step('shape: a wide card turns the slot, the hand and every export on thei
   expect(Math.abs(slot.width / slot.height - 1.4) < 0.03, `the slot is ${slot.width}x${slot.height}, not 7:5`);
   const card = await page.locator('.hand-slot').first().boundingBox();
   expect(card.width > card.height, 'the hand still holds upright cards');
-  const [pw, ph] = await pngSize(await save('png'));
-  expect(pw === 1260 + 48 && ph === 900 + 48, `the PNG is ${pw}x${ph}`);
+  await page.click('#formatSeg [role=radio][data-format=mp4]');
+  const [mw, mh] = (await page.textContent('#saveBtn .btn-text small')).match(/(\d+)×(\d+)/).slice(1).map(Number);
+  expect(mw > mh && mw / mh < 1.91, `the MP4 is ${mw}x${mh}`);
   const gif = parseGIF(readFileSync(await (await save('gif')).path()));
   expect(gif.lsd.width > gif.lsd.height, `the GIF is ${gif.lsd.width}x${gif.lsd.height}`);
   const [aw, ah] = await pngSize(await save('apng'));
   expect(aw > ah, `the APNG is ${aw}x${ah}`);
   await page.click('#shapeSeg [data-shape=square]');
-  const [sw, sh] = await pngSize(await save('png'));
-  expect(sw === 948 && sh === 948, `the square PNG is ${sw}x${sh}`);
+  const [sw, sh] = await pngSize(await save('apng'));
+  expect(Math.abs(sw / sh - 1) < 0.02, `the square APNG is ${sw}x${sh}`);
   // The celebration frames, on a card of another shape.
   for (const f of ['rim', 'ribbon']) {
     await page.click(`#frameSeg [role=radio]:nth-child(${['paper', 'ink', 'gilt', 'rarity', 'rim', 'ribbon'].indexOf(f) + 1})`);
@@ -692,7 +844,7 @@ await step('shape: a wide card turns the slot, the hand and every export on thei
   expect(r.shape === 'card' && r.frame === 'paper', `reset left ${r.shape}/${r.frame}`);
   const back = await page.locator('#cardSlot').boundingBox();
   expect(Math.abs(back.width / back.height - 5 / 7) < 0.02, 'the slot did not go back to 5:7');
-  await page.click('#formatSeg [role=radio][data-format=png]');
+  await page.click('#formatSeg [role=radio][data-format=gif]');
 });
 
 // ---------- Binder ----------
@@ -941,7 +1093,7 @@ await step('share: a small moving GIF goes to the share sheet with the site addr
   await p.goto(`${URL}?lang=en`);
   await p.waitForTimeout(1500);
   expect(await p.isVisible('#shareBtn'), 'Share is hidden although files can be shared');
-  // PNG is the chosen format; Share still sends the moving card.
+  // GIF is the chosen format: Share sends the small GIF.
   await p.click('#shareBtn');
   await p.waitForFunction(() => window.__shared.length === 1, null, { timeout: 240000 });
   const gif = await p.evaluate(() => window.__shared[0]);
@@ -989,6 +1141,47 @@ await step('share on a Mac: one call, one GIF, no text (its Copy would put two i
   expect(calls.length === 1, `share was called ${calls.length} times`);
   expect(calls[0].files === 1 && calls[0].type === 'image/gif' && calls[0].text === null && calls[0].url === null, `not one GIF alone: ${JSON.stringify(calls[0])}`);
   await mac.close();
+});
+
+await step('share with MP4 chosen: the MP4 goes to the share sheet, for Instagram', async () => {
+  const sharer = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p = await sharer.newPage();
+  p.on('pageerror', (e) => errors.push(`mp4 share: ${e.message}`));
+  await p.addInitScript(() => {
+    window.__shared = [];
+    navigator.canShare = (data) => !!data?.files?.every((f) => f instanceof File);
+    navigator.share = async (data) => {
+      for (const f of data.files) {
+        const box = new TextDecoder().decode(await f.slice(4, 8).arrayBuffer());
+        window.__shared.push({ name: f.name, type: f.type, size: f.size, box });
+      }
+    };
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(1500);
+  await p.click('#formatSeg [role=radio][data-format=mp4]');
+  const hint = await p.getAttribute('#shareBtn', 'title');
+  expect(/MP4/.test(hint) && /Instagram/.test(hint), `Share does not say it sends an MP4: ${hint}`);
+  await p.click('#shareBtn');
+  await p.waitForFunction(() => window.__shared.length === 1, null, { timeout: 400000 });
+  const mp4 = await p.evaluate(() => window.__shared[0]);
+  expect(mp4.type === 'video/mp4' && mp4.name.endsWith('.mp4') && mp4.box === 'ftyp' && mp4.size > 100_000, `not an MP4: ${JSON.stringify(mp4)}`);
+  await sharer.close();
+});
+
+await step('no MP4 where the browser cannot encode H.264: it is not offered, and a saved MP4 choice falls back to GIF', async () => {
+  for (const block of ['delete window.VideoEncoder;', 'VideoEncoder.isConfigSupported = async () => ({ supported: false });']) {
+    const plain = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p = await plain.newPage();
+    p.on('pageerror', (e) => errors.push(`no mp4: ${e.message}`));
+    await p.addInitScript({ content: `${block} localStorage.setItem('foil:v1', JSON.stringify({ exportFormat: 'mp4' }));` });
+    await p.goto(`${URL}?lang=en`);
+    await p.waitForTimeout(1500);
+    const shown = await p.locator('#formatSeg [role=radio]').evaluateAll((els) => els.map((e) => e.dataset.format));
+    const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('foil:v1')).exportFormat);
+    expect(shown.join() === 'gif,apng' && saved === 'gif', `${block}: formats ${shown.join()}, saved ${saved}`);
+    await plain.close();
+  }
 });
 
 const handCount = () => page.locator('.hand-slot').count();

@@ -17,7 +17,8 @@ import { GIF_SAVE, GIF_SHARE } from './exportSize';
 import { forgetUserImage, loadUserImage, saveUserImage } from './imageStore';
 import { animKind, frameAt, type Anim } from './anim/anim';
 import { apngPlan } from './anim/apngPlan';
-import { mountApngExport } from './anim/apngUi';
+import { formatBytes, mountApngExport } from './anim/apngUi';
+import { MP4_H, MP4_W, mp4Config, mp4Plan } from './anim/mp4Plan';
 import { mountLetteringJump } from './letteringJump';
 import { bindMessageField } from './messageField';
 import { loadMessageFont, messageFonts } from './card/messageFace';
@@ -489,7 +490,9 @@ function buildThumbs() {
   $('panel').dataset.picture = s.sample >= 0 ? 'sample' : 'own';
   $('recapThumb').style.backgroundImage = `url(${thumbUrl(currentImage())})`;
   $('recapImageName').textContent = s.sample >= 0 ? t.samplesName[s.sample] : t.yourImage;
-  apngExport.refresh();
+  // An animated picture sets the loop's length, which Save and the loop options name.
+  buildSaveOpts();
+  renderSave();
 }
 
 const thumbCache = new WeakMap<Img, string>();
@@ -1193,11 +1196,23 @@ function animatedExport(anim: Anim) {
 
 const saveBtn = $<HTMLButtonElement>('saveBtn');
 
+/** Whether this browser can encode the MP4 (H.264 through WebCodecs); checked once on load (see below). */
+let mp4Ok = typeof VideoEncoder !== 'undefined';
+/** The formats this browser can make. */
+const formats = () => EXPORT_FORMATS.filter((f) => f !== 'mp4' || mp4Ok);
+
+/** The MP4 as the current card would make it. */
+function mp4Now() {
+  const s = store.get();
+  const sh = shapeById(s.shape);
+  return mp4Plan(s.tune, sh.h / sh.w, userAnim && s.sample < 0 ? userAnim.duration : undefined, !!editionById(s.edition).torch);
+}
+
 function buildFormats() {
   const fs = $('formatSeg');
   fs.textContent = '';
   fs.setAttribute('aria-label', t.formatLabel);
-  for (const f of EXPORT_FORMATS) {
+  for (const f of formats()) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'seg-btn';
@@ -1225,12 +1240,15 @@ function renderSave() {
   saveBtn.querySelector<HTMLElement>('.btn-text b')!.dataset.short = t.saveShort;
   if (f === 'apng') return apngExport.refresh();
   saveBtn.querySelector('.btn-text b')!.textContent = t.save.replace('{f}', t.format[f]);
-  // The card's own size for a PNG; the GIF's frame turns with the shape.
+  // The frame turns with the shape; the MP4 also says how big and how long it will be.
   const sh = shapeById(store.get().shape);
   const gif = exportFrame(sh.h / sh.w, GIF_SAVE.w, GIF_SAVE.h);
-  const size = f === 'png' ? `${sh.w}×${sh.h}` : `${gif.W}×${gif.H}`;
+  const mp4 = f === 'mp4' ? mp4Now() : null;
+  const size = mp4 ? `${mp4.width}×${mp4.height}` : `${gif.W}×${gif.H}`;
   saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
-  for (const el of saveBtn.querySelectorAll('.save-meta > *')) el.textContent = '';
+  const [mb, msmall] = saveBtn.querySelectorAll('.save-meta > *');
+  mb.textContent = mp4 ? t.mp4Meta.size.replace('{n}', formatBytes(mp4.bytes)) : '';
+  msmall.textContent = mp4 ? t.mp4Meta.secs.replace('{s}', String(+mp4.seconds.toFixed(1))) : '';
   saveBtn.removeAttribute('title');
 }
 
@@ -1240,7 +1258,6 @@ const MATTES = ['auto', '#ffffff', '#000000'];
 function buildSaveOpts() {
   const s = store.get();
   const gif = s.exportFormat === 'gif';
-  $('saveOpts').hidden = s.exportFormat === 'png';
   $('saveOptsToggle').setAttribute('aria-expanded', String(s.saveOptsOpen));
   $('saveOptsBody').hidden = !s.saveOptsOpen;
   $('saveOpts').classList.toggle('is-open', s.saveOptsOpen);
@@ -1256,6 +1273,9 @@ function buildSaveOpts() {
   const touch = !!(ed.touch || (s.layer2 && editionById(s.layer2.edition).touch));
   $('saveTouchNote').hidden = !touch;
   $('saveTouchNote').textContent = t.saveTouchNote;
+  const mp4 = s.exportFormat === 'mp4' ? mp4Now() : null;
+  $('saveMp4Note').hidden = !mp4;
+  if (mp4) $('saveMp4Note').textContent = t.saveMp4Note.replace('{n}', String(mp4.loops)).replace('{t}', String(+mp4.seconds.toFixed(1)));
   $('gifBgField').hidden = !gif;
   const bg = $('gifBgSeg');
   bg.textContent = '';
@@ -1377,8 +1397,9 @@ function useExporter() {
   if (!exporter) {
     exporter = import('./exporter');
     exporter.catch(() => (exporter = null));
-    // APNG's encoder comes along, for a first APNG save that does not wait either.
+    // APNG's and MP4's encoders come along, for a first save that does not wait either.
     void import('./anim/apngExport').catch(() => {});
+    if (mp4Ok) void import('./anim/mp4Export').catch(() => {});
   }
   return exporter;
 }
@@ -1392,11 +1413,15 @@ async function faceReady() {
 }
 
 /** The card as a file, its progress shown on the Save button under `label`; a GIF to share is smaller. */
-async function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
-  const { exportGif, exportPng } = await useExporter();
+async function makeFile(format: 'gif' | 'mp4' | 'share', label: string, progress: (p: number) => void): Promise<File> {
+  if (format === 'mp4') {
+    const [{ exportMp4 }] = await Promise.all([import('./anim/mp4Export'), useExporter()]);
+    await faceReady();
+    return exportMp4(exportInput(), progress);
+  }
+  const { exportGif } = await useExporter();
   // After the fetch: the card may have changed layout meanwhile.
   await faceReady();
-  if (format === 'png') return exportPng(exportInput());
   const small = saveBtn.querySelector('.btn-text small')!;
   return exportGif(
     exportInput(),
@@ -1446,7 +1471,7 @@ saveBtn.addEventListener('click', async () => {
   // One export at a time, and not while a picture is loading. APNG runs from its own module,
   // which also handles stopping it.
   if (f === 'apng' || saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
-  const file = await busy(t.saving, (progress) => makeFile(f, t.saving, progress), f === 'png' ? t.errPng : t.errGif);
+  const file = await busy(t.saving, (progress) => makeFile(f, t.saving, progress), f === 'mp4' ? t.errMp4 : t.errGif);
   if (!file) return;
   (await useExporter()).download(file);
   sfx.coin();
@@ -1457,28 +1482,49 @@ saveBtn.addEventListener('click', async () => {
 // ---------- Share ----------
 
 const shareBtn = $<HTMLButtonElement>('shareBtn');
-// Only where the share sheet takes an image file; elsewhere Save is the way out.
-shareBtn.hidden = !(() => {
+/** Whether the share sheet takes a file of this type. */
+const shareTakes = (name: string, type: string) => {
   try {
-    return !!navigator.canShare?.({ files: [new File([''], 'card.gif', { type: 'image/gif' })] });
+    return !!navigator.canShare?.({ files: [new File([''], name, { type })] });
   } catch {
     return false;
   }
-})();
+};
+const shareGif = shareTakes('card.gif', 'image/gif');
+const shareMp4 = shareTakes('card.mp4', 'video/mp4');
+// Only where the share sheet takes the file; elsewhere Save is the way out.
+shareBtn.hidden = !shareGif && !(shareMp4 && mp4Ok);
+/** What Share sends: the MP4 when it is the chosen format (for Instagram), otherwise a GIF. */
+const shareFormat = (): 'gif' | 'mp4' => ((store.get().exportFormat === 'mp4' && mp4Ok && shareMp4) || !shareGif ? 'mp4' : 'gif');
 /** A file made for sharing that waits for one more tap: the browser stopped counting the first. */
 let shareReady: File | null = null;
 
 function renderShare() {
+  const f = t.format[shareFormat()];
   shareBtn.dataset.ready = String(!!shareReady);
   shareBtn.querySelector('span')!.textContent = shareReady ? t.shareReady : t.share;
-  shareBtn.title = shareReady ? t.shareReadyHint : t.shareHint;
+  shareBtn.title = shareReady ? t.shareReadyHint.replace('{f}', f) : t.shareHint[shareFormat()];
 }
 
 function readyToShare(file: File | null) {
   shareReady = file;
   renderShare();
-  if (file) toast(t.shareReadyHint);
+  if (file) toast(t.shareReadyHint.replace('{f}', t.format[shareFormat()]));
 }
+
+/**
+ * MP4 is offered where VideoEncoder exists; the encoder may still lack H.264 at this size, and then
+ * MP4 goes (a saved MP4 choice falls back to GIF).
+ */
+function dropMp4() {
+  mp4Ok = false;
+  shareBtn.hidden = !shareGif;
+  if (store.get().exportFormat === 'mp4') store.set({ exportFormat: 'gif' });
+  buildFormats();
+  renderShare();
+}
+if (!mp4Ok) dropMp4();
+else void mp4Config(MP4_W, MP4_H).then((c) => c || dropMp4(), dropMp4);
 
 /** Only the site's address goes along with the card; the card itself leaves the device only through the sheet. */
 const SITE = 'https://dennougorilla.github.io/foil/';
@@ -1524,14 +1570,16 @@ shareBtn.addEventListener('click', async () => {
   // The progress shows on Share as well as on the Save button.
   const label = shareBtn.querySelector('span')!;
   shareBtn.dataset.busy = 'true';
+  const f = shareFormat();
+  const sharing = t.sharing.replace('{f}', t.format[f]);
   const file = await busy(
-    t.sharing,
+    sharing,
     (progress) =>
-      makeFile('share', t.sharing, (p) => {
+      makeFile(f === 'mp4' ? 'mp4' : 'share', sharing, (p) => {
         label.textContent = `${Math.round(p * 100)}%`;
         progress(p);
       }),
-    t.errGif,
+    f === 'mp4' ? t.errMp4 : t.errGif,
   );
   delete shareBtn.dataset.busy;
   renderShare();
@@ -2049,7 +2097,10 @@ store.on((s, changed) => {
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
   if (['sample', 'name', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
-  if (changed.has('exportFormat')) buildFormats();
+  if (changed.has('exportFormat')) {
+    buildFormats();
+    renderShare();
+  }
   if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'shape', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
@@ -2060,7 +2111,7 @@ store.on((s, changed) => {
     droppedId = null;
     if (isKept()) setKept(null);
   }
-  if (shareReady && [...CARD_KEYS, 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
+  if (shareReady && [...CARD_KEYS, 'gifClear', 'gifMatte', 'exportFormat'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
