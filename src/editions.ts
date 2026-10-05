@@ -36,6 +36,7 @@ export type EditionId =
   | 'snowglobe'
   | 'rain'
   | 'liquidmetal'
+  | 'kaleidoscope'
   // Shaders in src/gl/finishes/jewel.ts and supporter.ts
   | 'kintsugi'
   | 'opal'
@@ -111,6 +112,8 @@ export const EDITIONS: Edition[] = [
   { id: 'rain', shader: 94, color: '#a9c6d8', swirl: ['#0a1018', '#2a4152', '#8fb0c4'], value: 7, dither: true, touch: 'rain' },
   // Shader in src/gl/liquidMetal.ts; its ripples are a touch field (src/touch/heat.ts).
   { id: 'liquidmetal', shader: 98, color: '#d4dde8', swirl: ['#07090d', '#323c4a', '#c3cfdc'], value: 7, dither: true, touch: 'liquid' },
+  // Shader in src/gl/kaleidoscope.ts.
+  { id: 'kaleidoscope', shader: 100, color: '#f2c879', swirl: ['#0b0a1a', '#3a2a6e', '#e8a85a'], value: 6 },
   // Shaders in src/gl/finishes/jewel.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
