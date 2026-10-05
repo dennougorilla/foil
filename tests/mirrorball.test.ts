@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EDITIONS, layerable } from '../src/editions.ts';
 import { OPEN_EDITIONS, packOf } from '../src/packs.ts';
-import { MIRRORBALL_SHADER, MIRRORBALL_GLSL, ROOM_FS, roomSpin, SPIN } from '../src/gl/mirrorball.ts';
+import { MIRRORBALL_SHADER, MIRRORBALL_GLSL, ROOM_FS, roomLap } from '../src/gl/mirrorball.ts';
 
 test('Mirror Ball is a Light pack finish on shader 104', () => {
   const ed = EDITIONS.find((e) => e.id === 'mirrorball');
@@ -17,12 +17,20 @@ test('Mirror Ball is a Light pack finish on shader 104', () => {
   assert.ok(layerable('mirrorball'));
 });
 
-test('the ball turns by whole cells of spots in an exported loop, so the loop closes', () => {
-  assert.equal(roomSpin(0), SPIN);
-  for (const loop of [2, 3, 6, 12, 2.4]) {
-    const cells = roomSpin(loop) * loop;
-    assert.ok(Math.abs(cells - Math.round(cells)) < 1e-9, `loop ${loop}`);
-    assert.ok(cells >= 1, `loop ${loop} turns`);
+test('an exported loop hands the turning spots back to the ones it began with, so it closes', () => {
+  // Live the ball just turns on.
+  assert.deepEqual(roomLap(7.3, 0), [7.3, 0]);
+  for (const loop of [3, 6, 2.4]) {
+    // The loop starts on its own spots alone, and ends on the spots one loop back, which are the same.
+    assert.deepEqual(roomLap(0, loop), [0, 0]);
+    const [t, end] = roomLap(loop - 1e-6, loop);
+    assert.ok(Math.abs(t - loop) < 1e-5 && end > 0.999, `loop ${loop}`);
+    // Most of the loop shows the spots as they turn on the stage.
+    assert.equal(roomLap(loop * 0.5, loop)[1], 0);
+    // The same moment of any lap is the same frame.
+    const [a, fa] = roomLap(loop * 2.85, loop);
+    const [b, fb] = roomLap(loop * 0.85, loop);
+    assert.ok(Math.abs(a - b) < 1e-9 && Math.abs(fa - fb) < 1e-9 && fa > 0, `loop ${loop}`);
   }
 });
 
