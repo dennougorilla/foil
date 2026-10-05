@@ -2,10 +2,11 @@
 // flakes in it, drawn as GPU points that tumble and catch the light over the card. The liquid and
 // glass themselves are drawn by the card shader (SNOWGLOBE_GLSL below, in the Nature pack's program).
 //
-// Left alone the glitter is a function of the moment in the loop (docs/motion.md): a bed of leaf and
-// glitter lies on the floor, rocking, and the rest drifts with the liquid's slow convection, each
-// flake fading in and out once a life, the lives a whole fraction of the loop. So a file closes
-// without a seam and the stage left alone shows the same flakes. A hand stirs it (a drag or toss of
+// Left alone the glitter is a function of the moment in the loop (docs/motion.md): the dome is
+// shaken lightly as the loop starts, so the bed of leaf and glitter on the floor is thrown up,
+// swirls, sinks and settles back where it lay by the loop's end, while fine glitter drifts with the
+// liquid's slow convection, each flake fading in and out once a life (a whole fraction of the loop).
+// So a file closes without a seam and the stage left alone shows the same flakes. A hand stirs it (a drag or toss of
 // the card, a pointer sweeping across the art, a shaken phone): a transform-feedback pass moves each
 // flake away from its place through a simple fluid (a swirl, a slosh, turbulence), and once the
 // liquid calms the flakes drift back into the loop. Exports and reduced motion never take input.
@@ -119,14 +120,34 @@ struct Home {
   float shown;   // how much of it shows: a drifting flake fades in and out once a life
   float age;     // seconds into its life
   float life;    // which of its lives this is
+  float flying;  // 0 at rest .. 1 thrown highest by the loop's shake
 };
+// The light shake at the start of every loop: each flake is thrown up and aside in a moment, then
+// sinks slowly (the leaf first, the fine glitter last) and has settled where it began by the loop's
+// end. Its offset from its place, and how far into the throw it is. A short loop shakes lightly.
+vec3 toss(int id, bool bed) {
+  float s = uTau / uLoopT;
+  float leaf = leafOf(id);
+  float reach = min(1.0, uLoopT / 6.0);
+  float a = mix(0.03, 0.2, rnd(id, 22) * rnd(id, 22));
+  float b = leaf > 0.5 ? mix(0.35, 0.6, rnd(id, 23)) : mix(0.5, 0.95, rnd(id, 23));
+  float f = s < a ? 1.0 - pow(1.0 - s / a, 2.0) : 1.0 - smoothstep(a, b, s);
+  // Thrown anywhere up to the top of the dome, most of the bed high, the heavy leaf a little lower.
+  float h = (bed ? mix(0.1, 0.95, rnd(id, 24)) * (1.0 - 0.25 * leaf) : mix(0.04, 0.2, rnd(id, 24))) * A * reach;
+  // Thrown aside too, swirling round as it rises and slowing as the liquid calms.
+  float side = mix(0.05, 0.3, rnd(id, 25)) * reach * (rnd(id, 26) < 0.5 ? -1.0 : 1.0);
+  float turn = rnd(id, 27) * 6.2832 + 4.0 * (1.0 - exp(-6.0 * s));
+  return vec3(side * sin(turn) * f, -h * f, f);
+}
 Home home(int id) {
   Home h;
   if (bedded(id)) {
-    h.P = vec2(0.008 + 0.984 * rnd(id, 20), floorY(id));
+    vec3 t = toss(id, true);
+    h.P = clamp(vec2(0.008 + 0.984 * rnd(id, 20), floorY(id)) + t.xy, vec2(0.008), vec2(0.992, A));
     h.shown = 1.0;
     h.age = 0.0;
     h.life = 0.0;
+    h.flying = t.z;
     return h;
   }
   float span = uLoopT / uLives;
@@ -138,8 +159,10 @@ Home home(int id) {
   // Fine glitter barely sinks: it rides the convection.
   vec2 v = CURL(calmStream, P0) + vec2(0.0, mix(0.006, 0.03, rnd(id, 3)));
   h.age = u * span;
-  h.P = clamp(P0 + v * h.age, vec2(0.008), vec2(0.992, A - 0.008));
+  vec3 t = toss(id, false);
+  h.P = clamp(P0 + v * h.age + t.xy, vec2(0.008), vec2(0.992, A - 0.008));
   h.shown = smoothstep(0.0, 0.2, u) * smoothstep(1.0, 0.8, u);
+  h.flying = t.z;
   return h;
 }
 `;
@@ -266,8 +289,9 @@ void main() {
     a = rnd(id, 9) * 6.2832 + h.life * 1.7 + h.age * mix(0.3, 1.4, rnd(id, 10));
     b = rnd(id, 11) * 6.2832 + h.life * 2.3 + h.age * mix(0.2, 1.1, rnd(id, 12));
   }
-  a += speed * 2.0;
-  b += speed * 3.0;
+  // Thrown up by the loop's shake, flakes tumble over and over as they sink.
+  a += speed * 2.0 + h.flying * mix(3.0, 7.0, rnd(id, 28));
+  b += speed * 3.0 + h.flying * mix(2.0, 5.0, rnd(id, 29));
   vec3 fn = normalize(vec3(cos(a) * sin(b), sin(a) * sin(b), 0.6 + abs(cos(b))));
   vAxis = vec2(cos(a), sin(a));
   vSquash = clamp(fn.z, 0.25, 1.0);
@@ -381,6 +405,9 @@ const MAX_DT = 1 / 20;
 const NO_LOOP = 6;
 /** A drifting flake lives about this long (s), a whole fraction of the loop. */
 const LIFE = 6;
+/** Where in the loop a stage held still (reduced motion) stands: the glitter thrown up and sinking. */
+const HELD = 0.16;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
 /** Calm this long (s), a stirred globe is back in its loop: the flakes are put home and stirring stops. */
 const SETTLE = 4;
 
@@ -461,7 +488,8 @@ export class SnowGlobe {
   private loopUniforms(u: Record<string, WebGLUniformLocation | null>, loop: number) {
     const { gl } = this;
     const L = loop > 0 ? loop : NO_LOOP;
-    gl.uniform1f(u.uTau, ((this.time % L) + L) % L);
+    // Held still (reduced motion), the stage shows the moment the glitter is in the air.
+    gl.uniform1f(u.uTau, !this.settled && REDUCED.matches ? L * HELD : ((this.time % L) + L) % L);
     gl.uniform1f(u.uLoopT, L);
     gl.uniform1f(u.uLives, Math.max(1, Math.round(L / LIFE)));
     gl.uniform1f(u.uA, this.art.A);

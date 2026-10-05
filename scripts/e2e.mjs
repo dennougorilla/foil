@@ -1459,13 +1459,24 @@ await step("Snow Globe's glitter closes its loop: the frame after the last is th
     const fresh = scene();
     const mid = shot(fresh, 0.5);
     fresh.dispose();
-    return { seam: diff(frames[N], frames[0]), wrap: diff(frames[N - 1], frames[0]), step: Math.max(...steps), moves: Math.max(...steps.slice(0, 10)), history: diff(mid, frames[N / 2]) };
+    // Glitter catching the light in the top half of the art (the floor's bed lies below it): share of bright pixels.
+    const up = (f) => {
+      let n = 0;
+      for (let y = 110; y < 230; y++) for (let x = 120; x < 240; x++) {
+        const i = (y * W + x) * 4;
+        if (Math.max(f[i], f[i + 1], f[i + 2]) > 170) n++;
+      }
+      return n / (120 * 120);
+    };
+    return { seam: diff(frames[N], frames[0]), wrap: diff(frames[N - 1], frames[0]), step: Math.max(...steps), moves: Math.max(...steps.slice(0, 10)), history: diff(mid, frames[N / 2]), tossed: up(frames[4]), late: up(frames[N - 1]), rest: up(frames[0]) };
   });
   const f = (v) => v.toFixed(3);
   expect(r.moves > 0.05, `the glitter does not move along the loop (${f(r.moves)})`);
   expect(r.seam < 0.01, `the frame after the last is not the first (${f(r.seam)})`);
   expect(r.wrap <= r.step * 1.5, `the loop jumps where it closes (${f(r.wrap)} against steps up to ${f(r.step)})`);
   expect(r.history < 0.01, `a frame depends on the frames drawn before it (${f(r.history)})`);
+  // The dome is shaken at the start of each loop: glitter fills the liquid, then settles back.
+  expect(r.tossed > r.rest * 3 && r.tossed > r.late * 3, `the loop does not throw the glitter up and let it settle (${f(r.tossed)} of the upper art lit early, ${f(r.late)} at the end, ${f(r.rest)} at the start)`);
 });
 
 await step('phones: the live preview rides in the Save box, never over the controls', async () => {
