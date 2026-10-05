@@ -19,7 +19,7 @@ const ja = {
   supportBmc: 'コーヒー1杯ぶんを一度だけ',
   supportOpen: '新しいタブで開きます',
   creditPre: '',
-  creditPost: ' (LocalThunk) のエディション表現に着想を得た非公式のファン制作です。LocalThunk / Playstack とは無関係で、公認も受けていません。Balatro は LocalThunk LLC の登録商標です。',
+  creditPost: ' に着想を得た非公式のファン作品です。',
   creditLink: 'Balatro 公式サイト — 新しいタブで開きます',
   version: 'バージョン {v} — 更新履歴を新しいタブで開きます',
   lang: 'EN',

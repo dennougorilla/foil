@@ -72,9 +72,7 @@ npm run release -- patch            # minor / major / x.y.z の指定も可。--
 
 ## 着想
 
-FOIL は、LocalThunk による [Balatro](https://www.playbalatro.com/) のカードのエディション表現に着想を得た、非公式のファン制作です。LocalThunk および Playstack とは無関係で、公認も受けていません。ゲームのコード、アート、フォントなどの素材は一切使っていません。
-
-Balatro は LocalThunk LLC の登録商標です。
+FOIL は LocalThunk の [Balatro](https://www.playbalatro.com/) に着想を得た非公式のファン作品で、LocalThunk・Playstack とは無関係です。ゲームの素材は使っていません。Balatro は LocalThunk LLC の登録商標です。
 
 ## サードパーティ
 

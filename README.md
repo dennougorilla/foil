@@ -72,9 +72,7 @@ From a clean `main` that is up to date with `origin`, this builds, bumps the ver
 
 ## Inspiration
 
-FOIL is an unofficial fan project inspired by the card editions in [Balatro](https://www.playbalatro.com/) by LocalThunk. It is not affiliated with, or endorsed by, LocalThunk or Playstack. No code, art, fonts or other assets from the game are used.
-
-Balatro is a registered trademark of LocalThunk LLC.
+FOIL is an unofficial fan project inspired by [Balatro](https://www.playbalatro.com/) by LocalThunk, not affiliated with LocalThunk or Playstack, and uses none of the game's assets. Balatro is a registered trademark of LocalThunk LLC.
 
 ## Third-party
 
