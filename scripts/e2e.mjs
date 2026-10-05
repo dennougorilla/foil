@@ -787,6 +787,8 @@ const paintStroke = async (from, to) => {
 };
 
 await step('keep a card: it goes into the binder as a still picture with its brush strokes, and Keep rests until the card changes', async () => {
+  // The layers step reset the area; the card kept gets a stroke of its own.
+  await paintStroke([0.25, 0.3], [0.7, 0.6]);
   await page.fill('#nameInput', 'Kept meadow');
   await page.keyboard.press('Escape');
   await page.click('#keepBtn');
