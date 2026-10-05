@@ -40,6 +40,7 @@ pointer or focus reaches the control that opens them, so opening one does not wa
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
+| The card samples: the Joker and the three game cards (`sampleCards.ts`), painted in the page's language and painted again when it changes | one of them is chosen, or was left on the card | idle, pointing at the samples |
 | The binder, the pack shop and its opening, View deck, a pack's finishes, Shadowbox's depth model | as before (see `binder.md`, `packs.md`) | as before |
 
 Fine-tune opens only once its tabs are there, so a tab never opens empty; a language switch waits for
@@ -133,3 +134,7 @@ When the stage's motions and the export motions became one list (docs/motion.md)
 stayed under the numbers above: 74.8 kB for an English page and 76.3 kB for a Japanese one. Only
 Sway (the default) and None are in it; the other nineteen motions (2.1 kB) and their pixel icons
 come in their own chunks.
+
+The four card samples (the Joker and three game cards) came as their own chunk (5.7 kB) on 2026-10-05:
+the first load grew by 0.3 kB (the code that fetches them and their seven names), to about 75.3 kB for an
+English page and 76.8 kB for a Japanese one.

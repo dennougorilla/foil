@@ -218,7 +218,7 @@ const en: Dict = {
     postWide: 'Post, wide',
     meishi: 'Business',
   },
-  samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts'],
+  samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts', 'Joker', 'Starsea Orb', 'Two for the Road', 'Dawn Lighthouse'],
   tune: {
     sunKeys: '←→ to turn',
     peekCap: 'Preview',

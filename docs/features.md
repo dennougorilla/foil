@@ -5,7 +5,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Picture
 
 - Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). PNG, JPEG, WebP and GIF are read; animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
-- Three samples are there to start with. Zoom and drag the window to choose what the card shows (arrow keys and + − work too).
+- Seven samples are there to start with, all drawn by code as pixel art: three scenes (Dusk Pass, Moon Tide, Ace of Hearts), a Joker playing card, and three cards from an imaginary card game (a collector number, a rarity in stars, the card's kind and a line of flavor text, written in the page's language). The last four come in their own small chunk: fetched when the page is idle, when the pointer reaches the samples, or at once when one of them is on the card; their thumbnails are blank until then, and choosing one waits for it. Zoom and drag the window to choose what the card shows (arrow keys and + − work too).
 - Your picture, and Flip Lenticular's other picture, are kept in this browser (IndexedDB) across reloads.
 
 ## The side panel
