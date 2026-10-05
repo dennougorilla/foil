@@ -11,7 +11,7 @@ import { CARD_LAYOUTS } from './card/tcg';
 import type { PrintPop } from './printPop';
 import type { TextRun } from './lettering';
 import type { ShadowDepth } from './depth/shadowDepth';
-import { loadCardSamples, paintSample, SAMPLE_COUNT, SCENES } from './samples';
+import { loadArtSamples, paintSample, SAMPLE_COUNT, SCENES } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
 import { GIF_SAVE, GIF_SHARE } from './exportSize';
@@ -103,21 +103,10 @@ let t: Dict = await dict;
 // A trading card from last visit: its painter is fetched at once.
 if (store.get().layout === 'tcg') void loadTcgFace().catch(() => {});
 
-/**
- * The interface fonts. Their stylesheet may still be on its way (index.html adds it without holding the
- * script), and fonts not declared yet would count as loaded at once.
- */
-const uiFonts = new Promise<unknown>((done) => {
-  const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
-  if (!sheet || sheet.sheet) return done(null);
-  sheet.addEventListener('load', done);
-  sheet.addEventListener('error', done);
-}).then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]));
-
 // ---------- Images ----------
 
 type Img = HTMLCanvasElement;
-/** The samples; the card samples are null until their chunk has painted them (wakeCardSamples). */
+/** The samples; the illustrations are null until their chunk has painted them (wakeArtSamples). */
 const samples: (Img | null)[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => (i < SCENES ? paintSample(i) : null));
 /** A sample's picture, the first one standing in while it is on its way. */
 const sampleImg = (i: number): Img => samples[i] ?? samples[0]!;
@@ -665,14 +654,14 @@ function buildThumbs() {
     b.className = 'thumb';
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-label', label);
-    // A card sample still on its way shows an empty pocket; choosing it waits for it.
+    // An illustration still on its way shows an empty pocket; choosing it waits for it.
     if (img) b.style.backgroundImage = `url(${thumbUrl(img)})`;
     if (idx < 0 && userAnim) b.dataset.badge = animKind(userAnim);
     radio(b, s.sample === idx);
     b.onclick = () => {
       if (store.get().sample === idx) return;
       if (img) return useImage(idx);
-      void wakeCardSamples().then(
+      void wakeArtSamples().then(
         () => store.get().sample !== idx && useImage(idx),
         () => toast(t.loadFailed, true),
       );
@@ -997,18 +986,12 @@ function buildThumbsPending(idx: number) {
     .forEach((b, i) => radio(b, (i < SAMPLE_COUNT ? i : -1) === idx));
 }
 
-/** The language the card samples are painted (or being painted) in, and that painting. */
-let cardSamples: { lang: State['lang']; done: Promise<void> } | null = null;
-/**
- * Fetches and paints the card samples in the page's language (again when it changed), then shows them:
- * their thumbnails, and the card if one of them is on it.
- */
-function wakeCardSamples(): Promise<void> {
-  const lang = store.get().lang;
-  if (cardSamples?.lang === lang) return cardSamples.done;
-  // Their words are in the pixel font, which is declared only once the fonts' stylesheet is in.
-  const done = uiFonts.then(() => loadCardSamples(lang), () => loadCardSamples(lang)).then((imgs) => {
-    if (cardSamples?.done !== done) return;
+/** The illustrations' painting, once asked for. */
+let artSamples: Promise<void> | null = null;
+/** Fetches and paints the illustrations, then shows them: their thumbnails, and the card if one of them is on it. */
+function wakeArtSamples(): Promise<void> {
+  if (artSamples) return artSamples;
+  const done = loadArtSamples().then((imgs) => {
     imgs.forEach((img, k) => (samples[SCENES + k] = img));
     buildThumbs();
     if (store.get().sample >= SCENES) {
@@ -1016,9 +999,9 @@ function wakeCardSamples(): Promise<void> {
       drawCropPreview();
     }
   });
-  cardSamples = { lang, done };
+  artSamples = done;
   // A failed fetch (offline) is tried again on the next wake.
-  done.catch(() => cardSamples?.done === done && (cardSamples = null));
+  done.catch(() => artSamples === done && (artSamples = null));
   return done;
 }
 
@@ -2326,7 +2309,6 @@ document.addEventListener('keydown', (e) => {
 store.on((s, changed) => {
   if (changed.has('lang')) {
     applyText();
-    if (cardSamples) void wakeCardSamples().catch(() => {});
     redrawFace();
     deck.render();
     return;
@@ -2340,8 +2322,8 @@ store.on((s, changed) => {
     depth?.update(face, artKey());
   }
   if (changed.has('layer2')) wakePacks();
-  // A card sample put on the card from elsewhere (the binder) is fetched for it.
-  if (changed.has('sample') && s.sample >= SCENES && !samples[s.sample]) void wakeCardSamples().catch(() => {});
+  // An illustration put on the card from elsewhere (the binder) is fetched for it.
+  if (changed.has('sample') && s.sample >= SCENES && !samples[s.sample]) void wakeArtSamples().catch(() => {});
   // Layer 1 and layer 2 never hold the same finish: putting layer 2's finish on the card removes layer 2.
   if (changed.has('edition') && s.layer2?.edition === s.edition) store.set({ layer2: null, areaLayer: 1 });
   if (changed.has('edition') || changed.has('flicked')) syncFlickHint();
@@ -2441,12 +2423,20 @@ const boot = () => {
   drawCropPreview();
 };
 // The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before
-// painting the face.
-uiFonts.then(boot, boot);
+// painting the face. Their stylesheet may still be on its way (index.html adds it without holding the
+// script), and fonts not declared yet would count as loaded at once.
+new Promise<unknown>((done) => {
+  const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
+  if (!sheet || sheet.sheet) return done(null);
+  sheet.addEventListener('load', done);
+  sheet.addEventListener('error', done);
+})
+  .then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]))
+  .then(boot, boot);
 boot();
-// A card sample left on the card is fetched at once; the others when the page is idle or the pointer nears them.
-if (store.get().sample >= SCENES) void wakeCardSamples().catch(() => {});
-for (const ev of ['pointerenter', 'focusin']) $('thumbs').addEventListener(ev, () => void wakeCardSamples().catch(() => {}), { once: true });
+// An illustration left on the card is fetched at once; the others when the page is idle or the pointer nears them.
+if (store.get().sample >= SCENES) void wakeArtSamples().catch(() => {});
+for (const ev of ['pointerenter', 'focusin']) $('thumbs').addEventListener(ev, () => void wakeArtSamples().catch(() => {}), { once: true });
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
   // A picture chosen (or removed) meanwhile wins over last visit's.
@@ -2502,7 +2492,7 @@ settled(() => {
     void import('./tune/quickTray').catch(() => {});
     void loadTcgFace().catch(() => {});
     void useDot().catch(() => {});
-    void wakeCardSamples().catch(() => {});
+    void wakeArtSamples().catch(() => {});
   });
 });
 

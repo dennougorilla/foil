@@ -64,14 +64,14 @@ await step('while a sample shows, choosing a picture outranks Save', async () =>
   expect((await loud('pickBtn')) && !(await loud('saveBtn')), 'expected a blue pick button and Save still resting in slate');
 });
 
-await step('the Joker and the game cards arrive with their chunk, and one goes on the card', async () => {
+await step('the illustrations arrive with their chunk, and one goes on the card', async () => {
   await page.hover('#thumbs');
-  await page.waitForFunction(() => [...document.querySelectorAll('#thumbs .thumb')].slice(3, 7).every((b) => b.style.backgroundImage), null, { timeout: 15000 });
+  await page.waitForFunction(() => [...document.querySelectorAll('#thumbs .thumb')].slice(3, 8).every((b) => b.style.backgroundImage), null, { timeout: 15000 });
   await page.click('#thumbs .thumb >> nth=4');
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').sample === 4, null, { timeout: 10000 });
   await page.waitForTimeout(900);
   const name = await page.textContent('#recapImageName');
-  expect(name === 'Starsea Orb' || name === '星海の宝珠', `the picture is named ${name}`);
+  expect(name === 'Night Wind' || name === '夜風の精', `the picture is named ${name}`);
   await page.click('#thumbs .thumb >> nth=0');
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').sample === 0, null, { timeout: 10000 });
   await page.waitForTimeout(900);
@@ -153,7 +153,7 @@ await step('load an image', async () => {
   });
   await page.setInputFiles('#fileInput', { name: 'meadow.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1') ?? '{}').sample === -1, null, { timeout: 15000 });
-  expect((await page.locator('#thumbs .thumb').count()) === 8, 'own image thumb missing');
+  expect((await page.locator('#thumbs .thumb').count()) === 9, 'own image thumb missing');
   expect((await loud('saveBtn')) && !(await loud('pickBtn')), 'with your own picture, Save should be the red slab and the pick button quiet');
 });
 
@@ -1076,7 +1076,7 @@ await step('play a card from the binder: its picture, settings and brush strokes
   for (const k of ['edition', 'name', 'rarity', 'sample', 'crop', 'tune', 'text', 'rangeRegion', 'rangeLo', 'rangeHi'])
     expect(JSON.stringify(now[k]) === JSON.stringify(kept[k]), `${k} did not come back (${JSON.stringify(now[k])} ≠ ${JSON.stringify(kept[k])})`);
   expect(now.lang === kept.lang && now.exportFormat === kept.exportFormat, 'an app setting changed');
-  expect((await page.locator('#thumbs .thumb').count()) === 8, 'the kept picture is not the picture in step 1');
+  expect((await page.locator('#thumbs .thumb').count()) === 9, 'the kept picture is not the picture in step 1');
   // The brush strokes came back with it, and only those.
   let brush = '';
   for (let i = 0; i < 20 && (brush = await brushCells()) !== keptBrush; i++) await page.waitForTimeout(150);

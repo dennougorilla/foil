@@ -44,7 +44,7 @@ in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 | The backdrops other than the swirl (`gl/backdrops.ts`; the stage keeps the old one until the new one is ready) | another backdrop is picked, or was left picked | pointing at the backdrop tiles |
 | Pixel art: the face's conversion (`dot/dot.ts`, `dot/convert.ts`) | pixel art is turned on (at once if it was left on) | idle, pointing at the pixel art choices |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
-| The card samples: the Joker and the three game cards (`sampleCards.ts`), painted in the page's language and painted again when it changes | one of them is chosen, or was left on the card | idle, pointing at the samples |
+| The five illustrated samples (`sampleArt.ts`) | one of them is chosen, or was left on the card | idle, pointing at the samples |
 | The binder, the pack shop and its opening, View deck, a pack's finishes, Shadowbox's depth model | as before (see `binder.md`, `packs.md`) | as before |
 | Registering the service worker, the Update chip, a picture shared to FOIL (`pwa.ts`, see `pwa.md`) | the page has loaded and is idle (also under a data saver), or at once when a picture was shared to it | — |
 
@@ -148,6 +148,5 @@ the rest of the page are unchanged, and the page shows exactly the same pixels (
 phone and a tablet, time held still). `pwa.ts` and its styles are about 1.2 kB on their own. Once the page
 is idle, the service worker keeps 50 files (about 1.2 MB, about 510 kB as sent); a new version copies
 the files whose names carry an unchanged hash from the old one instead of downloading them again.
-The four card samples (the Joker and three game cards) came as their own chunk (5.7 kB) on 2026-10-05:
-the first load grew by 0.3 kB (the code that fetches them and their seven names), to about 75.3 kB for an
-English page and 76.8 kB for a Japanese one.
+The five illustrated samples came as their own chunk (`sampleArt.ts`, 6.2 kB) on 2026-10-06; the first
+load holds only the code that fetches them and their names.

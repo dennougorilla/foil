@@ -284,7 +284,7 @@ const ja = {
     fit: '画像の形',
   } satisfies Record<ShapeId, string>,
   shapeFitHint: '画像の縦横比のまま',
-  samplesName: ['夕焼けの峠', '月の潮', 'ハートのA', 'ジョーカー', '星海の宝珠', 'ふたり旅の呪文', '夜明けの灯台'],
+  samplesName: ['夕焼けの峠', '月の潮', 'ハートのA', '瑠璃の星', '夜風の精', '鎖の誓い', '空ゆく旅団', '道化師'],
   tune: {
     sunKeys: '←→ で回す',
     peekCap: 'プレビュー',

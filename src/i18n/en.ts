@@ -274,7 +274,7 @@ const en: Dict = {
     fit: 'Picture',
   },
   shapeFitHint: "The picture's own proportions",
-  samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts', 'Joker', 'Starsea Orb', 'Two for the Road', 'Dawn Lighthouse'],
+  samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts', 'Lapis World', 'Night Wind', 'Chained Oath', 'Sky Caravan', 'Jester'],
   tune: {
     sunKeys: '←→ to turn',
     peekCap: 'Preview',
