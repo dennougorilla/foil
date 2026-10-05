@@ -1097,8 +1097,9 @@ adjustToggle.addEventListener('click', () => {
   sfx.tick();
   if (store.get().adjustOpen) return store.set({ adjustOpen: false });
   // A press while the tabs are on their way calls the opening off, as it would close Fine-tune.
-  if (adjustWanted) {
-    adjustWanted = false;
+  if (adjustPending) {
+    adjustPending = false;
+    adjustAsk++;
     return adjustToggle.removeAttribute('aria-busy');
   }
   // The tabs' code arrives first, so a tab never opens empty.
@@ -1122,28 +1123,32 @@ function useAdjust(): Promise<Adjust> {
   return adjustLoad;
 }
 
-/** Fine-tune was asked to open and its tabs are still on their way. */
-let adjustWanted = false;
+/** Fine-tune was asked to open and its tabs are still on their way; each ask (and each call-off) has its own number. */
+let adjustPending = false;
+let adjustAsk = 0;
 
 /**
  * Opens Fine-tune once its tabs are there (on `tab` when given), unless the opening was called off
  * meanwhile (then null); says so when they can't be fetched.
  */
 function openAdjust(tab?: PanelTab): Promise<Adjust | null> {
-  adjustWanted = true;
+  const ask = ++adjustAsk;
+  adjustPending = true;
   adjustToggle.setAttribute('aria-busy', 'true');
   const ready = useAdjust().then((a) => {
-    if (!adjustWanted) return null;
-    adjustWanted = false;
+    // A later ask, or a call-off, overrides this one.
+    if (ask !== adjustAsk) return null;
+    adjustPending = false;
     store.set(tab ? { adjustOpen: true, panelTab: tab } : { adjustOpen: true });
     return a;
   });
   ready
     .catch(() => {
-      adjustWanted = false;
+      if (ask !== adjustAsk) return;
+      adjustPending = false;
       toast(t.loadFailed, true);
     })
-    .finally(() => adjustWanted || adjustToggle.removeAttribute('aria-busy'));
+    .finally(() => adjustPending || adjustToggle.removeAttribute('aria-busy'));
   return ready;
 }
 
