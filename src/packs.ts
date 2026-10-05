@@ -40,7 +40,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'light',
-    finishes: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
+    finishes: ['galaxy', 'aurora', 'glow', 'blacklight', 'neon', 'shallows'],
     wrap: 'holo',
     colors: ['#06101f', '#2a5fa8', '#7fe3f0'],
     load: () => import('./gl/finishes/light'),
@@ -70,7 +70,7 @@ export const PACKS: readonly Pack[] = [
   {
     // Provisional, for review: the finishes added after v0.14, until the owner places each one.
     id: 'lab',
-    finishes: ['chameleon'],
+    finishes: ['chameleon', 'neon'],
     wrap: 'holo',
     colors: ['#0c1418', '#2f8a8a', '#c8f4e8'],
     load: () => import('./gl/finishes/lab'),
