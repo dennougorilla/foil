@@ -559,8 +559,10 @@ export class Stage {
       // Fetched the first time one other than the swirl is wanted; a failed fetch keeps the old one.
       void backdropShader(id).then((fs) => this.backdrop === id && this.bg.use(fs), () => {});
     }
-    if (`${ed.id}|${state.shape}` !== this.shown) {
-      this.shown = `${ed.id}|${state.shape}`;
+    // The size, not the shape's name: the Picture shape changes with the picture.
+    const size = `${shapeById(state.shape).w}x${shapeById(state.shape).h}`;
+    if (`${ed.id}|${size}` !== this.shown) {
+      this.shown = `${ed.id}|${size}`;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
       if (ed.touch) this.heat = new HeatField(ed.touch, kOf(state.shape));
       this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
@@ -899,8 +901,9 @@ export class Stage {
   /** The preview card strokes itself; held still (reduced motion) it shows the stroke at its best. */
   private demoAt(kind: TouchKind, time: number) {
     const shape = this.o.store.get().shape;
-    let demo = this.demos.get(`${kind}|${shape}`);
-    if (!demo) this.demos.set(`${kind}|${shape}`, (demo = new AutoTouch(kind, SWIPES[0], kOf(shape))));
+    const key = `${kind}|${kOf(shape).join('x')}`;
+    let demo = this.demos.get(key);
+    if (!demo) this.demos.set(key, (demo = new AutoTouch(kind, SWIPES[0], kOf(shape))));
     demo.at(2 + AUTO_STILL[kind] + time / AUTO_LOOP);
     return demo;
   }

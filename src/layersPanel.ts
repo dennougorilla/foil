@@ -75,7 +75,9 @@ export function initLayers(host: LayersHost) {
   /** Where a layer goes, in words: a region, a band of tones, inverted, plus the brush. */
   function place(n: 1 | 2, painted: boolean): string {
     const tt = t();
-    const a = areaOf(n);
+    const at = areaOf(n);
+    // A card that is all picture has no art, frame or name of its own: those places are the whole card.
+    const a: Area = store.get().frameless && at.region !== 'none' ? { ...at, region: 'all' } : at;
     const band = a.lo > 0 || a.hi < 1;
     const tone = TONE_NAMES.find(([lo, hi]) => Math.abs(lo - a.lo) < 0.005 && Math.abs(hi - a.hi) < 0.005);
     let what =
