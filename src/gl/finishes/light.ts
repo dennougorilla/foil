@@ -5,7 +5,10 @@ import { GLOW_GLSL } from '../../touch/glow';
 import { HeatLayer } from '../../touch/layer';
 import { BLACKLIGHT_GLSL } from '../blacklight';
 import { NEON_GLSL } from '../neon';
+import { NeonGL } from '../neonGL';
 import type { FinishModule } from './types';
+
+const NEON = 92;
 
 const finishes: FinishModule = {
   glsl: /* glsl */ `
@@ -66,9 +69,11 @@ ${NEON_GLSL}
   else if (e == 92) col = neon(c, uv, uTilt, L, m.r);
 `,
   // Glow keeps the light shone on it in a touch field, like Warmth's heat (see touch/).
-  layers: (gl) => {
+  // Neon lays its sign out from each new face (see neonGL.ts).
+  layers: (gl, live) => {
     const heat = new HeatLayer(gl);
-    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }];
+    const neon = new NeonGL(gl, live);
+    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }, { setFace: (face) => neon.setFace(face), bind: (p, d) => neon.bind(p, d.edition === NEON) }];
   },
 };
 export default finishes;
