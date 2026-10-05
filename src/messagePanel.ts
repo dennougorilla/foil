@@ -11,13 +11,12 @@ import { ARRANGES, type Arrange } from './arrange';
 import type { Dict } from './i18n';
 import { sfx } from './audio';
 import { stamp } from './lettering';
-import { messageFonts } from './card/messageFace';
+import { bindMessageField } from './messageField';
 import {
   MESSAGE_FACES,
   MESSAGE_FONTS,
   MESSAGE_PHRASES,
   MESSAGE_PLACES,
-  cleanMessageText,
   type Message,
 } from './message';
 
@@ -57,22 +56,6 @@ function roving(group: HTMLElement) {
     b.click();
     b.focus();
   });
-}
-
-/** Writes the message text into a field, keeping the caret where it was when it is being typed in. */
-export function bindMessageField(field: HTMLTextAreaElement, store: Store): () => void {
-  field.addEventListener('input', () => {
-    const text = cleanMessageText(field.value);
-    if (text !== field.value) {
-      const at = Math.min(field.selectionStart ?? text.length, text.length);
-      field.value = text;
-      field.setSelectionRange(at, at);
-    }
-    store.set({ message: { ...store.get().message, text } });
-  });
-  return () => {
-    if (document.activeElement !== field) field.value = store.get().message.text;
-  };
 }
 
 export function mountMessage(o: Options): void {
@@ -256,12 +239,7 @@ export function mountMessage(o: Options): void {
     clear.hidden = !m.text;
     // Where and in which face only matter once there are words.
     detail.hidden = !has;
-    // The typeface buttons show themselves in their own face, which needs the sheet;
-    // the words being typed (here and in the tag) take the card's typeface too.
-    if (has) void messageFonts();
-    const f = MESSAGE_FACES[m.font];
-    if (has) document.documentElement.style.setProperty('--msg-font', `${f.weight} 1em "${f.family}", ${f.fallback}`);
-    else document.documentElement.style.removeProperty('--msg-font');
+    // The typeface buttons show themselves in their own face: main.ts fetches the sheet once there are words.
     place.btns.forEach((b) => radio(b, b.dataset.v === m.place));
     font.btns.forEach((b) => radio(b, b.dataset.v === m.font));
     radio(plate.btns[0], s.plate);

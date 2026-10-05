@@ -25,7 +25,18 @@
     <meta name="twitter:image" content="https://dennougorilla.github.io/foil/og.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+    <!-- The interface typefaces hold the first paint (blocking="render") but not the page's script, which
+         starts the card's shaders meanwhile; a stylesheet in the markup would hold both. -->
+    <script>
+      (function () {
+        var l = document.createElement('link');
+        l.rel = 'stylesheet';
+        l.href = 'https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap';
+        l.setAttribute('blocking', 'render');
+        l.id = 'uiFonts';
+        document.head.appendChild(l);
+      })();
+    </script>
   </head>
   <body>
     <canvas id="bg" aria-hidden="true"></canvas>

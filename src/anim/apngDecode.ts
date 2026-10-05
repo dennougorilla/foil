@@ -1,12 +1,7 @@
 // Reads animated PNG (APNG) and animated WebP into the same frame list the GIF path uses,
 // so the card face, the preview tick and the exports step through them unchanged.
-import type { Anim } from '../gifDecode';
+import type { Anim, AnimKind, KindedAnim } from './anim';
 import { chunk, chunks, isPng, PNG_SIG } from './png';
-
-export type AnimKind = 'GIF' | 'APNG' | 'WebP';
-
-/** An animation that remembers which format it came from, for the thumbnail badge. */
-export type KindedAnim = Anim & { kind: AnimKind };
 
 /** Same memory rules as the GIF decoder: every frame stays decoded, so cap pixels and frame count. */
 const PIXEL_BUDGET = 30_000_000;
@@ -14,8 +9,6 @@ const MAX_FRAMES = 180;
 const MAX_SIDE = 1024;
 /** The full-size canvas the APNG reader composites onto; larger animations open as stills. */
 const SCREEN_PIXEL_MAX = 16_777_216;
-
-export const animKind = (anim: Anim): AnimKind => (anim as Partial<KindedAnim>).kind ?? 'GIF';
 
 /** Very short delays play at 100 ms in browsers; match that so the speed feels familiar. */
 const delayMs = (ms: number) => (ms >= 10 ? Math.round(ms) : 100);

@@ -1,72 +1,29 @@
 // Panel controls for lettering finishes: five live preview chips to pick how the
-// name is printed, then only the tuning that style actually has.
+// name is printed, then only the tuning that style actually has. Loads with Fine-tune; the print
+// the face uses and the shortcut under the name tag are letteringJump.ts.
 
 import './lettering.css';
 import type { Store } from './state';
 import type { Dict } from './i18n';
-import type { FrameId } from './editions';
-import { rarityById } from './editions';
 import { sfx } from './audio';
-import { customFrame, isDark, isHex } from './palette';
-import {
-  DEFAULT_LETTERING,
-  FOIL_RAMP,
-  FOIL_TONES,
-  LETTER_STYLES,
-  STYLE_CONTROLS,
-  foilRamp,
-  letterFill,
-  normalizeLettering,
-  setLettering,
-  stamp,
-  type LetterInk,
-  type Lettering,
-} from './lettering';
+import { DEFAULT_LETTERING, FOIL_RAMP, FOIL_TONES, LETTER_STYLES, STYLE_CONTROLS, foilRamp, stamp, type LetterInk, type Lettering } from './lettering';
+import { chipGlyph, chipLook, stock } from './letteringJump';
 
 interface Options {
   store: Store;
   /** The panel tab the controls live in. */
   host: HTMLElement;
-  /** Brings that tab into view (opening Fine-tune if needed). */
-  open: () => void;
   dict: () => Dict;
   /** The name as printed on the card (typed or fallback). */
   name: () => string;
-  /** Repaint the card face; called only when the printed colour changes. */
-  repaint: () => void;
   /** A small bounce on the card when a style is picked. */
   onPick: () => void;
-  /** The card's name tag; the shortcut button that jumps to these controls goes right under it. */
-  tag?: HTMLElement;
 }
 
 /** Named inks, in swatch order. 'auto' and 'none' sit in front of these. */
 const INKS = { white: '#f7f3ea', black: '#1b1f22', red: '#c8322a', navy: '#1f3b7a' } as const;
 type InkKey = 'auto' | 'none' | keyof typeof INKS | 'custom';
 const INK_KEYS: InkKey[] = ['auto', 'none', 'white', 'black', 'red', 'navy', 'custom'];
-
-/** Frame paper and ink, mirrored from card/face so the chips sit on the card's own stock. */
-function stock(
-  frame: FrameId,
-  rarity: Parameters<typeof rarityById>[0],
-  frameColor: string,
-): { paper: string; solid: string; ink: string } {
-  // A custom frame colour wins over the preset, as on the card itself.
-  if (isHex(frameColor)) {
-    const f = customFrame(frameColor);
-    return { paper: f.fill, solid: f.fill, ink: f.ink };
-  }
-  switch (frame) {
-    case 'ink':
-      return { paper: '#252c30', solid: '#252c30', ink: '#f3eee2' };
-    case 'gilt':
-      return { paper: 'linear-gradient(135deg,#f7dc8b,#d9a441 45%,#fbe7a6 60%,#b97f26)', solid: '#e2b65a', ink: '#3b2408' };
-    case 'rarity':
-      return { paper: rarityById(rarity).color, solid: rarityById(rarity).color, ink: '#ffffff' };
-    default:
-      return { paper: '#f3eee2', solid: '#f3eee2', ink: '#262d31' };
-  }
-}
 
 const inkKeyOf = (ink: LetterInk): InkKey =>
   ink === 'auto' || ink === 'none' ? ink : ((Object.keys(INKS) as (keyof typeof INKS)[]).find((k) => INKS[k] === ink) ?? 'custom');
@@ -105,11 +62,9 @@ function roving(group: HTMLElement) {
   });
 }
 
-export function mountLettering(o: Options): void {
+/** Builds the controls; `call` brings them into view and draws the eye to them (the name tag's shortcut). */
+export function mountLettering(o: Options): { call: () => void } {
   const { store } = o;
-  const start = normalizeLettering(store.get().text);
-  setLettering(start);
-  if (start !== store.get().text) store.set({ text: start });
 
   const set = (patch: Partial<Lettering>) => store.set({ text: { ...store.get().text, ...patch } });
 
@@ -305,23 +260,7 @@ export function mountLettering(o: Options): void {
     styles.style.removeProperty('--my');
   });
 
-  // Shortcut on the name tag: shows the current lettering and jumps to the controls.
-  const jump = el('button', 'lt-jump');
-  jump.type = 'button';
-  const jumpChip = el('span', 'lt-chip');
-  jumpChip.setAttribute('aria-hidden', 'true');
-  jumpChip.append(el('b'));
-  const jumpText = el('span', 'lt-jump-text');
-  jumpText.setAttribute('aria-hidden', 'true');
-  jumpText.append(el('small'), el('b'));
-  const chevron = el('span', 'lt-jump-arrow');
-  chevron.setAttribute('aria-hidden', 'true');
-  chevron.textContent = '›';
-  jump.append(jumpChip, jumpText, chevron);
-  o.tag?.after(jump);
-  jump.addEventListener('click', () => {
-    sfx.tick();
-    o.open();
+  function call() {
     const on = styles.querySelector<HTMLButtonElement>('[aria-checked=true]');
     // Off-screen (phones: the panel is far below) jump there first, then fit the whole block.
     const r = root.getBoundingClientRect();
@@ -331,7 +270,7 @@ export function mountLettering(o: Options): void {
     root.classList.remove('is-called');
     void root.offsetWidth;
     root.classList.add('is-called');
-  });
+  }
   root.addEventListener('animationend', (e) => {
     if (e.target === root) root.classList.remove('is-called');
   });
@@ -375,21 +314,10 @@ export function mountLettering(o: Options): void {
     const l = s.text;
     const t = o.dict().lt;
     const c = STYLE_CONTROLS[l.style];
-    const { paper, solid, ink: frameInk } = stock(s.frame, s.rarity, s.frameColor);
-    const glyph = Array.from(o.name().trim())[0]?.toLocaleUpperCase() || 'A';
-    const [lo, hi] = foilRamp(l);
-    const shown = letterFill(l, frameInk);
+    const frameInk = stock(s.frame, s.rarity, s.frameColor).ink;
+    const glyph = chipGlyph(o.name());
     // Chips preview each style in your current colours on your current frame.
-    for (const host of [root, jump]) {
-      host.style.setProperty('--lt-paper', paper);
-      host.style.setProperty('--lt-stock', solid);
-      host.style.setProperty('--lt-ink', l.ink === 'auto' || l.ink === 'none' ? frameInk : l.ink);
-      host.style.setProperty('--lt-lo', lo);
-      host.style.setProperty('--lt-hi', hi);
-      host.classList.toggle('is-blind', l.ink === 'none' && c.blind);
-      host.classList.toggle('is-rainbow', l.foil === 'rainbow');
-      host.classList.toggle('is-dark-stock', isHex(s.frameColor) ? isDark(s.frameColor) : s.frame === 'ink');
-    }
+    chipLook(root, s);
     styleBtns.forEach((b) => {
       radio(b, b.dataset.style === l.style);
       const g = b.querySelector('b')!;
@@ -397,14 +325,6 @@ export function mountLettering(o: Options): void {
       g.dataset.g = glyph;
     });
     help.textContent = t.help[l.style];
-    const jumpLabel = t.jump.replace('{style}', t.style[l.style].replace('​', ''));
-    jump.setAttribute('aria-label', jumpLabel);
-    jump.title = jumpLabel;
-    jump.dataset.style = l.style;
-    jumpText.querySelector('small')!.textContent = t.title;
-    jumpText.querySelector('b')!.textContent = t.style[l.style].replace('​', '');
-    const jg = jumpChip.querySelector('b')!;
-    jg.textContent = jg.dataset.g = glyph;
 
     // Only the tuning the style actually has is shown.
     ink.row.hidden = !c.ink;
@@ -446,23 +366,15 @@ export function mountLettering(o: Options): void {
     gloss.input.setAttribute('aria-valuetext', `${gloss.out.textContent} (${Math.round(l.gloss * 100)}%)`);
     fill(gloss.input);
     tools.hidden = JSON.stringify(l) === JSON.stringify(DEFAULT_LETTERING);
-    lastFill = `${l.style}|${shown}`;
   }
 
-  let lastFill = '';
   labels();
   sync();
 
   store.on((s, changed) => {
-    if (changed.has('text')) {
-      const prev = lastFill;
-      setLettering(s.text);
-      sync();
-      // Depth and gloss only move uniforms; repaint the face only when the printed colour changes.
-      if (lastFill !== prev) o.repaint();
-      return;
-    }
+    if (changed.has('text')) return sync();
     if (changed.has('lang')) labels();
     if (['lang', 'frame', 'frameColor', 'rarity', 'name', 'sample'].some((k) => changed.has(k as keyof typeof s))) sync();
   });
+  return { call };
 }

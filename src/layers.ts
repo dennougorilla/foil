@@ -1,5 +1,5 @@
 // The card's two layers of finish as the renderer draws them (docs/layering.md).
-import { editionById, type Edition } from './editions';
+import { editionById } from './editions';
 import type { CardDraw } from './gl/renderers';
 import type { State } from './state';
 
@@ -19,7 +19,3 @@ export function cardLayers(s: Pick<State, 'edition' | 'layer2'>, proof: 0 | 1 | 
   if (proof) return { edition: editionById(s.edition).shader };
   return { edition: editionById(s.edition).shader, layer: layerDraw(s) };
 }
-
-/** The finishes on the card, layer 1 first. */
-export const cardEditions = (s: Pick<State, 'edition' | 'layer2'>): Edition[] =>
-  [editionById(s.edition), ...(s.layer2 ? [editionById(s.layer2.edition)] : [])];

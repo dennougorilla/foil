@@ -74,132 +74,6 @@
   word-break: keep-all;
 }
 
-@container (max-width: 320px) {
-  .lt-chip {
-    height: 40px;
-  }
-}
-
-.lt-chip {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 46px;
-  border-radius: 5px;
-  background: var(--lt-paper);
-  box-shadow: 0 0 0 2px var(--edge), inset 0 2px 0 rgba(255, 255, 255, 0.25), inset 0 -3px 0 rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-  transition: transform 0.18s var(--ease-back);
-}
-
-.lt-chip b {
-  position: relative;
-  font-family: 'DotGothic16', monospace;
-  font-size: 36px;
-  /* Faux bold: the pixel font is thin, and relief needs a letter with some body. */
-  font-weight: 700;
-  line-height: 1;
-  color: var(--lt-ink);
-}
-
-/* Print: flat. */
-
-/*
- * Deboss and emboss chips are lit by a fixed raking light from the upper left
- * (the angle that shows a press best); the pointer swings it around. The stroke
- * widens the die past the letter, as on a real card, so the walls show even
- * around dark ink.
- */
-.lt {
-  --lt-sh: rgba(0, 0, 0, 0.55);
-  --lt-hl: rgba(255, 255, 255, 0.95);
-  --lt-trough: rgba(0, 0, 0, 0.2);
-  --lt-pillow: rgba(255, 255, 255, 0.85);
-}
-
-.is-dark-stock {
-  --lt-sh: rgba(0, 0, 0, 0.95);
-  --lt-hl: rgba(255, 255, 255, 0.4);
-  --lt-trough: rgba(0, 0, 0, 0.45);
-  --lt-pillow: rgba(255, 255, 255, 0.14);
-}
-
-[data-style='deboss'] .lt-chip b,
-[data-style='emboss'] .lt-chip b {
-  -webkit-text-stroke: 6px var(--lt-trough);
-  paint-order: stroke fill;
-}
-
-/* Deboss: a sunken trough; the wall towards the light in shadow, a lit lip on the far side. */
-[data-style='deboss'] .lt-chip b {
-  color: color-mix(in srgb, var(--lt-ink) 85%, #000);
-  text-shadow:
-    calc(var(--lx) * 2px) calc(var(--ly) * 2px) 0 var(--lt-sh),
-    calc(var(--lx) * -1.5px) calc(var(--ly) * -1.5px) 0 var(--lt-hl);
-}
-
-/* Emboss: a raised pillow; lit shoulder towards the light, a long soft shadow away from it. */
-[data-style='emboss'] .lt-chip b {
-  -webkit-text-stroke-color: var(--lt-pillow);
-  text-shadow:
-    calc(var(--lx) * 1.5px) calc(var(--ly) * 1.5px) 0 var(--lt-hl),
-    calc(var(--lx) * -3.5px) calc(var(--ly) * -3.5px) 0 var(--lt-sh);
-}
-
-/* Blind (no ink): the letter is the card stock itself; the die's edges carry it. */
-.is-blind {
-  --lt-trough: rgba(0, 0, 0, 0.3);
-}
-
-.is-blind[data-style='deboss'] .lt-chip b,
-.is-blind[data-style='emboss'] .lt-chip b,
-.is-blind [data-style='deboss'] .lt-chip b,
-.is-blind [data-style='emboss'] .lt-chip b {
-  color: var(--lt-stock);
-}
-
-/* Foil: metal ramp that slides as the light moves. */
-[data-style='foil'] .lt-chip b {
-  color: transparent;
-  background: linear-gradient(115deg, var(--lt-lo) 10%, var(--lt-hi) 30%, var(--lt-lo) 48%, var(--lt-hi) 64%, var(--lt-lo) 86%);
-  background-size: 320% 100%;
-  background-position: calc(var(--mx) * 100%) 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
-}
-
-.is-rainbow[data-style='foil'] .lt-chip b,
-.is-rainbow [data-style='foil'] .lt-chip b {
-  background-image: linear-gradient(115deg, #ff8aa8, #ffe28a 18%, #9cf7c8 34%, #8ad4ff 50%, #c99cff 66%, #ff8aa8 84%, #ffe28a);
-}
-
-/* Spot UV: the glyph barely shows; a hard gloss band crosses it. */
-[data-style='spot'] .lt-chip b {
-  color: color-mix(in srgb, var(--lt-ink) 85%, #000);
-}
-
-[data-style='spot'] .lt-chip b::after {
-  content: attr(data-g);
-  position: absolute;
-  inset: 0;
-  color: transparent;
-  background: linear-gradient(115deg, transparent 42%, #fff 46% 50%, transparent 54%);
-  background-size: 300% 100%;
-  /* At rest the band crosses the glyph's right side; moving the pointer sweeps it across. */
-  background-position: calc((var(--mx) * 0.6 + 0.2) * 100%) 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-.is-blind[data-style='spot'] .lt-chip b,
-.is-blind [data-style='spot'] .lt-chip b {
-  /* Clear varnish on bare stock: only its edge and the gloss band show. */
-  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.14);
-  color: color-mix(in srgb, var(--lt-ink) 10%, transparent);
-}
-
 .lt-help {
   min-height: 2.6em;
 }
@@ -382,7 +256,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lt-style,
-  .lt-chip,
   .lt-swatch {
     transition: none;
   }
@@ -392,97 +265,6 @@
   .lt-tilt::before {
     animation: none;
   }
-}
-
-/* ---------- Shortcut under the card's name tag ---------- */
-
-/* A chunky button like the rest of the app: the finish preview, its name, and an arrow. */
-.lt-jump {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 12px;
-  padding: 6px 12px 6px 6px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--panel-lo);
-  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 5px 0 3px var(--edge);
-  color: var(--text);
-  text-align: left;
-  transition: transform 0.08s, background 0.15s;
-}
-
-.lt-jump:hover {
-  background: var(--panel-hi);
-}
-
-.lt-jump:active {
-  transform: translateY(4px);
-  box-shadow: 0 0 0 3px var(--edge), inset 0 0 0 2px var(--panel-hi), 0 1px 0 3px var(--edge);
-}
-
-.lt-jump .lt-chip {
-  flex: none;
-  width: 40px;
-  height: 34px;
-  border-radius: 6px;
-}
-
-.lt-jump .lt-chip b {
-  font-size: 24px;
-}
-
-.lt-jump-text {
-  display: grid;
-  min-width: 0;
-  line-height: 1.15;
-}
-
-.lt-jump-text small {
-  font-size: 13px;
-  color: var(--text);
-  opacity: 0.75;
-}
-
-/* On phones the controls are further down the page, so the arrow points down. */
-@media (max-width: 900px) {
-  .lt-jump-arrow {
-    transform: rotate(90deg);
-  }
-  .lt-jump:hover .lt-jump-arrow {
-    transform: rotate(90deg) translateY(-3px);
-  }
-}
-
-.lt-jump-text b {
-  font-weight: 400;
-  font-size: 17px;
-  text-shadow: 0 2px 0 var(--edge);
-}
-
-.lt-jump-arrow {
-  margin-left: auto;
-  font-family: var(--display);
-  font-size: 20px;
-  color: var(--gold);
-  transition: transform 0.15s var(--ease-back);
-}
-
-.lt-jump:hover .lt-jump-arrow {
-  transform: translateX(3px);
-}
-
-/* A small sparkle on the preview marks it as a finish. */
-.lt-jump .lt-chip::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 9px;
-  height: 9px;
-  background: var(--gold);
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
 }
 
 /* Focus and scroll targets clear the sticky tabs and the export bar of the panel. */
@@ -519,13 +301,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lt-jump,
-  .lt-jump-arrow {
-    transition: none;
-  }
-  .lt-jump:hover .lt-jump-arrow {
-    transform: none;
-  }
   .lt.is-called::before {
     animation-duration: 0.01s;
   }

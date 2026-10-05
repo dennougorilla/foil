@@ -343,66 +343,8 @@
   --act: tune-act-turn;
 }
 
-@keyframes tune-act-float {
-  50% { transform: translateY(-3px); }
-}
-
-@keyframes tune-act-swing {
-  25% { transform: rotate(14deg); }
-  75% { transform: rotate(-14deg); }
-}
-
-@keyframes tune-act-wobble {
-  20% { transform: rotate(-6deg); }
-  45% { transform: rotate(5deg); }
-  70% { transform: rotate(-3deg); }
-}
-
-@keyframes tune-act-bounce {
-  0%, 40%, 100% { transform: none; }
-  20% { transform: translateY(-4px); }
-  48% { transform: scale(1.15, 0.85); }
-}
-
-@keyframes tune-act-glint {
-  0%, 60%, 100% { transform: scale(0.8); opacity: 0.6; }
-  75% { transform: scale(1.2) rotate(45deg); opacity: 1; }
-}
-
-@keyframes tune-act-turn {
-  0%, 30% { transform: none; }
-  100% { transform: rotateY(360deg); }
-}
-
 .tune-opt[data-value='pointer'] {
   --act: tune-act-point;
-}
-
-@keyframes tune-act-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes tune-act-sway {
-  25% {
-    transform: translateX(-2px) rotate(-6deg);
-  }
-  75% {
-    transform: translateX(2px) rotate(6deg);
-  }
-}
-
-@keyframes tune-act-breathe {
-  50% {
-    transform: scale(1.25);
-  }
-}
-
-@keyframes tune-act-point {
-  50% {
-    transform: translate(2px, 2px);
-  }
 }
 
 .tune-help {

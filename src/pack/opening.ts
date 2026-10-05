@@ -18,7 +18,6 @@ import { sfx } from '../audio';
 import { paintPack, PACK_H, PACK_W, TEAR_Y } from './packArt';
 import { buzz, packSfx } from './sounds';
 import { Pillow, type Print } from './pillow';
-import { PACK_EN } from '../packText';
 import { contain, fitArea } from '../card/shape';
 
 export interface OpeningOptions {
@@ -198,7 +197,7 @@ export function openPack(o: OpeningOptions) {
   const prints = new Map<PackId, Print>();
   let print: Print | undefined;
   // The room: FOIL's own swirl, in the pack's colors, drawn small and scaled up pixelated.
-  const swirl = new BackgroundRenderer($<HTMLCanvasElement>('.pk-swirl'));
+  const swirl = new BackgroundRenderer($<HTMLCanvasElement>('.pk-swirl'), { live: true });
   r.tune = tuneGl(o.tune);
   r.setFace(o.face, o.mask);
   /** The card's shape (height / width), and its size at the area of a trading card one unit tall. */
@@ -211,7 +210,7 @@ export function openPack(o: OpeningOptions) {
     const mask = document.createElement('canvas');
     paintPack(face, mask, p, {
       // Seven letters is what fits at the crisp title size.
-      big: p.supporter ? 'SUPPORT' : PACK_EN.name[p.id].toUpperCase(),
+      big: p.supporter ? 'SUPPORT' : p.id.toUpperCase(),
       line: t.inside.replace('{n}', String(p.finishes.length)),
       top: p.supporter ? 'THANK YOU' : undefined,
     });

@@ -1,5 +1,5 @@
 import { BG_FS, cardFs, CARD_VS, PARTICLE_FS, PARTICLE_VS, QUAD_VS } from './shaders';
-import { createProgram, createTexture, hexToRgb, quadBuffer, startProgram, uploadTexture, type PendingProgram, type Program } from './gl';
+import { createTexture, hexToRgb, quadBuffer, startProgram, uploadTexture, type PendingProgram } from './gl';
 import { applyTune, TUNE_GL_DEFAULT, type TuneGl } from '../tune/model';
 import { LetteringGL } from '../lettering';
 import { artOf } from '../card/face';
@@ -17,6 +17,9 @@ export type RGB = [number, number, number];
 interface CardProgram {
   pending: PendingProgram;
   layers: FinishLayer[];
+  /** The frame (see begin) whose answer `ready` holds: each question is a round trip to the GPU process. */
+  askedIn: number;
+  ready: boolean;
 }
 
 export interface BackgroundFrame {
@@ -29,20 +32,22 @@ export interface BackgroundFrame {
 /** Full-viewport swirl. Rendered at a fraction of the screen size, then upscaled pixelated by CSS. */
 export class BackgroundRenderer {
   readonly gl: WebGL2RenderingContext;
-  private p: Program;
+  private pending: PendingProgram;
   private vao: WebGLVertexArrayObject;
+  /** On the page, the swirl compiles in the background and shows from the first frame it is ready; an export waits for it. */
+  private live: boolean;
 
-  constructor(readonly canvas: HTMLCanvasElement) {
+  constructor(readonly canvas: HTMLCanvasElement, opts: { live?: boolean } = {}) {
+    this.live = !!opts.live;
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error('webgl2');
     this.gl = gl;
-    this.p = createProgram(gl, QUAD_VS, BG_FS);
+    this.pending = startProgram(gl, QUAD_VS, BG_FS, 'aPos');
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
     quadBuffer(gl, 1);
-    const loc = this.p.attr('aPos');
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   }
 
   resize(w: number, h: number): void {
@@ -53,7 +58,9 @@ export class BackgroundRenderer {
   }
 
   render(f: BackgroundFrame): void {
-    const { gl, p } = this;
+    if (this.live && !this.pending.done()) return;
+    const { gl } = this;
+    const p = this.pending.get();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(p.prog);
     gl.bindVertexArray(this.vao);
@@ -143,7 +150,8 @@ export interface Particle {
 export class CardRenderer {
   readonly gl: WebGL2RenderingContext;
   private programs = new Map<PackId | 'open', CardProgram>();
-  private parts: Program;
+  /** The sparks' program compiles in the background; a burst waits for it. */
+  private parts: PendingProgram;
   private cardVao: WebGLVertexArrayObject;
   private partVao: WebGLVertexArrayObject;
   private partBuf: WebGLBuffer;
@@ -186,7 +194,7 @@ export class CardRenderer {
     this.live = !opts.settled;
     // The open finishes' program starts compiling now; a pack's when it is first asked for.
     this.program('open');
-    this.parts = createProgram(gl, PARTICLE_VS, PARTICLE_FS);
+    this.parts = startProgram(gl, PARTICLE_VS, PARTICLE_FS, 'aP', 'aC');
 
     // Every card program pins aPos to location 0, so they share this VAO.
     this.cardVao = gl.createVertexArray()!;
@@ -200,12 +208,10 @@ export class CardRenderer {
     this.partBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.partBuf);
     gl.bufferData(gl.ARRAY_BUFFER, this.partData.byteLength, gl.DYNAMIC_DRAW);
-    const ap = this.parts.attr('aP');
-    const ac = this.parts.attr('aC');
-    gl.enableVertexAttribArray(ap);
-    gl.vertexAttribPointer(ap, 4, gl.FLOAT, false, 28, 0);
-    gl.enableVertexAttribArray(ac);
-    gl.vertexAttribPointer(ac, 3, gl.FLOAT, false, 28, 16);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 28, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 28, 16);
     gl.bindVertexArray(null);
 
     this.back = createTexture(gl, true);
@@ -223,7 +229,7 @@ export class CardRenderer {
     if (cp) return cp;
     const mod = key === 'open' ? undefined : packModule(key);
     if (key !== 'open' && !mod) return null;
-    cp = { pending: startProgram(this.gl, CARD_VS, cardFs(mod), 'aPos'), layers: mod?.layers?.(this.gl, this.live) ?? [] };
+    cp = { pending: startProgram(this.gl, CARD_VS, cardFs(mod), 'aPos'), layers: mod?.layers?.(this.gl, this.live) ?? [], askedIn: -1, ready: false };
     if (this.cardFace) for (const l of cp.layers) l.setFace?.(this.cardFace);
     this.programs.set(key, cp);
     return cp;
@@ -235,8 +241,18 @@ export class CardRenderer {
    */
   ready(shader: number): boolean {
     const cp = this.program(packOfShader(shader) ?? 'open');
-    return !!cp && (!this.live || cp.pending.done());
+    if (!cp) return false;
+    if (!this.live) return true;
+    // Every card of a frame shares one answer (asking waits while the GPU process is busy compiling).
+    if (cp.askedIn !== this.frames) {
+      cp.askedIn = this.frames;
+      cp.ready = cp.pending.done();
+    }
+    return cp.ready;
   }
+
+  /** Frames begun, so the cards of one frame share one answer in `ready`. */
+  private frames = 0;
 
   /**
    * `key`: 'card' is the card's own face; other names hold extra faces drawn with the same shader.
@@ -300,6 +316,7 @@ export class CardRenderer {
   }
 
   begin(): void {
+    this.frames++;
     const { gl } = this;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -404,8 +421,9 @@ export class CardRenderer {
   }
 
   drawParticles(list: Particle[]): void {
-    if (!list.length) return;
-    const { gl, parts: p } = this;
+    if (!list.length || !this.parts.done()) return;
+    const { gl } = this;
+    const p = this.parts.get();
     const n = Math.min(list.length, 512);
     const data = this.partData;
     for (let i = 0; i < n; i++) {

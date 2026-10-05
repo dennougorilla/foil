@@ -142,19 +142,8 @@
   white-space: normal;
 }
 
-/* The name in the tag steps back while the nameplate is off. */
-.info-box .info-name.is-off {
-  opacity: 0.45;
-}
-
-/* The tag's message box grows with the lines (up to three). */
-.info-desc textarea {
-  field-sizing: content;
-}
-
-/* The words take the card's typeface while they are typed (the hint keeps the app's). */
-.msg-field:not(:placeholder-shown),
-.info-desc textarea:not(:placeholder-shown) {
+/* The words take the card's typeface while they are typed (the hint keeps the app's; tag.css does the tag's). */
+.msg-field:not(:placeholder-shown) {
   font: var(--msg-font, inherit);
   line-height: 1.4;
 }

@@ -53,3 +53,58 @@ test('no pack shader code is in the first load', () => {
     }
   }
 });
+
+/**
+ * What waits until it is used (docs/performance.md): Fine-tune's tabs, the print menu, free placement,
+ * the motion tray, making a file, reading an animated picture, and each language's texts.
+ */
+const ON_DEMAND = [
+  'i18n/ja.ts',
+  'i18n/en.ts',
+  'adjust.ts',
+  'tune/panel.ts',
+  'tune/peek.ts',
+  'tune/handle.ts',
+  'tune/quickTray.ts',
+  'letteringPanel.ts',
+  'messagePanel.ts',
+  'rangePanel.ts',
+  'layersPanel.ts',
+  'miniPreview.ts',
+  'swatches.ts',
+  'printPop.ts',
+  'arrangeEdit.ts',
+  'exporter.ts',
+  'tune/exportMotion.ts',
+  'anim/apngExport.ts',
+  'anim/png.ts',
+  'gifDecode.ts',
+  'anim/apngDecode.ts',
+];
+
+test('the on-demand modules are not in the first load', () => {
+  const first = closure(join(SRC, 'main.ts'));
+  for (const f of ON_DEMAND) {
+    assert.ok(existsSync(join(SRC, f)), `${f} does not exist`);
+    assert.ok(!first.has(join(SRC, f)), `${f} is loaded up front`);
+  }
+});
+
+test('each on-demand module is still loaded somewhere (a dynamic import reaches it)', () => {
+  // Every dynamic import target in src, and what those modules import statically.
+  const reached = new Set<string>();
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (p.endsWith('.ts')) {
+        for (const m of readFileSync(p, 'utf8').matchAll(/import\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
+          const base = normalize(join(dirname(p), m[1]));
+          for (const f of [base, `${base}.ts`]) if (f.endsWith('.ts') && existsSync(f)) for (const c of closure(f)) reached.add(c);
+        }
+      }
+    }
+  };
+  walk(SRC);
+  for (const f of ON_DEMAND) assert.ok(reached.has(join(SRC, f)), `${f} is never loaded`);
+});

@@ -1,7 +1,7 @@
 // The panel's "Shine" tab: three groups of controls (pattern, light, motion). Every
 // control shows its value, can be reset on its own, and double-click / Delete puts it back.
 import './tune.css';
-import { DICTS, type Dict } from '../i18n';
+import { dictOf, type Dict } from '../i18n';
 import type { State, Store } from '../state';
 import type { EditionId } from '../editions';
 import { sfx } from '../audio';
@@ -22,6 +22,8 @@ import { motion } from './motion';
 import { mountPeek } from './peek';
 import { mountSunHandle } from './handle';
 import { svg } from './icons';
+import { format } from './format';
+import './acts.css';
 
 type Group = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
@@ -36,38 +38,6 @@ const GROUPS: { id: Group; keys: Key[] }[] = [
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
 const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'blacklight', 'stardust', 'snowglobe', 'kintsugi', 'opal', 'confetti', 'fireworks']);
 
-
-const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
-
-/** Amounts read as a multiple of the finish's own look (×1.0); the notch under the track marks it. */
-const RELATIVE = new Set<NumKey>(['scale', 'sharp', 'sparkleSize', 'sat', 'glare']);
-
-export function format(k: NumKey, v: number, t: Dict['tune']): string {
-  if (RELATIVE.has(k)) return `×${(v / (TUNE_DEFAULTS[k] || 1)).toFixed(1)}`;
-  switch (k) {
-    case 'scale':
-    case 'sharp':
-    case 'sparkleSize':
-      return `${Math.round(v * 100)}%`;
-    case 'angle':
-    case 'hue':
-      return `${sign(Math.round(v))}°`;
-    case 'lightAngle':
-    case 'tiltMax':
-      return `${Math.round(v)}°`;
-    case 'sat':
-    case 'glare':
-      return `${Math.round(v * 100)}%`;
-    case 'sparkle':
-      return `${Math.round(v * 100)}%`;
-    case 'temp':
-      return `${Math.round(v)}K`;
-    case 'speed':
-      return v <= 0 ? t.stopped : `×${+v.toFixed(2)}`;
-    case 'idleAmp':
-      return `×${+v.toFixed(2)}`;
-  }
-}
 
 const formatChoice = (k: ChoiceKey, v: string, t: Dict['tune']) =>
   k === 'light' ? t.lightMode[v as Tune['light']] : k === 'idle' ? t.idleMode[v as Tune['idle']] : t.metalMode[v as Tune['metal']];
@@ -97,7 +67,7 @@ function trackFor(k: NumKey, v: number): string {
 
 export function mountTune(store: Store, root: HTMLElement): void {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let t = DICTS[store.get().lang].tune;
+  let t = dictOf(store.get().lang).tune;
   /** What "Reset all" replaced, offered back for a few seconds. */
   let undo: Tune | null = null;
   let undoTimer = 0;
@@ -126,7 +96,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
   // ---------- Build ----------
 
   function build() {
-    t = DICTS[store.get().lang].tune;
+    t = dictOf(store.get().lang).tune;
     root.innerHTML = `
         <div class="tune-groups"></div>
         <p class="hint tune-hint"></p>

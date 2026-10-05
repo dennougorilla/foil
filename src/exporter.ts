@@ -2,7 +2,9 @@ import { exportFrame } from './card/shape';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { exportLoop, exportView, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
+import { exportLoop, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
+import { exportView } from './tune/exportMotion';
+import { GIF_SAVE, type GifSize } from './exportSize';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
@@ -249,24 +251,6 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   };
 }
 
-/**
- * A GIF's frame for the trading card (other shapes turn it, see shape.ts exportFrame), its shortest
- * time between frames (ms, a multiple of 10), and at most how many frames it holds: a slow loop
- * plays at a lower frame rate rather than growing without end.
- */
-export interface GifSize {
-  w: number;
-  h: number;
-  delay: number;
-  maxFrames: number;
-}
-/** Saved: up to 20 fps. */
-export const GIF_SAVE: GifSize = { w: 480, h: 600, delay: 50, maxFrames: 90 };
-/**
- * For the share sheet: smaller and at most 50 frames (a long loop gets longer frames instead), so
- * even a noisy picture stays well under the 15 MB X takes (50 × 360 × 450 is 8.1 MB before compression).
- */
-export const GIF_SHARE: GifSize = { w: 360, h: 450, delay: 60, maxFrames: 50 };
 /** Share of the progress bar spent drawing frames; the worker's encode fills the rest. */
 const GIF_DRAW_SHARE = 0.35;
 

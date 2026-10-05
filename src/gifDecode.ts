@@ -1,11 +1,7 @@
+// Animated GIFs, decoded once they are opened (docs/performance.md).
 import { decompressFrames, parseGIF } from 'gifuct-js';
+import type { Anim } from './anim/anim';
 
-export interface Anim {
-  frames: HTMLCanvasElement[];
-  /** Start time of each frame in ms, plus the total loop length. */
-  starts: number[];
-  duration: number;
-}
 
 /** Keeps every decoded frame in memory, so cap the total pixel budget (~120 MB of RGBA). */
 const PIXEL_BUDGET = 30_000_000;
@@ -78,17 +74,4 @@ export function decodeGif(buf: ArrayBuffer): Anim | null {
     else if (f.disposalType === 3 && restore) sctx.putImageData(restore, 0, 0);
   }
   return { frames, starts, duration: t };
-}
-
-/** Index of the frame showing at time `ms` in a looping animation. */
-export function frameAt(anim: Anim, ms: number): number {
-  const t = ((ms % anim.duration) + anim.duration) % anim.duration;
-  let lo = 0;
-  let hi = anim.starts.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (anim.starts[mid] <= t) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo;
 }

@@ -102,7 +102,6 @@ export function letterFill(l: Lettering, frameInk: string): string | null {
 
 let active: Lettering = { ...DEFAULT_LETTERING };
 export const setLettering = (l: Lettering) => (active = l);
-export const getLettering = () => active;
 
 // ---------- Per piece of text ----------
 // Each piece (the name, the type line, the message) is printed in the card's

@@ -1,7 +1,8 @@
 // Export-only motions: Showcase (the v0.12 export orbit, restored exactly) and the ones made to show the foil off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EXPORT_MOTIONS, exportLoop, exportView, fixedLight, TUNE_DEFAULTS, type ExportMotion, type Tune } from '../src/tune/model.ts';
+import { EXPORT_MOTIONS, exportLoop, fixedLight, TUNE_DEFAULTS, type ExportMotion, type Tune } from '../src/tune/model.ts';
+import { exportView } from '../src/tune/exportMotion.ts';
 
 const close = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) <= eps;
 

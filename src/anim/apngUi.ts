@@ -1,9 +1,9 @@
 // The Save button while APNG is the chosen format: size hint, progress, and cancel (click again or Esc).
+// The encoder (apngExport.ts) loads when a file is made.
 import './apng.css';
 import type { Lang } from '../i18n';
 import type { ExportInput } from '../exporter';
-import { apngPlan, exportApng } from './apngExport';
-import { TUNE_DEFAULTS } from '../tune/model';
+import type { ApngPlan } from './apngPlan';
 
 const TEXT = {
   ja: {
@@ -56,6 +56,8 @@ export interface ApngUiOptions {
   loading: () => boolean;
   lang: () => Lang;
   input: () => ExportInput;
+  /** The file the current card would make (apngPlan), for the idle label. */
+  plan: () => ApngPlan;
   toast: (msg: string, error?: boolean) => void;
   /** After a file is written, for the panel's saved moment. */
   onSaved: (file: string) => void;
@@ -64,7 +66,7 @@ export interface ApngUiOptions {
   sfx: { coin(): void; error(): void; tick(): void };
 }
 
-export function mountApngExport({ btn, active, loading, lang, input, toast, onSaved, busy, sfx }: ApngUiOptions) {
+export function mountApngExport({ btn, active, loading, lang, input, plan: planNow, toast, onSaved, busy, sfx }: ApngUiOptions) {
   const [label, meta] = btn.querySelectorAll<HTMLElement>('.btn-text, .save-meta');
   const [b, small] = [label.querySelector('b')!, label.querySelector('small')!];
   const [mb, msmall] = [meta.querySelector('b')!, meta.querySelector('small')!];
@@ -77,8 +79,7 @@ export function mountApngExport({ btn, active, loading, lang, input, toast, onSa
   const refresh = () => {
     if (job || hold || !active()) return;
     const t = TEXT[lang()];
-    const i = input();
-    const plan = apngPlan(i.tune ?? TUNE_DEFAULTS, i.face.height / i.face.width, i.loopMs, i.motion);
+    const plan = planNow();
     const size = fill(t.size, { n: formatBytes(plan.bytes) });
     const secs = plan.delays.reduce((a, d) => a + d, 0) / 1000;
     b.textContent = t.title;
@@ -116,6 +117,7 @@ export function mountApngExport({ btn, active, loading, lang, input, toast, onSa
     };
     let stopped = false;
     try {
+      const { exportApng } = await import('./apngExport');
       const { file, bytes } = await exportApng(input(), progress, ctl.signal);
       sfx.coin();
       toast(fill(t.saved, { file, size: formatBytes(bytes) }) + t.note);

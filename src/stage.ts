@@ -151,7 +151,7 @@ export class Stage {
   constructor(o: StageOptions) {
     this.o = o;
     this.cards = new CardRenderer(o.canvas);
-    this.bg = new BackgroundRenderer(o.bgCanvas);
+    this.bg = new BackgroundRenderer(o.bgCanvas, { live: true });
     const ed = EDITIONS.find((e) => e.id === o.store.get().edition) ?? EDITIONS[0];
     this.palette = ed.swirl.map(hexToRgb) as [RGB, RGB, RGB];
     this.syncHand();

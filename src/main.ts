@@ -1,30 +1,32 @@
 import './style.css';
+import './tag.css';
 import { cardOf, CARD_KEYS, CARD_TYPE_MAX, cleanCard, createStore, EXPORT_FORMATS, PANEL_TABS, type PanelTab, type State } from './state';
-import { DICTS, type Dict } from './i18n';
+import { dictOf, loadDict, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { clampCrop, cropRect, drawFace, drawFlip, faceArt, type Crop } from './card/face';
 import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
 import { CARD_LAYOUTS } from './card/tcg';
-import { mountPrintPop } from './printPop';
-import { mountArrange } from './arrangeEdit';
+import type { PrintPop } from './printPop';
 import type { TextRun } from './lettering';
 import type { ShadowDepth } from './depth/shadowDepth';
 import { paintSample, SAMPLE_COUNT } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
-import { download, exportGif, exportPng, GIF_SAVE, GIF_SHARE } from './exporter';
+import { GIF_SAVE, GIF_SHARE } from './exportSize';
 import { forgetUserImage, loadUserImage, saveUserImage } from './imageStore';
-import { decodeGif, frameAt, type Anim } from './gifDecode';
-import { mountTune } from './tune/panel';
-import { animKind, asTypedApng, decodeAnimated } from './anim/apngDecode';
+import { animKind, frameAt, type Anim } from './anim/anim';
+import { apngPlan } from './anim/apngPlan';
 import { mountApngExport } from './anim/apngUi';
-import { mountLettering } from './letteringPanel';
-import { bindMessageField, mountMessage } from './messagePanel';
-import { loadMessageFont } from './card/messageFace';
+import { mountLetteringJump } from './letteringJump';
+import { bindMessageField } from './messageField';
+import { loadMessageFont, messageFonts } from './card/messageFace';
+import { MESSAGE_FACES } from './message';
 import { changedKeys, EXPORT_MOTIONS, type ExportMotion } from './tune/model';
 import { DEFAULT_LETTERING, fieldAt, setFieldPrints, setTextRuns } from './lettering';
-import { initRangeColors } from './features';
+import { initAreas } from './areas';
+import { layerDraw } from './layers';
+import type { Adjust } from './adjust';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
@@ -49,34 +51,11 @@ const store = createStore();
 releaseSealedEdition(store);
 /** The hand: seven cards, in their order. */
 const hand = () => store.get().hand;
-let t: Dict = DICTS[store.get().lang];
-
-// ---------- Images ----------
-
-type Img = HTMLCanvasElement;
-const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSample(i));
-let userImage: Img | null = null;
-/** Set when the person's image is an animated GIF; userImage then holds its first frame. */
-let userAnim: Anim | null = null;
-/** The person's picture as it came (kept in the binder as is while it moves). */
-let userSource: Blob | null = null;
-let animFrame = 0;
-const currentImage = (): Img => {
-  const s = store.get();
-  if (s.sample >= 0) return samples[s.sample];
-  if (userAnim) return userAnim.frames[animFrame] ?? userAnim.frames[0];
-  return userImage ?? samples[0];
-};
-
-const face = document.createElement('canvas');
-const mask = document.createElement('canvas');
-const back = document.createElement('canvas');
-drawBack(back, store.get().shape);
-// Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
-document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
+const dict = loadDict(store.get().lang);
 
 // ---------- Stage ----------
 
+// The stage comes first: its shaders compile in the background while the rest of the page is built.
 let stage: Stage;
 try {
   stage = new Stage({
@@ -96,7 +75,7 @@ try {
     // Tapping words on the card opens their own print.
     onTapCard: (uv, x, y) => {
       const field = fieldAt(uv);
-      if (field) printPop.open(field, { x, y });
+      if (field) void usePrint().then((p) => p.open(field, { x, y }), () => toast(t.loadFailed, true));
     },
     handIds: hand,
     deckRect: () => document.getElementById('deckBtn')?.getBoundingClientRect() ?? null,
@@ -105,9 +84,55 @@ try {
   console.error(err);
   const fatal = $('fatal');
   fatal.hidden = false;
-  fatal.textContent = t.errGl;
+  fatal.textContent = (await dict).errGl;
   throw err;
 }
+let t: Dict = await dict;
+
+// ---------- Images ----------
+
+type Img = HTMLCanvasElement;
+const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSample(i));
+let userImage: Img | null = null;
+/** Set when the person's image is an animated GIF; userImage then holds its first frame. */
+let userAnim: Anim | null = null;
+/** The person's picture as it came (kept in the binder as is while it moves). */
+let userSource: Blob | null = null;
+let animFrame = 0;
+const currentImage = (): Img => {
+  const s = store.get();
+  if (s.sample >= 0) return samples[s.sample];
+  if (userAnim) return userAnim.frames[animFrame] ?? userAnim.frames[0];
+  return userImage ?? samples[0];
+};
+
+// Animated pictures: advance the card face whenever the next frame is due, for as long as there is one.
+let framesPlaying = false;
+function playFrames() {
+  if (framesPlaying || !userAnim) return;
+  framesPlaying = true;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const tick = (now: number) => {
+    if (!userAnim) return void (framesPlaying = false);
+    if (store.get().sample < 0 && !reduced.matches) {
+      const i = frameAt(userAnim, now);
+      if (i !== animFrame) {
+        animFrame = i;
+        redrawFace();
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+const face = document.createElement('canvas');
+const mask = document.createElement('canvas');
+const back = document.createElement('canvas');
+drawBack(back, store.get().shape);
+// Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
+document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
+
 stage.cards.setBack(back);
 // Shadowbox and 3D Lenticular read the art's depth; its code loads the first time one is chosen.
 let depth: ShadowDepth | null = null;
@@ -173,7 +198,7 @@ function redrawFace() {
   if (ask && ask !== fontAsked) void loadMessageFont(font, text).then(() => fontAsked === ask && redrawFace());
   fontAsked = ask;
   stage.cards.setFace(face, mask);
-  rangeColors.onFace(face, mask, spec);
+  areas.onFace(face, mask, spec);
   depth?.update(face, artKey());
 }
 
@@ -190,7 +215,7 @@ function fallback() {
 
 function applyText() {
   const s = store.get();
-  t = DICTS[s.lang];
+  t = dictOf(s.lang);
   document.documentElement.lang = s.lang;
   document.querySelectorAll<HTMLElement>('[data-t]').forEach((el) => {
     const key = el.dataset.t as keyof Dict;
@@ -227,7 +252,7 @@ function applyText() {
   const pasteKey = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘V' : 'Ctrl+V';
   $('pickBtn').querySelector('small')!.textContent = t.pickSub.replace('Ctrl+V', pasteKey);
   $('pickBtn').title = t.pickSub.replace('Ctrl+V', pasteKey);
-  if (matchMedia('(pointer: coarse)').matches) document.querySelector('#info .card-hint')!.textContent = t.cardHintTouch;
+  renderCardHint();
   buildSegments();
   buildThumbs();
   buildTabs();
@@ -240,6 +265,13 @@ function applyText() {
   syncInputs();
   renderInfo();
   renderCaption(null);
+}
+
+/** The hint under the tag beside the card: taps rather than clicks on touch screens, and what Free does while it is on. */
+function renderCardHint() {
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const words = store.get().arrange === 'free' ? t.arrange : t;
+  document.querySelector('#info .card-hint')!.textContent = touch ? words.cardHintTouch : words.cardHint;
 }
 
 function renderInfo() {
@@ -354,7 +386,7 @@ function buildSegments() {
     };
     fs.appendChild(b);
   }
-  rangeColors.decorateFrames(fs);
+  adjust?.decorateFrames(fs);
   const ss = $('shapeSeg');
   ss.textContent = '';
   for (const sh of SHAPES) {
@@ -472,6 +504,12 @@ function syncInputs() {
   name.placeholder = fallback().name;
   const tcg = s.layout === 'tcg';
   msg.placeholder = tcg ? t.msg.effectTag : t.msg.tag;
+  // The words being typed (in the tag and in the Lettering tab) take the card's typeface.
+  if (s.message.text.trim()) {
+    void messageFonts();
+    const f = MESSAGE_FACES[s.message.font];
+    document.documentElement.style.setProperty('--msg-font', `${f.weight} 1em "${f.family}", ${f.fallback}`);
+  } else document.documentElement.style.removeProperty('--msg-font');
   const type = $<HTMLInputElement>('typeInput');
   type.hidden = !tcg;
   if (document.activeElement !== type) type.value = s.cardType;
@@ -617,10 +655,12 @@ const MAX_SIDE = 2048;
 /** Decodes a still image (downscaled), or every frame of an animated GIF, PNG or WebP. */
 async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null }> {
   if (blob.type === 'image/gif') {
+    const { decodeGif } = await import('./gifDecode');
     const anim = decodeGif(await blob.arrayBuffer());
     if (anim) return { still: anim.frames[0], anim };
   }
   if (/^image\/(a?png|webp)$/.test(blob.type)) {
+    const { decodeAnimated } = await import('./anim/apngDecode');
     const anim = await decodeAnimated(blob);
     if (anim) return { still: anim.frames[0], anim };
   }
@@ -639,7 +679,7 @@ async function decodeImage(blob: Blob): Promise<{ still: Img; anim: Anim | null 
 async function loadFile(file: File) {
   if (!ACCEPT.test(file.type)) {
     // A .apng with no MIME type is still welcome if its bytes say APNG.
-    const apng = file.type ? null : await asTypedApng(file);
+    const apng = file.type ? null : await import('./anim/apngDecode').then((m) => m.asTypedApng(file));
     if (!apng) {
       toast(t.errType.replace('{name}', file.name), true, true);
       return;
@@ -662,6 +702,7 @@ async function loadFile(file: File) {
     userAnim = anim;
     userSource = file;
     animFrame = 0;
+    playFrames();
     void saveUserImage(anim ? file : still);
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
     const s = store.get();
@@ -890,8 +931,15 @@ $<HTMLInputElement>('pixel').addEventListener('input', (e) => {
 });
 $('langBtn').addEventListener('click', () => {
   sfx.tick();
-  store.set({ lang: store.get().lang === 'ja' ? 'en' : 'ja' });
+  // The other language's texts arrive first; then everything changes at once.
+  const next = store.get().lang === 'ja' ? 'en' : 'ja';
+  loadDict(next).then(
+    () => store.set({ lang: next }),
+    () => toast(t.loadFailed, true),
+  );
 });
+// Fetched ahead the moment the button is pointed at.
+for (const ev of ['pointerenter', 'focus']) $('langBtn').addEventListener(ev, () => void loadDict(store.get().lang === 'ja' ? 'en' : 'ja').catch(() => {}));
 $('soundBtn').addEventListener('click', () => {
   const on = !store.get().sound;
   setSound(on);
@@ -908,7 +956,6 @@ rovingKeys($('shapeSeg'));
 rovingKeys($('layoutSeg'));
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
-mountTune(store, $('pane-light'));
 mountProof($('finishProof'));
 mountProof($('recapProof'));
 
@@ -1028,10 +1075,38 @@ new ResizeObserver(([e]) =>
 
 adjustToggle.addEventListener('click', () => {
   sfx.tick();
-  const open = !store.get().adjustOpen;
-  store.set({ adjustOpen: open });
-  if (open) revealTabs();
+  if (store.get().adjustOpen) return store.set({ adjustOpen: false });
+  // The tabs' code arrives first, so a tab never opens empty.
+  void openAdjust().then(revealTabs, () => {});
 });
+for (const ev of ['pointerenter', 'focus']) adjustToggle.addEventListener(ev, () => void useAdjust().catch(() => {}), { once: true });
+
+let adjust: Adjust | null = null;
+let adjustLoad: Promise<Adjust> | null = null;
+/** Fine-tune's tabs past Card (and the frame's own colours): their code and styles come on first use. */
+function useAdjust(): Promise<Adjust> {
+  if (!adjustLoad) {
+    adjustLoad = Promise.all([import('./adjust'), usePrint()]).then(([m, print]) => {
+      adjust = m.mountAdjust({ store, stage, areas, print, dict: () => t, announce, onPick: () => stage.juice(0.35), fallbackName: () => fallback().name });
+      buildSegments();
+      syncAdjust();
+      return adjust;
+    });
+    adjustLoad.catch(() => (adjustLoad = null));
+  }
+  return adjustLoad;
+}
+
+/** Opens Fine-tune once its tabs are there (on `tab` when given); says so when they can't be fetched. */
+function openAdjust(tab?: PanelTab): Promise<Adjust> {
+  adjustToggle.setAttribute('aria-busy', 'true');
+  const ready = useAdjust().then((a) => {
+    store.set(tab ? { adjustOpen: true, panelTab: tab } : { adjustOpen: true });
+    return a;
+  });
+  ready.catch(() => toast(t.loadFailed, true)).finally(() => adjustToggle.removeAttribute('aria-busy'));
+  return ready;
+}
 
 // ---------- Export ----------
 
@@ -1048,10 +1123,17 @@ function exportInput() {
     motion: s.exportMotion,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
-    ...rangeColors.exportExtras(),
+    range: areas.snapshot(),
+    layer: layerOf(s),
     layers: depth?.current(),
     flip: flipImage ? flip : undefined,
   };
+}
+
+/** Layer 2 as the exporter draws it, when the card has one. */
+function layerOf(s: State) {
+  const draw = layerDraw(s);
+  return s.layer2 && draw ? { edition: editionById(s.layer2.edition), draw, range: areas.snapshot2() } : undefined;
 }
 
 /** Lets GIF and APNG exports step through the person's animated GIF frame by frame. */
@@ -1256,8 +1338,18 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
   return made;
 }
 
+let exporter: Promise<typeof import('./exporter')> | null = null;
+/** The exporters' code, fetched ahead (idle, or pointing at Save or Share) so a press does not wait for it. */
+function useExporter() {
+  exporter ??= import('./exporter');
+  exporter.catch(() => (exporter = null));
+  return exporter;
+}
+for (const b of [saveBtn, $('shareBtn'), $('formatSeg')]) for (const ev of ['pointerenter', 'focusin']) b.addEventListener(ev, () => void useExporter().catch(() => {}), { once: true });
+
 /** The card as a file, its progress shown on the Save button under `label`; a GIF to share is smaller. */
-function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
+async function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
+  const { exportGif, exportPng } = await useExporter();
   if (format === 'png') return exportPng(exportInput());
   const small = saveBtn.querySelector('.btn-text small')!;
   return exportGif(
@@ -1310,7 +1402,7 @@ saveBtn.addEventListener('click', async () => {
   if (f === 'apng' || saveBtn.hasAttribute('aria-busy') || store.get().loading) return;
   const file = await busy(t.saving, (progress) => makeFile(f, t.saving, progress), f === 'png' ? t.errPng : t.errGif);
   if (!file) return;
-  download(file);
+  (await useExporter()).download(file);
   sfx.coin();
   announce(`${t.saved}: ${file.name}`);
   celebrate(file.name);
@@ -1509,6 +1601,7 @@ async function playCard(k: Kept, id: string) {
       userAnim = img.anim;
       userSource = k.picture;
       animFrame = 0;
+      playFrames();
       void saveUserImage(k.picture!);
     } else {
       card.sample = 0;
@@ -1527,14 +1620,9 @@ async function playCard(k: Kept, id: string) {
   });
 }
 
-// Before the APNG export: its first refresh already reads the export input, which includes the range.
-const rangeColors = initRangeColors({
+const areas = initAreas({
   store,
   stage,
-  t: () => t,
-  announce,
-  redrawFace,
-  rebuildFrames: buildSegments,
   onRangeChanged: (changed) => {
     if (changed === rangeChanged) return;
     rangeChanged = changed;
@@ -1547,6 +1635,10 @@ const apngExport = mountApngExport({
   loading: () => store.get().loading,
   lang: () => store.get().lang,
   input: exportInput,
+  plan: () => {
+    const s = store.get();
+    return apngPlan(s.tune, face.height / face.width, userAnim && s.sample < 0 ? userAnim.duration : undefined, s.exportMotion);
+  },
   toast: (msg, error) => toast(msg, error),
   onSaved: (file) => celebrate(file),
   busy: exportBusy,
@@ -1646,6 +1738,36 @@ function viewDeck() {
   ).catch(() => {
     deckOpen = false;
     toast(t.pack.failed, true);
+  });
+}
+
+// ---------- On demand: the print menu, free placement ----------
+
+let printLoad: Promise<PrintPop> | null = null;
+/** The print menu of one piece of text, fetched the first time a word on the card is tapped (or Fine-tune opens). */
+function usePrint(): Promise<PrintPop> {
+  printLoad ??= import('./printPop').then((m) => m.mountPrintPop({ store, dict: () => t, onPick: () => stage.juice(0.35) }));
+  printLoad.catch(() => (printLoad = null));
+  return printLoad;
+}
+
+let arrangeLoad: Promise<void> | null = null;
+/** Free placement on the card, fetched once a piece is set to Free. */
+function useArrange() {
+  arrangeLoad ??= import('./arrangeEdit').then((m) =>
+    m.mountArrange({
+      store,
+      stage,
+      slot: $('cardSlot'),
+      face,
+      dict: () => t,
+      runs: () => lastRuns,
+      openPrint: (f, at) => void usePrint().then((p) => p.open(f, at), () => toast(t.loadFailed, true)),
+    }),
+  );
+  arrangeLoad.catch(() => {
+    arrangeLoad = null;
+    toast(t.loadFailed, true);
   });
 }
 
@@ -1854,7 +1976,11 @@ store.on((s, changed) => {
     stage.syncHand();
     deck.render();
   }
-  if (changed.has('rarity') || changed.has('frame') || changed.has('shape')) buildSegments();
+  if (['rarity', 'frame', 'shape', 'frameColor', 'frameSwatches'].some((k) => changed.has(k as keyof State))) buildSegments();
+  if (changed.has('arrange')) {
+    renderCardHint();
+    if (s.arrange === 'free') useArrange();
+  }
   if (changed.has('prints')) setFieldPrints(s.prints);
   if (changed.has('shape')) applyShape();
   if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
@@ -1866,7 +1992,7 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if (['name', 'rarity', 'frame', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if (['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
@@ -1896,34 +2022,17 @@ store.on((s, changed) => {
 
 setSound(store.get().sound);
 setFieldPrints(store.get().prints);
-const printPop = mountPrintPop({ store, dict: () => t, onPick: () => stage.juice(0.35) });
-mountArrange({
+mountLetteringJump({
   store,
-  stage,
-  slot: $('cardSlot'),
-  face,
-  dict: () => t,
-  runs: () => lastRuns,
-  openPrint: (f, at) => printPop.open(f, at),
-});
-mountMessage({
-  store,
-  host: $('pane-text'),
-  dict: () => t,
-  onPick: () => stage.juice(0.35),
-  chip: (f) => printPop.chip(f),
-  namePlaceholder: () => fallback().name,
-});
-mountLettering({
-  store,
-  host: $('pane-text'),
-  open: () => store.set({ adjustOpen: true, panelTab: 'text' }),
   dict: () => t,
   name: () => store.get().name || fallback().name,
   repaint: () => redrawFace(),
-  onPick: () => stage.juice(0.35),
+  open: () => void openAdjust('text').then((a) => a.callLettering(), () => {}),
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
+// Left open last visit: Fine-tune's tabs are fetched at once.
+if (store.get().adjustOpen) void useAdjust().catch(() => {});
+if (store.get().arrange === 'free') useArrange();
 applyText();
 applyShape();
 initPackStore(store);
@@ -1951,8 +2060,17 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before painting the face.
-Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]).then(boot, boot);
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before
+// painting the face. Their stylesheet may still be on its way (index.html adds it without holding the
+// script), and fonts not declared yet would count as loaded at once.
+new Promise<unknown>((done) => {
+  const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
+  if (!sheet || sheet.sheet) return done(null);
+  sheet.addEventListener('load', done);
+  sheet.addEventListener('error', done);
+})
+  .then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]))
+  .then(boot, boot);
 boot();
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
@@ -1967,6 +2085,7 @@ if (store.get().sample < 0) {
       userImage = img.still;
       userAnim = img.anim;
       userSource = blob;
+      playFrames();
       buildThumbs();
       boot();
     } else {
@@ -1979,18 +2098,24 @@ if (store.get().sample < 0) {
 }
 window.addEventListener('resize', () => drawCropPreview());
 
-// Animated GIFs: advance the card face whenever the GIF's next frame is due.
-{
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const tick = (now: number) => {
-    if (userAnim && store.get().sample < 0 && !reduced.matches) {
-      const i = frameAt(userAnim, now);
-      if (i !== animFrame) {
-        animFrame = i;
-        redrawFace();
-      }
-    }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
+// ---------- Fetching ahead ----------
+
+/** The readers of moving pictures, wanted as soon as a picture may be opened. */
+const prefetchDecoders = () => void Promise.all([import('./gifDecode'), import('./anim/apngDecode')]).catch(() => {});
+for (const b of [$('pickBtn'), $('pickBtnStage')]) for (const ev of ['pointerenter', 'focus']) b.addEventListener(ev, prefetchDecoders, { once: true });
+addEventListener('dragenter', prefetchDecoders, { once: true });
+// A picture from last visit comes back through them.
+if (store.get().sample < 0) prefetchDecoders();
+
+// Once the page has settled, what the next taps want is fetched while nothing else happens (not
+// on a data saver): Fine-tune's tabs, the print menu, the exporters, the motion tray.
+addEventListener('load', () => {
+  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+  const idle = window.requestIdleCallback ?? ((run: () => void) => setTimeout(run, 300));
+  idle(() => {
+    void useAdjust().catch(() => {});
+    void useExporter().catch(() => {});
+    void import('./tune/quickTray').catch(() => {});
+  });
+});
+

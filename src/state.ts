@@ -184,6 +184,7 @@ const defaults = (): State => ({
 
 /** Saved values that no longer fit fall back to their defaults. */
 function sanitize(state: State) {
+  if (state.lang !== 'ja') state.lang = 'en';
   state.tune = sanitizeTune(state.tune);
   state.shape = shapeOf(state.shape);
   state.adjustOpen = state.adjustOpen === true;

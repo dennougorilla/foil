@@ -42,6 +42,8 @@ export class RangeModel {
   private body = new Uint8Array(N).fill(1);
   private luma = new Uint8Array(N);
   private maskKey = '';
+  /** The mask whose regions are not read yet: they are read the first time an area needs them. */
+  private maskDue: HTMLCanvasElement | null = null;
   private face: HTMLCanvasElement | null = null;
   private spec: FaceSpec | null = null;
   private textKey = '';
@@ -51,7 +53,7 @@ export class RangeModel {
   /** Range-texture rows per column over the same distance on the card: 1 on the trading card. */
   cellAspect = 1;
 
-  /** Called after the live face is redrawn. Region masks are refreshed from it. */
+  /** Called after the live face is redrawn. Region masks are refreshed from it (when next needed). */
   onFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): void {
     this.face = face;
     this.spec = spec;
@@ -61,6 +63,14 @@ export class RangeModel {
     const key = `${spec.frame}|${spec.frameColor ?? ''}|${face.width}x${face.height}|${a.x},${a.y},${a.w},${a.h}`;
     if (key === this.maskKey) return;
     this.maskKey = key;
+    this.maskDue = mask;
+  }
+
+  /** Reads the art, frame and card body out of the mask, if it changed since they were last read. */
+  private readMask(): void {
+    const mask = this.maskDue;
+    if (!mask) return;
+    this.maskDue = null;
     const m = sample(mask, this.scratch);
     const art = new Uint8Array(N);
     const frame = new Uint8Array(N);
@@ -119,6 +129,7 @@ export class RangeModel {
 
   region(r: RangeRegion): Uint8Array {
     if (r === 'text') return this.textRegion();
+    if (r === 'art' || r === 'frame') this.readMask();
     return this.regions[r] ?? this.regions.all!;
   }
 
@@ -155,6 +166,7 @@ export class RangeModel {
 
   /** Share of the card (outline excluded) that takes the finish, 0..1. */
   coverage(a: Area, paint: Paint): number {
+    this.readMask();
     this.readLuma();
     const reg = this.region(a.region);
     let sum = 0;
@@ -172,6 +184,7 @@ export class RangeModel {
    * the layer list's card diagrams.
    */
   map(a: Area, paint: Paint, w: number, h: number): Int16Array {
+    this.readMask();
     this.readLuma();
     const reg = this.region(a.region);
     const out = new Int16Array(w * h);
@@ -214,7 +227,9 @@ export class RangeModel {
 
 /** One layer's brush strokes (painted in and out), with undo; kept in IndexedDB under `key`. */
 export class Paint {
-  layers: Layers = { add: new Uint8Array(N), erase: new Uint8Array(N) };
+  private held: Layers = { add: new Uint8Array(N), erase: new Uint8Array(N) };
+  /** Whether the layers hold any paint, counted again only after they changed (null: not known). */
+  private any: boolean | null = false;
   private undoStack: Layers[] = [];
   private redoStack: Layers[] = [];
   /** Range-texture rows per column over the same distance on the card (RangeModel.cellAspect): 1 on the trading card. */
@@ -222,8 +237,19 @@ export class Paint {
 
   constructor(private key: string) {}
 
+  /** The strokes (undo, redo and load put whole new ones in). */
+  get layers(): Layers {
+    return this.held;
+  }
+
+  set layers(l: Layers) {
+    this.held = l;
+    this.any = null;
+  }
+
   get painted(): boolean {
-    return this.layers.add.some((v) => v) || this.layers.erase.some((v) => v);
+    this.any ??= this.held.add.some((v) => v) || this.held.erase.some((v) => v);
+    return this.any;
   }
 
   get canUndo(): boolean {
@@ -262,8 +288,9 @@ export class Paint {
   }
 
   clear(): void {
-    this.layers.add.fill(0);
-    this.layers.erase.fill(0);
+    this.held.add.fill(0);
+    this.held.erase.fill(0);
+    this.any = false;
   }
 
   /** Clears the strokes and their undo history: for a layer that is removed, not a Clear that can be undone. */
@@ -279,6 +306,7 @@ export class Paint {
    * `cellAspect` to stay round on the card.
    */
   dab(x: number, y: number, radius: number, soft: number, mode: BrushMode): void {
+    this.any = null;
     const into = mode === 'add' ? this.layers.add : this.layers.erase;
     const other = mode === 'add' ? this.layers.erase : this.layers.add;
     const inner = radius * (1 - soft);
