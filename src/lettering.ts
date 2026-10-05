@@ -407,6 +407,24 @@ export function stillPose(tilt: [number, number], light: [number, number]): { ti
 const STYLE_INDEX: Record<LetterStyle, number> = { ink: 0, deboss: 1, emboss: 2, foil: 3, spot: 4 };
 
 /** Owns one renderer's copy of the lettering map and feeds the shader its uniforms. */
+/** Each piece's print as uniforms, worked out once per change rather than for every card drawn. */
+let fields: { key: unknown[]; styles: Int32Array; los: Float32Array; his: Float32Array; rainbows: Float32Array; bevels: Float32Array } | null = null;
+function fieldUniforms() {
+  const key = [active, prints, bevel, plateBevel];
+  if (fields && key.every((k, i) => k === fields!.key[i])) return fields;
+  // With no ink the die is the letter itself, so counters (the holes in a, e, o) stay open.
+  const blind = active.ink === 'none';
+  const each = TEXT_FIELDS.map(letteringOf);
+  return (fields = {
+    key,
+    styles: Int32Array.from(each, (f) => STYLE_INDEX[f.style]),
+    los: Float32Array.from(each.flatMap((f) => hexToRgb(foilRamp(f)[0]))),
+    his: Float32Array.from(each.flatMap((f) => hexToRgb(foilRamp(f)[1]))),
+    rainbows: Float32Array.from(each, (f) => (f.style === 'foil' && f.foil === 'rainbow' ? 1 : 0)),
+    bevels: Float32Array.from(each, (f) => ((f.style === 'deboss' || f.style === 'emboss') && !blind ? plateBevel : bevel)),
+  });
+}
+
 export class LetteringGL {
   private tex: WebGLTexture;
   private version = -1;
@@ -427,15 +445,14 @@ export class LetteringGL {
     }
     const l = active;
     gl.uniform1i(p.u.uTextMap, unit);
-    // With no ink the die is the letter itself, so counters (the holes in a, e, o) stay open.
-    const blind = l.ink === 'none';
-    const each = TEXT_FIELDS.map(letteringOf);
+    const f = fieldUniforms();
     gl.uniform4fv(p.u.uTextBox, fieldBoxes);
-    gl.uniform1iv(p.u.uTextStyles, each.map((f) => STYLE_INDEX[f.style]));
-    gl.uniform3fv(p.u.uTextLos, each.flatMap((f) => hexToRgb(foilRamp(f)[0])));
-    gl.uniform3fv(p.u.uTextHis, each.flatMap((f) => hexToRgb(foilRamp(f)[1])));
-    gl.uniform1fv(p.u.uTextRainbows, each.map((f) => (f.style === 'foil' && f.foil === 'rainbow' ? 1 : 0)));
-    gl.uniform1fv(p.u.uTextBevels, each.map((f) => ((f.style === 'deboss' || f.style === 'emboss') && !blind ? plateBevel : bevel)));
+    gl.uniform1iv(p.u.uTextStyles, f.styles);
+    gl.uniform3fv(p.u.uTextLos, f.los);
+    gl.uniform3fv(p.u.uTextHis, f.his);
+    gl.uniform1fv(p.u.uTextRainbows, f.rainbows);
+    gl.uniform1fv(p.u.uTextBevels, f.bevels);
+    const blind = l.ink === 'none';
     gl.uniform1f(p.u.uTextDepth, l.depth);
     gl.uniform1f(p.u.uTextGloss, l.gloss);
     gl.uniform1f(p.u.uTextBlind, blind ? 1 : 0);

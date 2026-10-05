@@ -58,6 +58,7 @@ npm test         # ユニットテスト (Node 標準のテストランナー)
 npm run shoot -- <outDir> [filter]   # 開発サーバーを起動した状態で: スクリーンショットの一式を撮る
 npm run e2e      # 開発サーバーを起動した状態で: パネル、すべての書き出し、パック、バインダー、共有、スマホの画面を確かめる
 npm run e2e:pwa  # npm run build のあとで: manifest、Service Worker、オフラインでの起動、「更新」ボタン、共有で届いた絵を確かめる
+npm run perf     # 開発サーバーを起動した状態で: 性能の予算チェック (全加工と背景を、遅くしたスマホ画面で。docs/performance.md)
 npm run og       # 開発サーバーを起動した状態で: public/og.png とホーム画面用アイコン一式を描き出す
 node scripts/layering-check.mjs [--measure]   # 開発サーバーを起動した状態で: 加工 1 つの見た目が 1 ピクセルも変わっていないこと (基準 URL と比較) と、2 つ目の加工のコストを測る
 ```
