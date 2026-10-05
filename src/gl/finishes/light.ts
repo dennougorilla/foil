@@ -1,9 +1,11 @@
-// Light pack: Galaxy, Aurora, Glow, Blacklight and Shallows (the showpiece). See docs/packs.md.
+// Light pack: Galaxy, Aurora, Glow, Blacklight, Mirror Ball and Shallows (the showpiece). See docs/packs.md.
 import { SHALLOWS_GLSL } from '../shallows';
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { GLOW_GLSL } from '../../touch/glow';
 import { HeatLayer } from '../../touch/layer';
 import { BLACKLIGHT_GLSL } from '../blacklight';
+import { MIRRORBALL_GLSL, MIRRORBALL_SHADER } from '../mirrorball';
+import { MirrorRoom } from '../mirrorRoom';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -54,6 +56,7 @@ ${SHALLOWS_GLSL}
 ${TOUCH_GLSL}
 ${GLOW_GLSL}
 ${BLACKLIGHT_GLSL}
+${MIRRORBALL_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 7) col = galaxy(c, uv, uTilt, L);
@@ -61,11 +64,22 @@ ${BLACKLIGHT_GLSL}
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 70) col = glow(c, uv, L, m.r);
   else if (e == 72) col = blacklight(c, uv, L, lod, m);
+  else if (e == 104) col = mirrorball(c, uv, artUv, uTilt, lod, m.r);
 `,
-  // Glow keeps the light shone on it in a touch field, like Warmth's heat (see touch/).
-  layers: (gl) => {
+  // Glow keeps the light shone on it in a touch field, like Warmth's heat (see touch/). Mirror
+  // Ball throws spots of light round the room behind the card, where there is one.
+  layers: (gl, live) => {
     const heat = new HeatLayer(gl);
-    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }];
+    let room: MirrorRoom | null = null;
+    return [
+      { bind: (p, d) => heat.bind(p, 6, d.heat) },
+      {
+        after: (view, d, time) => {
+          if (d.edition !== MIRRORBALL_SHADER || !d.room) return;
+          (room ??= new MirrorRoom(gl, live)).draw(view, d, time);
+        },
+      },
+    ];
   },
 };
 export default finishes;

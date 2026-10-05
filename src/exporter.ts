@@ -228,6 +228,8 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
           loop: tune.speed > 0 ? loopCycle(tune, torch) : 0,
           heat: touch ?? undefined,
           layer: input.layer?.draw,
+          // Mirror Ball's spots light the backdrop, or the clear APNG softly; a clear GIF has no soft edges for them.
+          room: shadow,
         },
         time,
       );

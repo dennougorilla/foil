@@ -118,6 +118,8 @@ export interface CardDraw {
   uv?: [number, number, number, number];
   /** Blacklight's lamp power, 0..1; full when absent. */
   lamp?: number;
+  /** There is a room round this card to throw light into (the stage, a file's backdrop): Mirror Ball's spots. */
+  room?: boolean;
   /** Layer 2, drawn over the card in its own area (docs/layering.md); none when absent. */
   layer?: LayerDraw;
   /** 2: draw this card in layer 2's area instead of layer 1's (the Finish area's proof of layer 2). */

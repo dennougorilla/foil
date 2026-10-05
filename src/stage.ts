@@ -682,6 +682,7 @@ export class Stage {
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
           lamp: this.lampPower,
+          room: true,
         },
         motion.fx,
       );
