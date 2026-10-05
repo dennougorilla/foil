@@ -2,8 +2,8 @@
 // Pixel art (docs/features.md, Picture): the choices, and the conversion on raw RGBA.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artBlock, DOT_PRESETS, gridOf, PIXEL_STEPS, pixelCells, pixelCellsSmall, presetOf, sanitizeDot, type Dot } from '../src/dot/model.ts';
-import { dotFrames, FOIL_PALETTE, pixelateArt } from '../src/dot/convert.ts';
+import { artBlock, DOT_PRESETS, dotScopeOf, gridOf, sanitizeDotScope, PIXEL_STEPS, pixelCells, pixelCellsSmall, presetOf, sanitizeDot, type Dot } from '../src/dot/model.ts';
+import { dotFrames, dotGridFace, FOIL_PALETTE, pixelateArt } from '../src/dot/convert.ts';
 
 const W = 32;
 const H = 24;
@@ -158,4 +158,58 @@ test('Pixelate under pixel art averages the art window in blocks and leaves the 
   const e = before.slice();
   pixelateArt(e, w, h, inArt, 1);
   assert.deepEqual(e, before);
+});
+
+test('the area is the whole card or the frame only; a card with no frame of its own is pixel art all over', () => {
+  const chunky = DOT_PRESETS.chunky;
+  assert.equal(dotScopeOf({ dot: null, dotScope: 'frame', frameless: false }), null);
+  assert.equal(dotScopeOf({ dot: chunky, dotScope: 'card', frameless: false }), 'card');
+  assert.equal(dotScopeOf({ dot: chunky, dotScope: 'frame', frameless: false }), 'frame');
+  // Used as the whole card, the picture has no frame around it: the choice steps aside.
+  assert.equal(dotScopeOf({ dot: chunky, dotScope: 'frame', frameless: true }), 'card');
+  // A saved card keeps its area; anything else is the whole card.
+  assert.equal(sanitizeDotScope('frame'), 'frame');
+  assert.equal(sanitizeDotScope('art'), 'card');
+  assert.equal(sanitizeDotScope(undefined), 'card');
+});
+
+/** A face on the grid: the art window (a photo) in the middle, plain light frame around it. */
+function cardFace() {
+  const inArt = new Uint8Array(W * H);
+  const d = paint((x, y) => {
+    const art = x >= 8 && x < 24 && y >= 6 && y < 18;
+    inArt[y * W + x] = art ? 1 : 0;
+    return art ? [128 + 120 * Math.sin(x / 3), 128 + 120 * Math.sin(y / 2), 90] : [240, 236, 220 - x];
+  });
+  return { d, inArt };
+}
+
+test('on the whole card every pixel is converted, picture and frame', () => {
+  const { d, inArt } = cardFace();
+  const before = d.slice();
+  dotGridFace(d, W, H, plain, { inArt, frameOnly: false, block: 1 });
+  const art = [...inArt.keys()].filter((i) => inArt[i]);
+  assert.ok(art.some((i) => d[i * 4] !== before[i * 4]), 'the picture is converted');
+  assert.ok(colors(d).size <= 8);
+});
+
+test('on the frame only the picture is left exactly as it was and the frame is converted from its own palette', () => {
+  const { d, inArt } = cardFace();
+  const before = d.slice();
+  // Pixelate on as well: under Frame only it is the shader's, so the art is not blocked here either.
+  const pal = dotGridFace(d, W, H, { ...plain, outline: true }, { inArt, frameOnly: true, block: 3 });
+  for (let i = 0; i < W * H; i++) {
+    if (!inArt[i]) continue;
+    assert.deepEqual([...d.subarray(i * 4, i * 4 + 4)], [...before.subarray(i * 4, i * 4 + 4)], `art pixel ${i}`);
+  }
+  // The frame's palette holds only frame colours (light paper), none of the picture's.
+  for (const [r, g] of pal) assert.ok(r > 200 && g > 200, `${r},${g}`);
+  const frame = [...inArt.keys()].filter((i) => !inArt[i]);
+  const fc = new Set(frame.map((i) => (d[i * 4] << 16) | (d[i * 4 + 1] << 8) | d[i * 4 + 2]));
+  // The frame is cut down to its palette (and the dark outline round the art window).
+  assert.ok(fc.size <= pal.length + pal.length, `${fc.size}`);
+  const lum = (i: number) => d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+  // The outline runs round the art window, on the frame side.
+  assert.ok(lum(6 * W + 7) < 100, 'outlined beside the art');
+  assert.ok(lum(1 * W + 1) > 200, 'plain frame away from it');
 });

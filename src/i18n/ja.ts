@@ -150,6 +150,9 @@ const ja = {
   dot: {
     label: 'ドット絵',
     hint: '枠も文字もふくめ、カード全体をドット絵に。',
+    hintFrame: '枠・名札・文字をドット絵に。イラストはそのまま。',
+    scope: '範囲',
+    scopeName: { card: 'カード全体', frame: '枠だけ' },
     preset: { off: 'オフ', chunky: '太ドット', retro: 'レトロ', fine: '細かい' },
     custom: 'カスタム',
     more: '細かく調整',

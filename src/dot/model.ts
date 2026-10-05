@@ -1,5 +1,5 @@
-// Pixel art: the whole card (face, frame, words, picture, back) drawn as chunky pixels with few colours,
-// and the finish's light in the same grain (docs/features.md, Card). These are the choices; the
+// Pixel art: the whole card (face, frame, words, picture, back), or the frame only around a picture
+// left as it is, drawn as chunky pixels with few colours, and the finish's light in the same grain (docs/features.md, Card). These are the choices; the
 // conversion of the face loads on demand (dot.ts).
 
 /** Pixels across the card's short side. */
@@ -42,10 +42,22 @@ export function sanitizeDot(v: unknown): Dot | null {
   return { size: d.size as DotSize, colors: d.colors as DotColors, outline: d.outline === true, dither: d.dither === true };
 }
 
+/** Where pixel art goes: the whole card, or the frame only (frame, nameplate, words and back; the picture stays as it is). */
+export const DOT_SCOPES = ['card', 'frame'] as const;
+export type DotScope = (typeof DOT_SCOPES)[number];
+
+export const sanitizeDotScope = (v: unknown): DotScope => (v === 'frame' ? 'frame' : 'card');
+
+/** Where pixel art goes on this card now, or null when it is off. A card used as the whole card has no frame: all of it. */
+export function dotScopeOf(s: { dot: Dot | null; dotScope: DotScope; frameless: boolean }): DotScope | null {
+  if (!s.dot) return null;
+  return s.frameless ? 'card' : s.dotScope;
+}
+
 /** Names a setting, for the conversion's cache. */
 export const dotKey = (d: Dot) => `${d.size}/${d.colors}/${+d.outline}/${+d.dither}`;
 
-/** The pixel grid across the card's short side that the shader steps the face and its light on; 0 = off. */
+/** The pixel grid across the card's short side that the shader steps the face and its light on (only off the art window on the frame only); 0 = off. */
 export const dotGrid = (dot: Dot | null) => dot?.size ?? 0;
 
 /** The grid in columns and rows on a face `w` × `h` (as the shader rounds it: square cells on any shape). */

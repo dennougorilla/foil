@@ -192,3 +192,31 @@ export function pixelateArt(d: Uint8ClampedArray, w: number, h: number, inArt: U
         }
     }
 }
+
+/**
+ * A face shrunk to its pixel grid made pixel art, in place, by area (dot/model.ts DotScope). On the
+ * whole card, Pixelate's `block` first runs on the art window (`inArt`). On the frame only, the art
+ * window is left exactly as it is (the picture keeps its own pixels, and Pixelate is the shader's
+ * there): it is a hole while the rest is converted, so the palette is the frame's and the outline runs
+ * round it. Returns the palette.
+ */
+export function dotGridFace(
+  d: Uint8ClampedArray,
+  w: number,
+  h: number,
+  dot: Dot,
+  area: { inArt?: Uint8Array; frameOnly: boolean; block: number },
+  pal?: RGB[],
+): RGB[] {
+  const { inArt, frameOnly, block } = area;
+  if (!inArt) return dotFrames([d], w, h, dot, pal);
+  if (!frameOnly) {
+    pixelateArt(d, w, h, inArt, block);
+    return dotFrames([d], w, h, dot, pal);
+  }
+  const art = d.slice();
+  for (let i = 0; i < inArt.length; i++) if (inArt[i]) d[i * 4 + 3] = 0;
+  pal = dotFrames([d], w, h, dot, pal);
+  for (let i = 0; i < inArt.length; i++) if (inArt[i]) d.set(art.subarray(i * 4, i * 4 + 4), i * 4);
+  return pal;
+}

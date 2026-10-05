@@ -97,6 +97,7 @@ uniform float uIntensity;
 uniform float uTime;
 uniform float uPixel;      // Pixelate: pixel columns across the card in the art window, 0 = off
 uniform float uDot;        // pixel art: pixels across the card's short side, 0 = off (src/dot)
+uniform float uDotFrame;   // 1 = pixel art on the frame only: the art window is drawn as without it
 uniform vec2 uTilt;        // -1..1, drives sheen
 uniform vec2 uLight;       // highlight position in card uv
 uniform float uShadow;     // 1 = draw as drop shadow
@@ -247,18 +248,23 @@ void main() {
   }
   vec2 uv = vUv;
   float lod = 0.0;
-  // Only the art window is pixelated; the frame and nameplate stay crisp. Under pixel art the face
-  // already carries it (dot/dot.ts pixelates the art before the whole face is converted).
-  float inArt = uDot > 0.5 ? 0.0 : texture(uMask, vUv).r;
+  // Where pixel art is (src/dot): the whole card, or on the frame only every pixel art pixel whose
+  // centre is off the art window (as dot/dot.ts keeps the picture), so the window's edge steps too.
+  float dotOn = uDot > 0.5 ? 1.0 : 0.0;
+  if (dotOn > 0.5 && uDotFrame > 0.5) dotOn = 1.0 - step(0.5, texture(uMask, (floor(vUv * pixelGrid()) + 0.5) / pixelGrid()).r);
+  // Only the art window is pixelated; the frame and nameplate stay crisp. Under pixel art on the whole
+  // card the face already carries it (dot/dot.ts pixelates the art before the whole face is converted).
+  float inArt = uDot > 0.5 ? (uDotFrame > 0.5 ? 1.0 - dotOn : 0.0) : texture(uMask, vUv).r;
   if (uPixel > 0.5 && inArt > 0.5) {
     // uPixel cells across the short side, square on every shape.
     vec2 grid = floor(uPixel * uCardK + 0.5);
     uv = (floor(uv * grid) + 0.5) / grid;
     lod = max(log2(uFaceTexels / uCardK.x / uPixel) - 0.5, 0.0);
   }
-  // Pixel art (src/dot): the face is already drawn on this grid; every pixel of the card reads its
-  // cell's centre, so the finish's light steps in the same grain and the corners step too.
-  if (uDot > 0.5) uv = (floor(uv * pixelGrid()) + 0.5) / pixelGrid();
+  // Pixel art (src/dot): the face is already drawn on this grid; every pixel of it reads its cell's
+  // centre, so the finish's light steps in the same grain and the corners step too. On the frame only
+  // the light over the picture stays smooth, as on a card without pixel art.
+  if (dotOn > 0.5) uv = (floor(uv * pixelGrid()) + 0.5) / pixelGrid();
   vec4 base = face(uv, lod);
   if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
   if (base.a < 0.002) discard;
@@ -346,11 +352,11 @@ void main() {
   col *= shade;
   lit *= shade;
   // The light comes in a few levels, as a palette would.
-  if (uDot > 0.5 || (uPixel > 0.5 && inArt > 0.5)) col = floor(col * 18.0 + 0.5) / 18.0;
+  if (dotOn > 0.5 || (uPixel > 0.5 && inArt > 0.5)) col = floor(col * 18.0 + 0.5) / 18.0;
   col = showRange(col, uv, range);
   if (uGlint > -1.0) {
     // Stepped on a coarse pixel grid, like the rest of the page: a bright bar with a thin one trailing.
-    vec2 gs = uDot > 0.5 ? pixelGrid() : uCardK * 60.0;
+    vec2 gs = dotOn > 0.5 ? pixelGrid() : uCardK * 60.0;
     vec2 g = floor(vUv * gs) / gs;
     float d = g.x * 0.8 + g.y * 0.6 - uGlint;
     float streak = step(abs(d), 0.045) + step(abs(d + 0.11), 0.012) * 0.7;

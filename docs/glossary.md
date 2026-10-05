@@ -9,11 +9,12 @@ name below.
 
 | ja | en | Meaning |
 | --- | --- | --- |
-| カード | Card | The card on the stage, and the first Fine-tune tab (strength, frame, shape, layout, pixelate, backdrop). |
+| カード | Card | The card on the stage, and the first Fine-tune tab (strength, frame, shape, layout, pixelate, pixel art, backdrop). |
 | 画像 | Picture | The picture you open (or a sample). Also the second picture of Flip Lenticular (傾けると出る画像 / Picture shown on tilt). |
 | イラスト | Art | The art window of the card, where the picture shows. As an area: only inside it. |
 | 窓 | Window | The box in the crop view that you drag to choose what the card shows. Never 枠 / Frame, which is the card's border. |
 | 枠 | Frame | The card's border and its color. |
+| ピクセル化 / ドット絵 | Pixelate / Pixel art | Coarsens only the picture / redraws the card as pixel art, on カード全体 / Whole card or 枠だけ / Frame only (the frame, nameplate and words; the picture stays as it is). |
 | 形 | Shape | Trading card, wide, square, postcard upright or on its side, business card, and 画像の形 / Picture (the picture's own proportions). |
 | カードそのものとして使う | Use as the whole card | The picture is the whole card: no frame, nameplate or words of FOIL's, only the finish on it. |
 | 名前 | Name | The card's name on its nameplate. Not カード名. |

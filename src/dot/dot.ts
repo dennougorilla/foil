@@ -3,12 +3,15 @@
 // Loaded the first time pixel art is turned on (docs/performance.md). The grid is small (at most
 // 128 × 180 pixels), so this runs right where the face is painted: about 5 ms with a kept palette
 // (a moving picture's next frame), 15–20 ms when a palette is picked.
-import { dotFrames, pixelateArt, type RGB } from './convert';
+import { dotGridFace, type RGB } from './convert';
 import { gridOf, type Dot } from './model';
 
 const small = document.createElement('canvas');
 const smallMask = document.createElement('canvas');
 const half = document.createElement('canvas');
+/** The face as painted, and its art window cut out of it (the frame only keeps the picture). */
+const plain = document.createElement('canvas');
+const cut = document.createElement('canvas');
 /** Palettes by what they were picked for (a moving picture keeps one from frame to frame; a file being made keeps its own). */
 const kept = new Map<string, RGB[]>();
 
@@ -54,15 +57,22 @@ function artOf(mask: HTMLCanvasElement, w: number, h: number): Uint8Array {
 /**
  * Redraws `face` as pixel art in place. `palKey` names what the palette belongs to: while it stays the
  * same (the frames of one moving picture) the palette is kept, so the colours don't flicker. With `art`
- * (Pixelate on as well), the art window in `art.mask` is first pixelated in blocks of `art.block` pixels.
+ * (the face's mask): on the whole card the art window is first pixelated in blocks of `art.block`
+ * pixels (Pixelate on as well); on the frame only (`art.frameOnly`) the picture in it is kept as painted.
  */
-export function dotFace(face: HTMLCanvasElement, dot: Dot, palKey: string, art?: { mask: HTMLCanvasElement; block: number }): void {
+export function dotFace(face: HTMLCanvasElement, dot: Dot, palKey: string, art?: { mask: HTMLCanvasElement; block: number; frameOnly: boolean }): void {
   const g = gridOf(face.width, face.height, dot.size);
+  const frameOnly = !!art?.frameOnly;
+  if (frameOnly) {
+    plain.width = face.width;
+    plain.height = face.height;
+    plain.getContext('2d')!.drawImage(face, 0, 0);
+  }
   const x = shrink(face, g.w, g.h);
   const img = x.getImageData(0, 0, g.w, g.h);
-  if (art && art.block > 1) pixelateArt(img.data, g.w, g.h, artOf(art.mask, g.w, g.h), art.block);
-  const key = `${palKey}|${dot.colors}`;
-  const pal = dotFrames([img.data], g.w, g.h, dot, kept.get(key));
+  const inArt = art && (frameOnly || art.block > 1) ? artOf(art.mask, g.w, g.h) : undefined;
+  const key = `${palKey}|${dot.colors}|${+frameOnly}`;
+  const pal = dotGridFace(img.data, g.w, g.h, dot, { inArt, frameOnly, block: art?.block ?? 1 }, kept.get(key));
   kept.set(key, pal);
   // Only the latest few are wanted again.
   if (kept.size > 6) kept.delete(kept.keys().next().value!);
@@ -73,5 +83,20 @@ export function dotFace(face: HTMLCanvasElement, dot: Dot, palKey: string, art?:
   fx.clearRect(0, 0, face.width, face.height);
   fx.imageSmoothingEnabled = false;
   fx.drawImage(small, 0, 0, face.width, face.height);
+  if (frameOnly && inArt) {
+    // The picture goes back sharp over the art window's pixels (whole grid pixels, as the shader judges them).
+    const m = smallMask.getContext('2d')!;
+    const on = m.createImageData(g.w, g.h);
+    for (let i = 0; i < inArt.length; i++) on.data[i * 4 + 3] = inArt[i] ? 255 : 0;
+    m.putImageData(on, 0, 0);
+    cut.width = face.width;
+    cut.height = face.height;
+    const c = cut.getContext('2d')!;
+    c.imageSmoothingEnabled = false;
+    c.drawImage(smallMask, 0, 0, face.width, face.height);
+    c.globalCompositeOperation = 'source-in';
+    c.drawImage(plain, 0, 0);
+    fx.drawImage(cut, 0, 0);
+  }
   fx.restore();
 }

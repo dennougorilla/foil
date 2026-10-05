@@ -167,6 +167,8 @@ export interface CardDraw {
   pixel: number;
   /** Pixel art: the whole face's grid across the short side (the face is already drawn on it), 0 or absent = off. */
   dot?: number;
+  /** Pixel art on the frame only: the art window is drawn as without it. */
+  dotFrame?: boolean;
   tilt: [number, number];
   light: [number, number];
   alpha: number;
@@ -461,6 +463,7 @@ export class CardRenderer {
     gl.uniform1f(p.u.uTime, time);
     gl.uniform1f(p.u.uPixel, d.pixel);
     gl.uniform1f(p.u.uDot, d.dot ?? 0);
+    gl.uniform1f(p.u.uDotFrame, d.dotFrame ? 1 : 0);
     gl.uniform2f(p.u.uTilt, d.tilt[0], d.tilt[1]);
     gl.uniform2f(p.u.uLight, d.light[0], d.light[1]);
     gl.uniform1f(p.u.uAlpha, d.alpha);

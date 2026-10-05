@@ -140,6 +140,9 @@ const en: Dict = {
   dot: {
     label: 'Pixel art',
     hint: 'The whole card, frame and words too.',
+    hintFrame: 'Frame, nameplate and words. The art stays as it is.',
+    scope: 'Area',
+    scopeName: { card: 'Whole card', frame: 'Frame only' },
     preset: { off: 'Off', chunky: 'Chunky', retro: 'Retro', fine: 'Fine' },
     custom: 'Custom',
     more: 'Adjust',

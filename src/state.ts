@@ -7,7 +7,7 @@ import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Letteri
 import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
 import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
 import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
-import { sanitizeDot, type Dot } from './dot/model';
+import { sanitizeDot, sanitizeDotScope, type Dot, type DotScope } from './dot/model';
 import { DEFAULT_BACKDROP, PLAIN_DEFAULT, sanitizeBackdrop, sanitizeBackdropColor, type BackdropId } from './backdrop';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
@@ -39,8 +39,10 @@ export interface State extends RangeColorState {
   intensity: number;
   /** Pixelate: the art window's step (0 = off, see dot/model.ts PIXEL_STEPS); the frame and words stay crisp. */
   pixel: number;
-  /** Pixel art over the whole card, or null (src/dot). */
+  /** Pixel art, or null (src/dot). */
   dot: Dot | null;
+  /** Where pixel art goes: the whole card, or the frame only (the picture stays as it is); whole card when frameless. */
+  dotScope: DotScope;
   name: string;
   /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
@@ -102,6 +104,7 @@ const PERSIST: (keyof State)[] = [
   'intensity',
   'pixel',
   'dot',
+  'dotScope',
   'name',
   'nameEdited',
   'message',
@@ -169,6 +172,7 @@ const defaults = (): State => ({
   intensity: 1,
   pixel: 0,
   dot: null,
+  dotScope: 'card',
   name: '',
   nameEdited: false,
   message: { ...DEFAULT_MESSAGE },
@@ -199,6 +203,7 @@ function sanitize(state: State) {
   if (state.lang !== 'ja') state.lang = 'en';
   state.tune = sanitizeTune(state.tune);
   state.dot = sanitizeDot(state.dot);
+  state.dotScope = sanitizeDotScope(state.dotScope);
   state.shape = shapeOf(state.shape);
   state.frameless = state.frameless === true;
   state.adjustOpen = state.adjustOpen === true;

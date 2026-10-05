@@ -8,7 +8,7 @@ import type { Dict } from './i18n';
 import type { Store } from './state';
 import type { EditionId } from './editions';
 import { contain } from './card/shape';
-import { dotGrid, pixelCellsSmall } from './dot/model';
+import { dotGrid, dotScopeOf, pixelCellsSmall } from './dot/model';
 
 const W = 84;
 const H = Math.round((W * 7) / 5);
@@ -175,6 +175,7 @@ export class MiniPreview {
         intensity: s.intensity,
         pixel: pixelCellsSmall(s.pixel),
         dot: dotGrid(s.dot),
+        dotFrame: dotScopeOf(s) === 'frame',
         tilt: [ry / 0.32, rx / 0.28],
         light: [0.5 - ry, 0.35 - rx],
         alpha: 1,
