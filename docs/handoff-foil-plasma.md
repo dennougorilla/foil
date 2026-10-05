@@ -47,14 +47,19 @@ After round 3 (not re-judged): forks at about half strength, smaller bead, less 
 
 ## Remaining
 
-1. **e2e not yet green on the final code.** Run 1 (before the last fixes): all ok except the
+Second pass (Mac): `npm run build` and `npm test` (158) pass on the final code, and
+`scripts/shoot.mjs` lists Plasma in the Light pack's reveal order. Per the owner, no more scoring
+rounds and no e2e for now: the owner looks at the finish first and sets the direction. Also open:
+while held, the three strands that do not gather fade almost out.
+
+1. **e2e not yet green on the final code** (not re-run, see above). Run 1 (before the last fixes): all ok except the
    old-secrets deck count (fixed, now 11) and the Plasma step (metric changed). Run 2: the Plasma
    step measured 0.008 vs 0.002 (threshold 0.02) after a 1.5 s wait. On a fast machine the probe gave
    0.061 vs 0.002. The wait is now 3.5 s; re-run. Run 2 also had a binder step fail ("the binder does not
    show one card") and every step after it time out in a chain; those passed in run 1, so this looks
    like load flakiness, but re-check. Run 3 ended at once with no output (cause not looked at). Restart
    the dev server before e2e.
-2. `npm run build` not run yet on the final code.
+2. `npm run build` passes on the final code (second pass).
 3. Quality loop: 3 rounds done. Open points: the realism score (it still reads somewhat as a
    "lightning spell"); in a 480 px GIF the bolt on the finger is small; check other shapes and
    the trading-card layout (the art window's centre: the code falls back to the card when the
