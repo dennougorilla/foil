@@ -521,7 +521,7 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
   const edition = (await state()).edition;
   expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
-  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  expect(!chips.some((v) => ['warmth', 'glow', 'rain', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
   const pick = chips.includes('negative') ? 'negative' : 'poly';
   await page.click(`.layer-chip[data-v=${pick}]`);
   let s = await state();
@@ -2037,6 +2037,138 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
     expect(keep > 0.6, `${id} loses the picture (${keep.toFixed(2)})`);
     expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
   }
+  await still.close();
+});
+
+await step('Rainy Window fogs the picture but keeps it, a wipe clears it, its drops run, its loops close, and it holds still under reduced motion', async () => {
+  const report = await page.evaluate(async () => {
+    const { createScene } = await import('/src/exporter.ts');
+    await (await import('/src/gl/finishes/registry.ts')).loadPack('nature');
+    const { drawFace } = await import('/src/card/face.ts');
+    const { drawBack } = await import('/src/card/back.ts');
+    const { editionById } = await import('/src/editions.ts');
+    const { TUNE_DEFAULTS } = await import('/src/tune/model.ts');
+    const { AUTO_STILL } = await import('/src/touch/heat.ts');
+    // A detailed picture: stripes, blocks and words, so blur and sharpness are easy to tell apart.
+    const img = document.createElement('canvas');
+    img.width = 600;
+    img.height = 800;
+    const x = img.getContext('2d');
+    for (let i = 0; i < 40; i++) {
+      x.fillStyle = `hsl(${i * 37},70%,${i % 2 ? 30 : 70}%)`;
+      x.fillRect(0, i * 20, 600, 20);
+    }
+    x.fillStyle = '#fff';
+    x.font = 'bold 70px sans-serif';
+    x.fillText('RAIN', 150, 300);
+    x.fillText('WINDOW', 90, 520);
+    const face = document.createElement('canvas');
+    const mask = document.createElement('canvas');
+    const back = document.createElement('canvas');
+    face.width = mask.width = back.width = 900;
+    face.height = mask.height = back.height = 1260;
+    drawFace(face, mask, { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Rain', shape: 'card', message: { text: '', place: 'top', font: 'dot' }, plate: true, layout: 'classic', cardType: '', arrange: 'auto', placements: {} });
+    drawBack(back, 'card');
+    const W = 360;
+    const H = 450;
+    const tune = { ...TUNE_DEFAULTS, idle: 'none' };
+    const cw = (320 * 5) / 7;
+    const [x0, y0, x1, y1] = [Math.round(W / 2 - 0.4 * cw), Math.round(H / 2 - 0.42 * 320), Math.round(W / 2 + 0.4 * cw), Math.round(H / 2 + 0.35 * 320)];
+    const grab = (intensity, ps, idle = 'none') => {
+      const s = createScene({ face, mask, back, edition: editionById('rain'), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
+      const out = ps.map((p) => {
+        s.draw(p, 40);
+        const d = s.ctx.getImageData(0, 0, W, H).data;
+        const v = [];
+        for (let y = y0; y < y1; y++) for (let xx = x0; xx < x1; xx++) {
+          const i = (y * W + xx) * 4;
+          v.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        }
+        return v;
+      });
+      s.dispose();
+      return out;
+    };
+    const w = x1 - x0;
+    // Mean step between neighbouring pixels: high on a sharp picture, low through fog.
+    const sharp = (v) => {
+      let n = 0;
+      for (let i = 0; i < v.length - w; i++) n += Math.abs(v[i] - v[i + 1]) + Math.abs(v[i] - v[i + w]);
+      return n / v.length;
+    };
+    // The same in each tile of a 6 × 6 grid over the art, where a wipe shows as a few tiles turning sharp.
+    const tiles = (v) => {
+      const h = v.length / w;
+      const out = [];
+      for (let ty = 0; ty < 6; ty++) for (let tx = 0; tx < 6; tx++) {
+        let n = 0, c = 0;
+        for (let y = Math.floor((ty * h) / 6); y < Math.floor(((ty + 1) * h) / 6) - 1; y++) for (let xx = Math.floor((tx * w) / 6); xx < Math.floor(((tx + 1) * w) / 6) - 1; xx++) {
+          const i = y * w + xx;
+          n += Math.abs(v[i] - v[i + 1]) + Math.abs(v[i] - v[i + w]);
+          c++;
+        }
+        out.push(n / c);
+      }
+      return out;
+    };
+    const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const corr = (a, b) => {
+      const ma = mean(a);
+      const mb = mean(b);
+      let n = 0, sa = 0, sb = 0;
+      for (let i = 0; i < a.length; i++) {
+        n += (a[i] - ma) * (b[i] - mb);
+        sa += (a[i] - ma) ** 2;
+        sb += (b[i] - mb) ** 2;
+      }
+      return n / Math.sqrt(sa * sb);
+    };
+    const diff = (a, b) => a.reduce((n, v, i) => n + Math.abs(v - b[i]), 0) / a.length;
+    const [plain] = grab(0, [0]);
+    const [p0, drift, wiped, p1] = grab(1, [0, 0.04, AUTO_STILL.rain, 1]);
+    const [q0, q1] = grab(1, [0, 1], 'pulse');
+    return {
+      fogged: sharp(p0) / sharp(plain),
+      cleared: (() => {
+        const a = tiles(p0);
+        return tiles(wiped).filter((v, i) => v > a[i] * 1.25).length;
+      })(),
+      keep: corr(p0, plain),
+      drops: diff(p0, drift),
+      seam: Math.max(diff(p0, p1), diff(q0, q1)),
+    };
+  });
+  const f = (v) => v.toFixed(3);
+  console.log(`  rain fogged ${f(report.fogged)} cleared ${report.cleared} tiles, keep ${f(report.keep)} drops ${f(report.drops)} seam ${f(report.seam)}`);
+  expect(report.fogged < 0.8, `the fog hardly softens the picture (${f(report.fogged)} of its sharpness)`);
+  expect(report.keep > 0.6, `the fog hides the picture (correlation ${f(report.keep)})`);
+  expect(report.cleared >= 3, `the unseen finger's wipe does not clear the glass (${report.cleared} of 36 tiles sharper)`);
+  expect(report.drops > 0.05, `the drops do not run (${f(report.drops)})`);
+  expect(report.seam < 0.6, `the loop jumps where it closes (${f(report.seam)})`);
+
+  // On the stage, held still: once the arrival wipe has fogged over again (about 11 s), nothing moves.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  await p.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['nature'], supporter: false }));
+    localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'rain'], edition: 'rain' }));
+    sessionStorage.setItem('seeded', '1');
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(8000);
+  const b = await p.locator('#cardSlot').boundingBox();
+  const clip = { x: b.x + b.width * 0.1, y: b.y + b.height * 0.1, width: b.width * 0.8, height: b.height * 0.8 };
+  let last = await p.screenshot({ clip });
+  let settled = false;
+  for (let i = 0; i < 20 && !settled; i++) {
+    await p.waitForTimeout(1500);
+    const now = await p.screenshot({ clip });
+    settled = now.equals(last);
+    last = now;
+  }
+  expect(settled, 'the card keeps moving under reduced motion');
   await still.close();
 });
 

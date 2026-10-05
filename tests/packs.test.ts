@@ -41,7 +41,7 @@ test('five theme packs and the supporter pack of celebrations, showpiece last', 
     metal: METAL,
     jewel: ['crystal', 'opal', 'raden', 'kintsugi'],
     light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
-    nature: ['sakura', 'frost', 'stardust', 'magma'],
+    nature: ['sakura', 'frost', 'stardust', 'rain', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
     supporter: ['confetti', 'snowglobe', 'fireworks'],
   });
@@ -80,9 +80,11 @@ test('a v0.13 save (opened pack ids) becomes every finish those packs held then,
   assert.ok(isOpened(o, 'jewel'));
   assert.ok(!isOpened(o, 'metal') && !o.owned.includes('chameleon'));
   assert.ok(!isOpened(o, 'supporter') && !o.owned.includes('snowglobe'));
-  // The old Nature pack held Snow Globe: with it, the new Supporter pack is whole too.
+  // The old Nature pack held Snow Globe: with it, the new Supporter pack is whole too. Nature gained
+  // Rainy Window and Marble (v0.15), so it is sealed again for them.
   const n = parsePacks('{"opened":["nature","supporter"],"supporter":true}');
-  assert.ok(isOpened(n, 'nature') && isOpened(n, 'supporter'));
+  assert.ok(isOpened(n, 'supporter') && !isOpened(n, 'nature'));
+  assert.ok(['sakura', 'frost', 'stardust', 'magma'].every((f) => n.owned.includes(f)));
   assert.ok(!isOpened(n, 'jewel') && !n.owned.includes('crystal'));
 });
 

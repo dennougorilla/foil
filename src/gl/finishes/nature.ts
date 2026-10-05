@@ -1,5 +1,8 @@
-// Nature pack: Sakura, Frost, Stardust and Magma (the showpiece). See docs/packs.md.
+// Nature pack: Sakura, Frost, Stardust, Rainy Window and Magma (the showpiece). See docs/packs.md.
 import { STARDUST_GLSL } from '../stardust';
+import { RAIN_GLSL } from '../rain';
+import { TOUCH_GLSL } from '../../touch/glsl';
+import { HeatLayer } from '../../touch/layer';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -68,12 +71,20 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${STARDUST_GLSL}
+${TOUCH_GLSL}
+${RAIN_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 10) col = frost(c, uv, uTilt, L);
   else if (e == 11) col = magma(c, uv, uTilt, L);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 22) col = stardust(c, uv, uTilt, L);
+  else if (e == 94) col = rain(c, uv, uTilt, lod, m.r);
 `,
+  // Rainy Window keeps where its glass was wiped in a touch field, like Warmth's heat (see touch/).
+  layers: (gl) => {
+    const wiped = new HeatLayer(gl);
+    return [{ bind: (p, d) => wiped.bind(p, 6, d.heat) }];
+  },
 };
 export default finishes;

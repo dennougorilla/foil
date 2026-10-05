@@ -1,5 +1,6 @@
 // Heat on the card for the Warmth finish (where it was touched, how warm it still is, and the
-// fingerprints left by a press), and the light stored by the Glow finish's ink. A small grid over
+// fingerprints left by a press), the light stored by the Glow finish's ink, and where Rainy Window's
+// fogged glass was wiped. A small grid over
 // the card face, simulated on the CPU (a few thousand cells, so it costs next to nothing) and
 // uploaded to the card shader as a texture.
 //
@@ -15,8 +16,8 @@ const COLD = 0.002;
 /** Fingerprints kept at once; the oldest makes way. */
 const PRINTS = 3;
 
-/** The touch finishes: Warmth's heat, or the light Glow's ink stores. */
-export type TouchKind = 'warmth' | 'glow';
+/** The touch finishes: Warmth's heat, the light Glow's ink stores, or Rainy Window's wiped glass. */
+export type TouchKind = 'warmth' | 'glow' | 'rain';
 
 interface Fade {
   /** How fast it spreads, in cells² per second. */
@@ -36,6 +37,9 @@ const FADES: Record<TouchKind, Fade> = {
   // Light stays where it was shone and dies away like a real afterglow: half gone in a couple of
   // seconds, then a faint glow that hangs on for twenty or so.
   glow: { spread: 0, cool: 0.02, loss: 0.0015, quench: 1, prints: false },
+  // A wiped patch stays clear for a few seconds while the fog creeps back in from its edges; a
+  // fingertip pressed on the glass leaves its print in the fog.
+  rain: { spread: 0.4, cool: 0.3, loss: 0.02, quench: 0, prints: true },
 };
 
 export interface Print {
@@ -306,9 +310,10 @@ export class Swipe {
 export const AUTO_LOOP = 10;
 /**
  * Where in the loop a still picture (PNG, a held preview) is taken: for Warmth the swipe still warm
- * and the print just made, for Glow just after the light has left, the trail glowing on its own.
+ * and the print just made, for Glow just after the light has left, the trail glowing on its own, for
+ * Rainy Window the wipe and the print still clear.
  */
-export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36 };
+export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36, rain: 0.3 };
 /** Simulation ticks per loop: fixed, so every export of the same phase is identical. */
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */
