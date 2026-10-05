@@ -36,7 +36,7 @@ import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
 import type { Kept } from './binder/db';
-import { DOT_COLORS, DOT_PRESETS, DOT_SIZES, dotGrid, dotKey, presetOf, type Dot } from './dot/model';
+import { artBlock, DOT_COLORS, DOT_PRESETS, DOT_SIZES, dotGrid, dotKey, presetOf, type Dot } from './dot/model';
 import type { Layers } from './range';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -186,7 +186,7 @@ function artKey() {
   const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
   if (!artIds.has(src)) artIds.set(src, ++artCount);
   const a = faceArt(s);
-  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? dotKey(s.dot) : ''}`;
+  return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? `${dotKey(s.dot)}/${s.pixel}` : ''}`;
 }
 
 function faceSpec(image: Img) {
@@ -221,7 +221,7 @@ function redrawFace() {
   lastRuns = drawFace(face, mask, spec);
   // A moving picture's next frame keeps the palette the face was last given.
   if (!framing) facePalette = `face${++paletteRun}`;
-  pixelArt(face, facePalette);
+  pixelArt(face, facePalette, mask);
   setTextRuns(face.width, face.height, lastRuns);
   const { font, text } = spec.message;
   const ask = text.trim() ? `${font}|${text}` : '';
@@ -255,9 +255,10 @@ let facePalette = '';
 /**
  * Draws a just-painted face (or Flip Lenticular's picture) as pixel art when it is on. Calls with the
  * same `keep` share one palette (empty: a palette of its own). The face stays plain until the code is here.
+ * With the face's `artMask`, Pixelate (when it is on too) runs first on the art window.
  */
-function pixelArt(canvas: HTMLCanvasElement, keep: string) {
-  const d = store.get().dot;
+function pixelArt(canvas: HTMLCanvasElement, keep: string, artMask?: HTMLCanvasElement) {
+  const { dot: d, pixel } = store.get();
   if (!d) return;
   if (!dot)
     return void useDot().then(
@@ -267,7 +268,7 @@ function pixelArt(canvas: HTMLCanvasElement, keep: string) {
       },
       () => toast(t.loadFailed, true),
     );
-  dot.dotFace(canvas, d, keep || `own${++paletteRun}`);
+  dot.dotFace(canvas, d, keep || `own${++paletteRun}`, artMask && { mask: artMask, block: artBlock(d, pixel) });
 }
 
 // ---------- Text ----------
@@ -528,6 +529,7 @@ function buildDot() {
   };
   const td = t.dot;
   $('dotLabel').textContent = td.label;
+  $('dotHint').textContent = td.hint;
   $('dotNow').textContent = preset === null ? td.custom : '';
   const presets = ['off', 'chunky', 'retro', 'fine'] as const;
   seg('dotSeg', td.label, presets, (p) => td.preset[p], (p) => preset === p, (p) => store.set({ dot: p === 'off' ? null : { ...DOT_PRESETS[p] } }));
@@ -653,6 +655,11 @@ function syncInputs() {
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
   setRangeFill(inten);
+  const px = $<HTMLInputElement>('pixel');
+  px.value = String(s.pixel);
+  $('pixelOut').textContent = t.pixelLevels[s.pixel] ?? t.off;
+  px.setAttribute('aria-valuetext', t.pixelLevels[s.pixel] ?? t.off);
+  setRangeFill(px);
   const zoom = $<HTMLInputElement>('zoom');
   zoom.value = String(s.crop.zoom);
   $('zoomOut').textContent = `${Math.round(s.crop.zoom * 100)}%`;
@@ -1053,6 +1060,9 @@ $<HTMLInputElement>('typeInput').addEventListener('input', (e) => store.set({ ca
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
+$<HTMLInputElement>('pixel').addEventListener('input', (e) => {
+  store.set({ pixel: +(e.target as HTMLInputElement).value });
+});
 $('langBtn').addEventListener('click', () => {
   sfx.tick();
   // The other language's texts arrive first; then everything changes at once.
@@ -1105,7 +1115,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1191,7 +1201,7 @@ function syncAdjust() {
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, dot: null, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic' });
+  store.set({ intensity: 1, pixel: 0, dot: null, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1268,7 +1278,8 @@ function exportInput() {
     back,
     edition: editionById(s.edition),
     intensity: s.intensity,
-    pixel: dotGrid(s.dot),
+    pixel: s.pixel,
+    dot: dotGrid(s.dot),
     tune: s.tune,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
@@ -1296,7 +1307,7 @@ function animatedExport(anim: Anim) {
     loopMs: anim.duration,
     faceAt: (ms: number, f: HTMLCanvasElement, m: HTMLCanvasElement) => {
       drawFace(f, m, { ...spec, crop, image: anim.frames[frameAt(anim, ms)] });
-      pixelArt(f, keep);
+      pixelArt(f, keep, m);
     },
   };
 }
@@ -2205,7 +2216,7 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if (['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape', 'dot'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if ((['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape', 'dot'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && !!s.dot)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();

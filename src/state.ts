@@ -32,6 +32,8 @@ export interface State extends RangeColorState {
   /** The card's shape (card/shape.ts); the trading card unless chosen. */
   shape: ShapeId;
   intensity: number;
+  /** Pixelate: the art window's step (0 = off, see dot/model.ts PIXEL_STEPS); the frame and words stay crisp. */
+  pixel: number;
   /** Pixel art over the whole card, or null (src/dot). */
   dot: Dot | null;
   name: string;
@@ -90,6 +92,7 @@ const PERSIST: (keyof State)[] = [
   'frame',
   'shape',
   'intensity',
+  'pixel',
   'dot',
   'name',
   'nameEdited',
@@ -154,6 +157,7 @@ const defaults = (): State => ({
   frame: 'paper',
   shape: 'card',
   intensity: 1,
+  pixel: 0,
   dot: null,
   name: '',
   nameEdited: false,

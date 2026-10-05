@@ -12,7 +12,7 @@ import { cardLayers } from './layers';
 import './stage-phone.css';
 import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
 import { cardK, contain, shapeById, type ShapeId } from './card/shape';
-import { dotGrid } from './dot/model';
+import { dotGrid, pixelCells, pixelCellsSmall } from './dot/model';
 
 /** The card's proportions in units of its short side, for a heat grid. */
 const kOf = (shape: ShapeId) => cardK(shapeById(shape).w, shapeById(shape).h);
@@ -692,7 +692,8 @@ export class Stage {
           ...cardPose,
           ...cardLayers(state, this.rangeView > 0 ? this.rangeLayer : 0),
           intensity: state.intensity,
-          pixel: dotGrid(state.dot),
+          pixel: pixelCells(state.pixel),
+          dot: dotGrid(state.dot),
           tilt,
           light,
           alpha: 1,
@@ -857,7 +858,8 @@ export class Stage {
           scale: card.scale.x,
           edition: e.shader,
           intensity: state.intensity,
-          pixel: dotGrid(state.dot),
+          pixel: pixelCellsSmall(state.pixel),
+          dot: dotGrid(state.dot),
           tilt: [card.tiltY.x / 0.35 + Math.sin(t * 0.5) * 0.5 * idle, card.tiltX.x / 0.3 + Math.cos(t * 0.4) * 0.5 * idle],
           // Blacklight's preview drifts its lamp round by itself.
           light: e.torch ? torchAt(motion.fx / TORCH_DRIFT + i * 0.1) : [0.5, 0.35],
@@ -896,7 +898,8 @@ export class Stage {
           scale: 1 - 0.45 * e,
           edition: c.shader,
           intensity: state.intensity,
-          pixel: dotGrid(state.dot),
+          pixel: 0,
+          dot: dotGrid(state.dot),
           tilt: [0, 0],
           light: [0.5, 0.35],
           alpha: 1 - 0.7 * e,

@@ -161,10 +161,11 @@ await step('switch finish', async () => {
   expect(await page.evaluate(() => document.activeElement?.matches('.hand-slot[aria-checked=true]')), 'Pick from the hand did not lead to the hand');
 });
 
-await step('card tab: strength, pixel art, frame', async () => {
+await step('card tab: strength, pixelate, pixel art, frame', async () => {
   await tab('card');
   await page.locator('#intensity').fill('0.5');
   expect(await page.evaluate(() => document.getElementById('intensityOut').classList.contains('is-bump')), 'a changed value does not pop in its pocket');
+  await page.locator('#pixel').fill('2');
   expect(!(await page.isVisible('#dotMore')), 'pixel art offers Adjust while it is off');
   await page.click('#dotSeg [role=radio]:nth-child(2)');
   await page.click('#dotMore');
@@ -173,10 +174,10 @@ await step('card tab: strength, pixel art, frame', async () => {
   expect((await page.textContent('#dotNow')).length > 0, 'a mix of my own is not called custom');
   await page.click('#frameSeg [role=radio]:nth-child(2)');
   const s = await state();
-  expect(s.intensity === 0.5 && s.dot?.size === 128 && s.dot.colors === 16 && s.dot.outline && s.frame === 'ink', `got ${s.intensity}/${JSON.stringify(s.dot)}/${s.frame}`);
+  expect(s.intensity === 0.5 && s.pixel === 2 && s.dot?.size === 128 && s.dot.colors === 16 && s.dot.outline && s.frame === 'ink', `got ${s.intensity}/${s.pixel}/${JSON.stringify(s.dot)}/${s.frame}`);
   await page.click('#cardReset');
   const r = await state();
-  expect(r.intensity === 1 && r.dot === null && r.frame === 'paper', 'card reset failed');
+  expect(r.intensity === 1 && r.pixel === 0 && r.dot === null && r.frame === 'paper', 'card reset failed');
   expect(!(await page.isVisible('#dotBody')), 'the pixel art choices stay open with pixel art off');
   await page.click('#adjustToggle');
   expect(!(await page.isVisible('#panelTabs')), 'the pinned Fine-tune row did not close it');

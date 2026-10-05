@@ -107,8 +107,13 @@ const en: Dict = {
   frame: 'Frame',
   shape: 'Shape',
   intensity: 'Finish strength',
+  pixel: 'Pixelate',
+  pixelHint: 'The picture only. Frame stays sharp.',
+  off: 'Off',
+  pixelLevels: ['Off', 'Subtle', 'Light', 'Medium', 'Strong', 'Heavy', 'Max'],
   dot: {
     label: 'Pixel art',
+    hint: 'The whole card, frame and words too.',
     preset: { off: 'Off', chunky: 'Chunky', retro: 'Retro', fine: 'Fine' },
     custom: 'Custom',
     more: 'Adjust',
