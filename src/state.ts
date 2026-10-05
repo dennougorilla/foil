@@ -31,6 +31,10 @@ export interface State extends RangeColorState {
   frame: FrameId;
   /** The card's shape (card/shape.ts); the trading card unless chosen. */
   shape: ShapeId;
+  /** The Picture shape's size now ('900x1260'), following the picture on the card (not saved: shape.ts setFit). */
+  fit: string;
+  /** The picture is the whole card: FOIL's frame, nameplate and words are not drawn (their settings stay). */
+  frameless: boolean;
   intensity: number;
   pixel: number;
   name: string;
@@ -90,6 +94,7 @@ const PERSIST: (keyof State)[] = [
   'rarity',
   'frame',
   'shape',
+  'frameless',
   'intensity',
   'pixel',
   'name',
@@ -154,6 +159,8 @@ const defaults = (): State => ({
   rarity: 'rare',
   frame: 'paper',
   shape: 'card',
+  fit: '',
+  frameless: false,
   intensity: 1,
   pixel: 0,
   name: '',
@@ -186,6 +193,7 @@ function sanitize(state: State) {
   if (state.lang !== 'ja') state.lang = 'en';
   state.tune = sanitizeTune(state.tune);
   state.shape = shapeOf(state.shape);
+  state.frameless = state.frameless === true;
   state.adjustOpen = state.adjustOpen === true;
   state.message = normalizeMessage(state.message);
   state.plate = state.plate !== false;

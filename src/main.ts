@@ -5,7 +5,8 @@ import { dictOf, loadDict, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop } from './card/face';
 import { backUrl, drawBack } from './card/back';
-import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
+import { exportFrame, fitArea, setFit, shapeById, SHAPES } from './card/shape';
+import { isPixelArt, PIXEL_ART_MAX } from './card/pixelArt';
 import { CARD_LAYOUTS } from './card/tcg';
 import type { PrintPop } from './printPop';
 import type { TextRun } from './lettering';
@@ -187,7 +188,21 @@ function artKey() {
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements, frameless: s.frameless, crisp: isCrisp() };
+}
+
+const crispOf = new WeakMap<object, boolean>();
+/** Whether the picture on the card is pixel art, to be enlarged with hard pixels (looked at once per picture). */
+function isCrisp(): boolean {
+  const s = store.get();
+  const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
+  let crisp = crispOf.get(src);
+  if (crisp === undefined) {
+    const img = s.sample >= 0 ? samples[s.sample] : (userAnim?.frames[0] ?? userImage ?? samples[0]);
+    crisp = img.width <= PIXEL_ART_MAX && img.height <= PIXEL_ART_MAX && isPixelArt(img.getContext('2d')!.getImageData(0, 0, img.width, img.height));
+    crispOf.set(src, crisp);
+  }
+  return crisp;
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
@@ -204,7 +219,14 @@ let lastRuns: TextRun[] = [];
 let paintWaiting = false;
 
 function redrawFace() {
-  const spec = faceSpec(currentImage());
+  // The Picture shape follows the picture: a new size is a new shape, and the store's answer repaints.
+  const img = currentImage();
+  if (setFit(img.width, img.height)) {
+    const fit = shapeById('fit');
+    store.set({ fit: `${fit.w}x${fit.h}` });
+    if (store.get().shape === 'fit') return;
+  }
+  const spec = faceSpec(img);
   // A trading card's painter comes with its first use; the face is painted once it is here.
   if (!canPaint(spec)) {
     if (paintWaiting) return;
@@ -423,7 +445,7 @@ function buildSegments() {
     const { w, h } = fitArea(sh.h / sh.w, 18);
     b.innerHTML = `<span class="shape-ico" style="--w:${w.toFixed(1)}px;--h:${h.toFixed(1)}px"></span><span></span>`;
     b.lastElementChild!.textContent = t.shapeName[sh.id];
-    b.title = `${t.shapeName[sh.id]} · ${sh.size}`;
+    b.title = sh.id === 'fit' ? t.shapeFitHint : `${t.shapeName[sh.id]} · ${sh.size}`;
     radio(b, s.shape === sh.id);
     b.onclick = () => {
       sfx.tick();
@@ -432,7 +454,10 @@ function buildSegments() {
     };
     ss.appendChild(b);
   }
+  // A card that is all picture has no frame or layout of FOIL's: their choices step aside (and stay).
+  fs.parentElement!.hidden = s.frameless;
   const ls = $('layoutSeg');
+  ls.parentElement!.hidden = s.frameless;
   ls.textContent = '';
   for (const id of CARD_LAYOUTS) {
     const b = document.createElement('button');
@@ -551,6 +576,8 @@ function thumbUrl(img: Img): string {
     c.width = Math.round((img.width / img.height) * h);
     c.height = h;
     const x = c.getContext('2d')!;
+    // A small picture (a sprite) is enlarged with hard pixels.
+    x.imageSmoothingEnabled = h < img.height;
     x.imageSmoothingQuality = 'high';
     x.drawImage(img, 0, 0, c.width, c.height);
     u = c.toDataURL('image/png');
@@ -589,6 +616,8 @@ function syncInputs() {
   name.classList.toggle('is-off', !s.plate);
   msg.setAttribute('aria-label', t.msg.title);
   $('info').classList.toggle('is-tcg', tcg);
+  $('info').classList.toggle('is-frameless', s.frameless);
+  renderWhole();
   const inten = $<HTMLInputElement>('intensity');
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
@@ -609,6 +638,31 @@ function syncInputs() {
   $('crt').classList.toggle('is-off', !s.crt);
 }
 
+// ---------- Use as the whole card ----------
+
+/** A picture of your own shaped like a card, just opened: the switch suggests itself until used or the picture changes. */
+let suggestWhole = false;
+
+function renderWhole() {
+  const s = store.get();
+  const btn = $('wholeBtn');
+  btn.setAttribute('aria-pressed', String(s.frameless));
+  const suggest = suggestWhole && !s.frameless && s.sample < 0;
+  btn.classList.toggle('is-suggest', suggest);
+  $('wholeNote').textContent = s.frameless ? t.wholeOn : suggest ? t.wholeSuggest : t.wholeOff;
+}
+
+$('wholeBtn').addEventListener('click', () => {
+  sfx.tick();
+  suggestWhole = false;
+  const s = store.get();
+  const on = !s.frameless;
+  // On, the card takes the picture's proportions; off, a card that had them goes back to the trading card.
+  const shape = on ? 'fit' : s.shape === 'fit' ? 'card' : s.shape;
+  stage.flipTo(() => store.set({ frameless: on, shape, crop: { zoom: 1, x: 0.5, y: 0.5 } }));
+  stage.juice(0.4);
+});
+
 // ---------- Crop ----------
 
 const cropCanvas = $<HTMLCanvasElement>('cropCanvas');
@@ -626,8 +680,11 @@ function drawCropPreview() {
   cropCanvas.style.width = `${w}px`;
   cropCanvas.style.height = `${h}px`;
   const x = cropCanvas.getContext('2d')!;
+  const crisp = isCrisp();
+  x.imageSmoothingEnabled = !crisp;
   x.imageSmoothingQuality = 'high';
   x.drawImage(img, 0, 0, cropCanvas.width, cropCanvas.height);
+  cropView.classList.toggle('is-crisp', crisp);
   cropWin.style.backgroundImage = `url(${thumbUrl(img)})`;
   positionCropWindow();
 }
@@ -773,6 +830,9 @@ async function loadFile(file: File) {
     animFrame = 0;
     playFrames();
     void saveUserImage(anim ? file : still);
+    // Taller than wide by about a card's proportions (5 : 7 to 2 : 3 and a touch more).
+    const r = still.height / still.width;
+    suggestWhole = r > 1.3 && r < 1.6;
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
     const s = store.get();
     if (!s.nameEdited && base && !/^(image|img|photo|IMG_|DSC|screenshot|スクリーンショット)/i.test(base)) {
@@ -795,6 +855,7 @@ async function loadFile(file: File) {
 
 function useImage(idx: number) {
   const s = store.get();
+  if (idx >= 0) suggestWhole = false;
   const patch: Partial<State> = { sample: idx, crop: { zoom: 1, x: 0.5, y: 0.5 } };
   if (idx >= 0) {
     if (!s.nameEdited) patch.name = '';
@@ -1062,7 +1123,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic' || s.backdrop !== 'swirl';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1083,7 +1144,7 @@ function buildTabs() {
     b.innerHTML = '<span></span><i class="tab-dot" hidden></i>';
     b.firstElementChild!.textContent = t.tabs[id];
     b.onclick = () => {
-      if (store.get().panelTab === id) return;
+      if (tabNow() === id) return;
       sfx.tick();
       store.set({ panelTab: id });
       revealTabs();
@@ -1095,11 +1156,12 @@ function buildTabs() {
 }
 
 tabBar.addEventListener('keydown', (e) => {
-  const i = PANEL_TABS.indexOf(store.get().panelTab);
-  const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: PANEL_TABS.length - 1 }[e.key];
+  const tabs = tabsShown();
+  const i = tabs.indexOf(tabNow());
+  const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
   if (n === undefined) return;
   e.preventDefault();
-  const id = PANEL_TABS[(n + PANEL_TABS.length) % PANEL_TABS.length];
+  const id = tabs[(n + tabs.length) % tabs.length];
   sfx.tick();
   store.set({ panelTab: id });
   $(`tab-${id}`).focus();
@@ -1125,10 +1187,12 @@ function syncAdjust() {
   adjustToggle.setAttribute('aria-expanded', String(s.adjustOpen));
   $('adjustBody').hidden = !s.adjustOpen;
   $('adjust').classList.toggle('is-open', s.adjustOpen);
-  const changed = PANEL_TABS.filter(tabChanged);
+  const changed = tabsShown(s).filter(tabChanged);
+  const open = tabNow(s);
   for (const id of PANEL_TABS) {
     const b = $(`tab-${id}`);
-    const on = s.panelTab === id;
+    const on = open === id;
+    b.hidden = !tabsShown(s).includes(id);
     b.setAttribute('aria-selected', String(on));
     b.tabIndex = on ? 0 : -1;
     b.querySelector<HTMLElement>('.tab-dot')!.hidden = !changed.includes(id);
@@ -1146,9 +1210,17 @@ function syncAdjust() {
   requestAnimationFrame(trackExportBar);
 }
 
+/** The shape a card starts from: the picture's own when the picture is the whole card. */
+const shapeDefault = () => (store.get().frameless ? 'fit' : 'card');
+
+/** The tabs on show: a card that is all picture prints no words, so Lettering steps aside. */
+const tabsShown = (s = store.get()) => PANEL_TABS.filter((id) => !(id === 'text' && s.frameless));
+/** The tab open now: the one chosen, unless it stepped aside. */
+const tabNow = (s = store.get()): PanelTab => (tabsShown(s).includes(s.panelTab) ? s.panelTab : 'card');
+
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic', backdrop: 'swirl' });
+  store.set({ intensity: 1, pixel: 0, frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -2125,15 +2197,17 @@ store.on((s, changed) => {
     stage.syncHand();
     deck.render();
   }
-  if (['rarity', 'frame', 'shape', 'frameColor', 'frameSwatches'].some((k) => changed.has(k as keyof State))) buildSegments();
+  // The Picture shape changing size is a new shape.
+  const reshaped = changed.has('shape') || (changed.has('fit') && s.shape === 'fit');
+  if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit'].some((k) => changed.has(k as keyof State))) buildSegments();
   if (['backdrop', 'backdropColor', 'edition'].some((k) => changed.has(k as keyof State))) buildBackdrops();
   if (changed.has('arrange')) {
     renderCardHint();
     if (s.arrange === 'free') useArrange();
   }
   if (changed.has('prints')) setFieldPrints(s.prints);
-  if (changed.has('shape')) applyShape();
-  if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
+  if (reshaped) applyShape();
+  if (reshaped || changed.has('frameless') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
     // A new art window has its own proportions: keep the crop inside the picture, and redraw the flip picture for it.
     const img = currentImage();
     const crop = clampCrop(img.width, img.height, s.crop, artAspect());
@@ -2142,18 +2216,18 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if (['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape'].some((k) => changed.has(k as keyof State)) && !changed.has('sample')) {
+  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless'].some((k) => changed.has(k as keyof State))) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
-  if (['sample', 'name', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
+  if (['sample', 'name', 'message', 'plate', 'layout', 'cardType', 'frameless'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) {
     buildFormats();
     renderShare();
   }
-  if (['exportFormat', 'saveOptsOpen', 'backdrop', 'gifMatte', 'shape', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
+  if (reshaped || ['exportFormat', 'saveOptsOpen', 'backdrop', 'gifMatte', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }

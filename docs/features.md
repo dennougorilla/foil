@@ -5,6 +5,8 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Picture
 
 - Bring an image by choosing a file, dropping it anywhere, or pasting (Ctrl+V). PNG, JPEG, WebP and GIF are read; animated GIF, APNG and animated WebP keep moving on the card. It never leaves your browser.
+- **Use as the whole card** (a switch under the pick button): for a picture that already is a card, its frame and words drawn in (like a game's joker), the whole picture becomes the card face. FOIL's frame, nameplate, message and lettering are not drawn and their controls step aside; their settings stay, for when the switch is turned off. Turning it on gives the card the picture's own proportions (the shape **Picture**); any other shape crops the picture to it. The rounded corner, the card's edge and shadow, its back, tilt, every finish, the layers (whole card, brightness and the brush), motion and every export work as before. A picture of your own shaped like a card gets a quiet note beside the switch.
+- Pixel art (a small picture of few colours, or one made of square blocks of the same colour) is enlarged with hard pixels, on the card, in the crop and in every export, never blurred.
 - Three samples are there to start with. Zoom and drag the window to choose what the card shows (arrow keys and + − work too).
 - Your picture, and Flip Lenticular's other picture, are kept in this browser (IndexedDB) across reloads.
 
@@ -85,7 +87,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ### Shapes
 
-- The card is a trading card (63 × 88, 5 : 7) unless you choose another **shape** under Fine-tune → Card: **Wide** (7 : 5, a greeting card on its side), **Square**, **Postcard** upright or on its side (100 × 148) and **Business** card (91 × 55, on its side); each choice shows its outline, and its size on hover.
+- The card is a trading card (63 × 88, 5 : 7) unless you choose another **shape** under Fine-tune → Card: **Wide** (7 : 5, a greeting card on its side), **Square**, **Postcard** upright or on its side (100 × 148) **Business** card (91 × 55, on its side) and **Picture**, the picture's own proportions (kept between 1 : 2.2 and 2.2 : 1, following the picture as it changes); each choice shows its outline, and its size on hover.
 - Every shape is still a card: the short side, the frame's line and margins, the corner and the nameplate keep their size and only the art window stretches, so a frame never squeezes or bends. The crop, every finish, the layers, the lettering, the hand, the deck builder, the pack opening, the card back and every export follow the shape.
 
 ### Frames
@@ -131,7 +133,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ## Finish area
 
-- In the Layers tab, the chosen layer's place is set by the area controls: the whole card, the art, the frame, the name or nowhere, a band of brightness (highlights only, shadows only…), inverted, and painted in or out with a soft brush while the card holds still. An overlay shows what is left out, and exports follow it.
+- In the Layers tab, the chosen layer's place is set by the area controls: the whole card, the art, the frame, the name or nowhere, a band of brightness (highlights only, shadows only…), inverted, and painted in or out with a soft brush while the card holds still. An overlay shows what is left out, and exports follow it. A card used as a whole (no frame) has no art, frame or name of its own: there the place is the whole card or the brush, with the brightness band and invert.
 
 ## Light and motion
 

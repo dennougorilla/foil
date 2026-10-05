@@ -581,8 +581,10 @@ export class Stage {
       void backdropShader(id).then((fs) => this.backdrop === id && this.bg.use(fs), () => {});
     }
     const touch = ed.touch ? this.useTouch() : null;
-    if (`${ed.id}|${state.shape}` !== this.shown && (!ed.touch || touch)) {
-      this.shown = `${ed.id}|${state.shape}`;
+    // The size, not the shape's name: the Picture shape changes with the picture.
+    const size = `${shapeById(state.shape).w}x${shapeById(state.shape).h}`;
+    if (`${ed.id}|${size}` !== this.shown && (!ed.touch || touch)) {
+      this.shown = `${ed.id}|${size}`;
       this.lastTouch = null;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
       this.heat = ed.touch && touch ? new touch.HeatField(ed.touch, kOf(state.shape)) : null;
@@ -936,8 +938,9 @@ export class Stage {
     const touch = this.useTouch();
     if (!touch) return undefined;
     const shape = this.o.store.get().shape;
-    let demo = this.demos.get(`${kind}|${shape}`);
-    if (!demo) this.demos.set(`${kind}|${shape}`, (demo = new touch.AutoTouch(kind, touch.SWIPES[0], kOf(shape))));
+    const key = `${kind}|${kOf(shape).join('x')}`;
+    let demo = this.demos.get(key);
+    if (!demo) this.demos.set(key, (demo = new touch.AutoTouch(kind, touch.SWIPES[0], kOf(shape))));
     demo.at(2 + touch.AUTO_STILL[kind] + time / touch.AUTO_LOOP);
     return demo;
   }
