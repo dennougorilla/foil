@@ -29,11 +29,12 @@ const shots = [
 // The seven starters, then every pack in its reveal order.
 const editions = [
   ...['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
-  ...['relief', 'gold', 'platinum', 'cosmoholo', 'chameleon', 'crystal'],
+  ...['platinum', 'gold', 'relief', 'chameleon', 'cosmoholo'],
+  ...['crystal', 'opal', 'raden', 'kintsugi'],
   ...['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
-  ...['sakura', 'frost', 'stardust', 'snowglobe', 'rain', 'marble', 'magma'],
+  ...['sakura', 'frost', 'stardust', 'rain', 'marble', 'magma'],
   ...['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
-  ...['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],
+  ...['confetti', 'snowglobe', 'fireworks'],
 ];
 const errors = [];
 

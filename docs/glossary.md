@@ -14,7 +14,8 @@ name below.
 | イラスト | Art | The art window of the card, where the picture shows. As an area: only inside it. |
 | 窓 | Window | The box in the crop view that you drag to choose what the card shows. Never 枠 / Frame, which is the card's border. |
 | 枠 | Frame | The card's border and its color. |
-| 形 | Shape | Trading card, wide, square, postcard upright or on its side, business card. |
+| 形 | Shape | Trading card, wide, square, postcard upright or on its side, business card, and 画像の形 / Picture (the picture's own proportions). |
+| カードそのものとして使う | Use as the whole card | The picture is the whole card: no frame, nameplate or words of FOIL's, only the finish on it. |
 | 名前 | Name | The card's name on its nameplate. Not カード名. |
 | 名札 | Nameplate | The band holding the name and rarity. |
 | レアリティ | Rarity | Common to Legendary, shown as ◆. Not レア度. |
@@ -26,7 +27,7 @@ name below.
 
 | ja | en | Meaning |
 | --- | --- | --- |
-| 加工 | Finish | One of the 33 effects (Foil, Holographic…). Only finishes are 加工; the way words are printed is 刷り方. |
+| 加工 | Finish | One of the 36 effects (Foil, Holographic…). Only finishes are 加工; the way words are printed is 刷り方. |
 | 加工の強さ | Finish strength | How strongly the finish shows. Not 効果の強さ. |
 | 輝き | Shine | The Fine-tune tab for pattern, light and motion. |
 | 手札 / デッキ / パック | Hand / Deck / Pack | Up to seven finishes to pick from / the other owned finishes / a theme set opened once. |

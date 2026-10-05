@@ -1380,8 +1380,8 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.move(g.x + g.width, g.y, { steps: 12 });
   await page.mouse.up();
   await phase('deck');
-  expect((await packsSaved()).owned.join() === 'platinum,gold,relief,cosmoholo', 'the tear did not own the Metal finishes');
-  for (const name of ['Platinum', 'Gold', 'Relief']) {
+  expect((await packsSaved()).owned.join() === 'platinum,gold,relief,chameleon,cosmoholo', 'the tear did not own the Metal finishes');
+  for (const name of ['Platinum', 'Gold', 'Relief', 'Chameleon']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
@@ -1403,7 +1403,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   }
   await page.keyboard.press('ArrowRight');
   await phase('haul');
-  expect((await page.locator('.pk-name').count()) === 4, 'the haul does not show all four');
+  expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
   await page.click('.pk-try');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'cosmoholo', null, { timeout: 10000 });
@@ -1420,7 +1420,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   const hand = (await state()).hand;
   expect(hand.includes('cosmoholo') && !hand.includes('glitch'), `the pick did not take the hand's last place: ${hand}`);
   expect((await handCount()) === 7, `the hand has ${await handCount()} cards, not seven`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '4', 'the deck does not hold the other three Metal finishes and the swapped-out Glitch');
+  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck does not hold the other four Metal finishes and the swapped-out Glitch');
 });
 
 await step('the deck builder: one tap moves a card, a full hand gives up its last card, undo, drag, reset', async () => {
@@ -1434,7 +1434,7 @@ await step('the deck builder: one tap moves a card, a full hand gives up its las
   // Out of the hand: its slot stays open, and the next card goes there.
   await page.click('.db-hand .db-card[data-id=holo]');
   expect((await count()) === '6 / 7' && !(await hand()).includes('holo'), 'tapping a hand card did not send it to the deck');
-  expect((await page.textContent('#deckBtn .deck-count')) === '5', 'the deck count did not rise');
+  expect((await page.textContent('#deckBtn .deck-count')) === '6', 'the deck count did not rise');
   await page.click('.db-grid .db-card[data-id=relief]');
   expect((await hand())[2] === 'relief', `Relief did not take the emptied slot: ${await hand()}`);
   // Full: the last card that is not Base gives way.
@@ -1517,7 +1517,7 @@ await step('held still, the pack opens with a button and the haul fades in', asy
   await page.click('.pk-name >> nth=0');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).hand.includes('sakura'), null, { timeout: 10000 });
-  expect((await page.textContent('#deckBtn .deck-count')) === '8', 'the deck does not hold both packs');
+  expect((await page.textContent('#deckBtn .deck-count')) === '11', 'the deck does not hold both packs');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 });
 
@@ -1577,8 +1577,8 @@ await step('packs reorganized: a v0.13 save keeps every finish it had, a pack th
   expect(s.edition === 'raden' && s.hand.join() === 'base,opal,snowglobe,kintsugi,raden,holo,magma', `finishes were lost: ${s.edition} / ${s.hand}`);
   const saved = await packsSaved();
   expect(!('opened' in saved) && saved.owned.join() === 'opal,raden,kintsugi,sakura,frost,stardust,magma,confetti,snowglobe,fireworks', `not rewritten as owned finishes: ${JSON.stringify(saved)}`);
-  // Nature and the new Supporter pack are whole; Jewel lacks Crystal, so it is sealed with Metal, Light and Studio.
-  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '4', `sealed: ${await page.getAttribute('#packsBtn', 'data-sealed')}`);
+  // The new Supporter pack is whole; Jewel lacks Crystal and Nature Rainy Window and Marble, so they are sealed with Metal, Light and Studio.
+  expect((await page.getAttribute('#packsBtn', 'data-sealed')) === '5', `sealed: ${await page.getAttribute('#packsBtn', 'data-sealed')}`);
   await page.click('#packsBtn');
   await phase('shop');
   expect((await page.locator('.pk-slot').count()) === 6, 'the shop does not show six packs');
@@ -1607,7 +1607,7 @@ await step('packs reorganized: a v0.13 save keeps every finish it had, a pack th
 });
 
 await step('Open all opens every sealed pack on the tray at once, lists them pack by pack and leads to the deck builder; the Supporter pack joins only once it is on the tray', async () => {
-  // Saved by v0.13 with the old Metal pack opened: Crystal is owned, so Jewel brings three.
+  // Saved by v0.13 with the old Metal pack opened: Crystal is owned, so Jewel brings three, and Metal only Chameleon.
   await page.evaluate(() => localStorage.setItem('foil:packs', '{"opened":["metal"],"supporter":false}'));
   await page.reload();
   await page.waitForTimeout(1500);
@@ -1615,7 +1615,7 @@ await step('Open all opens every sealed pack on the tray at once, lists them pac
   await page.click('#packsBtn');
   await phase('shop');
   // The count leaves out the Supporter pack, which is not on the tray.
-  expect((await page.textContent('.pk-all small')) === '4 packs · no intros', `Open all does not count four sealed packs: ${await page.textContent('.pk-all small')}`);
+  expect((await page.textContent('.pk-all small')) === '5 packs · no intros', `Open all does not count five sealed packs: ${await page.textContent('.pk-all small')}`);
   // The first tap only arms it.
   await page.click('.pk-all');
   await page.waitForSelector('.pk-all.is-armed', { timeout: 3000 });
@@ -1623,26 +1623,27 @@ await step('Open all opens every sealed pack on the tray at once, lists them pac
   await page.click('.pk-all');
   await phase('all');
   const saved = await packsSaved();
-  expect(saved.owned.length === 23 && saved.supporter === false, `saved ${JSON.stringify(saved)}`);
+  expect(saved.owned.length === 26 && saved.supporter === false, `saved ${JSON.stringify(saved)}`);
   // One row per pack opened now, every finish in it, the showpiece in the middle with a star.
   const rows = await page.$$eval('.pk-row', (els) => els.map((r) => [r.dataset.pack, [...r.querySelectorAll('.pk-swatch b')].map((b) => b.textContent), r.querySelector('.pk-swatch.is-showpiece b')?.textContent, r.querySelector('.pk-row-tag small').textContent, [...r.querySelectorAll('.pk-swatch.is-had b')].map((b) => b.textContent).join()]));
-  expect(rows.map((r) => r[0]).join() === 'jewel,light,nature,studio', `rows ${rows.map((r) => r[0])}`);
-  expect(rows.map((r) => r[1].length).join() === '4,5,4,6', `cards per row ${rows.map((r) => r[1].length)}`);
-  expect(rows.map((r) => r[2]).join() === 'Kintsugi,Shallows,Magma,Shadowbox', `showpieces ${rows.map((r) => r[2])}`);
-  expect(rows[1][1][2] === 'Shallows', `the showpiece is not in the middle: ${rows[1][1]}`);
-  // Crystal was owned already: in its place, marked, and not counted.
-  expect(rows[0][3] === '+3 new' && rows[0][4] === 'Crystal' && rows.slice(1).every((r) => !r[4]), `Jewel row: ${rows[0]}`);
-  expect(/^18 new finishes from 4 packs/.test(await page.textContent('.pk-list-title b')), `title: ${await page.textContent('.pk-list-title b')}`);
+  expect(rows.map((r) => r[0]).join() === 'metal,jewel,light,nature,studio', `rows ${rows.map((r) => r[0])}`);
+  expect(rows.map((r) => r[1].length).join() === '5,4,5,6,6', `cards per row ${rows.map((r) => r[1].length)}`);
+  expect(rows.map((r) => r[2]).join() === 'Cosmo Holo,Kintsugi,Shallows,Magma,Shadowbox', `showpieces ${rows.map((r) => r[2])}`);
+  expect(rows[2][1][2] === 'Shallows', `the showpiece is not in the middle: ${rows[2][1]}`);
+  // Crystal and the old Metal finishes were owned already: in their places, marked, and not counted.
+  expect(rows[0][3] === '+1 new' && rows[0][4].split(',').sort().join() === 'Cosmo Holo,Gold,Platinum,Relief', `Metal row: ${rows[0]}`);
+  expect(rows[1][3] === '+3 new' && rows[1][4] === 'Crystal' && rows.slice(2).every((r) => !r[4]), `Jewel row: ${rows[1]}`);
+  expect(/^21 new finishes from 5 packs/.test(await page.textContent('.pk-list-title b')), `title: ${await page.textContent('.pk-list-title b')}`);
   // The list draws no finish (nothing compiles for it).
   expect((await page.locator('.pk-list canvas').count()) === 0, 'the list draws cards with WebGL');
   await page.click('.pk-list-deck');
   await overlayGone();
   await page.waitForSelector('.dv.is-in', { timeout: 15000 });
-  expect((await page.locator('.db-grid .db-card').count()) === 30, `the deck builder shows ${await page.locator('.db-grid .db-card').count()} finishes, not 30`);
+  expect((await page.locator('.db-grid .db-card').count()) === 33, `the deck builder shows ${await page.locator('.db-grid .db-card').count()} finishes, not 33`);
   expect((await state()).hand.join() === handBefore, 'Open all changed the hand');
   await page.click('.db-done');
   await page.waitForSelector('.dv', { state: 'detached', timeout: 5000 });
-  const deck30 = String(30 - (await state()).hand.length);
+  const deck30 = String(33 - (await state()).hand.length);
   expect((await page.textContent('#deckBtn .deck-count')) === deck30, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck30}`);
   // Nothing sealed: no Open all, and each pack can still be watched.
   await page.click('#packsBtn');
@@ -1673,8 +1674,8 @@ await step('Open all opens every sealed pack on the tray at once, lists them pac
   await page.click('.pk-list-close');
   await overlayGone();
   const all = await packsSaved();
-  expect(all.owned.length === 26 && all.supporter === true, `saved ${JSON.stringify(all)}`);
-  const deck33 = String(33 - (await state()).hand.length);
+  expect(all.owned.length === 29 && all.supporter === true, `saved ${JSON.stringify(all)}`);
+  const deck33 = String(36 - (await state()).hand.length);
   expect((await page.textContent('#deckBtn .deck-count')) === deck33, `the deck holds ${await page.textContent('#deckBtn .deck-count')}, not ${deck33}`);
   // Kept across a reload.
   await page.reload();
@@ -2152,7 +2153,7 @@ await step('Rainy Window fogs the picture but keeps it, a wipe clears it, its dr
   await p.addInitScript(() => {
     if (sessionStorage.getItem('seeded')) return;
     localStorage.clear();
-    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['nature'], supporter: false }));
+    localStorage.setItem('foil:packs', JSON.stringify({ owned: ['rain'], supporter: false }));
     localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'rain'], edition: 'rain' }));
     sessionStorage.setItem('seeded', '1');
   });
