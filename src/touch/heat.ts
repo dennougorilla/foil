@@ -1,6 +1,7 @@
 // Heat on the card for the Warmth finish (where it was touched, how warm it still is, and the
-// fingerprints left by a press), the light stored by the Glow finish's ink, and where Rainy Window's
-// fogged glass was wiped. A small grid over
+// fingerprints left by a press), the light stored by the Glow finish's ink, where Rainy Window's
+// fogged glass was wiped, and the ripples on Liquid Metal's mercury (a height that waves instead of
+// fading). A small grid over
 // the card face, simulated on the CPU (a few thousand cells, so it costs next to nothing) and
 // uploaded to the card shader as a texture.
 //
@@ -16,8 +17,29 @@ const COLD = 0.002;
 /** Fingerprints kept at once; the oldest makes way. */
 const PRINTS = 3;
 
-/** The touch finishes: Warmth's heat, the light Glow's ink stores, or Rainy Window's wiped glass. */
-export type TouchKind = 'warmth' | 'glow' | 'rain';
+/** The touch finishes: Warmth's heat, the light Glow's ink stores, Rainy Window's wiped glass, or Liquid Metal's ripples. */
+export type TouchKind = 'warmth' | 'glow' | 'rain' | 'liquid';
+
+/**
+ * A surface that waves: a touch presses it down and the dent runs off as rings that bounce off
+ * the card's edges. `speed` in cells per second; `stiff` (cells⁴ per second²) lets short waves
+ * outrun long ones, so a touch spreads as a train of rings; `spring` pulls the surface back to
+ * level; `damp` is how fast the motion dies, per second; `settle` how fast a dent eases back when
+ * held still (reduced motion), per second.
+ */
+interface Wave {
+  speed: number;
+  stiff: number;
+  spring: number;
+  damp: number;
+  settle: number;
+}
+
+const WAVE: Wave = { speed: 8, stiff: 180, spring: 4, damp: 2, settle: 1.2 };
+/** Below this everywhere, a wave field counts as level: ripples stay visible far fainter than heat. */
+const LEVEL = 3e-4;
+/** Deepest a dent goes: a finger held down for a while. */
+const DENT = 1.2;
 
 interface Fade {
   /** How fast it spreads, in cells² per second. */
@@ -29,6 +51,8 @@ interface Fade {
   quench: number;
   /** A press leaves a fingerprint; without, holding still just keeps adding. */
   prints: boolean;
+  /** The field is a wave height (Liquid Metal), not a heat that spreads and fades. */
+  wave?: Wave;
 }
 
 const FADES: Record<TouchKind, Fade> = {
@@ -40,6 +64,8 @@ const FADES: Record<TouchKind, Fade> = {
   // A wiped patch stays clear for a few seconds while the fog creeps back in from its edges; a
   // fingertip pressed on the glass leaves its print in the fog.
   rain: { spread: 0.4, cool: 0.3, loss: 0.02, quench: 0, prints: true },
+  // A height, signed: down where pressed, up and down as the rings pass.
+  liquid: { spread: 0, cool: 0, loss: 0, quench: 0, prints: false, wave: WAVE },
 };
 
 export interface Print {
@@ -69,6 +95,11 @@ export class HeatField implements HeatSource {
   readonly h: number;
   readonly data: Float32Array;
   private next: Float32Array;
+  /** The surface's speed, up or down, and room for a second Laplacian (wave fields only). */
+  private vel: Float32Array;
+  private spare: Float32Array;
+  /** Held still (reduced motion): a wave field does not travel; a dent just eases back. */
+  calm = false;
   prints: Print[] = [];
   version = 0;
   private warm = false;
@@ -85,6 +116,8 @@ export class HeatField implements HeatSource {
     this.h = Math.round(HEAT_CELLS * k[1]);
     this.data = new Float32Array(this.w * this.h);
     this.next = new Float32Array(this.w * this.h);
+    this.vel = new Float32Array(this.fade.wave ? this.w * this.h : 0);
+    this.spare = new Float32Array(this.fade.wave ? this.w * this.h : 0);
   }
 
   get cold() {
@@ -97,6 +130,7 @@ export class HeatField implements HeatSource {
    * about the same warmth however fast the stroke goes; lingering adds more, up to MAX.
    */
   touch(u0: number, v0: number, u1: number, v1: number, dt: number, firm: boolean) {
+    if (this.fade.wave) return this.dent(u0, v0, u1, v1, dt, firm);
     const { w, h } = this;
     const r = (firm ? 0.07 : 0.042) * HEAT_CELLS;
     const ax = u0 * w - 0.5;
@@ -131,6 +165,42 @@ export class HeatField implements HeatSource {
     this.version++;
   }
 
+  /**
+   * Presses a wave field along a segment: a little for each spot passed and, for a finger held
+   * down, more the longer it stays (a resting mouse leaves it be). The dent is ringed by a low rim
+   * and adds up to nothing, so it runs off as a train of rings instead of sinking the whole pool.
+   */
+  private dent(u0: number, v0: number, u1: number, v1: number, dt: number, firm: boolean) {
+    const { w, h } = this;
+    const r = (firm ? 0.03 : 0.024) * HEAT_CELLS;
+    const ax = u0 * w - 0.5;
+    const ay = v0 * h - 0.5;
+    const dx = u1 * w - 0.5 - ax;
+    const dy = v1 * h - 0.5 - ay;
+    const len2 = dx * dx + dy * dy;
+    const push = (firm ? 0.14 : 0.045) * Math.min(Math.sqrt(len2) / r, 1) + (firm ? 1.6 * dt : 0);
+    const reach = r * 5;
+    const x0 = Math.max(0, Math.floor(Math.min(ax, ax + dx) - reach));
+    const x1 = Math.min(w - 1, Math.ceil(Math.max(ax, ax + dx) + reach));
+    const y0 = Math.max(0, Math.floor(Math.min(ay, ay + dy) - reach));
+    const y1 = Math.min(h - 1, Math.ceil(Math.max(ay, ay + dy) + reach));
+    const inv = 1 / (r * r);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const t = len2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / len2)) : 0;
+        const d2 = ((x - ax - dx * t) ** 2 + (y - ay - dy * t) ** 2) * inv;
+        // The dent, less a rim twice as wide with the same volume.
+        const k = Math.exp(-d2) - 0.25 * Math.exp(-d2 / 4);
+        const i = y * w + x;
+        this.data[i] = Math.min(DENT, Math.max(-DENT, this.data[i] - push * k));
+      }
+    }
+    this.warm = true;
+    this.lamp = [u1, v1, 1];
+    this.lit = true;
+    this.version++;
+  }
+
   /** A finger held at (u, v): its print forms over the first half second or so. */
   press(u: number, v: number, dt: number) {
     if (!this.fade.prints) return this.touch(u, v, u, v, dt, true);
@@ -156,7 +226,8 @@ export class HeatField implements HeatSource {
     // The lamp goes out within a fifth of a second of the touch leaving.
     if (!this.lit) this.lamp[2] = Math.max(0, this.lamp[2] - dt * 5);
     this.lit = false;
-    if (this.warm) {
+    if (this.warm && this.fade.wave) this.wave(this.fade.wave, dt);
+    else if (this.warm) {
       // Spread (explicit diffusion, split into stable sub-steps), then cool.
       const { spread, cool, quench } = this.fade;
       const k = spread * dt;
@@ -179,6 +250,57 @@ export class HeatField implements HeatSource {
     for (const p of this.prints) if (p !== this.pressing) p.heat = p.heat * Math.exp(-this.fade.cool * dt) - this.fade.loss * dt;
     this.prints = this.prints.filter((p) => p === this.pressing || p.heat > 0.01);
     this.version++;
+  }
+
+  /**
+   * Moves the surface on by `dt`: the wave equation in sub-steps short enough to stay stable, with
+   * reflecting edges. Held still, nothing travels and a dent eases back to level.
+   */
+  private wave(wv: Wave, dt: number) {
+    const h = this.data;
+    const v = this.vel;
+    const lap = this.next;
+    let peak = 0;
+    if (this.calm) {
+      v.fill(0);
+      const keep = Math.exp(-wv.settle * dt);
+      for (let i = 0; i < h.length; i++) {
+        h[i] *= keep;
+        peak = Math.max(peak, Math.abs(h[i]));
+      }
+    } else {
+      // The fastest mode the grid holds, kept well inside what the explicit step can take.
+      const fastest = Math.sqrt(8 * wv.speed * wv.speed + 64 * wv.stiff + wv.spring);
+      const n = Math.ceil((dt * fastest) / 1.2);
+      const ds = dt / n;
+      const keep = Math.exp(-wv.damp * ds);
+      for (let s = 0; s < n; s++) {
+        this.laplace(h, lap);
+        this.laplace(lap, this.spare);
+        for (let i = 0; i < h.length; i++) v[i] = (v[i] + (wv.speed * wv.speed * lap[i] - wv.stiff * this.spare[i] - wv.spring * h[i]) * ds) * keep;
+        for (let i = 0; i < h.length; i++) h[i] += v[i] * ds;
+      }
+      for (let i = 0; i < h.length; i++) peak = Math.max(peak, Math.abs(h[i]), Math.abs(v[i]) * 0.05);
+    }
+    if (peak < LEVEL) {
+      h.fill(0);
+      v.fill(0);
+      this.warm = false;
+    }
+  }
+
+  /** The 5-point Laplacian of `a` into `out`, with reflecting edges. */
+  private laplace(a: Float32Array, out: Float32Array) {
+    const { w, h } = this;
+    for (let y = 0; y < h; y++) {
+      const up = (y > 0 ? y - 1 : y) * w;
+      const row = y * w;
+      const down = (y < h - 1 ? y + 1 : y) * w;
+      for (let x = 0; x < w; x++) {
+        const c = a[row + x];
+        out[row + x] = a[row + (x > 0 ? x - 1 : x)] + a[row + (x < w - 1 ? x + 1 : x)] + a[up + x] + a[down + x] - 4 * c;
+      }
+    }
   }
 
   private spread(k: number) {
@@ -311,9 +433,10 @@ export const AUTO_LOOP = 10;
 /**
  * Where in the loop a still picture (PNG, a held preview) is taken: for Warmth the swipe still warm
  * and the print just made, for Glow just after the light has left, the trail glowing on its own, for
- * Rainy Window the wipe and the print still clear.
+ * Rainy Window the wipe and the print still clear, for Liquid Metal just after the thumb lifts, the
+ * rings of the stroke and the press still running.
  */
-export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36, rain: 0.3 };
+export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36, rain: 0.3, liquid: 0.34 };
 /** Simulation ticks per loop: fixed, so every export of the same phase is identical. */
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */

@@ -57,7 +57,7 @@ if (!onlyIcons) {
     pitch.className = 'og-pitch';
     pitch.innerHTML =
       '<h2>Turn any picture into a <em>rare foil</em> card.</h2><p>Free, in your browser. Your picture never leaves it.</p>' +
-      '<div class="og-chips"><span>33 finishes</span><span>Card shapes</span><span>GIF · APNG</span></div>';
+      '<div class="og-chips"><span>34 finishes</span><span>Card shapes</span><span>GIF · APNG</span></div>';
     document.querySelector('.stage').appendChild(pitch);
     window.dispatchEvent(new Event('resize'));
   });

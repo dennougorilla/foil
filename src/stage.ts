@@ -567,6 +567,7 @@ export class Stage {
       this.shown = `${ed.id}|${size}`;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
       if (ed.touch) this.heat = new HeatField(ed.touch, kOf(state.shape));
+      this.heat.calm = !this.motion;
       this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && !this.motion) {
@@ -779,6 +780,8 @@ export class Stage {
       this.lastTouch = null;
       this.heat.lift();
     }
+    // Under reduced motion Liquid Metal's ripples do not travel; a touch leaves a dent that settles.
+    this.heat.calm = !this.motion;
     this.heat.step(dt);
   }
 
