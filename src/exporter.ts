@@ -32,6 +32,7 @@ export interface ExportInput {
   /** Layer 2 (docs/layering.md): its finish, how it is drawn, and its area. */
   layer?: { edition: Edition; draw: LayerDraw; range: RangeSnapshot };
   intensity: number;
+  /** Pixel art's grid across the card's short side, 0 = off (the face is already drawn on it). */
   pixel: number;
   name: string;
   /** For animated sources: paints the card face as it looks `ms` into the animation. */
@@ -47,8 +48,6 @@ export interface ExportInput {
   /** Flip Lenticular's other picture (card/face.ts drawFlip); the front one in pencil when absent. */
   flip?: HTMLCanvasElement;
 }
-
-const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 
 export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
 
@@ -103,7 +102,7 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
       scale: 1,
       edition: input.edition.shader,
       intensity: input.intensity,
-      pixel: PIXEL_STEPS[input.pixel] ?? 0,
+      pixel: input.pixel,
       // A finish that reacts to touch shows a swipe made for this picture, caught while it still shows.
       heat: input.edition.touch ? autoTouch(input.face, input.edition.touch) : undefined,
       // The light follows the tune; the tilt is nudged so foil or spot UV lettering catches it,
@@ -210,7 +209,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
           scale: pose.scale,
           edition: input.edition.shader,
           intensity: input.intensity,
-          pixel: PIXEL_STEPS[input.pixel] ?? 0,
+          pixel: input.pixel,
           tilt,
           // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
           // Blacklight's lamp drifts round the art, as dim as on the stage left alone (unless the tune fixes the light).

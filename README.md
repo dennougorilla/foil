@@ -11,6 +11,7 @@ English · [日本語](README.ja.md)
 ## What it does
 
 - **Any picture.** Open a file, drop it or paste it. Animated GIF, APNG and WebP keep moving on the card.
+- **Pixel art.** Draw the whole card as chunky pixel art with few colors and a dark outline, from three presets or your own coarseness, colors, outline and dither. The finish's light steps on the same pixels, and files are saved the same way.
 - **33 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, light, nature and studio finishes. Each one reacts to tilt and light.
 - **Packs.** Seven finishes come in the starting hand; the rest come in theme packs you tear open once. Each pack holds its whole theme, with no random draws.
 - **Hand and deck.** Pick finishes from a fanned hand of up to seven live previews; the others wait in the deck, which you edit like a card game's deck screen.
