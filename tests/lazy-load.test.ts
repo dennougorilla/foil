@@ -82,6 +82,7 @@ const ON_DEMAND = [
   'gifDecode.ts',
   'anim/apngDecode.ts',
   'card/tcgFace.ts',
+  'card/effect.ts',
 ];
 
 test('the on-demand modules are not in the first load', () => {

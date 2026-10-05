@@ -375,6 +375,60 @@ await step('the trading-card layout: the message fills the effect box, and each 
   await page.keyboard.press('Escape');
 });
 
+await step("a trading card's text area is its words alone, upright and wide, where the wide card sets its words beside the picture", async () => {
+  const r = await page.evaluate(async () => {
+    const { drawFace, loadTcgFace, artOf } = await import('/src/card/face.ts');
+    const { tcgFrame } = await import('/src/card/tcg.ts');
+    const { RangeModel } = await import('/src/range.ts');
+    const { RANGE_W, RANGE_H } = await import('/src/gl/range.ts');
+    await loadTcgFace();
+    await document.fonts.ready;
+    const img = document.createElement('canvas');
+    img.width = 800;
+    img.height = 600;
+    const x = img.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 800, 600);
+    g.addColorStop(0, '#2a6f97');
+    g.addColorStop(1, '#f4a261');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 800, 600);
+    const out = {};
+    for (const shape of ['card', 'wide']) {
+      const spec = { image: img, crop: { zoom: 1, x: 0.5, y: 0.5 }, frame: 'paper', rarity: 'rare', name: 'Gorilla', shape, message: { text: 'When this card comes into play,\ndraw a card.', place: 'top', font: 'dot' }, plate: true, layout: 'tcg', cardType: 'Monster — Forest', arrange: 'auto', placements: {} };
+      const face = document.createElement('canvas');
+      const mask = document.createElement('canvas');
+      drawFace(face, mask, spec);
+      const model = new RangeModel();
+      model.onFace(face, mask, spec);
+      const text = model.region('text');
+      // Share of a rectangle (face px) the region takes.
+      const share = (rc, pad = 0) => {
+        let on = 0;
+        let n = 0;
+        const sx = RANGE_W / face.width;
+        const sy = RANGE_H / face.height;
+        for (let py = Math.ceil((rc.y + pad) * sy); py < Math.floor((rc.y + rc.h - pad) * sy); py++)
+          for (let px = Math.ceil((rc.x + pad) * sx); px < Math.floor((rc.x + rc.w - pad) * sx); px++) {
+            n++;
+            if (text[py * RANGE_W + px] > 127) on++;
+          }
+        return on / Math.max(1, n);
+      };
+      const f = tcgFrame(face.width, face.height, { type: true, lines: 2 });
+      const a = artOf(face);
+      out[shape] = { art: share(a, 8), effect: share(f.effect, 12), name: share(f.name, 6), type: share(f.type, 6), beside: f.effect.x >= a.x + a.w, size: [face.width, face.height] };
+    }
+    return out;
+  });
+  for (const [shape, v] of Object.entries(r)) {
+    const f = (n) => (n * 100).toFixed(1) + '%';
+    expect(v.art < 0.002, `${shape}: the text area covers the picture (${f(v.art)})`);
+    expect(v.effect > 0.03 && v.effect < 0.6, `${shape}: the text area misses the card text (${f(v.effect)})`);
+    expect(v.name > 0.03 && v.type > 0.03, `${shape}: the text area misses the name or the type line (${f(v.name)}, ${f(v.type)})`);
+  }
+  expect(r.wide.beside && !r.card.beside, `the wide card does not set its words beside the picture (${JSON.stringify(r)})`);
+});
+
 await step('free placement: drag the words on the card, a tap still opens their print, Auto puts them back', async () => {
   await tab('text');
   await page.fill('#messageInput', 'Happy\nBirthday');

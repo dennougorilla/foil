@@ -105,3 +105,34 @@ shadow make the card look thick (that is the stage, shared by every layout); the
 stock reads as a skin rather than a premium material; the diamonds and the set emblem are two
 rarity signals (the diamonds stay: the name plate carries the rarity, as asked); a juror would
 like a true bitmap Japanese face with no smoothing for every line of text.
+
+## On a wide card
+
+The stack above is made for an upright card. Laid on its side (Wide, the postcard on its side, the
+business card) the same stack squeezed every plate into a thin strip under a short, wide picture.
+A wide card puts the picture and the words side by side instead, keeping the conventions above (a
+name plate across the top, the art a step below the frame, the words on parchment plates, the fine
+print across the foot): the picture takes the left of the card and the type line and the text box
+stand beside it as a column on the right, the text box filling the column's height. The plates
+keep the trading card's own heights (the face's short side is 900 px on every shape), so the name
+and the type line read at the same size as on an upright card. The card text is set at the top of
+its box, under the type line, in a band as tall as an upright card's box for the same lines, so it
+reads at the same size as there (real cards leave short rules text the rest of the box too); where a
+line would wrap in the narrower column the text gives way, down to a fifteenth of the column's
+width, before it wraps. Without card text there is no column: the type line
+runs under the picture as on an upright card, and with neither the card is full-art. Square and
+upright shapes are unchanged.
+
+Judged by a juror who did not know the work (strict, three rounds at most): with the text centred
+in the tall box, 7 / 7.5 / 7 / 7.5 (design, usability, creativity, content); set under the type
+line as now, about 7 / 7.3 / 7.5 / 7.5. Open points: a one-line message leaves most of the box
+empty (weakest on a card without a type line), English rules text wraps into a narrow three-line
+stack, and the juror would quieten the box's border and paper texture so the words lead.
+
+## The finish area's text region
+
+The Layers tab's "text" region is found by drawing the face again with its words blanked and keeping
+what changed. On a trading card the parts follow the words (no card text, no text box), so blanking
+them used to change the card itself: the picture grew into the empty room and the whole picture
+counted as text. The blank face keeps the parts the card has and leaves only the words out, so the
+region is the lettering alone.
