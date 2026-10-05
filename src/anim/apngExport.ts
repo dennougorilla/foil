@@ -1,5 +1,5 @@
-// High-quality animated export: the same orbit as the GIF, but full colour and with the card's
-// rounded corners and soft shadow kept on a transparent background, saved as APNG.
+// High-quality animated export: the same loop as the GIF, but full colour, saved as APNG. On the Clear
+// backdrop the card's rounded corners and soft shadow are kept on a transparent background.
 import { createScene, download, fileSafe, packsLoaded, type ExportInput, type Scene } from '../exporter';
 import { TUNE_DEFAULTS } from '../tune/model';
 import { apngPlan, H, W } from './apngPlan';
@@ -76,11 +76,11 @@ export async function exportApng(
   let at = 0;
   let scene: Scene | undefined;
   try {
-    scene = createScene(input, W, H, true, true);
+    scene = await createScene(input, W, H, true);
     send({ type: 'start', width: plan.width, height: plan.height });
     for (let i = 0; i < frames; i++) {
       await nextFrame(signal);
-      scene.draw(at / loopMs, 0, (at / loopMs) * plan.sourceSpan);
+      scene.draw(at / loopMs, (at / loopMs) * plan.sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, plan.width, plan.height);
       send({ type: 'frame', data: data.buffer, delay: plan.delays[i] }, [data.buffer]);
       at += plan.delays[i];

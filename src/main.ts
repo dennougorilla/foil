@@ -5,7 +5,8 @@ import { dictOf, loadDict, type Dict } from './i18n';
 import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './editions';
 import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop } from './card/face';
 import { backUrl, drawBack } from './card/back';
-import { exportFrame, fitArea, shapeById, SHAPES } from './card/shape';
+import { exportFrame, fitArea, setFit, shapeById, SHAPES } from './card/shape';
+import { isPixelArt, PIXEL_ART_MAX } from './card/pixelArt';
 import { CARD_LAYOUTS } from './card/tcg';
 import type { PrintPop } from './printPop';
 import type { TextRun } from './lettering';
@@ -35,6 +36,8 @@ import { addToHand, available, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
+import { BACKDROPS } from './backdrop';
+import { loadBackdrops } from './gl/renderers';
 import type { Kept } from './binder/db';
 import { artBlock, DOT_COLORS, DOT_PRESETS, DOT_SIZES, dotGrid, dotKey, presetOf, type Dot } from './dot/model';
 import type { Layers } from './range';
@@ -191,7 +194,21 @@ function artKey() {
 
 function faceSpec(image: Img) {
   const s = store.get();
-  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements };
+  return { image, crop: s.crop, frame: s.frame, rarity: s.rarity, name: s.name || fallback().name, frameColor: s.frameColor, shape: s.shape, message: s.message, plate: s.plate, layout: s.layout, cardType: s.cardType, arrange: s.arrange, placements: s.placements, frameless: s.frameless, crisp: isCrisp() };
+}
+
+const crispOf = new WeakMap<object, boolean>();
+/** Whether the picture on the card is pixel art, to be enlarged with hard pixels (looked at once per picture). */
+function isCrisp(): boolean {
+  const s = store.get();
+  const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
+  let crisp = crispOf.get(src);
+  if (crisp === undefined) {
+    const img = s.sample >= 0 ? samples[s.sample] : (userAnim?.frames[0] ?? userImage ?? samples[0]);
+    crisp = img.width <= PIXEL_ART_MAX && img.height <= PIXEL_ART_MAX && isPixelArt(img.getContext('2d')!.getImageData(0, 0, img.width, img.height));
+    crispOf.set(src, crisp);
+  }
+  return crisp;
 }
 
 /** Changes whenever the face is repainted: View deck's cached mini cards are remade after it. */
@@ -208,7 +225,14 @@ let lastRuns: TextRun[] = [];
 let paintWaiting = false;
 
 function redrawFace() {
-  const spec = faceSpec(currentImage());
+  // The Picture shape follows the picture: a new size is a new shape, and the store's answer repaints.
+  const img = currentImage();
+  if (setFit(img.width, img.height)) {
+    const fit = shapeById('fit');
+    store.set({ fit: `${fit.w}x${fit.h}` });
+    if (store.get().shape === 'fit') return;
+  }
+  const spec = faceSpec(img);
   // A trading card's painter comes with its first use; the face is painted once it is here.
   if (!canPaint(spec)) {
     if (paintWaiting) return;
@@ -323,6 +347,7 @@ function applyText() {
   $('pickBtn').title = t.pickSub.replace('Ctrl+V', pasteKey);
   renderCardHint();
   buildSegments();
+  buildBackdrops();
   buildThumbs();
   buildTabs();
   buildFormats();
@@ -468,7 +493,7 @@ function buildSegments() {
     const { w, h } = fitArea(sh.h / sh.w, 18);
     b.innerHTML = `<span class="shape-ico" style="--w:${w.toFixed(1)}px;--h:${h.toFixed(1)}px"></span><span></span>`;
     b.lastElementChild!.textContent = t.shapeName[sh.id];
-    b.title = `${t.shapeName[sh.id]} · ${sh.size}`;
+    b.title = sh.id === 'fit' ? t.shapeFitHint : `${t.shapeName[sh.id]} · ${sh.size}`;
     radio(b, s.shape === sh.id);
     b.onclick = () => {
       sfx.tick();
@@ -477,7 +502,10 @@ function buildSegments() {
     };
     ss.appendChild(b);
   }
+  // A card that is all picture has no frame or layout of FOIL's: their choices step aside (and stay).
+  fs.parentElement!.hidden = s.frameless;
   const ls = $('layoutSeg');
+  ls.parentElement!.hidden = s.frameless;
   ls.textContent = '';
   for (const id of CARD_LAYOUTS) {
     const b = document.createElement('button');
@@ -557,6 +585,48 @@ $('dotMore').addEventListener('click', () => {
 });
 // The conversion is fetched the moment its choices are pointed at.
 for (const ev of ['pointerenter', 'focusin']) $('dotSeg').addEventListener(ev, () => void useDot().catch(() => {}), { once: true });
+/**
+ * The backdrop tiles (docs/backdrops.md): a small picture of each and its name, the swirl and the
+ * bokeh in the finish's own colors, Plain in its color, which a button under the tiles changes.
+ */
+function buildBackdrops() {
+  const s = store.get();
+  const bs = $('backdropSeg');
+  bs.textContent = '';
+  const [c1, c2, c3] = editionById(s.edition).swirl;
+  bs.style.cssText = `--c1:${c1};--c2:${c2};--c3:${c3};--plain:${s.backdropColor}`;
+  for (const id of BACKDROPS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.dataset.v = id;
+    b.setAttribute('role', 'radio');
+    b.innerHTML = '<i class="bd-pic" aria-hidden="true"></i><span></span>';
+    b.lastElementChild!.textContent = t.backdropName[id];
+    b.title = t.backdropHelp[id];
+    radio(b, s.backdrop === id);
+    b.onclick = () => {
+      if (store.get().backdrop === id) return;
+      sfx.tick();
+      store.set({ backdrop: id });
+    };
+    bs.appendChild(b);
+  }
+  $('backdropColorRow').hidden = s.backdrop !== 'plain';
+  $('backdropColorRow').style.setProperty('--plain', s.backdropColor);
+}
+
+/** Opens Fine-tune at the Card tab with the backdrop tiles in view (from the GIF and APNG options). */
+function showBackdrops() {
+  void openAdjust('card').then((a) => {
+    if (!a) return;
+    const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    requestAnimationFrame(() => {
+      $('backdropField').scrollIntoView({ block: 'center', behavior });
+      $('backdropSeg').querySelector<HTMLButtonElement>('[aria-checked=true]')?.focus({ preventScroll: true });
+    });
+  }, () => {});
+}
 
 /** The card takes a new shape: its slot, its back, the crop window and every face follow. */
 function applyShape() {
@@ -613,6 +683,8 @@ function thumbUrl(img: Img): string {
     c.width = Math.round((img.width / img.height) * h);
     c.height = h;
     const x = c.getContext('2d')!;
+    // A small picture (a sprite) is enlarged with hard pixels.
+    x.imageSmoothingEnabled = h < img.height;
     x.imageSmoothingQuality = 'high';
     x.drawImage(img, 0, 0, c.width, c.height);
     u = c.toDataURL('image/png');
@@ -651,6 +723,8 @@ function syncInputs() {
   name.classList.toggle('is-off', !s.plate);
   msg.setAttribute('aria-label', t.msg.title);
   $('info').classList.toggle('is-tcg', tcg);
+  $('info').classList.toggle('is-frameless', s.frameless);
+  renderWhole();
   const inten = $<HTMLInputElement>('intensity');
   inten.value = String(s.intensity);
   $('intensityOut').textContent = `${Math.round(s.intensity * 100)}%`;
@@ -671,6 +745,31 @@ function syncInputs() {
   $('crt').classList.toggle('is-off', !s.crt);
 }
 
+// ---------- Use as the whole card ----------
+
+/** A picture of your own shaped like a card, just opened: the switch suggests itself until used or the picture changes. */
+let suggestWhole = false;
+
+function renderWhole() {
+  const s = store.get();
+  const btn = $('wholeBtn');
+  btn.setAttribute('aria-pressed', String(s.frameless));
+  const suggest = suggestWhole && !s.frameless && s.sample < 0;
+  btn.classList.toggle('is-suggest', suggest);
+  $('wholeNote').textContent = s.frameless ? t.wholeOn : suggest ? t.wholeSuggest : t.wholeOff;
+}
+
+$('wholeBtn').addEventListener('click', () => {
+  sfx.tick();
+  suggestWhole = false;
+  const s = store.get();
+  const on = !s.frameless;
+  // On, the card takes the picture's proportions; off, a card that had them goes back to the trading card.
+  const shape = on ? 'fit' : s.shape === 'fit' ? 'card' : s.shape;
+  stage.flipTo(() => store.set({ frameless: on, shape, crop: { zoom: 1, x: 0.5, y: 0.5 } }));
+  stage.juice(0.4);
+});
+
 // ---------- Crop ----------
 
 const cropCanvas = $<HTMLCanvasElement>('cropCanvas');
@@ -688,8 +787,11 @@ function drawCropPreview() {
   cropCanvas.style.width = `${w}px`;
   cropCanvas.style.height = `${h}px`;
   const x = cropCanvas.getContext('2d')!;
+  const crisp = isCrisp();
+  x.imageSmoothingEnabled = !crisp;
   x.imageSmoothingQuality = 'high';
   x.drawImage(img, 0, 0, cropCanvas.width, cropCanvas.height);
+  cropView.classList.toggle('is-crisp', crisp);
   cropWin.style.backgroundImage = `url(${thumbUrl(img)})`;
   positionCropWindow();
 }
@@ -835,6 +937,9 @@ async function loadFile(file: File) {
     animFrame = 0;
     playFrames();
     void saveUserImage(anim ? file : still);
+    // Taller than wide by about a card's proportions (5 : 7 to 2 : 3 and a touch more).
+    const r = still.height / still.width;
+    suggestWhole = r > 1.3 && r < 1.6;
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 24);
     const s = store.get();
     if (!s.nameEdited && base && !/^(image|img|photo|IMG_|DSC|screenshot|スクリーンショット)/i.test(base)) {
@@ -857,6 +962,7 @@ async function loadFile(file: File) {
 
 function useImage(idx: number) {
   const s = store.get();
+  if (idx >= 0) suggestWhole = false;
   const patch: Partial<State> = { sample: idx, crop: { zoom: 1, x: 0.5, y: 0.5 } };
   if (idx >= 0) {
     if (!s.nameEdited) patch.name = '';
@@ -1089,6 +1195,19 @@ rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
 rovingKeys($('layoutSeg'));
 for (const id of ['dotSeg', 'dotSizeSeg', 'dotColorsSeg', 'dotOutlineSeg', 'dotDitherSeg']) rovingKeys($(id));
+rovingKeys($('backdropSeg'));
+$('backdropSeg').addEventListener('pointerenter', () => void loadBackdrops().catch(() => {}), { once: true });
+$('backdropColorBtn').addEventListener('click', () => {
+  sfx.tick();
+  const picker = $<HTMLInputElement>('backdropPicker');
+  picker.value = store.get().backdropColor;
+  try {
+    picker.showPicker();
+  } catch {
+    picker.click();
+  }
+});
+$<HTMLInputElement>('backdropPicker').addEventListener('input', (e) => store.set({ backdropColor: (e.target as HTMLInputElement).value }));
 $('layoutSeg').addEventListener('pointerenter', () => void loadTcgFace().catch(() => {}), { once: true });
 rovingKeys($('thumbs'));
 rovingKeys($('formatSeg'));
@@ -1115,7 +1234,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== 'card' || s.layout !== 'classic';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1136,7 +1255,7 @@ function buildTabs() {
     b.innerHTML = '<span></span><i class="tab-dot" hidden></i>';
     b.firstElementChild!.textContent = t.tabs[id];
     b.onclick = () => {
-      if (store.get().panelTab === id) return;
+      if (tabNow() === id) return;
       sfx.tick();
       store.set({ panelTab: id });
       revealTabs();
@@ -1148,11 +1267,12 @@ function buildTabs() {
 }
 
 tabBar.addEventListener('keydown', (e) => {
-  const i = PANEL_TABS.indexOf(store.get().panelTab);
-  const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: PANEL_TABS.length - 1 }[e.key];
+  const tabs = tabsShown();
+  const i = tabs.indexOf(tabNow());
+  const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
   if (n === undefined) return;
   e.preventDefault();
-  const id = PANEL_TABS[(n + PANEL_TABS.length) % PANEL_TABS.length];
+  const id = tabs[(n + tabs.length) % tabs.length];
   sfx.tick();
   store.set({ panelTab: id });
   $(`tab-${id}`).focus();
@@ -1178,10 +1298,12 @@ function syncAdjust() {
   adjustToggle.setAttribute('aria-expanded', String(s.adjustOpen));
   $('adjustBody').hidden = !s.adjustOpen;
   $('adjust').classList.toggle('is-open', s.adjustOpen);
-  const changed = PANEL_TABS.filter(tabChanged);
+  const changed = tabsShown(s).filter(tabChanged);
+  const open = tabNow(s);
   for (const id of PANEL_TABS) {
     const b = $(`tab-${id}`);
-    const on = s.panelTab === id;
+    const on = open === id;
+    b.hidden = !tabsShown(s).includes(id);
     b.setAttribute('aria-selected', String(on));
     b.tabIndex = on ? 0 : -1;
     b.querySelector<HTMLElement>('.tab-dot')!.hidden = !changed.includes(id);
@@ -1199,9 +1321,17 @@ function syncAdjust() {
   requestAnimationFrame(trackExportBar);
 }
 
+/** The shape a card starts from: the picture's own when the picture is the whole card. */
+const shapeDefault = () => (store.get().frameless ? 'fit' : 'card');
+
+/** The tabs on show: a card that is all picture prints no words, so Lettering steps aside. */
+const tabsShown = (s = store.get()) => PANEL_TABS.filter((id) => !(id === 'text' && s.frameless));
+/** The tab open now: the one chosen, unless it stepped aside. */
+const tabNow = (s = store.get()): PanelTab => (tabsShown(s).includes(s.panelTab) ? s.panelTab : 'card');
+
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, dot: null, frame: 'paper', frameColor: '', shape: 'card', layout: 'classic' });
+  store.set({ intensity: 1, pixel: 0, dot: null, frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1287,6 +1417,7 @@ function exportInput() {
     layer: layerOf(s),
     layers: depth?.current(),
     flip: flipImage ? flip : undefined,
+    backdrop: { id: s.backdrop, color: s.backdropColor },
   };
 }
 
@@ -1363,14 +1494,14 @@ function renderSave() {
   const gif = exportFrame(sh.h / sh.w, GIF_SAVE.w, GIF_SAVE.h);
   const mp4 = f === 'mp4' ? mp4Now() : null;
   const size = mp4 ? `${mp4.width}×${mp4.height}` : `${gif.W}×${gif.H}`;
-  saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().gifClear ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
+  saveBtn.querySelector('.btn-text small')!.textContent = (f === 'gif' && store.get().backdrop === 'clear' ? t.saveSubGifClear : t.saveSub[f]).replace('{size}', size);
   const [mb, msmall] = saveBtn.querySelectorAll('.save-meta > *');
   mb.textContent = mp4 ? t.mp4Meta.size.replace('{n}', formatBytes(mp4.bytes)) : '';
   msmall.textContent = mp4 ? t.mp4Meta.secs.replace('{s}', String(+mp4.seconds.toFixed(1))) : '';
   saveBtn.removeAttribute('title');
 }
 
-// GIF options: closed until asked for; the defaults keep the swirl backdrop.
+// GIF and APNG options: closed until asked for. They name the motion and the backdrop; a clear GIF picks its edge.
 const MATTES = ['auto', '#ffffff', '#000000'];
 
 function buildSaveOpts() {
@@ -1384,7 +1515,7 @@ function buildSaveOpts() {
   const secs = exportLoop(s.tune, userAnim && s.sample < 0 ? userAnim.duration : undefined, !!ed.torch).loopMs / 1000;
   const motion = t.tune.idleMode[s.tune.idle];
   const loop = t.tune.loopLen.replace('{s}', String(Math.round(secs * 10) / 10));
-  $('saveOptsSummary').textContent = [`${t.saveMotion}: ${motion}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
+  $('saveOptsSummary').textContent = `${t.saveMotion}: ${motion} · ${t.backdrop}: ${t.backdropName[s.backdrop]}`;
   $('saveMotionName').textContent = motion;
   $('saveMotionLen').textContent = loop;
   $('saveMotionNote').textContent = t.saveMotionNote;
@@ -1394,27 +1525,10 @@ function buildSaveOpts() {
   const mp4 = s.exportFormat === 'mp4' ? mp4Now() : null;
   $('saveMp4Note').hidden = !mp4;
   if (mp4) $('saveMp4Note').textContent = t.saveMp4Note.replace('{n}', String(mp4.loops)).replace('{t}', String(+mp4.seconds.toFixed(1)));
-  $('gifBgField').hidden = !gif;
-  const bg = $('gifBgSeg');
-  bg.textContent = '';
-  for (const clear of [false, true]) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'seg-btn';
-    b.dataset.v = clear ? 'clear' : 'swirl';
-    b.setAttribute('role', 'radio');
-    b.textContent = clear ? t.gifBgName.clear : t.gifBgName.swirl;
-    radio(b, s.gifClear === clear);
-    b.onclick = () => {
-      if (store.get().gifClear === clear) return;
-      sfx.tick();
-      store.set({ gifClear: clear });
-      revealSaveOpts();
-    };
-    bg.appendChild(b);
-  }
-  $('matteField').hidden = !gif || !s.gifClear;
-  $('gifClearNote').hidden = !gif || !s.gifClear;
+  $('saveBackdropName').textContent = t.backdropName[s.backdrop];
+  const clear = gif && s.backdrop === 'clear';
+  $('matteField').hidden = !clear;
+  $('gifClearNote').hidden = !clear;
   const ms = $('matteSeg');
   ms.textContent = '';
   const custom = !MATTES.includes(s.gifMatte);
@@ -1467,7 +1581,10 @@ $('toApng').addEventListener('click', () => {
   saveBtn.focus();
 });
 $('saveMotionPick').addEventListener('click', () => quickMotion.open());
-rovingKeys($('gifBgSeg'));
+$('saveBackdropPick').addEventListener('click', () => {
+  sfx.tick();
+  showBackdrops();
+});
 rovingKeys($('matteSeg'));
 
 /**
@@ -1550,7 +1667,7 @@ async function makeFile(format: 'gif' | 'mp4' | 'share', label: string, progress
       small.textContent = encoding ? t.encoding : label;
       progress(p);
     },
-    { clear: store.get().gifClear, matte: store.get().gifMatte, size: format === 'share' ? GIF_SHARE : undefined },
+    { matte: store.get().gifMatte, size: format === 'share' ? GIF_SHARE : undefined },
   );
 }
 
@@ -1566,7 +1683,7 @@ function celebrate(file: string) {
   void saveBtn.offsetWidth;
   saveBtn.classList.add('is-saved');
   // Save keeps its name (it can be pressed again); its note says what was written.
-  saveBtn.querySelector('.btn-text small')!.textContent = `${t.savedShort}: ${file}`;
+  saveBtn.querySelector('.btn-text small')!.textContent = t.savedShort.replace('{file}', file);
   $('seal').textContent = t.sealDone;
   clearTimeout(celebrateTimer);
   celebrateTimer = window.setTimeout(() => {
@@ -2199,15 +2316,18 @@ store.on((s, changed) => {
     stage.syncHand();
     deck.render();
   }
-  if (['rarity', 'frame', 'shape', 'frameColor', 'frameSwatches', 'dot'].some((k) => changed.has(k as keyof State))) buildSegments();
+  // The Picture shape changing size is a new shape.
+  const reshaped = changed.has('shape') || (changed.has('fit') && s.shape === 'fit');
+  if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit', 'dot'].some((k) => changed.has(k as keyof State))) buildSegments();
+  if (['backdrop', 'backdropColor', 'edition'].some((k) => changed.has(k as keyof State))) buildBackdrops();
   if (changed.has('dot') && flipImage) setFlip(flipImage);
   if (changed.has('arrange')) {
     renderCardHint();
     if (s.arrange === 'free') useArrange();
   }
   if (changed.has('prints')) setFieldPrints(s.prints);
-  if (changed.has('shape')) applyShape();
-  if (changed.has('shape') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
+  if (reshaped) applyShape();
+  if (reshaped || changed.has('frameless') || changed.has('layout') || (s.layout === 'tcg' && ['cardType', 'message', 'arrange', 'placements'].some((k) => changed.has(k as keyof State)))) {
     // A new art window has its own proportions: keep the crop inside the picture, and redraw the flip picture for it.
     const img = currentImage();
     const crop = clampCrop(img.width, img.height, s.crop, artAspect());
@@ -2216,18 +2336,18 @@ store.on((s, changed) => {
     buildSegments();
     drawCropPreview();
   }
-  if ((['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'shape', 'dot'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && !!s.dot)) && !changed.has('sample')) {
+  if ((reshaped || ['name', 'rarity', 'frame', 'frameColor', 'crop', 'message', 'plate', 'layout', 'cardType', 'prints', 'arrange', 'placements', 'frameless', 'dot'].some((k) => changed.has(k as keyof State)) || (changed.has('pixel') && !!s.dot)) && !changed.has('sample')) {
     redrawFace();
   }
   if (changed.has('crop')) positionCropWindow();
   if (['rarity', 'edition', 'sample'].some((k) => changed.has(k as keyof State))) renderInfo();
-  if (['sample', 'name', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
+  if (['sample', 'name', 'message', 'plate', 'layout', 'cardType', 'frameless'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) {
     buildFormats();
     renderShare();
   }
-  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'shape', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
+  if (reshaped || ['exportFormat', 'saveOptsOpen', 'backdrop', 'gifMatte', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }
@@ -2237,7 +2357,7 @@ store.on((s, changed) => {
     droppedId = null;
     if (isKept()) setKept(null);
   }
-  if (shareReady && [...CARD_KEYS, 'gifClear', 'gifMatte', 'exportFormat'].some((k) => changed.has(k as keyof State))) readyToShare(null);
+  if (shareReady && [...CARD_KEYS, 'gifMatte', 'exportFormat'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);

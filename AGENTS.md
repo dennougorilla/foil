@@ -2,11 +2,13 @@
 
 Instructions for coding agents working on FOIL. `README.md` describes the product, development and release commands; `docs/features.md` holds the detailed behavior.
 
-A new finish always goes into a pack (its shader in that pack's module, never the core card shader); `docs/packs.md` says how, and how the pack opening is designed. The service worker (`src/sw.ts`, built by `vite.config.ts`) keeps every file of the build for offline use except those listed in `src/swFiles.ts`; a new file that must not be kept offline goes on that list (`docs/pwa.md`). The card comes in several shapes, so nothing may assume the 5 : 7 card: shaders read `uCardK` and `uArt`, layouts size cards with `src/card/shape.ts`.
+A new finish always goes into a pack (its shader in that pack's module, never the core card shader); `docs/packs.md` says how, and how the pack opening is designed. A new backdrop goes into `src/gl/backdrops.ts` and must close its loop (`docs/backdrops.md`). The service worker (`src/sw.ts`, built by `vite.config.ts`) keeps every file of the build for offline use except those listed in `src/swFiles.ts`; a new file that must not be kept offline goes on that list (`docs/pwa.md`). The card comes in several shapes, so nothing may assume the 5 : 7 card: shaders read `uCardK` and `uArt`, layouts size cards with `src/card/shape.ts`.
 
 ## Slow devices
 
 Nothing new needs a light version of its own. The drawing levels in `src/quality.ts` lower the card canvases' resolution, still the backdrop and the page's endless CSS loops, cut the sparks and drop the CRT lines for the whole page (`docs/performance.md`); draw backdrops through `BackgroundRenderer.draw` and put loading indicators under `[aria-busy]` or `.is-waiting` (they keep moving). After adding a finish, a backdrop or anything drawn on every frame, run `npm run perf` (with the dev server running) and look only at what it lists as over budget.
+
+Interface texts (Japanese and English) use the names and writing rules in `docs/glossary.md`: one name for each thing, in both languages.
 
 ## Premise
 

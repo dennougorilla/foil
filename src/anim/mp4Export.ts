@@ -2,7 +2,7 @@
 // frame drawn and handed to the browser's own H.264 encoder (WebCodecs), never recorded in real time,
 // then put in an MP4 with its index at the front.
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer';
-import { createScene, fileSafe, nextFrame, packsLoaded, swirlAt, type ExportInput, type Scene } from '../exporter';
+import { createScene, fileSafe, nextFrame, packsLoaded, type ExportInput, type Scene } from '../exporter';
 import { TUNE_DEFAULTS } from '../tune/model';
 import { MP4_FPS, MP4_H, MP4_W, mp4At, mp4Config, mp4Plan } from './mp4Plan';
 
@@ -35,13 +35,13 @@ export async function exportMp4(input: ExportInput, onProgress?: (p: number) => 
   const frameUs = 1e6 / MP4_FPS;
   let scene: Scene | undefined;
   try {
-    scene = createScene(input, MP4_W, MP4_H);
+    scene = await createScene(input, MP4_W, MP4_H);
     for (let i = 0; i < plan.frames; i++) {
       await nextFrame();
       while (encoder.encodeQueueSize > QUEUE && !failed) await nextFrame();
       if (failed) throw failed;
       const p = mp4At(plan, i);
-      scene.draw(p, swirlAt(p), p * plan.sourceSpan);
+      scene.draw(p, p * plan.sourceSpan);
       const frame = new VideoFrame(scene.out, { timestamp: Math.round(i * frameUs), duration: Math.round(frameUs) });
       encoder.encode(frame, { keyFrame: i % KEY_EVERY === 0 });
       frame.close();

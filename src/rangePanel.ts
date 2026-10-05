@@ -65,7 +65,7 @@ function radio(btn: HTMLElement, on: boolean) {
 /** Arrow keys move the choice within a radio group, like the panel's other groups. */
 function roving(group: HTMLElement) {
   group.addEventListener('keydown', (e) => {
-    const items = [...group.querySelectorAll<HTMLElement>('[role=radio]')];
+    const items = [...group.querySelectorAll<HTMLElement>('[role=radio]:not([hidden])')];
     const i = items.indexOf(document.activeElement as HTMLElement);
     if (i < 0) return;
     const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
@@ -589,7 +589,13 @@ export function initRangePanel(host: RangeHost, areas: Areas) {
     // With two layers, the area controls name the finish they place.
     const placing = which(s) === 2 ? s.layer2!.edition : s.edition;
     q('#rangeWhereLabel').textContent = s.layer2 ? host.t().layerWhere.replace('{n}', String(which(s))).replace('{x}', host.t().edition[placing]) : host.t().rangeWhere;
-    regionSeg.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => radio(b, b.dataset.v === a.region));
+    // A card that is all picture has no art, frame or words of its own: its places are the whole card or the brush.
+    const region: RangeRegion = s.frameless && a.region !== 'none' ? 'all' : a.region;
+    regionSeg.querySelectorAll<HTMLButtonElement>('[role=radio]').forEach((b) => {
+      b.hidden = s.frameless && !['all', 'none'].includes(b.dataset.v!);
+      radio(b, b.dataset.v === region);
+    });
+    regionSeg.classList.toggle('is-whole', s.frameless);
     lo.value = String(a.lo);
     hi.value = String(a.hi);
     tone.style.setProperty('--lo', String(a.lo));
@@ -604,13 +610,13 @@ export function initRangePanel(host: RangeHost, areas: Areas) {
     // Invert flips region and brightness together, so name both when the band is narrowed.
     const narrowed = a.lo > 0 || a.hi < 1;
     const what = narrowed
-      ? tt.toneAt.replace('{r}', tt.region[a.region]).replace('{lo}', String(Math.round(a.lo * 100))).replace('{hi}', String(Math.round(a.hi * 100)))
-      : tt.regionQ.replace('{r}', tt.region[a.region]);
+      ? tt.toneAt.replace('{r}', tt.region[region]).replace('{lo}', String(Math.round(a.lo * 100))).replace('{hi}', String(Math.round(a.hi * 100)))
+      : tt.regionQ.replace('{r}', tt.region[region]);
     q('.region-hint').textContent = a.invert
       ? tt.invertHint.replace('{x}', what)
       : custom
-        ? tt.customHint.replace('{r}', tt.region[a.region])
-        : tt.regionHint[a.region];
+        ? tt.customHint.replace('{r}', tt.region[region])
+        : tt.regionHint[region];
     q('.where-tag').hidden = !paint().painted;
     paintBtn.querySelector('b')!.textContent = painting ? host.t().paintActive : host.t().paint;
     paintBtn.querySelector('small')!.textContent = painting ? host.t().paintActiveSub : host.t().paintSub;
@@ -641,7 +647,7 @@ export function initRangePanel(host: RangeHost, areas: Areas) {
     softOut.style.setProperty('--blur', `${(s.brushSoft * 5).toFixed(1)}px`);
     softOut.title = pct(s.brushSoft);
     soft.setAttribute('aria-valuetext', pct(s.brushSoft));
-    q<HTMLElement>('.pane-tools').hidden = !(a.region !== 'all' || a.lo > 0 || a.hi < 1 || a.invert || paint().painted);
+    q<HTMLElement>('.pane-tools').hidden = !(region !== 'all' || a.lo > 0 || a.hi < 1 || a.invert || paint().painted);
   }
 
   function applyText() {
