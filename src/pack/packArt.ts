@@ -162,17 +162,37 @@ interface Look {
   accent: string[];
 }
 
-const gem = (L: Layer, a: RGB[]) => {
-  // A gold coin behind a cut gem, sparkles around.
-  const [gold, goldHi, goldLo, ice, iceHi, iceLo, white] = a;
-  L.disc(76, 92, 25, (x, y) => (Math.hypot(x - 76, y - 92) > 21 ? goldLo : (x - 70) * 0.6 + (y - 86) < -6 ? goldHi : gold));
-  L.poly([76, 76, 82, 88, 94, 90, 84, 97, 87, 109, 76, 102, 65, 109, 68, 97, 58, 90, 70, 88], goldLo);
-  L.poly([24, 70, 36, 56, 64, 56, 76, 70, 50, 108], (x, y) => (y < 70 ? (x < 40 ? iceHi : x < 56 ? ice : iceLo) : x < 44 ? ice : x < 52 ? iceHi : iceLo));
-  L.poly([36, 70, 44, 58, 56, 58, 64, 70, 50, 100], (_x, y) => (y < 70 ? white : iceHi));
-  for (const [sx, sy, r] of [[22, 46, 4], [100, 60, 3], [104, 116, 4], [30, 118, 3]]) {
-    L.line(sx - r, sy, sx + r, sy, 1, white);
-    L.line(sx, sy - r, sx, sy + r, 1, white);
+const sparkles = (L: Layer, c: RGB, at: number[][]) => {
+  for (const [sx, sy, r] of at) {
+    L.line(sx - r, sy, sx + r, sy, 1, c);
+    L.line(sx, sy - r, sx, sy + r, 1, c);
   }
+};
+
+const coin = (L: Layer, a: RGB[]) => {
+  // A gold coin leaning on a platinum ingot, sparkles around.
+  const [gold, goldHi, goldLo, plat, platHi, platLo, white] = a;
+  L.poly([18, 104, 30, 84, 74, 84, 86, 104], (x, y) => (y < 90 ? platHi : x < 40 ? plat : platLo));
+  L.poly([30, 84, 74, 84, 70, 78, 34, 78], platHi);
+  L.line(36, 95, 66, 95, 1, platLo);
+  L.disc(80, 84, 25, (x, y) => (Math.hypot(x - 80, y - 84) > 21 ? goldLo : (x - 74) * 0.6 + (y - 78) < -6 ? goldHi : gold));
+  L.poly([80, 68, 86, 80, 98, 82, 88, 89, 91, 101, 80, 94, 69, 101, 72, 89, 62, 82, 74, 80], goldLo);
+  sparkles(L, white, [[22, 52, 4], [104, 50, 3], [106, 118, 4], [28, 124, 3]]);
+};
+
+const jewel = (L: Layer, a: RGB[]) => {
+  // A brilliant-cut gem over a pearl and a seam of gold, sparkles around.
+  const [ice, iceHi, iceLo, pink, white, pearl, pearlLo, gold] = a;
+  L.line(14, 120, 46, 104, 3, gold);
+  L.line(46, 104, 60, 112, 2, gold);
+  L.disc(96, 110, 13, (x, y) => ((x - 91) ** 2 + (y - 105) ** 2 < 26 ? white : (x - 96) ** 2 + (y - 110) ** 2 > 110 ? pearlLo : pearl));
+  // Crown (a table and four facets) over a pavilion that narrows to the point.
+  L.poly([22, 66, 38, 46, 90, 46, 106, 66, 64, 122], (x, y) => (y < 66 ? (x < 46 ? iceHi : x < 82 ? ice : iceLo) : x < 50 ? ice : x < 64 ? iceHi : x < 78 ? pink : iceLo));
+  L.poly([38, 66, 48, 50, 80, 50, 90, 66], (x) => (x < 64 ? white : iceHi));
+  L.line(22, 66, 106, 66, 1, iceLo);
+  L.line(48, 66, 64, 118, 1, iceLo);
+  L.line(80, 66, 64, 118, 1, iceLo);
+  sparkles(L, white, [[20, 40, 4], [108, 38, 3], [112, 86, 3], [24, 92, 2]]);
 };
 
 const star = (L: Layer, a: RGB[]) => {
@@ -231,10 +251,22 @@ const heart = (L: Layer, a: RGB[]) => {
   L.disc(42, 72 + d, 4, white);
   L.poly([42, 58 + d, 42, 40 + d, 53, 48 + d, 64, 34 + d, 75, 48 + d, 86, 40 + d, 86, 58 + d], (_x, y) => (y < 48 + d ? goldHi : gold));
   for (const [cx, cy] of [[42, 40], [64, 34], [86, 40]]) L.disc(cx, cy + d, 3, goldHi);
+  // Celebration: small fireworks bursting around it.
+  const burst = (cx: number, cy: number, r: number, c: RGB) => {
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      L.line(cx + Math.cos(ang) * r * 0.45, cy + Math.sin(ang) * r * 0.45, cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, 1, c);
+    }
+  };
+  burst(18, 66, 9, hRed);
+  burst(110, 62, 8, gold);
+  burst(108, 128, 7, hRed);
+  burst(20, 132, 7, gold);
 };
 
 const LOOKS: Record<PackId, Look> = {
-  metal: { body: ['#4a2c0c', '#b07a20', '#e8b24a'], art: gem, accent: ['#f2c14e', '#fff0b0', '#a8701c', '#5fd6ff', '#c8f4ff', '#2a80c8', '#ffffff'] },
+  metal: { body: ['#4a2c0c', '#b07a20', '#e8b24a'], art: coin, accent: ['#f2c14e', '#fff0b0', '#a8701c', '#c4cad6', '#eef1f8', '#7a8292', '#ffffff'] },
+  jewel: { body: ['#3a0810', '#8e1a2a', '#c8384a'], art: jewel, accent: ['#8fe6ff', '#e4fbff', '#3a8ad0', '#ff9ad0', '#ffffff', '#f3e6d0', '#b8a07a', '#f2c14e'] },
   light: { body: ['#0e1440', '#2a3c9a', '#5a78e0'], art: star, accent: ['#ffd84a', '#fff6c8', '#ffb84a', '#e07a2a', '#ffffff', '#ff7ab0'] },
   nature: { body: ['#0f3a24', '#2f7a46', '#5aae66'], art: blossom, accent: ['#5a3420', '#ffa8c8', '#ffe0ec', '#e0628f', '#ffe14a', '#3c9a4a', '#8ad87a'] },
   studio: { body: ['#5a140c', '#c8442a', '#f07a4a'], art: palette, accent: ['#c8904a', '#f0c88a', '#7a4a20', '#20b8e8', '#ff3a8a', '#ffe24a', '#ffffff', '#e8262a'] },

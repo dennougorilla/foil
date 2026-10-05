@@ -2,7 +2,7 @@
 // flakes in it. The flakes live on the GPU: a transform-feedback pass moves them through a
 // simple fluid (a swirl, a slosh, some turbulence, a slow convection), and a point pass draws
 // them on the card as tumbling flakes that catch the light. The liquid and glass themselves are
-// drawn by the card shader (SNOWGLOBE_GLSL below, in the Nature pack's program).
+// drawn by the card shader (SNOWGLOBE_GLSL below, in the Supporter pack's program).
 //
 // Shaking comes from the card itself (tossing, flicking the tilt, a click's wobble), a pointer
 // sweeping across the art, and on phones the motion sensor. Exports and reduced motion never

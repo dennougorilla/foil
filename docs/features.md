@@ -17,15 +17,16 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Hand, deck and packs
 
 - Pick a finish from the fanned hand at the bottom; each card in the hand is a live preview. The hand starts with seven finishes: the five editions of the game FOIL is modelled on (Base, Foil, Holographic, Polychrome and Negative), plus Prism and Glitch. Number keys pick the cards in the hand in order, ← → step through them. Press the logo to shuffle the finish.
-- Every other finish comes in a theme pack: **Metal** (Relief, Gold, Platinum, Cosmo Holo, Crystal), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Snow Globe, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
+- Every other finish comes in a theme pack: **Metal** (Platinum, Gold, Relief, Cosmo Holo), **Jewel** (Crystal, Opal, Raden, Kintsugi), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
 - A pack is opened once and holds its whole theme, with no random draws: trace the line across its top to tear it, swipe through the cards, and the rarest one waits until last for its own entrance. Skip jumps straight to the result, and the cards are shown on your own picture so you can try them at once. An opening can be watched again from the shop.
-- The hand holds up to seven cards; every other finish you own waits in the **deck**, a small stack of card backs at the end of the hand with its count. Press it to edit your hand like a card game's deck screen: one tap moves a finish between the deck and the hand (or drag it onto a slot), with undo and a reset to the starting seven; Base always stays.
-- Opening one of the support links in the header (GitHub Sponsors or Buy Me a Coffee) once adds the **Supporter pack** (Opal, Raden, Confetti, Fireworks, Kintsugi) to the shop in this browser and its other open tabs; until then it leaves no trace. It opens like the others, with a richer wrapper and opening. It is an honor system with no payment check.
-- Packs, their shaders and the shop itself only load when the shop is opened (an opened pack's finishes load with the hand). Opened packs are kept in this browser; a saved card on a finish whose pack is sealed again (site data cleared) goes back to Holographic. Finishes unlocked under the earlier support-link secrets (v0.9) carry over: their packs count as opened. The design is in [`packs.md`](packs.md).
+- **Open all** in the shop opens every sealed pack on the tray at once (a second tap confirms), without their openings: one list shows what came in, pack by pack, and leads to the deck builder. Each opening can still be watched from the shop afterwards.
+- The hand holds up to seven cards; every other finish you own waits in the **deck**, a small stack of card backs at the end of the hand with its count. Press it to edit your hand like a card game's deck screen; it opens on everything you own in one list, your hand first, with a tab per pack to narrow it. One tap moves a finish between the deck and the hand (or drag it onto a slot), with undo and a reset to the starting seven; Base always stays.
+- Opening one of the support links in the header (GitHub Sponsors or Buy Me a Coffee) once adds the **Supporter pack** of celebrations (Confetti, Snow Globe, Fireworks) to the shop in this browser and its other open tabs; until then it leaves no trace. It opens like the others, with a richer wrapper and opening. It is an honor system with no payment check.
+- Packs, their shaders and the shop itself only load when the shop is opened (an opened pack's finishes load with the hand). The finishes you own are kept in this browser, finish by finish, so one that moves to another pack stays yours; a pack that gains a finish is sealed again so you can open it for the new one. A saved card on a finish you no longer own (site data cleared) goes back to Holographic. Packs opened up to v0.13, and finishes unlocked under the earlier support-link secrets (v0.9), carry over as the finishes those packs held. The design is in [`packs.md`](packs.md).
 
 ## Finishes
 
-33 finishes in all: seven in the starting hand and 26 in five packs.
+33 finishes in all: seven in the starting hand and 26 in six packs.
 
 | Finish | Where | Look |
 | --- | --- | --- |
@@ -36,11 +37,14 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Negative | Starter | Lights and darks swapped, a night print |
 | Prism | Starter | Rainbow shards like cracked ice |
 | Glitch | Starter | Scanlines and slipping color |
-| Relief | Metal | Struck like a medal; light runs across as you tilt |
-| Gold | Metal | Gold leaf with a scatter of sparks |
 | Platinum | Metal | Hairline-brushed platinum; a streak of light runs as you tilt |
+| Gold | Metal | Gold leaf with a scatter of sparks |
+| Relief | Metal | Struck like a medal; light runs across as you tilt |
 | Cosmo Holo | Metal | Rows of foil circles and stars that flash rainbow as it tilts |
-| Crystal | Metal | Light bent through cut facets |
+| Crystal | Jewel | Light bent through cut facets |
+| Opal | Jewel | Patches of color welling up in the stone, flashing as you tilt |
+| Raden | Jewel | Shell mosaic on black lacquer, turning blue, green, pink and gold |
+| Kintsugi | Jewel | Cracks mended in gold, one of a kind |
 | Galaxy | Light | Nebulae rising out of the shadows |
 | Aurora | Light | Curtains of light that sway |
 | Glow | Light | Shine a light on it and it glows on in the dark |
@@ -49,7 +53,6 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Sakura | Nature | Petals drifting down |
 | Frost | Nature | Frost blooming in from the edges |
 | Stardust | Nature | Rainbow star dust that twinkles, with a big starburst now and then |
-| Snow Globe | Nature | Shake it and gold glitter swirls up |
 | Magma | Nature | Lava pulsing through the cracks |
 | Halftone | Studio | Printed in dots, like a comic panel |
 | Warmth | Studio | Stroke it and your warmth brings the color back |
@@ -57,11 +60,9 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Flip Lenticular | Studio | Tilt it left and the picture swaps, stripe by stripe, under fine lenses |
 | 3D Lenticular | Studio | The picture floats in 3D behind fine ridged lenses |
 | Shadowbox | Studio | The picture as paper-cut layers, set deep in a box |
-| Opal | Supporter | Patches of color welling up in the stone, flashing as you tilt |
-| Raden | Supporter | Shell mosaic on black lacquer, turning blue, green, pink and gold |
 | Confetti | Supporter | Gold, silver and rainbow foil confetti that glints piece by piece |
+| Snow Globe | Supporter | Shake it and gold glitter swirls up |
 | Fireworks | Supporter | Willows, chrysanthemums, hearts and stars burst in gold, silver, crimson and jade |
-| Kintsugi | Supporter | Cracks mended in gold, one of a kind |
 
 - **Relief** strikes the picture in metal like a proof coin: the subject stands up as a matte relief in a few flat levels with crisp steps, the background becomes a flat mirror field that flashes as the card tilts, and line work sinks into grooves. Dark pictures are lifted rather than crushed. The frame gets a stamped dot texture and the name a mirror foil on a matte plate. Gold by default; silver is a choice under Shine.
 - **Platinum** prints the art on cold white metal brushed with fine hairlines: the light is a hard streak across the lines, and tilting slides it along them, glinting on single lines as it passes. It moves only with the tilt and the light, so it holds still when motion is reduced.

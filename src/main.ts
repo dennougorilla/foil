@@ -31,7 +31,7 @@ import type { Adjust } from './adjust';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { addToHand, available, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
+import { addToHand, available, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, sealed, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
@@ -1754,16 +1754,15 @@ function openShop() {
   opening = true;
   const btn = $('packsBtn');
   btn.setAttribute('aria-busy', 'true');
-  const wasOpened = new Set(packs.get().opened);
   const list = shelf(packs.get());
   // The cards in the opening wear the face as it is now (a trading card's painter may be on its way).
   void Promise.all([import('./pack/opening'), faceReady()])
     .then(([m]) =>
       m.openPack({
-        pack: firstSealed(packs.get()) ?? list[0],
+        pack: sealed(packs.get())[0] ?? list[0],
         shop: list,
         from: btn.getBoundingClientRect(),
-        isOpened: (id) => packs.isOpened(id),
+        owns: (id) => packs.get().owned.includes(id),
         deckRect: () => deck.rect(),
         dict: t,
         face,
@@ -1772,15 +1771,16 @@ function openShop() {
         tune: store.get().tune,
         intensity: store.get().intensity,
         pause: (on) => stage.pause(on),
-        onOpened: (id) => packs.open(id),
-        onClose: (done, pick) => {
+        onOpened: (ids) => packs.open(ids),
+        onClose: (next, added) => {
           opening = false;
-          if (done && !wasOpened.has(done.id)) {
-            deck.bump(done.finishes.length);
-            toast(t.pack.intoDeck.replace('{name}', t.pack.name[done.id]).replace('{n}', String(done.finishes.length)));
+          if (added) {
+            deck.bump(added.n);
+            toast(added.note);
           }
-          // A pick in the haul comes into the hand and onto the card.
-          if (pick) useCard(pick);
+          // A pick in the haul comes into the hand and onto the card; the list leads to the deck builder.
+          if (next === 'deck') viewDeck();
+          else if (next) useCard(next);
           else deck.focusShop();
         },
       }),
