@@ -338,7 +338,7 @@ void main() {
   if (e != 0 && e != 20 && e != 76) col = tuneColor(col, c);
   // Frame and outline get a slightly softer treatment than the art.
   float amt = uIntensity * mix(0.7, 1.0, m.r);
-  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art)
+  if (e == 5 || e == 4 || e == 12 || e == 24 || e == 26 || e == 72 || e == 80 || e == 82 || e == 96) amt = uIntensity; // these cover the frame in full (Blacklight's lamp lights it as fully as the art, Plasma's lightning crosses it)
   if (uLayer > 0.5) amt = uIntensity; // layer 2 often lies on the frame: in full there too
   if (e == 13 || e == 18) amt *= m.r; // facets and the cosmos foil stay in the art window
   amt *= 1.0 - m.b; // the ink outline always stays ink
@@ -359,8 +359,8 @@ void main() {
   col = lettering(col, uv, uTilt);
   // Specular hotspot that follows the light.
   float spec = 0.0;
-  if (e == 72) {
-    // An ultraviolet lamp casts no white glare; its beam is drawn by the finish.
+  if (e == 72 || e == 96) {
+    // An ultraviolet lamp casts no white glare, nor does lightning; the finish draws its own light.
   } else if (e != 0) {
     float d = length((uv - uLight) * uCardK);
     // Glow's room is dim, so only a faint glare reaches it.

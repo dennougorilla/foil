@@ -17,7 +17,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Hand, deck and packs
 
 - Pick a finish from the fanned hand at the bottom; each card in the hand is a live preview. The hand starts with seven finishes: the five editions of the game FOIL is modelled on (Base, Foil, Holographic, Polychrome and Negative), plus Prism and Glitch. Number keys pick the cards in the hand in order, ← → step through them. Press the logo to shuffle the finish.
-- Every other finish comes in a theme pack: **Metal** (Relief, Gold, Platinum, Cosmo Holo, Crystal), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Snow Globe, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
+- Every other finish comes in a theme pack: **Metal** (Relief, Gold, Platinum, Cosmo Holo, Crystal), **Light** (Galaxy, Aurora, Glow, Blacklight, Plasma, Shallows), **Nature** (Sakura, Frost, Stardust, Snow Globe, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
 - A pack is opened once and holds its whole theme, with no random draws: trace the line across its top to tear it, swipe through the cards, and the rarest one waits until last for its own entrance. Skip jumps straight to the result, and the cards are shown on your own picture so you can try them at once. An opening can be watched again from the shop.
 - The hand holds up to seven cards; every other finish you own waits in the **deck**, a small stack of card backs at the end of the hand with its count. Press it to edit your hand like a card game's deck screen: one tap moves a finish between the deck and the hand (or drag it onto a slot), with undo and a reset to the starting seven; Base always stays.
 - Opening one of the support links in the header (GitHub Sponsors or Buy Me a Coffee) once adds the **Supporter pack** (Opal, Raden, Confetti, Fireworks, Kintsugi) to the shop in this browser and its other open tabs; until then it leaves no trace. It opens like the others, with a richer wrapper and opening. It is an honor system with no payment check.
@@ -25,7 +25,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ## Finishes
 
-33 finishes in all: seven in the starting hand and 26 in five packs.
+34 finishes in all: seven in the starting hand and 27 in five packs.
 
 | Finish | Where | Look |
 | --- | --- | --- |
@@ -45,6 +45,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Aurora | Light | Curtains of light that sway |
 | Glow | Light | Shine a light on it and it glows on in the dark |
 | Blacklight | Light | A UV lamp reveals hidden ink and a seal |
+| Plasma | Light | Lightning that reaches from the middle to your finger |
 | Shallows | Light | Sunlight netting a pool floor, fraying into spectrum |
 | Sakura | Nature | Petals drifting down |
 | Frost | Nature | Frost blooming in from the edges |
@@ -68,6 +69,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 - **Cosmo Holo** is the cosmos foil of trading cards laid over the art: a regular print of circles, stars and fine dots, each one a tiny diffraction grating. Rainbow bands run across the rows of motifs and slide over the card as it tilts, the star facets flash one after another and the dots twinkle; off the bands the foil all but disappears and the art shows through. It moves only with the tilt, so it loops in exports and holds still under reduced motion.
 - **Glow** turns the card into glow-in-the-dark ink in a dim room: the picture sits darker and cooler, and the pointer (or a finger) is a small violet lamp. Wherever it shines, the ink stores the light and, once the lamp moves on, glows pale yellow-green, brightest where the picture is light. It fades the way real glow-in-the-dark ink does: quickly at first, then a faint glow that lingers for twenty seconds or so, drawing back into its crystals so an old afterglow glimmers grain by grain. Holding still charges a spot brighter. Like Warmth it arrives with one sweep of light as a hint, and a drag strokes the card instead of tossing it. Exports sweep the light through the busiest part of the picture; a PNG catches the trail still glowing, and a GIF or APNG loop shows the light pass and the afterglow it leaves.
 - **Blacklight** hides fluorescent ink in the print. The card looks ordinary until the pointer (a finger on a phone) shines an ultraviolet lamp on it: inside the lamp's circle the print is washed in violet, white paper glows blue, and the hidden ink lights up neon pink, yellow and cyan — the outlines of the picture over a fine engraving of it, fibres in the paper, FOIL microtext round the frame and, somewhere on the art, a seal to find. Left alone, the lamp drifts slowly over the card by itself, glowing dimmer, and turns up to full when you point at the card (it holds still with reduced motion). On this finish a drag moves the lamp instead of tossing the card. Exports show it as the stage does left alone: drifting round the art, dimmer, once per loop (6 seconds at speed 1).
+- **Plasma** turns the card into a plasma ball: the picture sits a little darker under the glass, a hot violet-white electrode glows at the card's middle, and jagged violet-to-pink streamers of lightning crackle out from it, each wrapped in a soft glow that lights the picture around it. Left alone the streamers wander lazily towards the edges; point at the card (or put a finger on it) and they reach for that spot, bending after the pointer as it moves and gathering there in one bright bolt, the way a real plasma ball's lightning gathers on a fingertip. On this finish a drag leads the lightning instead of tossing the card. Exports show the drifting streamers with an unseen finger that touches the card once per loop and slides across the art, so every GIF and APNG shows the lightning gather and let go (6 seconds at speed 1); a PNG catches the finger down. Reduced motion freezes the crackle, while the lightning still follows the pointer.
 - **Shallows** sinks the art like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports.
 - **Stardust** scatters rainbow star dust over the art, which sits a little deeper so the grains of light lead: each fine grain is a tiny facet that catches the light at its own angle, square chips of confetti foil flash a color as they face you, and a few big starbursts blaze when the angle is right and pop on a steady beat (so its GIF and APNG loops close without a seam). A wide band of light rolls across as the card tilts, and every grain inside it fires harder.
 - **Snow Globe** sets the art behind a curved pane of clear liquid full of gold glitter; shake or toss the card and the glitter swirls up, then settles.
@@ -121,7 +123,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 - Layer two finishes, like layers in a photo app (Fine-tune → **Layers**): each layer has its own finish and its own place on the card, and a little pixel card in the list lights up exactly where each one lands. Sakura on the art and Kintsugi on the frame, or Holographic on the whole card with Gold's shine over the highlights.
 - Where the two overlap, layer 2 either adds only its light (the default, so both stay visible) or is laid over layer 1, with a strength slider.
-- Layer 2 can be any finish you own except Base and the ones that need the card to themselves (Warmth, Glow, Blacklight, Shadowbox, the two lenticulars, Snow Globe). Off by default; the card, the live previews and every export show both. How it is drawn, and the options weighed, are in [`layering.md`](layering.md).
+- Layer 2 can be any finish you own except Base and the ones that need the card to themselves (Warmth, Glow, Blacklight, Plasma, Shadowbox, the two lenticulars, Snow Globe). Off by default; the card, the live previews and every export show both. How it is drawn, and the options weighed, are in [`layering.md`](layering.md).
 
 ## Finish area
 
@@ -140,9 +142,9 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ### PNG, GIF and APNG
 
 - Save a transparent PNG, a looping GIF or a full-color transparent APNG loop. The PNG is the card's own pixels (900×1260 for the trading card, the short side always 900) with a small clear margin. The GIF (480×600 for the trading card) and the APNG are upright for upright shapes, on their side for wide ones and square for the square card.
-- A loop is the card exactly as it moves on the stage when nobody touches it — the motion, the speed and size, the light and its sheen as set — one loop of the motion long (see [`motion.md`](motion.md); 6 seconds while the light orbits or Blacklight's lamp drifts), so it closes without a seam. With an animated picture, its own loop plays a whole number of times inside (slightly retimed to fit); at speed zero the card holds still and the loop follows the picture's timing.
+- A loop is the card exactly as it moves on the stage when nobody touches it — the motion, the speed and size, the light and its sheen as set — one loop of the motion long (see [`motion.md`](motion.md); 6 seconds while the light orbits, Blacklight's lamp drifts or Plasma's lightning wanders), so it closes without a seam. With an animated picture, its own loop plays a whole number of times inside (slightly retimed to fit); at speed zero the card holds still and the loop follows the picture's timing.
 - The loop options say so in one line, and how touch finishes are exported: a file has no hand in it, so an unseen finger strokes the busiest part of the picture once per loop.
-- Relief, Platinum, Glow and Blacklight GIFs are dithered so their smooth gradients don't band in 256 colors (with layers, the GIF is dithered if either finish asks for it).
+- Relief, Platinum, Glow, Blacklight and Plasma GIFs are dithered so their smooth gradients don't band in 256 colors (with layers, the GIF is dithered if either finish asks for it).
 
 ### GIF options
 

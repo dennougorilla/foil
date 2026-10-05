@@ -1,9 +1,10 @@
-// Light pack: Galaxy, Aurora, Glow, Blacklight and Shallows (the showpiece). See docs/packs.md.
+// Light pack: Galaxy, Aurora, Glow, Blacklight, Plasma and Shallows (the showpiece). See docs/packs.md.
 import { SHALLOWS_GLSL } from '../shallows';
 import { TOUCH_GLSL } from '../../touch/glsl';
 import { GLOW_GLSL } from '../../touch/glow';
 import { HeatLayer } from '../../touch/layer';
 import { BLACKLIGHT_GLSL } from '../blacklight';
+import { PLASMA_GLSL } from '../plasma';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -54,6 +55,7 @@ ${SHALLOWS_GLSL}
 ${TOUCH_GLSL}
 ${GLOW_GLSL}
 ${BLACKLIGHT_GLSL}
+${PLASMA_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 7) col = galaxy(c, uv, uTilt, L);
@@ -61,6 +63,7 @@ ${BLACKLIGHT_GLSL}
   else if (e == 17) col = shallows(c, uv, uTilt, L, lod, m.r);
   else if (e == 70) col = glow(c, uv, L, m.r);
   else if (e == 72) col = blacklight(c, uv, L, lod, m);
+  else if (e == 96) col = plasma(c, uv, L);
 `,
   // Glow keeps the light shone on it in a touch field, like Warmth's heat (see touch/).
   layers: (gl) => {

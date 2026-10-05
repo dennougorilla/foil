@@ -17,7 +17,7 @@ ways to do it and records the one FOIL uses. The product summary is in `README.m
 - Some finishes cover the frame in full (Gold, Halftone, Platinum, Stained Glass, Blacklight,
   Confetti, Fireworks, Negative), two stay in the art window (Crystal, Cosmo Holo), the rest soften
   a little on the frame.
-- Some finishes need the card to themselves: Warmth and Glow are driven by touch, Blacklight by a
+- Some finishes need the card to themselves: Warmth and Glow are driven by touch, Blacklight and Plasma by a
   lamp that follows the pointer, Shadowbox and 3D Lenticular by the depth model, Flip Lenticular by
   a second picture, Snow Globe by particles drawn over its art.
 

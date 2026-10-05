@@ -455,7 +455,7 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
   const edition = (await state()).edition;
   expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
-  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'plasma', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
   const pick = chips.includes('negative') ? 'negative' : 'poly';
   await page.click(`.layer-chip[data-v=${pick}]`);
   let s = await state();
@@ -1189,7 +1189,7 @@ await step('finishes unlocked by the old support links carry over as opened pack
   expect((await page.evaluate(() => localStorage.getItem('foil:secrets'))) === null, 'the old key was left behind');
   const after = await state();
   expect(after.hand.length === 7 && after.hand.includes('shallows') && !('drawn' in after), `the drawn card did not move into the hand: ${after.hand}`);
-  expect((await page.textContent('#deckBtn .deck-count')) === '10', 'the carried-over packs are not in the deck');
+  expect((await page.textContent('#deckBtn .deck-count')) === '11', 'the carried-over packs are not in the deck');
 });
 
 await step('a card on a finish whose pack is sealed goes back to Holographic', async () => {
@@ -1560,6 +1560,88 @@ await step('Raden and Opal change the picture clearly, keep it, and answer the t
     expect(keep > 0.6, `${id} loses the picture (${keep.toFixed(2)})`);
     expect(swing > 0.08, `${id} hardly answers the tilt (${swing.toFixed(3)})`);
   }
+  await still.close();
+});
+
+await step('Plasma: the lightning reaches for the pointer, and the picture stays, a little darker', async () => {
+  // Held still (reduced motion), so two shots differ only by where the pointer is.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const p = await still.newPage();
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(e.message));
+  p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
+  await p.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    localStorage.clear();
+    localStorage.setItem('foil:packs', JSON.stringify({ opened: ['light'], supporter: false }));
+    localStorage.setItem('foil:v1', JSON.stringify({ hand: ['base', 'foil', 'holo', 'plasma'] }));
+    sessionStorage.setItem('seeded', '1');
+  });
+  await p.goto(`${URL}?lang=en`);
+  await p.waitForTimeout(2000);
+  const card = p.locator('#cardSlot');
+  // The card's pixels, with the pointer at (fx, fy) of the card (null: off the stage).
+  const shot = async (id, at) => {
+    await p.$eval(`.hand-slot[data-id=${id}]`, (el) => el.click());
+    await p.waitForTimeout(1200);
+    const b = await card.boundingBox();
+    if (at) await p.mouse.move(b.x + b.width * at[0], b.y + b.height * at[1], { steps: 4 });
+    else await p.mouse.move(5, 895);
+    // The lightning eases onto the pointer; slow software drawing takes a while to get there.
+    await p.waitForTimeout(3500);
+    const png = (await p.screenshot({ clip: b })).toString('base64');
+    return p.evaluate(async (src) => {
+      const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${src}`)).blob());
+      const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+      c.drawImage(img, 0, 0);
+      return { w: img.width, h: img.height, d: Array.from(c.getImageData(0, 0, img.width, img.height).data) };
+    }, png);
+  };
+  // How much bright light (lightning and its spark, above the darkened picture) a patch around (fx, fy) holds.
+  const electric = (s, fx, fy, r = 0.06) => {
+    let sum = 0, n = 0;
+    for (let y = Math.round((fy - r) * s.h); y < (fy + r) * s.h; y++)
+      for (let x = Math.round((fx - r) * s.w); x < (fx + r) * s.w; x++) {
+        const i = (y * s.w + x) * 4;
+        sum += Math.max(0, s.d[i] * 0.299 + s.d[i + 1] * 0.587 + s.d[i + 2] * 0.114 - 140) / 115;
+        n++;
+      }
+    return sum / n;
+  };
+  const luma = (s) => {
+    let sum = 0;
+    for (let i = 0; i < s.d.length; i += 4) sum += s.d[i] * 0.299 + s.d[i + 1] * 0.587 + s.d[i + 2] * 0.114;
+    return sum / (s.d.length / 4);
+  };
+  const corr = (a, b) => {
+    const la = [], lb = [];
+    for (let i = 0; i < a.d.length; i += 4) {
+      la.push(a.d[i] * 0.299 + a.d[i + 1] * 0.587 + a.d[i + 2] * 0.114);
+      lb.push(b.d[i] * 0.299 + b.d[i + 1] * 0.587 + b.d[i + 2] * 0.114);
+    }
+    const n = la.length, ma = la.reduce((x, y) => x + y) / n, mb = lb.reduce((x, y) => x + y) / n;
+    let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < n; i++) {
+      sab += (la[i] - ma) * (lb[i] - mb);
+      saa += (la[i] - ma) ** 2;
+      sbb += (lb[i] - mb) ** 2;
+    }
+    return sab / Math.sqrt(saa * sbb);
+  };
+  const base = await shot('base', null);
+  const idle = await shot('plasma', null);
+  const A = [0.72, 0.3];
+  const B = [0.3, 0.66];
+  const atA = await shot('plasma', A);
+  const atB = await shot('plasma', B);
+  const near = electric(atA, ...A), far = electric(atB, ...A);
+  console.log(`  plasma at A ${near.toFixed(3)} vs elsewhere ${far.toFixed(3)}, keep ${corr(idle, base).toFixed(2)}, luma ${luma(idle).toFixed(0)} vs ${luma(base).toFixed(0)}`);
+  // Measured at about 0.06 under the pointer and 0.002 elsewhere.
+  expect(near > far * 3 + 0.005 && near > 0.02, `the lightning does not gather under the pointer (${near.toFixed(3)} vs ${far.toFixed(3)})`);
+  expect(electric(atB, ...B) > electric(atA, ...B) * 3 + 0.005, 'the lightning does not follow the pointer to a second place');
+  expect(corr(idle, base) > 0.6, `Plasma loses the picture (${corr(idle, base).toFixed(2)})`);
+  expect(luma(idle) < luma(base) * 0.92, 'Plasma does not darken the picture');
+  expect(!errs.length, `errors: ${errs.join(' | ')}`);
   await still.close();
 });
 

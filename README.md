@@ -11,7 +11,7 @@ English · [日本語](README.ja.md)
 ## What it does
 
 - **Any picture.** Open a file, drop it or paste it. Animated GIF, APNG and WebP keep moving on the card.
-- **33 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, light, nature and studio finishes. Each one reacts to tilt and light.
+- **34 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, light, nature and studio finishes. Each one reacts to tilt and light.
 - **Packs.** Seven finishes come in the starting hand; the rest come in theme packs you tear open once. Each pack holds its whole theme, with no random draws.
 - **Hand and deck.** Pick finishes from a fanned hand of up to seven live previews; the others wait in the deck, which you edit like a card game's deck screen.
 - **Card shapes.** Trading card, wide, square, postcard (upright or on its side) and business card. Frames include Gold rim and Ribbon for celebration cards.
@@ -30,12 +30,12 @@ Every detail, finish by finish: [`docs/features.md`](docs/features.md).
 | --- | --- |
 | Starting hand | Base, Foil, Holographic, Polychrome, Negative, Prism, Glitch |
 | Metal pack | Relief, Gold, Platinum, Cosmo Holo, Crystal |
-| Light pack | Galaxy, Aurora, Glow, Blacklight, Shallows |
+| Light pack | Galaxy, Aurora, Glow, Blacklight, Plasma, Shallows |
 | Nature pack | Sakura, Frost, Stardust, Snow Globe, Magma |
 | Studio pack | Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox |
 | Supporter pack | Opal, Raden, Confetti, Fireworks, Kintsugi |
 
-33 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
+34 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
 
 ## Privacy
 
