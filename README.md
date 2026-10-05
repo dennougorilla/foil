@@ -19,7 +19,8 @@ English · [日本語](README.ja.md)
 - **Layers.** Put two finishes on one card, each in its own place (art, frame, name, highlights, or painted with a brush).
 - **Binder.** Keep cards in a binder of six pages that lives in this browser; drag them between pockets and bring any of them back to the stage.
 - **Share.** On phones, send the card as a moving GIF straight to the share sheet (X, LINE and the like), or as an MP4 video for Instagram.
-- **Export.** Save a looping GIF, a full-color transparent APNG or an MP4 video (for Instagram, which takes neither GIF nor APNG). The loop is what the card does on screen: pick one of 20 motions in four groups and the file moves just like that.
+- **Export.** Save a looping GIF, a full-color APNG or an MP4 video (for Instagram, which takes neither GIF nor APNG). The loop is what the card does on screen: pick one of 20 motions in four groups and the file moves just like that.
+- **Backdrops.** Put the card on the swirl, a felt card table, a photo studio, velvet, bokeh, a starry sky, confetti, a plain color, or nothing at all; the files get the same backdrop, moving with the loop.
 - **Phones.** The card tilts with the device's motion sensor, and a phone held upright shows the card first, nearly edge to edge.
 - **On the home screen.** Install FOIL from the browser and it opens like an app, offline too. On Android and in desktop Chrome, a picture sent from a photo app's share menu goes straight onto the card. A small **Update** chip says when a new version is ready.
 
@@ -62,7 +63,7 @@ npm run og       # with the dev server running: render public/og.png and the hom
 node scripts/layering-check.mjs [--measure]   # with the dev server running: single finishes unchanged pixel for pixel (against a reference URL), and the cost of a second finish
 ```
 
-Rendering is WebGL2 (swirl backdrop, cards, particles). The card shader's core and the seven open finishes live in `src/gl/shaders.ts`, each pack's finishes in `src/gl/finishes/` (see [`docs/packs.md`](docs/packs.md) for adding one); the card face is composed in `src/card/face.ts`, its shapes are listed in `src/card/shape.ts`. Shaders never assume the 5 : 7 card: `uCardK` is the face's size in units of its short side ((1, 1.4) on the trading card) and `uArt` the art window in face uv. Design notes: [`docs/tcg.md`](docs/tcg.md) (trading-card layout), [`docs/arrange.md`](docs/arrange.md) (free placement), [`docs/layering.md`](docs/layering.md) (layers), [`docs/binder.md`](docs/binder.md) (binder), [`docs/pwa.md`](docs/pwa.md) (home screen, offline, updates, share target).
+Rendering is WebGL2 (backdrops, cards, particles). The card shader's core and the seven open finishes live in `src/gl/shaders.ts`, each pack's finishes in `src/gl/finishes/` (see [`docs/packs.md`](docs/packs.md) for adding one); the card face is composed in `src/card/face.ts`, its shapes are listed in `src/card/shape.ts`. Shaders never assume the 5 : 7 card: `uCardK` is the face's size in units of its short side ((1, 1.4) on the trading card) and `uArt` the art window in face uv. Design notes: [`docs/tcg.md`](docs/tcg.md) (trading-card layout), [`docs/arrange.md`](docs/arrange.md) (free placement), [`docs/layering.md`](docs/layering.md) (layers), [`docs/binder.md`](docs/binder.md) (binder), [`docs/pwa.md`](docs/pwa.md) (home screen, offline, updates, share target), [`docs/backdrops.md`](docs/backdrops.md) (backdrops).
 
 Pushes to `main` and pull requests are type-checked and built by `.github/workflows/ci.yml`; they do not deploy.
 

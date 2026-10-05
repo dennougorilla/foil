@@ -8,8 +8,8 @@ import type { ApngPlan } from './apngPlan';
 const TEXT = {
   ja: {
     title: 'APNG で保存',
-    sub: 'フルカラー・背景透過の高画質',
-    about: 'APNG で保存します。背景が透明で、色と影がそのまま残ります。書き出し中は Esc かもう一度クリックで中止できます。Discord・Slack では動かないので、SNS には GIF を。',
+    sub: 'フルカラーの高画質',
+    about: 'APNG で保存します。色と影がそのまま残り、背景を「透明」にすると背景が透けます。書き出し中は Esc かもう一度クリックで中止できます。Discord・Slack では動かないので、SNS には GIF を。',
     size: '約{n}',
     meta: '{s} 秒ループ',
     working: '書き出し中…',
@@ -24,8 +24,8 @@ const TEXT = {
   },
   en: {
     title: 'Save APNG',
-    sub: 'Full color, transparent background',
-    about: 'Saves an APNG: transparent background, every color and the soft shadow kept. While it saves, press Esc or click again to stop. Discord and Slack won’t play it, so share a GIF there.',
+    sub: 'Full color, high quality',
+    about: 'Saves an APNG: every color and the soft shadow kept, and a transparent background with the Clear backdrop. While it saves, press Esc or click again to stop. Discord and Slack won’t play it, so share a GIF there.',
     size: '~{n}',
     meta: '{s} s loop',
     working: 'Saving…',
