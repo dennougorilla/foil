@@ -56,6 +56,8 @@ export interface ApngUiOptions {
   loading: () => boolean;
   lang: () => Lang;
   input: () => ExportInput;
+  /** Waits until the card's face is painted as it is now, before the file is made. */
+  prepare: () => Promise<unknown>;
   /** The file the current card would make (apngPlan), for the idle label. */
   plan: () => ApngPlan;
   toast: (msg: string, error?: boolean) => void;
@@ -66,7 +68,7 @@ export interface ApngUiOptions {
   sfx: { coin(): void; error(): void; tick(): void };
 }
 
-export function mountApngExport({ btn, active, loading, lang, input, plan: planNow, toast, onSaved, busy, sfx }: ApngUiOptions) {
+export function mountApngExport({ btn, active, loading, lang, input, prepare, plan: planNow, toast, onSaved, busy, sfx }: ApngUiOptions) {
   const [label, meta] = btn.querySelectorAll<HTMLElement>('.btn-text, .save-meta');
   const [b, small] = [label.querySelector('b')!, label.querySelector('small')!];
   const [mb, msmall] = [meta.querySelector('b')!, meta.querySelector('small')!];
@@ -117,7 +119,7 @@ export function mountApngExport({ btn, active, loading, lang, input, plan: planN
     };
     let stopped = false;
     try {
-      const { exportApng } = await import('./apngExport');
+      const [{ exportApng }] = await Promise.all([import('./apngExport'), prepare()]);
       const { file, bytes } = await exportApng(input(), progress, ctl.signal);
       sfx.coin();
       toast(fill(t.saved, { file, size: formatBytes(bytes) }) + t.note);

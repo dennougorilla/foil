@@ -48,6 +48,9 @@ const legacyDrawn = (() => {
   }
 })();
 const store = createStore();
+// Fine-tune left open last visit opens again once its tabs are here (see openAdjust), never empty.
+const reopenAdjust = store.get().adjustOpen;
+if (reopenAdjust) store.set({ adjustOpen: false });
 releaseSealedEdition(store);
 /** The hand: seven cards, in their order. */
 const hand = () => store.get().hand;
@@ -56,6 +59,8 @@ const dict = loadDict(store.get().lang);
 // ---------- Stage ----------
 
 // The stage comes first: its shaders compile in the background while the rest of the page is built.
+// Its hand and card answer only once the page is (`booted`, at the end of this module).
+let booted = false;
 let stage: Stage;
 try {
   stage = new Stage({
@@ -66,15 +71,16 @@ try {
     cardSlot: $<HTMLButtonElement>('cardSlot'),
     hand: $('hand'),
     info: $('info'),
-    onSelect: (id) => selectEdition(id),
-    onHover: (id) => renderCaption(id),
+    onSelect: (id) => booted && selectEdition(id),
+    onHover: (id) => booted && renderCaption(id),
     onFlick: (dir) => {
+      if (!booted) return;
       store.set({ flicked: true });
       stepEdition(dir);
     },
     // Tapping words on the card opens their own print.
     onTapCard: (uv, x, y) => {
-      const field = fieldAt(uv);
+      const field = booted && fieldAt(uv);
       if (field) void usePrint().then((p) => p.open(field, { x, y }), () => toast(t.loadFailed, true));
     },
     handIds: hand,
@@ -1346,15 +1352,26 @@ async function busy(label: string, job: (progress: (p: number) => void) => Promi
 let exporter: Promise<typeof import('./exporter')> | null = null;
 /** The exporters' code, fetched ahead (idle, or pointing at Save or Share) so a press does not wait for it. */
 function useExporter() {
-  exporter ??= import('./exporter');
-  exporter.catch(() => (exporter = null));
+  if (!exporter) {
+    exporter = import('./exporter');
+    exporter.catch(() => (exporter = null));
+    // APNG's encoder comes along, for a first APNG save that does not wait either.
+    void import('./anim/apngExport').catch(() => {});
+  }
   return exporter;
 }
 for (const b of [saveBtn, $('shareBtn'), $('formatSeg')]) for (const ev of ['pointerenter', 'focusin']) b.addEventListener(ev, () => void useExporter().catch(() => {}), { once: true });
 
+/** The face painted for the card as it is now (a trading card's painter may still be on its way). */
+async function faceReady() {
+  if (canPaint(faceSpec(currentImage()))) return;
+  await loadTcgFace();
+  redrawFace();
+}
+
 /** The card as a file, its progress shown on the Save button under `label`; a GIF to share is smaller. */
 async function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
-  const { exportGif, exportPng } = await useExporter();
+  const [{ exportGif, exportPng }] = await Promise.all([useExporter(), faceReady()]);
   if (format === 'png') return exportPng(exportInput());
   const small = saveBtn.querySelector('.btn-text small')!;
   return exportGif(
@@ -1585,7 +1602,7 @@ keepBtn.addEventListener('click', () => {
   if (isKept()) return void withBinder((b) => b.open());
   if (keepBtn.hasAttribute('aria-busy')) return;
   keepBtn.setAttribute('aria-busy', 'true');
-  void withBinder((b) => b.keep()).finally(() => keepBtn.removeAttribute('aria-busy'));
+  void withBinder((b) => faceReady().then(() => b.keep())).finally(() => keepBtn.removeAttribute('aria-busy'));
 });
 
 /** Puts a card from the binder on the stage: its picture and every setting of the card. */
@@ -1640,6 +1657,7 @@ const apngExport = mountApngExport({
   loading: () => store.get().loading,
   lang: () => store.get().lang,
   input: exportInput,
+  prepare: faceReady,
   plan: () => {
     const s = store.get();
     return apngPlan(s.tune, face.height / face.width, userAnim && s.sample < 0 ? userAnim.duration : undefined, s.exportMotion);
@@ -2035,8 +2053,7 @@ mountLetteringJump({
   open: () => void openAdjust('text').then((a) => a.callLettering(), () => {}),
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
-// Left open last visit: Fine-tune's tabs are fetched at once.
-if (store.get().adjustOpen) void useAdjust().catch(() => {});
+if (reopenAdjust) void openAdjust().catch(() => {});
 if (store.get().arrange === 'free') useArrange();
 applyText();
 applyShape();
@@ -2125,3 +2142,6 @@ addEventListener('load', () => {
   });
 });
 
+
+// The page is built: the stage's hand and card answer from now on.
+booted = true;

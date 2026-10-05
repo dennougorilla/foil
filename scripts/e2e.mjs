@@ -96,11 +96,13 @@ await step('the binder loads nothing before it is used, and Share shows only whe
 
 await step('fine-tune opens with four tabs and is remembered', async () => {
   await page.click('#adjustToggle');
+  // Fine-tune opens once its tabs' code is here (fetched ahead, but maybe not yet).
+  await page.waitForSelector('#panelTabs', { state: 'visible', timeout: 5000 }).catch(() => {});
   expect((await page.locator('#panelTabs [role=tab]').count()) === 4, 'expected four tabs');
   expect(await page.isVisible('#pane-card'), 'Card tab is not open first');
   expect((await state()).adjustOpen === true, 'open state not saved');
   await page.reload();
-  await page.waitForTimeout(1500);
+  await page.waitForSelector('#panelTabs', { state: 'visible', timeout: 5000 }).catch(() => {});
   expect(await page.isVisible('#panelTabs'), 'open state not restored');
   await page.click('#adjustToggle');
   expect(!(await page.isVisible('#panelTabs')), 'fine-tune did not close');

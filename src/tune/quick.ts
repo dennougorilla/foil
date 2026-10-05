@@ -24,7 +24,24 @@ export function mountQuickMotion(store: Store, host: HTMLElement): void {
     return loading;
   };
   for (const ev of ['pointerenter', 'focus']) btn.addEventListener(ev, () => void useTray().catch(() => {}));
-  btn.addEventListener('click', () => void useTray().then((t) => t.open(t.hidden), () => {}));
+  // A press while the tray's code is on its way opens it on arrival, unless a press elsewhere or
+  // focus leaving the button has called it off meanwhile.
+  let wanted = false;
+  btn.addEventListener('click', () => {
+    if (tray) return tray.open(tray.hidden);
+    wanted = true;
+    void useTray().then(
+      (t) => {
+        if (wanted) t.open(true);
+        wanted = false;
+      },
+      () => (wanted = false),
+    );
+  });
+  btn.addEventListener('blur', () => (wanted = false));
+  document.addEventListener('pointerdown', (e) => {
+    if (!root.contains(e.target as Node)) wanted = false;
+  });
 
   const render = () => {
     const t = dict();
