@@ -731,15 +731,20 @@ export class Stage {
 
     // The backdrop moves on the motion's clock, at the same place of the loop as a file (docs/backdrops.md).
     const phase = backdropPhase(tune, motion.idleTime, !!ed.torch);
-    this.bg.draw({
-      time: swirlTime(phase),
-      phase,
-      colors: this.palette,
-      pointer: this.bgPointer,
-      focus: this.focus,
-      card: r ? r.h / innerHeight : undefined,
-      color: hexToRgb(state.backdropColor),
-    }, q, innerWidth, innerHeight);
+    this.bg.draw(
+      {
+        time: swirlTime(phase),
+        phase,
+        colors: this.palette,
+        pointer: this.bgPointer,
+        focus: this.focus,
+        card: r ? r.h / innerHeight : undefined,
+        color: hexToRgb(state.backdropColor),
+      },
+      q,
+      innerWidth,
+      innerHeight,
+    );
 
     this.stepParticles(dt);
     this.cards.drawParticles(this.particles);

@@ -1,7 +1,8 @@
-// Metal pack: Platinum, Gold, Relief and Cosmo Holo (the showpiece). See docs/packs.md.
+// Metal pack: Platinum, Gold, Relief, Chameleon and Cosmo Holo (the showpiece). See docs/packs.md.
 import { RELIEF_GLSL, ReliefGL } from '../../relief';
 import { PLATINUM_GLSL } from '../platinum';
 import { COSMOHOLO_GLSL } from '../cosmoholo';
+import { CHAMELEON_GLSL } from '../chameleon';
 import type { FinishModule } from './types';
 
 /** Relief's shader index (see src/editions.ts). */
@@ -25,12 +26,14 @@ vec3 gold(vec3 c, vec2 uv, vec2 t, float L) {
 ${RELIEF_GLSL}
 ${PLATINUM_GLSL}
 ${COSMOHOLO_GLSL}
+${CHAMELEON_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 5) col = gold(c, uv, uTilt, L);
   else if (e == 15) col = relief(c, uv, uTilt, L, lod, m);
   else if (e == 24) col = platinum(c, uv, uTilt, L, m.r);
   else if (e == 18) col = cosmoholo(c, uv, uTilt, L);
+  else if (e == 90) col = chameleon(c, uv, uTilt, L, m.r);
 `,
   layers: (gl, live) => {
     const relief = new ReliefGL(gl, live);

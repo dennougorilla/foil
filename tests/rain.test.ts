@@ -14,14 +14,14 @@ const run = (f: HeatField, seconds: number) => {
   for (let i = 0; i < seconds * 60; i++) f.step(1 / 60);
 };
 
-test('Rainy Window is a touch finish of the Lab pack on shader 94', () => {
+test('Rainy Window is a touch finish of the Nature pack on shader 94', () => {
   const rain = EDITIONS.find((e) => e.id === 'rain');
   assert.ok(rain);
   assert.equal(rain.shader, 94);
   assert.equal(RAIN_SHADER, 94);
   assert.equal(rain.touch, 'rain');
   assert.ok(!OPEN_EDITIONS.includes('rain'));
-  assert.equal(packOf('rain')?.id, 'lab');
+  assert.equal(packOf('rain')?.id, 'nature');
   assert.ok(!layerable('rain'), 'a touch finish needs the card to itself');
 });
 
@@ -72,6 +72,6 @@ test('the unseen finger wipes once per loop and the fog is back when the loop cl
 test("the shader's uniforms carry its own prefix", () => {
   const uniforms = [...RAIN_GLSL.matchAll(/uniform\s+\w+\s+(\w+)/g)].map((m) => m[1]);
   for (const u of uniforms) assert.match(u, /^uRn[A-Z]/);
-  const nature = readFileSync(join(import.meta.dirname, '..', 'src', 'gl', 'finishes', 'lab.ts'), 'utf8');
+  const nature = readFileSync(join(import.meta.dirname, '..', 'src', 'gl', 'finishes', 'nature.ts'), 'utf8');
   assert.match(nature, /e == 94\) col = rain\(/);
 });

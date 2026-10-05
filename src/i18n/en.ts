@@ -118,7 +118,7 @@ const en: Dict = {
     stars: 'Stars',
     confetti: 'Confetti',
     plain: 'Plain',
-    clear: 'Clear',
+    clear: 'Transparent',
   },
   backdropHelp: {
     swirl: 'Poster-paint swirl in the finish’s colors',

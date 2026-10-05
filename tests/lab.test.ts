@@ -1,4 +1,4 @@
-// Run with `npm test`. The provisional Lab pack (review-v015): the nine finishes added after v0.14 in one
+// Run with `npm test`. The provisional Lab pack (review-v015): the finishes not yet released in one
 // program, so their shader numbers, uniforms and texture units must not collide with anything else.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

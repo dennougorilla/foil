@@ -7,13 +7,15 @@ import { CHAMELEON_GLSL } from '../src/gl/chameleon.ts';
 import { EDITIONS, layerable } from '../src/editions.ts';
 import { OPEN_EDITIONS, packOf } from '../src/packs.ts';
 
-test('Chameleon is a Lab pack finish on shader 90 (provisional)', () => {
+test('Chameleon is a Metal finish on shader 90, the card before the showpiece', () => {
   const ed = EDITIONS.find((e) => e.id === 'chameleon');
   assert.ok(ed, 'no Chameleon edition');
   assert.equal(ed.shader, 90);
   assert.equal(EDITIONS.filter((e) => e.shader === 90).length, 1);
   assert.ok(!OPEN_EDITIONS.includes('chameleon'));
-  assert.equal(packOf('chameleon')?.id, 'lab');
+  const metal = packOf('chameleon');
+  assert.equal(metal?.id, 'metal');
+  assert.equal(metal.finishes.at(-2), 'chameleon');
 });
 
 test('its smooth paint is dithered in a GIF, and it can be layer 2', () => {
@@ -39,8 +41,8 @@ test('any uniform of its own carries its prefix, and no other shader declares it
   for (const u of own) assert.ok(!others.includes(u), `${u} is declared elsewhere too`);
 });
 
-test('the Lab pack draws it', () => {
-  const metal = readFileSync(join(SRC, 'gl', 'finishes', 'lab.ts'), 'utf8');
+test('the Metal pack draws it', () => {
+  const metal = readFileSync(join(SRC, 'gl', 'finishes', 'metal.ts'), 'utf8');
   assert.match(metal, /CHAMELEON_GLSL/);
   assert.match(metal, /e == 90\) col = chameleon\(/);
 });

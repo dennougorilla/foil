@@ -63,15 +63,15 @@ pack, three celebrations.
 
 | Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish | Wrapper art |
 |---|---|---|---|---|
-| `metal` Metal | 金属 | Platinum → Gold → Relief → **Cosmo Holo** | Gold | a gold coin on a platinum ingot |
+| `metal` Metal | 金属 | Platinum → Gold → Relief → Chameleon → **Cosmo Holo** | Gold | a gold coin on a platinum ingot |
 | `jewel` Jewel | 宝飾 | Crystal → Opal → Raden → **Kintsugi** | Opal | a brilliant-cut gem, a pearl, a seam of gold, on lacquer red |
 | `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic | a star and a planet |
-| `nature` Nature | 自然 | Sakura → Frost → Stardust → **Magma** | Sakura | a blossom branch |
+| `nature` Nature | 自然 | Sakura → Frost → Stardust → Rainy Window → Marble → **Magma** | Sakura | a blossom branch |
 | `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone | a palette and brush |
 | `supporter` Supporter (celebrations) | サポーター限定 | Confetti → Snow Globe → **Fireworks** | Prism (rainbow shards on a silver-white body) | a crowned heart among fireworks |
-| `lab` Lab (provisional) | ラボ (試作) | Chameleon → Neon → Rainy Window → Liquid Metal → Marble → Mirror Ball → **Engraving** | Holographic | a star (Light's art in teal) |
+| `lab` Lab (provisional) | ラボ (試作) | Neon → Liquid Metal → Mirror Ball → **Engraving** | Holographic | a star (Light's art in teal) |
 
-The Lab pack is provisional (review-v015): it gathers the seven finishes made after v0.14 that are still in the running (Plasma and Kaleidoscope were dropped) so they can be tried together, seven to a haul. Each one moves to its theme pack once the owner has seen them, and the pack goes.
+The Lab pack is provisional (review-v015): it gathers the four finishes made after v0.14 that are still in the running and not yet released (Plasma and Kaleidoscope were dropped; Chameleon, Rainy Window and Marble went to Metal and Nature in v0.15.0) so they can be tried together. Each one moves to its theme pack once the owner has seen them, and the pack goes.
 
 Why each finish is where it is (reorganized after v0.13.1, when the owner asked for the Supporter
 pack to be the celebrations and the rest to be tidied):
@@ -80,6 +80,7 @@ pack to be the celebrations and the rest to be tidied):
 |---|---|---|
 | Platinum, Gold | Metal | Metals themselves. |
 | Relief | Metal | The picture struck into a metal medal. |
+| Chameleon | Metal | Color-shift car paint: a coat over metal, the card before the showpiece (added in v0.15). |
 | Cosmo Holo | Metal (showpiece) | A printed metal foil, and the most striking of the four at first sight (Relief is subtle until tilted). |
 | Crystal | Jewel | A cut stone: it was Metal's showpiece while Metal was "Metal & Gem"; gems now have their own pack. |
 | Opal | Jewel | A precious stone. |
@@ -87,6 +88,8 @@ pack to be the celebrations and the rest to be tidied):
 | Kintsugi | Jewel (showpiece) | Gold-mended lacquer, one of a kind: the rarest-looking of the four, the old Supporter showpiece. |
 | Galaxy, Aurora, Glow, Blacklight, Shallows | Light | Each is about a source of light (the night sky, a curtain of light, glow ink, a UV lamp, light under water). Unchanged. |
 | Sakura, Frost, Stardust, Magma | Nature | Seasons, weather, sky and earth. Snow Globe left for the celebrations. |
+| Rainy Window | Nature | Rain running down a fogged pane: weather, before the showpiece (added in v0.15). |
+| Marble | Nature | Ink floating on water (suminagashi): the element water, the card before the showpiece (added in v0.15). |
 | Halftone, Warmth, Stained Glass, the two lenticulars, Shadowbox | Studio | Crafts of the print shop. Unchanged. |
 | Confetti, Snow Globe, Fireworks | Supporter | Celebrations, for birthday and greeting cards: confetti thrown, a globe shaken, fireworks to finish (the showpiece, the biggest show). |
 

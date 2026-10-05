@@ -19,7 +19,7 @@ frame's size and scaled up pixelated, like the swirl, so it belongs to the same 
 | Stars | 星空 | A night sky with a faint band of the Milky Way, pixel stars twinkling | Twinkles; one shooting star |
 | Confetti | 紙吹雪 | Confetti in party colors falling and fluttering on a dark wall | Falls one frame's height |
 | Plain | 無地 | One flat color, picked with the color picker | Still |
-| Clear | 透明 | No backdrop in a file: GIF and APNG are transparent (the stage shows a dark checkerboard) | Still |
+| Transparent | 透過 | No backdrop in a file: GIF and APNG are transparent (the stage shows a dark checkerboard) | Still |
 
 Considered and left out: a neon night (its saturated tubes fight the finishes' own colors for the eye),
 a synthwave grid (reads as a template).
@@ -37,7 +37,7 @@ a synthwave grid (reads as a template).
 - **The light motions' dim room** darkens every backdrop alike (`.room` on the stage, the same shade in
   a file), and the pointer's small parallax on the stage is a hand, like tilting the card: a file has
   none.
-- **Clear** follows the transparency the files already had: a GIF keeps one fully clear color, so it
+- **Transparent** follows the transparency the files already had: a GIF keeps one fully clear color, so it
   drops the shadow and its edge pixels keep the card's border color or blend into the matte you pick
   (GIF and APNG options); an APNG keeps the soft shadow and every color. The PNG is always the card
   alone on a clear background, whatever the backdrop.

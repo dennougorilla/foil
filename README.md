@@ -12,7 +12,7 @@ English · [日本語](README.ja.md)
 
 - **Any picture.** Open a file, drop it or paste it. Animated GIF, APNG and WebP keep moving on the card.
 - **Pixel art.** Draw the whole card as chunky pixel art with few colors and a dark outline, from three presets or your own coarseness, colors, outline and dither. The finish's light steps on the same pixels, and files are saved the same way.
-- **40 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, jewel, light, nature, studio and celebration finishes, and seven new ones in a provisional Lab pack. Each one reacts to tilt and light.
+- **40 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, jewel, light, nature, studio and celebration finishes, and four new ones in a provisional Lab pack. Each one reacts to tilt and light.
 - **Packs.** Seven finishes come in the starting hand; the rest come in theme packs you tear open once, or all at once with Open all in the pack shop. Each pack holds its whole theme, with no random draws.
 - **Hand and deck.** Pick finishes from a fanned hand of up to seven live previews; the others wait in the deck, which you edit like a card game's deck screen.
 - **Card shapes.** Trading card, wide, square, postcard (upright or on its side), business card, or the picture's own proportions. Frames include Gold rim and Ribbon for celebration cards.
@@ -33,15 +33,15 @@ Every detail, finish by finish: [`docs/features.md`](docs/features.md).
 | Where | Finishes |
 | --- | --- |
 | Starting hand | Base, Foil, Holographic, Polychrome, Negative, Prism, Glitch |
-| Metal pack | Platinum, Gold, Relief, Cosmo Holo |
+| Metal pack | Platinum, Gold, Relief, Chameleon, Cosmo Holo |
 | Jewel pack | Crystal, Opal, Raden, Kintsugi |
 | Light pack | Galaxy, Aurora, Glow, Blacklight, Shallows |
-| Nature pack | Sakura, Frost, Stardust, Magma |
+| Nature pack | Sakura, Frost, Stardust, Rainy Window, Marble, Magma |
 | Studio pack | Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox |
 | Supporter pack | Confetti, Snow Globe, Fireworks |
-| Lab pack (provisional) | Chameleon, Neon, Rainy Window, Liquid Metal, Marble, Mirror Ball, Engraving |
+| Lab pack (provisional) | Neon, Liquid Metal, Mirror Ball, Engraving |
 
-40 finishes in all. The Lab pack is provisional: it gathers the seven newest finishes until each one gets its place. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
+40 finishes in all. The Lab pack is provisional: it gathers the four newest finishes until each one gets its place. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
 
 ## Privacy
 

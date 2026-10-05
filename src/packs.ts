@@ -26,7 +26,7 @@ export interface Pack {
 export const PACKS: readonly Pack[] = [
   {
     id: 'metal',
-    finishes: ['platinum', 'gold', 'relief', 'cosmoholo'],
+    finishes: ['platinum', 'gold', 'relief', 'chameleon', 'cosmoholo'],
     wrap: 'gold',
     colors: ['#1f1209', '#a86a22', '#f2c14e'],
     load: () => import('./gl/finishes/metal'),
@@ -47,7 +47,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'nature',
-    finishes: ['sakura', 'frost', 'stardust', 'magma'],
+    finishes: ['sakura', 'frost', 'stardust', 'rain', 'marble', 'magma'],
     wrap: 'sakura',
     colors: ['#0f1a14', '#3f8a5c', '#ffa8c8'],
     load: () => import('./gl/finishes/nature'),
@@ -68,9 +68,9 @@ export const PACKS: readonly Pack[] = [
     load: () => import('./gl/finishes/supporter'),
   },
   {
-    // Provisional, for review: the finishes added after v0.14, until the owner places each one.
+    // Provisional, for review: the finishes not yet released (after v0.15), until the owner places each one.
     id: 'lab',
-    finishes: ['chameleon', 'neon', 'rain', 'liquidmetal', 'marble', 'mirrorball', 'engraving'],
+    finishes: ['neon', 'liquidmetal', 'mirrorball', 'engraving'],
     wrap: 'holo',
     colors: ['#0c1418', '#2f8a8a', '#c8f4e8'],
     load: () => import('./gl/finishes/lab'),

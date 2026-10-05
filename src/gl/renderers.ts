@@ -57,6 +57,8 @@ export class BackgroundRenderer {
   private shown: PendingProgram;
   private wanted: PendingProgram;
   private programs = new Map<string, PendingProgram>();
+  /** A number for each program, so a still backdrop knows when another one has come in. */
+  private ids = new Map<PendingProgram, number>();
   private vao: WebGLVertexArrayObject;
   /** On the page, a backdrop compiles in the background and shows from the first frame it is ready; an export waits for it. */
   private live: boolean;
@@ -76,7 +78,10 @@ export class BackgroundRenderer {
 
   private program(fs: string): PendingProgram {
     let p = this.programs.get(fs);
-    if (!p) this.programs.set(fs, (p = startProgram(this.gl, QUAD_VS, fs, 'aPos')));
+    if (!p) {
+      this.programs.set(fs, (p = startProgram(this.gl, QUAD_VS, fs, 'aPos')));
+      this.ids.set(p, this.ids.size);
+    }
     return p;
   }
 
@@ -92,16 +97,14 @@ export class BackgroundRenderer {
     }
   }
 
-  /** What a still backdrop was last drawn with (size, colors, place), and the moment it holds. */
+  /** What a still backdrop was last drawn with (backdrop, size, colors, place), and the moment it holds. */
   private stillKey = '';
-  /** The program the still backdrop was last drawn with. */
-  private drawn: PendingProgram | null = null;
-  private held: { time: number; phase?: number; pointer: [number, number] } | null = null;
+  private held: { time: number; phase: number; pointer: [number, number] } | null = null;
 
   /**
    * Sizes and draws the backdrop for a window of w × h css px at a drawing level (src/quality.ts).
-   * At a still level it holds its moment and is drawn again only when its size, colors or place
-   * change, so any backdrop drawn here is light on a slow device without a light version of its own.
+   * At a still level it holds its moment and is drawn again only when its backdrop, size, colors or
+   * place change, so any backdrop drawn here is light on a slow device without a light version of its own.
    */
   draw(f: BackgroundFrame, q: QualityLevel, w: number, h: number): void {
     this.resize(Math.ceil(w / q.bg), Math.ceil(h / q.bg));
@@ -111,18 +114,22 @@ export class BackgroundRenderer {
       this.render(f);
       return;
     }
-    this.held ??= { time: f.time, phase: f.phase, pointer: f.pointer };
+    this.held ??= { time: f.time, phase: f.phase ?? 0, pointer: f.pointer };
+    this.pick();
     // Settled to a 256th of a color step and a pixel of place is settled.
     const focus = f.focus ?? [0.5, 0.5];
-    const key = [this.canvas.width, this.canvas.height, ...[...f.colors.flat(), ...(f.color ?? [])].map((c) => Math.round(c * 256)), Math.round(focus[0] * this.canvas.width), Math.round(focus[1] * this.canvas.height), Math.round((f.card ?? 0.6) * 256)].join();
-    // A newly picked backdrop that has compiled is drawn once too.
+    const key = [this.ids.get(this.shown), this.canvas.width, this.canvas.height, ...f.colors.flat().map((c) => Math.round(c * 256)), ...(f.color ?? []).map((c) => Math.round(c * 256)), Math.round(focus[0] * this.canvas.width), Math.round(focus[1] * this.canvas.height), Math.round((f.card ?? 0.6) * this.canvas.height)].join();
+    if (key !== this.stillKey && this.render({ ...f, ...this.held })) this.stillKey = key;
+  }
+
+  /** Shows the backdrop asked for last once it is ready (an export takes it at once and waits). */
+  private pick(): void {
     if (!this.live || this.wanted.done()) this.shown = this.wanted;
-    if ((key !== this.stillKey || this.shown !== this.drawn) && this.render({ ...f, ...this.held })) this.stillKey = key;
   }
 
   /** Draws one frame; false while the program is still compiling (on the page). */
   render(f: BackgroundFrame): boolean {
-    if (!this.live || this.wanted.done()) this.shown = this.wanted;
+    this.pick();
     if (this.live && !this.shown.done()) return false;
     const { gl } = this;
     const p = this.shown.get();
@@ -141,7 +148,6 @@ export class BackgroundRenderer {
     gl.uniform2f(p.u.uFocus, focus[0], focus[1]);
     gl.uniform1f(p.u.uCard, f.card ?? 0.6);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-    this.drawn = this.shown;
     return true;
   }
 }

@@ -128,7 +128,7 @@ const ja = {
     stars: '星空',
     confetti: '紙吹雪',
     plain: '無地',
-    clear: '透明',
+    clear: '透過',
   } satisfies Record<BackdropId, string>,
   backdropHelp: {
     swirl: '加工の色で描いた、うずまく絵の具',
