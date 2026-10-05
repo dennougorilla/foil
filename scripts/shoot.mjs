@@ -29,7 +29,7 @@ const shots = [
 // The seven starters, then every pack in its reveal order.
 const editions = [
   ...['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
-  ...['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
+  ...['relief', 'gold', 'platinum', 'cosmoholo', 'engraving', 'crystal'],
   ...['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
   ...['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
   ...['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],

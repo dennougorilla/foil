@@ -1023,7 +1023,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   await page.mouse.up();
   await phase('deck');
   expect((await packsSaved()).opened.includes('metal'), 'the tear did not mark the pack opened');
-  for (const name of ['Relief', 'Gold', 'Platinum', 'Cosmo Holo']) {
+  for (const name of ['Relief', 'Gold', 'Platinum', 'Cosmo Holo', 'Engraving']) {
     await page.waitForFunction((n) => document.querySelector('.pk-label b')?.textContent === n, name, { timeout: 10000 });
     await page.keyboard.press('ArrowRight');
   }
@@ -1045,7 +1045,7 @@ await step('open a pack: trace the top, swipe through, the showpiece last, then 
   }
   await page.keyboard.press('ArrowRight');
   await phase('haul');
-  expect((await page.locator('.pk-name').count()) === 5, 'the haul does not show all five');
+  expect((await page.locator('.pk-name').count()) === 6, 'the haul does not show all six');
   await page.click('.pk-try');
   await overlayGone();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('foil:v1')).edition === 'crystal', null, { timeout: 10000 });

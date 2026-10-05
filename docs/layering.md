@@ -14,7 +14,7 @@ ways to do it and records the one FOIL uses. The product summary is in `README.m
 - The **Finish area** (`src/range.ts`, `src/gl/range.ts`) already says, per pixel, how much of the
   finish lands there: a region (all, art, frame, name, none) from the face mask, a brightness band,
   invert, and a brush that paints in or out. Outside it the card shows the plain picture.
-- Some finishes cover the frame in full (Gold, Halftone, Platinum, Stained Glass, Blacklight,
+- Some finishes cover the frame in full (Gold, Halftone, Platinum, Engraving, Stained Glass, Blacklight,
   Confetti, Fireworks, Negative), two stay in the art window (Crystal, Cosmo Holo), the rest soften
   a little on the frame.
 - Some finishes need the card to themselves: Warmth and Glow are driven by touch, Blacklight by a
