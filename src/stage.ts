@@ -10,7 +10,7 @@ import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
 import { cardLayers } from './layers';
 import './stage-phone.css';
-import { TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
+import { plasmaFinger, TORCH_DRIFT, TORCH_IDLE, torchAt } from './gl/torch';
 import { cardK, contain, shapeById, type ShapeId } from './card/shape';
 import { dotGrid } from './dot/model';
 
@@ -122,6 +122,8 @@ export class Stage {
   private lamp: [number, number] = torchAt(0);
   private lampHeld = 0;
   private lampPower = TORCH_IDLE;
+  /** Where Plasma's lightning reaches on the main card (card uv), and how firmly the pointer holds it there. */
+  private plasma: [number, number, number] = [0.5, 0.5, 0];
   /** A Light motion's dim room over the backdrop (as a file darkens its swirl). */
   private room: HTMLElement;
   private roomShown = 0;
@@ -689,6 +691,7 @@ export class Stage {
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
           lamp: this.lampPower,
+          aim: ed.torch === 'plasma' && lamp ? this.aimPlasma(lamp, pointed, dt) : undefined,
         },
         motion.fx,
       );
@@ -736,6 +739,19 @@ export class Stage {
     if (!at && this.lampHeld < 1e-3) this.lampHeld = 0;
     const h = this.lampHeld;
     return [drift[0] + (this.lamp[0] - drift[0]) * h, drift[1] + (this.lamp[1] - drift[1]) * h];
+  }
+
+  /**
+   * Plasma's lightning: its tip trails the lamp a little, so it visibly chases the pointer, and it
+   * gathers there while the pointer is on the card, letting go more slowly.
+   */
+  private aimPlasma(lamp: [number, number], held: boolean, dt: number): [number, number, number] {
+    const p = this.plasma;
+    const k = 1 - Math.exp(-dt * 9);
+    p[0] += (lamp[0] - p[0]) * k;
+    p[1] += (lamp[1] - p[1]) * k;
+    p[2] += ((held ? 1 : 0) - p[2]) * (1 - Math.exp(-dt * (held ? 7 : 2.5)));
+    return p;
   }
 
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */
@@ -847,8 +863,9 @@ export class Stage {
           intensity: state.intensity,
           pixel: dotGrid(state.dot),
           tilt: [card.tiltY.x / 0.35 + Math.sin(t * 0.5) * 0.5 * idle, card.tiltX.x / 0.3 + Math.cos(t * 0.4) * 0.5 * idle],
-          // Blacklight's preview drifts its lamp round by itself.
+          // Blacklight's preview drifts its lamp round by itself; Plasma's is touched as in a file.
           light: e.torch ? torchAt(motion.fx / TORCH_DRIFT + i * 0.1) : [0.5, 0.35],
+          aim: e.torch === 'plasma' ? plasmaFinger(motion.fx / TORCH_DRIFT + i * 0.1) : undefined,
           alpha: 1 - clamp(card.deal.x, 0, 1) * 0.6,
           flash: 0,
           shadow: [4 + card.lift.x * 0.12, 6 + card.lift.x * 0.25],

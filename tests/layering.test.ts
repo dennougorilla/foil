@@ -9,7 +9,7 @@ const choices = (o: Owned, main: Parameters<typeof layerChoices>[1]) => layerCho
 
 test('a finish that needs the card to itself is never layer 2', () => {
   const solo = EDITIONS.filter((e) => !layerable(e.id)).map((e) => e.id);
-  assert.deepEqual(solo.sort(), ['base', 'blacklight', 'glow', 'lenticular3d', 'lenticularflip', 'rain', 'shadowbox', 'snowglobe', 'warmth']);
+  assert.deepEqual(solo.sort(), ['base', 'blacklight', 'glow', 'lenticular3d', 'lenticularflip', 'plasma', 'rain', 'shadowbox', 'snowglobe', 'warmth']);
 });
 
 test('layer 2 offers the owned finishes, in hand-then-pack order, without the card’s own', () => {
