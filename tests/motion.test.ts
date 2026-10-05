@@ -15,6 +15,7 @@ import {
   loopCycle,
   loopView,
   MOTION_GROUPS,
+  MOTION_ORDER,
   OWN_LIGHT,
   PERIOD,
   sanitizeTune,
@@ -64,6 +65,10 @@ test('one list: twenty motions in four groups, plus None; Sway is the default', 
     ],
   );
   assert.deepEqual(IDLE_MODES, ['none', ...MOTION_GROUPS.flatMap((g) => g.motions)]);
+  // Tiles (and arrow keys) go group by group, None closing the first row.
+  assert.deepEqual(MOTION_ORDER, ['sway', 'float', 'pendulum', 'breathe', 'none', ...MOTION_GROUPS.slice(1).flatMap((g) => g.motions)]);
+  // The whole Light group brings its own light.
+  assert.deepEqual([...OWN_LIGHT], ['sweep', 'beam', 'spotlight', 'flare']);
   assert.equal(new Set(IDLE_MODES).size, 21);
   assert.equal(TUNE_DEFAULTS.idle, 'sway');
   for (const m of IDLE_MODES) assert.equal(sanitizeTune({ idle: m }).idle, m);
@@ -93,6 +98,7 @@ test('each motion has its own loop, and every one divides the six-second cycle',
   assert.equal(loopCycle(t('pulse'), true), 6);
   // except where the motion brings its own light.
   assert.equal(loopCycle(t('beam', 'orbit')), 3);
+  assert.equal(loopCycle(t('sweep', 'orbit')), 3);
   assert.equal(loopCycle(t('none')), 6);
 });
 

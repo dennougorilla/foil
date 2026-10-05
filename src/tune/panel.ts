@@ -8,12 +8,12 @@ import { sfx } from '../audio';
 import {
   changedKeys,
   exportLoop,
-  IDLE_MODES,
   isDefault,
   LIGHT_MODES,
   lightCss,
   METALS,
   MOTION_GROUPS,
+  MOTION_ORDER,
   OWN_LIGHT,
   RANGES,
   TUNE_DEFAULTS,
@@ -333,7 +333,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
     group.className = 'seg tune-seg';
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', `tuneLabel-${k}`);
-    const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? IDLE_MODES : METALS;
+    const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? MOTION_ORDER : METALS;
     // The motions show in their four groups (as in the tray above the deck), None closing the first.
     const motions = k === 'idle' ? motionRows(group) : null;
     if (!motions) group.style.gridTemplateColumns = `repeat(${options.length}, 1fr)`;

@@ -243,6 +243,8 @@ export const MOTION_GROUPS: { id: MotionGroup; motions: IdleMode[] }[] = [
   { id: 'show', motions: ['reveal', 'push', 'pulse', 'glint', 'turn', 'bounce'] },
 ];
 export const IDLE_MODES: IdleMode[] = ['none', ...MOTION_GROUPS.flatMap((g) => g.motions)];
+/** The order the tiles show in (and arrow keys walk): the groups in turn, None closing the first row. */
+export const MOTION_ORDER: IdleMode[] = MOTION_GROUPS.flatMap((g, i) => (i ? g.motions : [...g.motions, 'none']));
 
 /** Idle seconds of one loop of each motion: the length of its GIF at speed 1. */
 export const PERIOD: Record<IdleMode, number> = {
@@ -270,7 +272,7 @@ export const PERIOD: Record<IdleMode, number> = {
 };
 
 /** The Light motions bring their own light, whatever the light setting. */
-export const OWN_LIGHT: ReadonlySet<IdleMode> = new Set<IdleMode>(['beam', 'spotlight', 'flare']);
+export const OWN_LIGHT: ReadonlySet<IdleMode> = new Set<IdleMode>(MOTION_GROUPS.find((g) => g.id === 'light')!.motions);
 /** Motions that turn the card round; pointed at, it comes round to its face and waits. */
 const TURNING: ReadonlySet<IdleMode> = new Set<IdleMode>(['spin', 'turn', 'reveal']);
 

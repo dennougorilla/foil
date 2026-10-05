@@ -57,7 +57,7 @@ divides it (speed 2 halves it) on the stage and in the file alike.
 - At speed 0 nothing moves on its own: the stage holds still and an export is a still loop (an
   animated picture's own timing, or 2.4 s).
 - **Size** scales every motion: how far the card moves and turns, and how far the light travels
-  under the Light motions and the ones that steer the light (Sweep, Figure 8, Glint). At 0 the card
+  under the Light motions and the ones that steer the light (Figure 8, Glint). At 0 the card
   holds still; a turn (Spin, Turn once, Reveal) still turns all the way round.
 - The Light group brings its own light, so the light setting (pointer, orbit, fixed) waits until another
   motion is picked; every other motion follows the light setting.

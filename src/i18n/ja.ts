@@ -345,7 +345,7 @@ const ja = {
   lt: {
     title: '文字の加工',
     styles: '刷り方 (カードの文字すべて)',
-    style: { ink: '印刷', deboss: '型押し', emboss: '浮き出し', foil: '箔押し', spot: 'スポット200bUV' } satisfies Record<LetterStyle, string>,
+    style: { ink: '印刷', deboss: '型押し', emboss: '浮き出し', foil: '箔押し', spot: 'スポット​UV' } satisfies Record<LetterStyle, string>,
     help: {
       ink: '平らに刷った、いつもの文字。',
       deboss: '型で押して紙をへこませた文字。',

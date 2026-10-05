@@ -10,7 +10,7 @@ import { dictOf } from '../i18n';
 import type { Store } from '../state';
 import { sfx } from '../audio';
 import { editionById } from '../editions';
-import { exportLoop, IDLE_MODES, MOTION_GROUPS, RANGES, TUNE_DEFAULTS, type IdleMode } from './model';
+import { exportLoop, MOTION_GROUPS, MOTION_ORDER, RANGES, TUNE_DEFAULTS, type IdleMode } from './model';
 import { svg } from './icons';
 import './motionIcons';
 import { format } from './format';
@@ -44,8 +44,8 @@ export function mountTray(store: Store, root: HTMLElement, btn: HTMLButtonElemen
   const now = () => store.get().tune.idle;
 
   const rowOf = (v: IdleMode) => grid.querySelector(`[data-group=${(MOTION_GROUPS.find((g) => g.motions.includes(v)) ?? MOTION_GROUPS[0]).id}] .qm-row`)!;
-  // None closes the first row; the rest go in their groups, in the order of the list.
-  const options = [...IDLE_MODES.filter((v) => v !== 'none'), 'none' as const].map((v) => {
+  // In their groups, None closing the first row: the order arrow keys walk.
+  const options = MOTION_ORDER.map((v) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'qm-opt';
