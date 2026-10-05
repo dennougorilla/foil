@@ -196,10 +196,19 @@ let fontAsked = '';
 /** The text the face last painted (Free placement starts each piece where it was). */
 let lastRuns: TextRun[] = [];
 
+/** A repaint waits for the trading card's painter (one, however many redraws ask meanwhile). */
+let paintWaiting = false;
+
 function redrawFace() {
   const spec = faceSpec(currentImage());
   // A trading card's painter comes with its first use; the face is painted once it is here.
-  if (!canPaint(spec)) return void loadTcgFace().then(redrawFace, () => toast(t.loadFailed, true));
+  if (!canPaint(spec)) {
+    if (paintWaiting) return;
+    paintWaiting = true;
+    return void loadTcgFace()
+      .then(redrawFace, () => toast(t.loadFailed, true))
+      .finally(() => (paintWaiting = false));
+  }
   faceVersion++;
   lastRuns = drawFace(face, mask, spec);
   setTextRuns(face.width, face.height, lastRuns);
@@ -1087,8 +1096,13 @@ new ResizeObserver(([e]) =>
 adjustToggle.addEventListener('click', () => {
   sfx.tick();
   if (store.get().adjustOpen) return store.set({ adjustOpen: false });
+  // A press while the tabs are on their way calls the opening off, as it would close Fine-tune.
+  if (adjustWanted) {
+    adjustWanted = false;
+    return adjustToggle.removeAttribute('aria-busy');
+  }
   // The tabs' code arrives first, so a tab never opens empty.
-  void openAdjust().then(revealTabs, () => {});
+  void openAdjust().then((a) => a && revealTabs(), () => {});
 });
 for (const ev of ['pointerenter', 'focus']) adjustToggle.addEventListener(ev, () => void useAdjust().catch(() => {}), { once: true });
 
@@ -1108,14 +1122,28 @@ function useAdjust(): Promise<Adjust> {
   return adjustLoad;
 }
 
-/** Opens Fine-tune once its tabs are there (on `tab` when given); says so when they can't be fetched. */
-function openAdjust(tab?: PanelTab): Promise<Adjust> {
+/** Fine-tune was asked to open and its tabs are still on their way. */
+let adjustWanted = false;
+
+/**
+ * Opens Fine-tune once its tabs are there (on `tab` when given), unless the opening was called off
+ * meanwhile (then null); says so when they can't be fetched.
+ */
+function openAdjust(tab?: PanelTab): Promise<Adjust | null> {
+  adjustWanted = true;
   adjustToggle.setAttribute('aria-busy', 'true');
   const ready = useAdjust().then((a) => {
+    if (!adjustWanted) return null;
+    adjustWanted = false;
     store.set(tab ? { adjustOpen: true, panelTab: tab } : { adjustOpen: true });
     return a;
   });
-  ready.catch(() => toast(t.loadFailed, true)).finally(() => adjustToggle.removeAttribute('aria-busy'));
+  ready
+    .catch(() => {
+      adjustWanted = false;
+      toast(t.loadFailed, true);
+    })
+    .finally(() => adjustWanted || adjustToggle.removeAttribute('aria-busy'));
   return ready;
 }
 
@@ -1683,8 +1711,9 @@ function openShop() {
   btn.setAttribute('aria-busy', 'true');
   const wasOpened = new Set(packs.get().opened);
   const list = shelf(packs.get());
-  void import('./pack/opening')
-    .then((m) =>
+  // The cards in the opening wear the face as it is now (a trading card's painter may be on its way).
+  void Promise.all([import('./pack/opening'), faceReady()])
+    .then(([m]) =>
       m.openPack({
         pack: firstSealed(packs.get()) ?? list[0],
         shop: list,
@@ -1744,7 +1773,7 @@ let deckOpen = false;
 function viewDeck() {
   if (deckOpen) return;
   deckOpen = true;
-  import('./pack/deckView').then((m) =>
+  Promise.all([import('./pack/deckView'), faceReady()]).then(([m]) =>
     m.viewDeck({
       dict: t,
       owned: ownedGroups(packs.get()),
@@ -2054,7 +2083,7 @@ mountLetteringJump({
   dict: () => t,
   name: () => store.get().name || fallback().name,
   repaint: () => redrawFace(),
-  open: () => void openAdjust('text').then((a) => a.callLettering(), () => {}),
+  open: () => void openAdjust('text').then((a) => a?.callLettering(), () => {}),
   tag: document.querySelector<HTMLElement>('#info .info-box') ?? undefined,
 });
 if (reopenAdjust) void openAdjust().catch(() => {});

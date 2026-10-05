@@ -243,16 +243,32 @@ export class CardRenderer {
     const cp = this.program(packOfShader(shader) ?? 'open');
     if (!cp) return false;
     if (!this.live) return true;
-    // Every card of a frame shares one answer (asking waits while the GPU process is busy compiling).
+    // Every ask within one animation frame shares one answer (asking waits while the GPU process is
+    // busy compiling); a frame clock runs while any program is still compiling.
     if (cp.askedIn !== this.frames) {
       cp.askedIn = this.frames;
       cp.ready = cp.pending.done();
+      if (!cp.ready) this.countFrames();
     }
     return cp.ready;
   }
 
-  /** Frames begun, so the cards of one frame share one answer in `ready`. */
+  /** Animation frames counted while a program compiles, so `ready` asks once per frame. */
   private frames = 0;
+  private counting = false;
+
+  private countFrames() {
+    if (this.counting) return;
+    this.counting = true;
+    const step = () => {
+      // Kept up while some program was asked this frame and is not ready; asking again restarts it.
+      const waiting = [...this.programs.values()].some((p) => !p.ready && p.askedIn === this.frames);
+      this.frames++;
+      if (waiting) requestAnimationFrame(step);
+      else this.counting = false;
+    };
+    requestAnimationFrame(step);
+  }
 
   /**
    * `key`: 'card' is the card's own face; other names hold extra faces drawn with the same shader.
@@ -316,7 +332,6 @@ export class CardRenderer {
   }
 
   begin(): void {
-    this.frames++;
     const { gl } = this;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
