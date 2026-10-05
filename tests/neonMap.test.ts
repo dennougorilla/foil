@@ -1,7 +1,7 @@
 // Run with `npm test`. Neon's sign layout (src/gl/neonMap.ts) on synthetic faces.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, NEON_WHITE, calm, enclosed, glassBend, neonDesign, neonPosts, neonTubeMap, neonWallMap, unfold, type NeonTube } from '../src/gl/neonMap.ts';
+import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, NEON_WHITE, calm, enclosed, glassBend, iconBend, outOfWindow, relax, turning, neonDesign, neonPosts, neonTubeMap, neonWallMap, unfold, type NeonTube } from '../src/gl/neonMap.ts';
 
 // A 900 × 1260 card face read at 4 face px per cell, with the classic art window.
 const FW = 900;
@@ -122,17 +122,20 @@ test('posts hold the long tubes sparingly and leave short ones alone', () => {
   assert.equal(neonPosts(short).length, 0);
 });
 
-test('a cropped subject is one open tube round the top of its silhouette', () => {
+test('a cropped subject is one closed icon: its silhouette with a straight base where the window cuts it', () => {
   // A red head cut off by the bottom of the window, on a plain green ground.
   const inHead = (x: number, y: number) => ((x - 450) / 300) ** 2 + ((y - 1000) / 560) ** 2 < 1;
   const d = neonDesign(face((x, y) => (inHead(x, y) ? [210, 40, 30] : [40, 110, 50])), w, h, FW, FH, art);
   const outline = d.tubes.filter((t) => t.role === 'outline');
   assert.equal(outline.length, 1);
   const p = outline[0].pts;
-  assert.ok(Math.hypot(p[0] - p[p.length - 2], p[1] - p[p.length - 1]) > 300, 'open, its ends far apart');
+  // Its two ends side by side on the base, near the bottom of the window.
+  assert.ok(Math.hypot(p[0] - p[p.length - 2], p[1] - p[p.length - 1]) < 3 * d.width, 'closed, its ends side by side');
+  assert.ok(p[1] > art.y + art.h - 160 && p[p.length - 1] > art.y + art.h - 160, 'its ends on the base');
   for (let i = 0; i < p.length; i += 2) {
     const r = Math.hypot((p[i] - 450) / 300, (p[i + 1] - 1000) / 560);
-    assert.ok(Math.abs(r - 1) < 0.12, `off the silhouette at ${p[i].toFixed(0)}, ${p[i + 1].toFixed(0)}`);
+    const base = p[i + 1] > art.y + art.h - 160;
+    assert.ok(base || Math.abs(r - 1) < 0.12, `off the silhouette at ${p[i].toFixed(0)}, ${p[i + 1].toFixed(0)}`);
   }
   assert.ok(outline[0].len > 900, `${outline[0].len.toFixed(0)} px`);
   assert.deepEqual(outline[0].gas, [1.0, 0.16, 0.12]);
@@ -194,18 +197,21 @@ test('a stray short mark in a corner of the window is left out', () => {
   }
 });
 
-test('a small strong spot inside a shape (an eye) gets a ring of its own', () => {
+test('a small strong spot inside a shape (an eye) gets a brow above it, a short arc of its own', () => {
   const d = neonDesign(face((x, y) => {
     if (Math.hypot(x - 430, y - 520) < 24) return [10, 10, 10];
     return Math.hypot(x - 450, y - 600) < 300 ? [235, 225, 200] : [20, 60, 30];
   }), w, h, FW, FH, art);
-  const ring = d.tubes.find((t) => {
-    if (t.border) return false;
-    for (let i = 0; i < t.pts.length; i += 2) if (Math.hypot(t.pts[i] - 430, t.pts[i + 1] - 520) > 90) return false;
+  const brow = d.tubes.find((t) => {
+    if (t.border || t.role !== 'detail') return false;
+    for (let i = 0; i < t.pts.length; i += 2) if (Math.hypot(t.pts[i] - 430, t.pts[i + 1] - 520) > 90 || t.pts[i + 1] > 520) return false;
     return true;
   });
-  assert.ok(ring, 'a ring round the spot');
-  assert.ok(ring.len > 150, `ring ${ring.len.toFixed(0)} px`);
+  assert.ok(brow, 'a brow over the spot');
+  assert.ok(brow.len > 80 && brow.len < 200, `brow ${brow.len.toFixed(0)} px`);
+  // An arc, not a ring: its ends well apart.
+  const q = brow.pts;
+  assert.ok(Math.hypot(q[0] - q[q.length - 2], q[1] - q[q.length - 1]) > 2 * d.width);
 });
 
 /** The tightest radius a line bends at, measured over three points `step` apart either side. */
@@ -287,7 +293,7 @@ test('a cropped head keeps its profile through the beak, not a smoothed hull ove
   assert.ok(left < 230, `the tube reaches only x = ${left.toFixed(0)}, short of the beak`);
 });
 
-test('an eye gets a ring and a pupil dot inside it, the dot all glass', () => {
+test('an eye is a dot of glass under its brow, the dot all glass', () => {
   const d = neonDesign(face((x, y) => {
     if (Math.hypot(x - 430, y - 520) < 24) return [10, 10, 10];
     return Math.hypot(x - 450, y - 600) < 300 ? [235, 225, 200] : [20, 60, 30];
@@ -296,11 +302,54 @@ test('an eye gets a ring and a pupil dot inside it, the dot all glass', () => {
   assert.ok(dot, 'a pupil');
   assert.ok(dot.len < d.width, `a dot, not a dash (${dot.len.toFixed(0)} px)`);
   assert.ok(Math.hypot(dot.pts[0] - 430, dot.pts[1] - 520) < 20, 'on the spot');
-  const ring = d.tubes.find((t) => t.role === 'detail')!;
-  for (let i = 0; i < ring.pts.length; i += 2) assert.ok(Math.hypot(ring.pts[i] - 430, ring.pts[i + 1] - 520) > 1.6 * d.width, 'the ring clears the dot');
+  const brow = d.tubes.find((t) => t.role === 'detail')!;
+  for (let i = 0; i < brow.pts.length; i += 2) assert.ok(Math.hypot(brow.pts[i] - 430, brow.pts[i + 1] - 520) > 1.6 * d.width, 'the brow clears the dot');
 });
 
 test('enclosed measures what an open line closes off with its chord', () => {
   assert.ok(Math.abs(Math.abs(enclosed([0, 0, 100, 0, 100, 100, 0, 100])) - 10000) < 1e-6);
   assert.ok(Math.abs(enclosed([0, 0, 50, 1, 100, 0])) < 100);
+});
+
+test('relax eases every bend tighter than glass can take, and leaves the ends where they were', () => {
+  // A zigzag with sharp corners, 3 px apart.
+  const p: number[] = [];
+  for (let i = 0; i <= 200; i++) p.push(i * 3, (i % 40 < 20 ? i % 40 : 40 - (i % 40)) * 3);
+  const q = relax(p, false, 40, 3);
+  assert.ok(tightest(q, 13) > 34, `bends at ${tightest(q, 13).toFixed(1)} px`);
+  assert.deepEqual([q[0], q[1]], [p[0], p[1]]);
+});
+
+test('an icon bend has no jitter: few, broad bends, none tighter than about 1.6 tube widths', () => {
+  // A wobbly circle (feathers on a head) of radius 250.
+  const p: number[] = [];
+  for (let k = 0; k < 520; k++) {
+    const a = (k / 520) * 2 * Math.PI;
+    const r = 250 + 6 * Math.sin(a * 37) + 4 * Math.sin(a * 23);
+    p.push(450 + Math.cos(a) * r, 600 + Math.sin(a) * r);
+  }
+  const W = 23;
+  const q = iconBend(p, true, 900, W, 3);
+  const loop = q.concat(q, q);
+  let r = Infinity;
+  const k = 13;
+  const n = q.length / 2;
+  for (let i = n; i < 2 * n; i++) {
+    const ax = loop[i * 2] - loop[(i - k) * 2];
+    const ay = loop[i * 2 + 1] - loop[(i - k) * 2 + 1];
+    const bx = loop[(i + k) * 2] - loop[i * 2];
+    const by = loop[(i + k) * 2 + 1] - loop[i * 2 + 1];
+    const t = Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
+    if (t > 1e-4) r = Math.min(r, (k * 3) / t);
+  }
+  assert.ok(r > 1.4 * W, `bends at ${r.toFixed(0)} px`);
+  // About one turn, not a scribble.
+  assert.ok(turning(q.concat(q.slice(0, 4))) < 2.4 * Math.PI, `turns ${(turning(q) / Math.PI).toFixed(2)} pi`);
+});
+
+test('an open silhouette runs out of the window at both ends, under the frame', () => {
+  const p = [120, 300, 300, 200, 600, 220, 790, 330];
+  const q = outOfWindow(p, art, 10, 3);
+  assert.ok(q[0] < art.x, 'the first end leaves by the left');
+  assert.ok(q[q.length - 2] > art.x + art.w, 'the last end leaves by the right');
 });

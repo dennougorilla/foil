@@ -214,3 +214,32 @@ pixel-stepped haze), with a frame tube that vanished in one still. Changes:
 - Still weak: the parrot's black lower beak is taken as ground, so its outline runs up the slot and
   stops; the eagle's cropped beak front is a straight bridge along the window edge; owl-like faces
   (subject fills the window) still give only an eye ring.
+
+## Second polish cycle, round 3 (2026-10-06, Mac)
+
+Judge after round 2: the eagle was one open, wandering line with an end floating mid-card and no
+beak; the parrot three disconnected strokes; tubes traced (micro-wiggles, facets) rather than bent;
+a ring plus pill eye that read as a power icon; standoffs and clips near invisible, no contact
+shadows, every tube equally bright, a dull mauve frame tube competing with the subject. Changes:
+
+- Layout (`neonMap.ts`):
+  - The subject mask is clipped a little inside the window before tracing, so a cropped subject
+    closes: where it runs off the picture its outline becomes a straight cut (a bust's base). One
+    closed icon unless the cut is more than 38 % of it; the electrode gap sits at the middle of the
+    base. The lowest 30 % of a closed silhouette is smoothed into one calm sweep (`calmBase`).
+  - `iconBend`: Douglas–Peucker within 2 % of the card, corners bent at 1.8 W or wider, the joins
+    eased (no jump in curvature), then `relax` eases any stretch still tighter than 1.6 W.
+  - A subject that fills the window: its own edge as one open tube whose ends run straight out of
+    the window under the frame (`outOfWindow`), never stopping in open board; a strong shape the
+    window crops (a parrot's beak) is drawn the same way as a detail.
+  - A shape that meets the silhouette (an eagle's beak) keeps the part of its outline clear of it as
+    a detail line, ending at the silhouette. Open details may be 0.25 S long (was 0.4) but turn no
+    more than 1.4 pi in all (`turning`), so no scribbles.
+  - The eye: a dot of glass in the eye's own color under a short brow arc in the silhouette's gas
+    (no ring).
+- Look (`neon.ts`): brushed black board (the spill catches on its streaks); spill wider (0.09 S),
+  deeper in color where it is strong (bends); contact shadow 5–9 px below right of each tube,
+  sliding against the tilt, also through the halo; metal standoff caps wider than the tube with a
+  shadow and a lit rim; clips as metal straps with bright edges; per-tube ±8 % brightness and a
+  slightly different shade; frame tube at 30 % and mostly desaturated, its spill at 0.2.
+- Tests: closed cropped icon with a base, brow + dot eye, relax / iconBend / outOfWindow.

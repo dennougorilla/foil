@@ -33,7 +33,7 @@ uniform vec4 uNeonPost[NEON_POSTS];  // each post: where it meets the board (fac
 // How high the tubes stand off the board, for their shadows (face px).
 #define NEON_HEIGHT 14.0
 // The border tube burns at this share of the picture's tubes, so it frames rather than leads.
-#define NEON_BORDER_DIM 0.5
+#define NEON_BORDER_DIM 0.3
 // Past this distance (face px) the tube map holds no tube (NEON_REACH in neonMap.ts).
 #define NEON_REACH 110.0
 
@@ -58,13 +58,17 @@ float neonFlicker(int id) {
   return 1.0 - 0.95 * off;
 }
 
-// The border tube's gas is paler, so it does not compete with the sign.
+// The border tube's gas is much paler, so it frames the sign without competing with it. The
+// sign's own tubes each come out of the bender a slightly different shade (a little more or less
+// of each primary), as real gas fills and phosphor coatings do.
 vec3 neonGas(int id) {
   vec3 g = uNeonGas[id];
-  return neonIsBorder(id) ? mix(vec3(dot(g, vec3(0.3, 0.5, 0.2))), g, 0.55) : g;
+  if (neonIsBorder(id)) return mix(vec3(dot(g, vec3(0.3, 0.5, 0.2))), g, 0.35);
+  vec3 h = vec3(hash12(vec2(float(id), 2.7)), hash12(vec2(float(id), 5.3)), hash12(vec2(float(id), 8.9))) - 0.5;
+  return clamp(g * (1.0 + 0.16 * h), 0.0, 1.0);
 }
-// Each tube burns a little differently, as real gas fills and transformers do.
-float neonPower(int id) { return neonIsBorder(id) ? NEON_BORDER_DIM : 0.86 + 0.2 * hash12(vec2(float(id), 7.31)); }
+// Each tube burns a little brighter or dimmer (about 8 % either way), as transformers differ.
+float neonPower(int id) { return neonIsBorder(id) ? NEON_BORDER_DIM : 0.92 + 0.16 * hash12(vec2(float(id), 7.31)); }
 
 vec3 neonTubeAt(vec2 p) { return texture(uNeonMap, p).rgb; }
 // The tube index and how far along it, without blending across the line where the nearest
@@ -105,7 +109,10 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
   // percent, from a wide soft blur so no pixel steps show ----
   float grain = hash12(floor(X * 0.7)) - 0.5;
   float mott = fbm(fuv * uCardK * 4.0) - 0.5;
-  vec3 board = vec3(0.02, 0.02, 0.024) * (1.0 + 0.35 * mott) + grain * 0.006;
+  // Brushed black metal: fine streaks running across the board, each a long scratch of slightly
+  // different sheen, so the light the tubes spill has something to catch on.
+  float brush = 0.6 * hash12(vec2(floor(X.y * 1.3), floor(X.x * 0.006 + hash12(vec2(floor(X.y * 1.3), 3.0)) * 7.0))) + 0.4 * hash12(vec2(floor(X.y * 0.45), 9.1));
+  vec3 board = vec3(0.02, 0.02, 0.024) * (1.0 + 0.35 * mott + 0.2 * (brush - 0.5)) + grain * 0.004;
   board *= mix(0.75, 1.0, art);
   vec2 bo = vec2(0.012, 0.0);
   vec3 pic = 0.25 * (face(uv + bo, 5.0).rgb + face(uv - bo, 5.0).rgb + face(uv + bo.yx, 5.0).rgb + face(uv - bo.yx, 5.0).rgb);
@@ -115,12 +122,19 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
   vec4 wm = texture(uNeonWall, fuv);
   float wid = texelFetch(uNeonWall, ivec2(fuv * vec2(textureSize(uNeonWall, 0))), 0).a;
   vec3 pool = wm.rgb * (wid > -0.5 ? neonFlicker(int(wid + 0.5)) : 1.0);
-  col += pool * 0.34;
+  // Where much tube is near (a bend, two runs side by side) the spill is deeper in color as well
+  // as brighter; it catches on the brushed streaks.
+  float pl = dot(pool, vec3(0.3, 0.5, 0.2));
+  vec3 spill = max(mix(vec3(pl), pool, 1.0 + 0.7 * smoothstep(0.1, 0.9, pl)), 0.0);
+  col += spill * 0.4 * (0.9 + 0.2 * brush);
 
-  // Each tube's soft contact shadow on the board, cast away from the room light; it shifts as the
-  // card tilts.
-  float sd = neonTubeAt(fuv + L3.xy / L3.z * NEON_HEIGHT * px).r;
-  col *= 1.0 - 0.55 * exp(-pow(max(sd - 0.3 * R, 0.0) / (0.6 * W), 2.0));
+  // Each tube's soft contact shadow on the board, a few pixels below and right of it (the room
+  // light is above left). The tube stands off the board, so as the card tilts the shadow slides
+  // the other way from the tube.
+  vec2 shOff = vec2(5.0, 9.0) + t * 7.0 + (uLight - 0.5) * vec2(-6.0, -6.0);
+  float sd = neonTubeAt(fuv - shOff * px).r;
+  float shadow = 1.0 - 0.85 * exp(-pow(max(sd - 0.5 * R, 0.0) / (0.8 * W), 2.0));
+  col *= shadow;
 
   // ---- The posts: a clear rod from the board to the tube. A small disc on the board with a
   // tiny shadow; once the card tilts, the rod between it and the tube shows ----
@@ -134,11 +148,31 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
     float u = clamp(dot(X - F, ab) / max(dot(ab, ab), 1e-3), 0.0, 1.0);
     postD = min(postD, length(X - F - ab * u));
   }
-  float footR = 0.32 * W;
-  col *= 1.0 - 0.45 * exp(-pow(max(footD - footR, 0.0) / (0.3 * W), 2.0));
+  // A metal standoff: a round cap on the board with a small dark shadow and a bright rim on the
+  // side facing the room light; tilted, the rod up to the tube shows.
+  float footR = 0.72 * W;
+  float footSh = 1e4;
+  for (int i = 0; i < NEON_POSTS; i++) {
+    if (float(i) >= uNeonInfo.w) break;
+    footSh = min(footSh, length(X - shOff * 0.7 - uNeonPost[i].xy));
+  }
+  col *= 1.0 - 0.7 * exp(-pow(max(footSh - footR, 0.0) / (0.35 * W), 2.0));
   float post = 1.0 - smoothstep(footR - 0.8, footR + 0.8, postD);
-  float prim = smoothstep(footR * 0.4, footR, postD);
-  col = mix(col, col * 0.7 + pool * (0.1 + 0.3 * prim) + vec3(0.06) * prim, post * 0.85);
+  float cap = 1.0 - smoothstep(footR - 0.8, footR + 0.8, footD);
+  vec3 metal = vec3(0.09, 0.095, 0.1) + spill * 0.55;
+  col = mix(col, metal * 0.75, post * 0.9);
+  // The cap: brushed metal lit by the tubes, a bright rim on its lit side, a dark one opposite.
+  vec2 fq = vec2(1e4);
+  for (int i = 0; i < NEON_POSTS; i++) {
+    if (float(i) >= uNeonInfo.w) break;
+    vec2 q = X - uNeonPost[i].xy;
+    if (dot(q, q) < dot(fq, fq)) fq = q;
+  }
+  vec2 fn = fq / max(length(fq), 1e-3);
+  float capEdge = smoothstep(footR * 0.55, footR * 0.95, footD);
+  float capLit = dot(fn, normalize(-L3.xy + vec2(1e-4)));
+  vec3 capCol = metal * (1.0 - 0.35 * capEdge) + vec3(0.42, 0.44, 0.46) * capEdge * smoothstep(0.1, 0.9, capLit) - vec3(0.05) * capEdge * smoothstep(0.1, 0.9, -capLit);
+  col = mix(col, max(capCol, 0.0), cap);
 
   // ---- The tube here ----
   vec3 tm = neonTubeAt(tp);
@@ -172,7 +206,8 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
   float halo = 0.3 * exp(-pow(hd / (0.5 * W), 2.0)) + 0.1 / (1.0 + pow(hd / (1.4 * W), 2.0));
   halo *= 1.0 - smoothstep(0.75 * NEON_REACH, NEON_REACH, d);
   // (Taken over the whole tube, ends too: the glow of the line between two tubes must not step.)
-  col += neonGlowGas(tp) * halo * mix(0.6, 1.0, art);
+  // The contact shadow still shows through it.
+  col += neonGlowGas(tp) * halo * mix(0.6, 1.0, art) * mix(1.0, shadow, 0.85);
 
   // Lit glass, across its width: a near-white core (a gaussian about a third of the width) grading
   // into the saturated gas, which darkens a little towards the sides as a cylinder does, then a
@@ -199,7 +234,7 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
   tube += vec3(0.95, 0.97, 1.0) * streak * mix(0.6, 0.25, paint) * (0.5 + 0.5 * min(glow + paint, 1.0));
   col = mix(col, tube, inTube);
 
-  // ---- The clips: a clear strap round the tube at each post, moving with the tube ----
+  // ---- The clips: a metal strap round the tube at each post, moving with the tube ----
   float clip = 0.0;
   float clipRim = 0.0;
   for (int i = 0; i < NEON_POSTS; i++) {
@@ -208,15 +243,16 @@ vec3 neon(vec3 c, vec2 uv, vec2 t, float L, float art) {
     vec2 q = XT - P.xy;
     float along = abs(dot(q, P.zw));
     float across = abs(dot(q, vec2(-P.w, P.z)));
-    float hw = 0.2 * W;
+    float hw = 0.28 * W;
     float reach = R + 0.22 * W;
     float m = (1.0 - smoothstep(hw - 0.8, hw + 0.8, along)) * (1.0 - smoothstep(reach - 0.8, reach + 0.8, across));
     clip = max(clip, m);
     clipRim = max(clipRim, m * max(smoothstep(hw - 2.0, hw - 0.5, along), smoothstep(reach - 2.2, reach - 0.6, across)));
   }
   // Clear plastic: it dims what is under it a little and catches a bright rim.
-  col = mix(col, col * 0.8 + vec3(0.04), clip * 0.9);
-  col += vec3(0.2, 0.21, 0.22) * clipRim;
+  // A metal strap: it hides the glass under it, lit by the tube's own glow, with bright edges.
+  col = mix(col, gas * 0.18 * glow + vec3(0.07), clip * 0.92);
+  col += vec3(0.5, 0.52, 0.55) * clipRim;
 
   // The name and the pips on the frame are lit as thin neon lettering: wherever the print is
   // darker than the paper round it, in the border tube's paler gas. Only clear of the art window
