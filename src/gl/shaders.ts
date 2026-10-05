@@ -261,11 +261,13 @@ void main() {
     uv = (floor(uv * grid) + 0.5) / grid;
     lod = max(log2(uFaceTexels / uCardK.x / uPixel) - 0.5, 0.0);
   }
-  // Pixel art (src/dot): the face is already drawn on this grid; every pixel of it reads its cell's
-  // centre, so the finish's light steps in the same grain and the corners step too. On the frame only
-  // the light over the picture stays smooth, as on a card without pixel art.
+  // Pixel art (src/dot): the face is already drawn on this grid, so it is read where it is: its words
+  // are printed on the grid finer than it (dot/words.ts) and stay crisp. Everything else reads its
+  // cell's centre, so the finish's light steps in the same grain. On the frame only the light over the
+  // picture stays smooth, as on a card without pixel art.
+  vec2 faceUv = uv;
   if (dotOn > 0.5) uv = (floor(uv * pixelGrid()) + 0.5) / pixelGrid();
-  vec4 base = face(uv, lod);
+  vec4 base = face(faceUv, lod);
   if (uShadow > 0.5) { o = vec4(0.0, 0.0, 0.0, base.a * 0.45 * uAlpha); return; }
   if (base.a < 0.002) discard;
   vec3 c = base.rgb / max(base.a, 1e-4);
@@ -325,7 +327,7 @@ void main() {
   col += uTLight * beamLit * beamLit * 0.06;
   // Layer 2's light: what its finish adds to the plain picture (the lettering is layer 1's to draw).
   vec3 lit = max(col - c, 0.0);
-  col = lettering(col, uv, uTilt);
+  col = lettering(col, faceUv, uTilt); // the words' print follows their letters, which are off the grid
   // Specular hotspot that follows the light.
   float spec = 0.0;
   if (e == 72 || e == 106) {

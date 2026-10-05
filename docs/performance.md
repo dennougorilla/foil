@@ -41,8 +41,8 @@ in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 | Making a file: GIF (`exporter.ts`), APNG (`anim/apngExport.ts`), MP4 and its muxer (`anim/mp4Export.ts`, `mp4-muxer`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
+| Pixel art: the face's conversion and its words (`dot/dot.ts`, `dot/convert.ts`, `dot/words.ts`) | pixel art is turned on (at once if it was left on) | idle, pointing at the pixel art choices |
 | The backdrops other than the swirl (`gl/backdrops.ts`; the stage keeps the old one until the new one is ready) | another backdrop is picked, or was left picked | pointing at the backdrop tiles |
-| Pixel art: the face's conversion (`dot/dot.ts`, `dot/convert.ts`) | pixel art is turned on (at once if it was left on) | idle, pointing at the pixel art choices |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
 | The five illustrated samples (`sampleArt.ts`) | one of them is chosen, or was left on the card | idle, pointing at the samples |
 | Touch: the heat a finger leaves and the preview's own strokes (`touch/heat.ts`), for Warmth and Glow only | a touch finish is in the hand or on the card (until it arrives the card draws cold) | — |

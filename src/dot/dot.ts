@@ -1,10 +1,13 @@
 // Pixel art on a painted card face (docs/features.md, Card → Pixel art): shrink the face to its pixel
-// grid, cut its colours down, outline it, and draw it back up as hard squares on the same canvas.
+// grid, cut its colours down, outline it, and draw it back up as hard squares on the same canvas. The
+// face is painted without its words, which are printed on the grid afterwards (words.ts).
 // Loaded the first time pixel art is turned on (docs/performance.md). The grid is small (at most
 // 128 × 180 pixels), so this runs right where the face is painted: about 5 ms with a kept palette
 // (a moving picture's next frame), 15–20 ms when a palette is picked.
 import { dotGridFace, type RGB } from './convert';
 import { gridOf, type Dot } from './model';
+
+export { printWords } from './words';
 
 const small = document.createElement('canvas');
 const smallMask = document.createElement('canvas');

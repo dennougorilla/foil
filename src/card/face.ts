@@ -6,6 +6,7 @@ import { paintFree, paintMessage } from './messageFace';
 import type { Arrange, FreeField, Placement, Placements } from '../arrange';
 import { artWindow, shapeById, SHORT, type ShapeId } from './shape';
 import { tcgFrame, type CardLayout, type TcgContent } from './tcg';
+import { holdWords, takeWords, type Word } from './words';
 
 /** Pixel literals below were tuned at 600px across the short side. */
 export const S = SHORT / 600;
@@ -43,6 +44,8 @@ export interface FaceSpec {
   frameless: boolean;
   /** The picture is pixel art: it is enlarged with hard pixels (card/pixelArt.ts). */
   crisp: boolean;
+  /** Pixel art is on: the words are held back, to be printed on its grid once the face is converted (card/words.ts). */
+  holdWords?: boolean;
 }
 
 /** Where a piece is placed freely, if the card is in free placement and it has a place. */
@@ -308,8 +311,18 @@ export function loadTcgFace(): Promise<unknown> {
 /** Whether drawFace can paint this face now: a trading card waits for its painter (loadTcgFace). */
 export const canPaint = (spec: Pick<FaceSpec, 'layout' | 'frameless'>) => spec.frameless || spec.layout !== 'tcg' || !!tcgFace;
 
-/** Paints the face and its mask (see canPaint); returns the text it printed, for the lettering map (`setTextRuns`). */
-export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
+/**
+ * Paints the face and its mask (see canPaint). Returns the text it laid out, for the lettering map
+ * (`setTextRuns`), and with `spec.holdWords` the words it left off the face (card/words.ts).
+ */
+export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): { runs: TextRun[]; words: Word[] } {
+  const ctx = face.getContext('2d')!;
+  if (spec.holdWords) holdWords(ctx);
+  const runs = paintFace(face, mask, spec);
+  return { runs, words: takeWords(ctx) };
+}
+
+function paintFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
   const { W, H } = sized(face, spec.shape);
   sized(mask, spec.shape);
   const ctx = face.getContext('2d')!;
@@ -401,8 +414,10 @@ function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: s
     // A freely placed name leaves the plate (the rarity stays) and is printed over the card.
     if (freeName) runs.push(...paintFree(ctx, 'name', [name], (s) => `${s}px "DotGothic16", monospace`, freeName));
     else {
-      runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y: plateY + plateH / 2 + S, stock: plateY + plateH / 2 + S - 0.0588 * SHORT });
-      paintLettering(ctx, name, art.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+      const y = plateY + plateH / 2 + S;
+      const stock = y - 0.0588 * SHORT;
+      runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y, stock });
+      paintLettering(ctx, name, art.x + 4 * S, y, f.ink, 'name', stock);
     }
     paintPips(ctx, spec, art.x + art.w - 6 * S, plateY + plateH / 2);
   }

@@ -139,8 +139,8 @@ const en: Dict = {
   pixelLevels: ['Off', 'Subtle', 'Light', 'Medium', 'Strong', 'Heavy', 'Max'],
   dot: {
     label: 'Pixel art',
-    hint: 'The whole card, frame and words too.',
-    hintFrame: 'Frame, nameplate and words. The art stays as it is.',
+    hint: 'The whole card. Words stay readable, in pixel type.',
+    hintFrame: 'Frame and nameplate. The art stays as it is, words stay readable.',
     scope: 'Area',
     scopeName: { card: 'Whole card', frame: 'Frame only' },
     preset: { off: 'Off', chunky: 'Chunky', retro: 'Retro', fine: 'Fine' },
