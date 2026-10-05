@@ -57,8 +57,8 @@ test('no pack shader code is in the first load', () => {
 /**
  * What waits until it is used (docs/performance.md): Fine-tune's tabs, the print menu, free placement,
  * the motion tray, the motions other than Sway, the backdrops other than the swirl, making a file (with the MP4 muxer),
- * reading an animated picture, pixel art's conversion, each language's texts, the service worker's registration (with
- * the Update chip and a picture shared to FOIL), and the deck builder's and the shop's rules.
+ * the card samples, reading an animated picture, pixel art's conversion, each language's texts, the service worker's
+ * registration (with the Update chip and a picture shared to FOIL), and the deck builder's and the shop's rules.
  */
 const ON_DEMAND = [
   'i18n/ja.ts',
@@ -91,6 +91,7 @@ const ON_DEMAND = [
   'gl/backdrops.ts',
   'dot/dot.ts',
   'dot/convert.ts',
+  'sampleCards.ts',
 ];
 
 test('the on-demand modules are not in the first load', () => {

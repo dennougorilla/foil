@@ -1,4 +1,6 @@
-// Three procedurally painted pixel-art samples, so the first card looks good before any upload.
+// The samples, so the first card looks good before any upload: three procedurally painted pixel-art
+// scenes here, and four cards (a Joker and three game cards) that come with their own chunk.
+import type { Lang } from './i18n';
 
 const W = 72;
 const H = 96;
@@ -84,6 +86,7 @@ const ace: Painter = (x, y) => {
 
 const PAINTERS = [dusk, tide, ace];
 
+/** One of the scenes (index below SCENES). */
 export function paintSample(index: number): HTMLCanvasElement {
   const small = document.createElement('canvas');
   small.width = W;
@@ -111,4 +114,9 @@ export function paintSample(index: number): HTMLCanvasElement {
   return big;
 }
 
-export const SAMPLE_COUNT = PAINTERS.length;
+/** The scenes painted up front; the card samples follow them. */
+export const SCENES = PAINTERS.length;
+export const SAMPLE_COUNT = SCENES + 4;
+
+/** The card samples (indices SCENES and up), painted in a language. */
+export const loadCardSamples = (lang: Lang) => import('./sampleCards').then((m) => m.paintCards(lang));

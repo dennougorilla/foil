@@ -11,7 +11,7 @@ import { CARD_LAYOUTS } from './card/tcg';
 import type { PrintPop } from './printPop';
 import type { TextRun } from './lettering';
 import type { ShadowDepth } from './depth/shadowDepth';
-import { paintSample, SAMPLE_COUNT } from './samples';
+import { loadCardSamples, paintSample, SAMPLE_COUNT, SCENES } from './samples';
 import { Stage } from './stage';
 import { setSound, sfx } from './audio';
 import { GIF_SAVE, GIF_SHARE } from './exportSize';
@@ -103,10 +103,24 @@ let t: Dict = await dict;
 // A trading card from last visit: its painter is fetched at once.
 if (store.get().layout === 'tcg') void loadTcgFace().catch(() => {});
 
+/**
+ * The interface fonts. Their stylesheet may still be on its way (index.html adds it without holding the
+ * script), and fonts not declared yet would count as loaded at once.
+ */
+const uiFonts = new Promise<unknown>((done) => {
+  const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
+  if (!sheet || sheet.sheet) return done(null);
+  sheet.addEventListener('load', done);
+  sheet.addEventListener('error', done);
+}).then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]));
+
 // ---------- Images ----------
 
 type Img = HTMLCanvasElement;
-const samples: Img[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => paintSample(i));
+/** The samples; the card samples are null until their chunk has painted them (wakeCardSamples). */
+const samples: (Img | null)[] = Array.from({ length: SAMPLE_COUNT }, (_, i) => (i < SCENES ? paintSample(i) : null));
+/** A sample's picture, the first one standing in while it is on its way. */
+const sampleImg = (i: number): Img => samples[i] ?? samples[0]!;
 let userImage: Img | null = null;
 /** Set when the person's image is an animated GIF; userImage then holds its first frame. */
 let userAnim: Anim | null = null;
@@ -115,9 +129,9 @@ let userSource: Blob | null = null;
 let animFrame = 0;
 const currentImage = (): Img => {
   const s = store.get();
-  if (s.sample >= 0) return samples[s.sample];
+  if (s.sample >= 0) return sampleImg(s.sample);
   if (userAnim) return userAnim.frames[animFrame] ?? userAnim.frames[0];
-  return userImage ?? samples[0];
+  return userImage ?? sampleImg(0);
 };
 
 // Animated pictures: advance the card face whenever the next frame is due, for as long as there is one.
@@ -186,7 +200,7 @@ let artCount = 0;
 /** Names the art in the window (picture, layout and crop), so depth is read once per art. */
 function artKey() {
   const s = store.get();
-  const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
+  const src: object = s.sample >= 0 ? sampleImg(s.sample) : (userAnim ?? userImage ?? sampleImg(0));
   if (!artIds.has(src)) artIds.set(src, ++artCount);
   const a = faceArt(s);
   return `${artIds.get(src)}:${a.x},${a.y},${a.w},${a.h}:${s.crop.zoom},${s.crop.x},${s.crop.y}:${s.dot && dot ? dotKey(s.dot) : ''}`;
@@ -201,10 +215,10 @@ const crispOf = new WeakMap<object, boolean>();
 /** Whether the picture on the card is pixel art, to be enlarged with hard pixels (looked at once per picture). */
 function isCrisp(): boolean {
   const s = store.get();
-  const src: object = s.sample >= 0 ? samples[s.sample] : (userAnim ?? userImage ?? samples[0]);
+  const src: object = s.sample >= 0 ? sampleImg(s.sample) : (userAnim ?? userImage ?? sampleImg(0));
   let crisp = crispOf.get(src);
   if (crisp === undefined) {
-    const img = s.sample >= 0 ? samples[s.sample] : (userAnim?.frames[0] ?? userImage ?? samples[0]);
+    const img = s.sample >= 0 ? sampleImg(s.sample) : (userAnim?.frames[0] ?? userImage ?? sampleImg(0));
     crisp = img.width <= PIXEL_ART_MAX && img.height <= PIXEL_ART_MAX && isPixelArt(img.getContext('2d')!.getImageData(0, 0, img.width, img.height));
     crispOf.set(src, crisp);
   }
@@ -645,18 +659,23 @@ function buildThumbs() {
   const th = $('thumbs');
   th.textContent = '';
   th.setAttribute('aria-label', t.samples);
-  const add = (img: Img, label: string, idx: number) => {
+  const add = (img: Img | null, label: string, idx: number) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'thumb';
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-label', label);
-    b.style.backgroundImage = `url(${thumbUrl(img)})`;
+    // A card sample still on its way shows an empty pocket; choosing it waits for it.
+    if (img) b.style.backgroundImage = `url(${thumbUrl(img)})`;
     if (idx < 0 && userAnim) b.dataset.badge = animKind(userAnim);
     radio(b, s.sample === idx);
     b.onclick = () => {
       if (store.get().sample === idx) return;
-      useImage(idx);
+      if (img) return useImage(idx);
+      void wakeCardSamples().then(
+        () => store.get().sample !== idx && useImage(idx),
+        () => toast(t.loadFailed, true),
+      );
     };
     th.appendChild(b);
   };
@@ -978,6 +997,31 @@ function buildThumbsPending(idx: number) {
     .forEach((b, i) => radio(b, (i < SAMPLE_COUNT ? i : -1) === idx));
 }
 
+/** The language the card samples are painted (or being painted) in, and that painting. */
+let cardSamples: { lang: State['lang']; done: Promise<void> } | null = null;
+/**
+ * Fetches and paints the card samples in the page's language (again when it changed), then shows them:
+ * their thumbnails, and the card if one of them is on it.
+ */
+function wakeCardSamples(): Promise<void> {
+  const lang = store.get().lang;
+  if (cardSamples?.lang === lang) return cardSamples.done;
+  // Their words are in the pixel font, which is declared only once the fonts' stylesheet is in.
+  const done = uiFonts.then(() => loadCardSamples(lang), () => loadCardSamples(lang)).then((imgs) => {
+    if (cardSamples?.done !== done) return;
+    imgs.forEach((img, k) => (samples[SCENES + k] = img));
+    buildThumbs();
+    if (store.get().sample >= SCENES) {
+      redrawFace();
+      drawCropPreview();
+    }
+  });
+  cardSamples = { lang, done };
+  // A failed fetch (offline) is tried again on the next wake.
+  done.catch(() => cardSamples?.done === done && (cardSamples = null));
+  return done;
+}
+
 const fileInput = $<HTMLInputElement>('fileInput');
 $('pickBtn').addEventListener('click', () => fileInput.click());
 $('pickBtnStage').addEventListener('click', () => fileInput.click());
@@ -1043,7 +1087,7 @@ function setFlip(img: Img | null) {
 function renderFlip() {
   const s = store.get();
   $('flipRow').hidden = s.edition !== 'lenticularflip';
-  const front = s.sample >= 0 ? samples[s.sample] : (userImage ?? samples[0]);
+  const front = s.sample >= 0 ? sampleImg(s.sample) : (userImage ?? sampleImg(0));
   const thumb = $('flipThumb');
   thumb.style.backgroundImage = `url(${thumbUrl(flipImage ?? front)})`;
   thumb.classList.toggle('is-auto', !flipImage);
@@ -1856,7 +1900,7 @@ function useBinder(): Promise<Binder> {
       cardRect: () => $('cardSlot').getBoundingClientRect(),
       card: () => cardOf(store.get()),
       input: exportInput,
-      picture: () => (store.get().sample >= 0 ? null : { still: userImage ?? samples[0], file: userAnim ? userSource : null }),
+      picture: () => (store.get().sample >= 0 ? null : { still: userImage ?? sampleImg(0), file: userAnim ? userSource : null }),
       brush: () => areas.paints.map((p) => p.layers),
       play: playCard,
       pause: (on) => stage.pause(on),
@@ -2282,6 +2326,7 @@ document.addEventListener('keydown', (e) => {
 store.on((s, changed) => {
   if (changed.has('lang')) {
     applyText();
+    if (cardSamples) void wakeCardSamples().catch(() => {});
     redrawFace();
     deck.render();
     return;
@@ -2295,6 +2340,8 @@ store.on((s, changed) => {
     depth?.update(face, artKey());
   }
   if (changed.has('layer2')) wakePacks();
+  // A card sample put on the card from elsewhere (the binder) is fetched for it.
+  if (changed.has('sample') && s.sample >= SCENES && !samples[s.sample]) void wakeCardSamples().catch(() => {});
   // Layer 1 and layer 2 never hold the same finish: putting layer 2's finish on the card removes layer 2.
   if (changed.has('edition') && s.layer2?.edition === s.edition) store.set({ layer2: null, areaLayer: 1 });
   if (changed.has('edition') || changed.has('flicked')) syncFlickHint();
@@ -2394,17 +2441,12 @@ const boot = () => {
   drawCropPreview();
 };
 // The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before
-// painting the face. Their stylesheet may still be on its way (index.html adds it without holding the
-// script), and fonts not declared yet would count as loaded at once.
-new Promise<unknown>((done) => {
-  const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
-  if (!sheet || sheet.sheet) return done(null);
-  sheet.addEventListener('load', done);
-  sheet.addEventListener('error', done);
-})
-  .then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]))
-  .then(boot, boot);
+// painting the face.
+uiFonts.then(boot, boot);
 boot();
+// A card sample left on the card is fetched at once; the others when the page is idle or the pointer nears them.
+if (store.get().sample >= SCENES) void wakeCardSamples().catch(() => {});
+for (const ev of ['pointerenter', 'focusin']) $('thumbs').addEventListener(ev, () => void wakeCardSamples().catch(() => {}), { once: true });
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
   // A picture chosen (or removed) meanwhile wins over last visit's.
@@ -2460,6 +2502,7 @@ settled(() => {
     void import('./tune/quickTray').catch(() => {});
     void loadTcgFace().catch(() => {});
     void useDot().catch(() => {});
+    void wakeCardSamples().catch(() => {});
   });
 });
 
