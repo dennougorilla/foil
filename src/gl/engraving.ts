@@ -3,52 +3,78 @@
 // and the tune helpers are in scope. Every name here starts with `en`/`EN_`.
 //
 // What makes the real thing read as one (and what this copies):
-// - One set of fine, evenly spaced lines carries the whole picture, each an unbroken burin stroke
-//   whose width swells smoothly in the shadows and thins to a hairline in the lights; in the
-//   brightest places the hairline breaks into short flicks that end in pointed slivers, so even
-//   a highlight is still engraved metal.
-// - The lines follow the form (contour hatching): they are the level lines of the picture's broad
-//   shapes laid over a gentle slant, so they bulge and orbit round an eye or a sun disc and run
-//   along a ridge, never kinking at a pixel's hard edge.
-// - A hard silhouette is drawn once, as a single crisp engraved outline.
-// - A second, thinner set is laid over the first only in the deepest shadows (added, never cut
-//   into it), so the darks are cross-hatched lozenges and the strokes stay whole.
+// - One set of long, calm, evenly spaced lines carries the whole picture. Tone is their WIDTH: a
+//   hairline in the lights that swells, on an S-curve, to most of a spacing in the shadows, so a
+//   mid-tone is a visibly fatter line, not a denser one. In the brightest places the hairline
+//   breaks into short flicks that end in pointed slivers, so even a highlight is engraved metal.
+// - The tone is read from the picture blurred over a few lines, with its local contrast raised:
+//   a pixel picture's hard edge becomes a swell along a few lines instead of a contour, and a flat
+//   band keeps a rim.
+// - The lines follow only the large form: they are level lines of a gentle slant bent a little by
+//   the picture's broad shapes, read through a smooth (cubic) filter, so they never kink and the
+//   spacing never pinches by more than a sixth.
+// - A second set crosses the first at 40 degrees, only in the deepest shadows.
+// - Lines stay resolvable: on a small card (a GIF, a low-density screen) every other line is
+//   dropped and the rest are drawn twice as wide, so the plate keeps its strokes instead of
+//   greying into a tone.
 // - The frame is a calm guilloche: two interlaced waves between two rules round the art, and a
 //   plain polished cartouche where the name sits.
-// - The plate is polished copper mirroring a room: a long, narrow, slightly streaky window strip
-//   slides across it as the card tilts, never brighter than pale gold.
-// - The grooves hold dark ink; only the lip of each cut catches the light, every groove on the
-//   same side at the same time, so a tilt runs a coherent sheen along the lines.
+// - The plate is bright polished copper; the grooves hold near-black ink. As the card tilts, a
+//   narrow specular flash crosses the plate and the walls of the cuts it passes light up on the
+//   same side together, so the light runs along the strokes as a coherent sheen.
 // Nothing reads the clock: it moves only with the tilt and the light, so it holds still when
 // motion is reduced and every export loop closes by itself.
 
 export const ENGRAVING_GLSL = /* glsl */ `
-// Lines per short side of the card.
+// Lines per short side of the card on a big card (half that on a small one).
 const float EN_LINES = 140.0;
-// How far (card units) the picture's broad and middle shapes bend the lines.
-const float EN_BEND_BIG = 0.13;
-const float EN_BEND_MID = 0.022;
+// How far (card units) the picture's broad shapes bend the lines, per unit of brightness.
+const float EN_BEND = 0.05;
 // The thinnest a line gets (of a spacing), and the widest.
-const float EN_HAIR = 0.17;
-const float EN_FULL = 0.6;
+const float EN_HAIR = 0.07;
+const float EN_FULL = 0.7;
 // Polished copper's own colour (its reflectance), the ink left in the grooves, the brightest the
 // plate ever gets (pale gold) and the slope of a groove's walls (a burin cuts a V about this steep).
-const vec3 EN_COPPER = vec3(0.93, 0.58, 0.4);
-const vec3 EN_INK = vec3(0.05, 0.027, 0.02);
-const vec3 EN_PALE = vec3(1.0, 0.8, 0.6);
+const vec3 EN_COPPER = vec3(0.96, 0.62, 0.42);
+const vec3 EN_INK = vec3(0.03, 0.016, 0.012);
+const vec3 EN_PALE = vec3(1.0, 0.86, 0.68);
 const float EN_WALL = 0.5;
-const vec2 EN_ROOM_DIR = vec2(0.8, 0.6);
 
 // The mip level that blurs the face over s card units (never sharper than the pixel picture's).
 float enLod(float s, float lod) { return max(log2(s * uFaceTexels / uCardK.x), lod); }
-float enLuma(vec2 uv, float l) { return luma(face(uv, l).rgb); }
-// The same in face uv (no tune), premultiplied as the face is.
-float enBlur(vec2 fuv, float l) { vec4 f = textureLod(uFace, fuv, l); return luma(f.rgb / max(f.a, 1e-3)); }
+
+// The face's brightness at face uv through a cubic B-spline on one mip level: smooth in value and
+// slope, so level lines drawn through it bend without the kinks a bilinear lookup leaves at every texel.
+float enCubic(vec2 fuv, int li) {
+  vec2 sz = vec2(textureSize(uFace, li));
+  vec2 p = fuv * sz - 0.5;
+  vec2 i = floor(p), f = p - i;
+  vec2 f2 = f * f, f3 = f2 * f;
+  vec2 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+  vec2 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+  vec2 w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+  vec2 w3 = f3 / 6.0;
+  vec2 g0 = w0 + w1, g1 = w2 + w3;
+  vec2 h0 = (i - 0.5 + w1 / g0) / sz, h1 = (i + 1.5 + w3 / g1) / sz;
+  float l = float(li);
+  vec4 s = g0.y * (g0.x * textureLod(uFace, h0, l) + g1.x * textureLod(uFace, vec2(h1.x, h0.y), l))
+    + g1.y * (g0.x * textureLod(uFace, vec2(h0.x, h1.y), l) + g1.x * textureLod(uFace, h1, l));
+  return luma(s.rgb / max(s.a, 1e-3));
+}
+// The same at a fractional level (between the two nearest), clamped to the levels the face has.
+float enSmooth(vec2 fuv, float l) {
+  vec2 sz0 = vec2(textureSize(uFace, 0));
+  float top = floor(log2(max(sz0.x, sz0.y)));
+  l = clamp(l, 0.0, top);
+  float l0 = floor(l);
+  float a = enCubic(fuv, int(l0));
+  return l0 >= top ? a : mix(a, enCubic(fuv, int(l0) + 1), l - l0);
+}
 
 // One set of grooves at phase f (one per unit) and width w (0..1 of a spacing). Returns how much
 // of the pixel is cut (0..1); side comes back signed across the groove (which wall) and lip is
-// how much of the groove's edge this pixel shows: lines finer than the pixels show only their
-// tone and no lip, so a small card keeps the tone of the plate instead of turning pale.
+// how much of the groove's wall this pixel shows: lines finer than the pixels show only their
+// tone and no wall.
 float enCut(float f, float w, out float side, out float lip) {
   float aa = max(fwidth(f), 1e-4);
   float x = fract(f) - 0.5;
@@ -56,7 +82,7 @@ float enCut(float f, float w, out float side, out float lip) {
   side = x;
   float cut = clamp((hw - abs(x)) / aa + 0.5, 0.0, 1.0) * min(w / aa, 1.0);
   float fine = 1.0 - smoothstep(0.3, 0.55, aa);
-  lip = smoothstep(0.35, 0.95, abs(x) / max(hw, 1e-3)) * smoothstep(1.5, 3.5, w / aa) * fine;
+  lip = smoothstep(0.25, 0.7, abs(x) / max(hw, 1e-3)) * smoothstep(1.5, 3.5, w / aa) * fine;
   return mix(w, cut, fine);
 }
 
@@ -66,81 +92,87 @@ float enRule(float d, float w) {
   return clamp((0.5 * w - abs(d)) / px + 0.5, 0.0, 1.0) * min(w / px, 1.0);
 }
 
-// The room the polished plate mirrors, at r across the plate: one long, narrow window (with a
-// faint streak of polish along it), a dimmer one beside it, and the shade between.
-float enRoom(float r, float along) {
-  float streak = 0.82 + 0.18 * vnoise(vec2(r * 70.0, along * 1.3));
-  return 0.15 + 0.85 * exp(-pow((r + 0.2) / 0.07, 2.0)) * streak + 0.15 * exp(-pow((r + 0.2) / 0.25, 2.0))
-    + 0.25 * exp(-pow((r - 0.5) / 0.18, 2.0)) + 0.4 * exp(-pow((r + 0.95) / 0.08, 2.0));
+// A stroke's width at darkness k (0..1): a hairline that breaks into tapered flicks in the
+// brightest places (s runs 0..1 along a flick), swelling on an S-curve to EN_FULL.
+float enWidth(float k, float s) {
+  float flick = pow(clamp(sin(3.14159 * min(s * 1.12, 1.0)), 0.0, 1.0), 0.6);
+  float hair = EN_HAIR * mix(flick, 1.0, smoothstep(0.02, 0.12, k));
+  float sw = smoothstep(0.0, 1.0, k);
+  return mix(hair, EN_FULL, sw);
 }
 
-// What the lip of a groove running across \`across\` shows at \`side\`: the wall tilts that way at
-// the burin's slope, so it mirrors another part of the room and the light at its own angle.
-vec3 enWall(vec2 across, float side, vec3 h, float r, float along) {
+// One set of strokes at phase F (card units across the lines) and along (card units along them),
+// n lines per unit; coarse (0..1) fades to every other line, drawn twice as wide.
+float enSet(float F, float along, float n, float k, float coarse, out float side, out float lip) {
+  float f1 = F * n, f2 = F * n * 0.5 + 0.25;
+  float s1 = fract(along * n / 11.0 + hash12(vec2(floor(f1), 3.1)));
+  float s2 = fract(along * n / 22.0 + hash12(vec2(floor(f2), 7.3)));
+  float sd1, lp1, sd2, lp2;
+  float c1 = enCut(f1, enWidth(k, s1), sd1, lp1);
+  float c2 = enCut(f2, enWidth(k, s2), sd2, lp2);
+  side = coarse < 0.5 ? sd1 : sd2;
+  lip = mix(lp1, lp2, coarse);
+  return mix(c1, c2, coarse);
+}
+
+// How much light the wall of a groove running across \`across\` catches at \`side\`: it tilts that
+// way at the burin's slope, so with the light coming from l (on the plate) one wall of every cut
+// faces it and the other turns away, all the grooves alike: the cuts read as cut, never as scratches.
+float enWall(vec2 across, float side, vec2 l) {
   vec3 n = normalize(vec3(-across * sign(side) * EN_WALL, 1.0));
-  float room = enRoom(r + 1.4 * dot(n.xy, EN_ROOM_DIR), along);
-  float spec = pow(max(dot(n, h), 0.0), 24.0);
-  return min(EN_COPPER * (0.2 + 0.9 * room + 0.6 * spec), EN_PALE);
+  return max(dot(n.xy, l), 0.0) / EN_WALL;
 }
 
 /** uv is pattern uv (the lines follow the tune's size and angle); m is the face mask. */
 vec3 engraving(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   vec2 q = (uv - 0.5) * uCardK;
   float art = m.r;
-  float sp = 1.0 / EN_LINES;
-
-  // The shapes that bend the lines: the picture blurred over many lines (broad) and a few (middle),
-  // looked up no nearer the art window's edge than the blur reaches, so the frame never pulls on
-  // the lines and they run straight into the edge.
-  float lb = enLod(0.09, lod), lm = enLod(0.035, lod);
   vec2 fuv = tuneFaceUv(uv);
-  vec2 inB = vec2(0.11) / uCardK, inM = vec2(0.04) / uCardK;
+
+  // How big the lines come out on screen: below about 4 px a spacing, drop to half as many.
+  float pxq = max(length(fwidth(q)) * 0.7071, 1e-6);
+  float coarse = smoothstep(4.4, 3.4, 1.0 / (EN_LINES * pxq));
+  float sp = mix(1.0, 2.0, coarse) / EN_LINES;
+
+  // The broad shapes that bend the lines: the picture blurred over about fifteen lines through the
+  // cubic filter, looked up a little inside the art window and faded out towards its edge, so the
+  // frame never pulls on the lines and they run straight into the edge.
+  vec2 inB = vec2(0.02) / uCardK;
   vec2 ub = clamp(fuv, min(uArt.xy + inB, 0.5), max(uArt.zw - inB, 0.5));
-  vec2 R = vec2(0.06) / uCardK;
-  float big = (enBlur(ub + vec2(R.x, 0.0), lb) + enBlur(ub - vec2(R.x, 0.0), lb)
-    + enBlur(ub + vec2(0.0, R.y), lb) + enBlur(ub - vec2(0.0, R.y), lb) + 2.0 * enBlur(ub, lb)) / 6.0;
-  float mid = enBlur(clamp(fuv, min(uArt.xy + inM, 0.5), max(uArt.zw - inM, 0.5)), lm);
-  float bend = big * EN_BEND_BIG + mid * EN_BEND_MID;
-  // The tone the width follows, blurred over about a spacing so a width never changes faster along
-  // a line than a spacing per stroke, with a little of the sharp picture for a photo's detail.
-  float lt = enLod(1.3 * sp, lod);
-  vec2 o = vec2(0.7 * sp) / uCardK;
-  float soft = 0.25 * (enLuma(uv + o, lt) + enLuma(uv - o, lt) + enLuma(uv + vec2(o.x, -o.y), lt) + enLuma(uv + vec2(-o.x, o.y), lt));
-  float tone = mix(soft, L, 0.15);
-  float dark = pow(1.0 - smoothstep(0.04, 0.95, tone), 1.35);
+  float big = enSmooth(ub, enLod(0.1, 0.0));
+  vec2 ea = min(fuv - uArt.xy, uArt.zw - fuv) * uCardK;
+  float win = smoothstep(0.0, 0.12, min(ea.x, ea.y));
+  float bend = (big - 0.5) * EN_BEND * win;
+
+  // The tone the width follows: the picture blurred over two or three lines (a hard pixel edge
+  // becomes a swell, not a contour), its local contrast raised against the broad shapes so a flat
+  // band keeps its rim, and lifted a little when the whole picture is dark.
+  float soft = enSmooth(fuv, enLod(1.1 * sp, lod));
+  float wide = enSmooth(fuv, enLod(0.05, 0.0));
+  float mean = enSmooth(vec2(0.5), 30.0);
+  float lift = 0.6 * (0.48 - mean);
+  float tone = mix(soft + 0.9 * (soft - wide), L, 0.08) + lift;
+  float dark = clamp((0.95 - tone) / 0.95, 0.0, 1.0);
+  // A thin dark band inside a bright shape (ripples across a sun) stays a few fat lines, never a
+  // solid bar: the darkness is capped by how dark the surroundings are.
+  dark = min(dark, 0.5 + (1.0 - wide - lift));
 
   // The art's lines: a gentle slant bent round the picture's shapes.
   vec2 dirA = normalize(vec2(0.32, 1.0));
   vec2 perpA = vec2(-dirA.y, dirA.x);
-  float fA = (dot(q, dirA) + bend) * EN_LINES;
-  vec2 gA = vec2(dFdx(fA), dFdy(fA));
+  float FA = dot(q, dirA) + bend;
+  float sideA, lipA;
+  float cutA = enSet(FA, dot(q, perpA), EN_LINES, dark, coarse, sideA, lipA);
   // Across the line on the plate (for the lit wall), from the phase's own slope.
   mat2 J = mat2(dFdx(q), dFdy(q));
+  vec2 gA = vec2(dFdx(FA), dFdy(FA));
   vec2 acrossA = normalize(inverse(transpose(J)) * gA + dirA * 1e-3);
-  float alongA = dot(q, perpA) * EN_LINES;
-  // Width swells with the darkness; in the lights a hairline that breaks into short flicks, each
-  // tapering to a point at both ends (the burin going in and lifting out).
-  float id = floor(fA);
-  float s = fract(alongA / 11.0 + hash12(vec2(id, 3.1)));
-  float flick = pow(clamp(sin(3.14159 * min(s * 1.12, 1.0)), 0.0, 1.0), 0.6);
-  float hair = EN_HAIR * mix(flick, 1.0, smoothstep(0.03, 0.14, dark));
-  float wA = mix(hair, EN_FULL, smoothstep(0.08, 1.0, dark));
-  float sideA, lipA;
-  float cutA = enCut(fA, wA, sideA, lipA);
-  // The cross set, thinner, laid over the first only in the deepest shadows and bent the same way.
-  vec2 dirB = normalize(vec2(1.0, -0.42));
-  float fB = (dot(q, dirB) + bend * 0.8) * EN_LINES * 0.92;
+  // The cross set, at 40 degrees to the first, thinner, only in the deepest shadows.
+  vec2 dirB = vec2(-0.375, 0.927);
   float sideB, lipB;
-  float wB = 0.3 * smoothstep(0.82, 1.0, dark);
-  float cutB = enCut(fB, wB, sideB, lipB);
-  // A hard silhouette is drawn once as a crisp line: where the picture, a little blurred, crosses
-  // its own surroundings (a zero of the difference) and the step across it is steep.
-  float e1 = enLuma(uv, enLod(2.6 * sp, lod)), e2 = enLuma(uv, enLod(8.0 * sp, lod));
-  float dog = e1 - e2;
-  float px = max(length(fwidth(q)), 1e-5);
-  float steep = length(vec2(dFdx(e1), dFdy(e1))) / px * 3.0 * sp;
-  float edge = enRule(dog / max(length(vec2(dFdx(dog), dFdy(dog))) / px, 1e-4), 0.42 * sp) * smoothstep(0.12, 0.24, steep);
-  float cutArt = max(max(cutA, cutB), edge);
+  float kB = smoothstep(0.8, 1.0, dark);
+  float cutB = enSet(dot(q, dirB) + bend, dot(q, vec2(-dirB.y, dirB.x)), EN_LINES, kB * 0.4, coarse, sideB, lipB) * smoothstep(0.0, 0.25, kB);
+  float cutArt = max(cutA, cutB);
 
   // The frame, in face units of the card: rules and two interlaced waves round the art window.
   vec2 P = (fuv - 0.5) * uCardK;
@@ -179,30 +211,32 @@ vec3 engraving(vec3 c, vec2 uv, vec2 t, float L, float lod, vec3 m) {
   float frameDark = 1.0 - smoothstep(0.08, 0.95, L);
   float solid = smoothstep(0.7, 0.85, frameDark);
 
-  // The light: where the plate mirrors it (h, the half vector between the light and the eye).
+  // The light, on the plate: where it is (dl, from here to it) and where the eye sees it mirrored.
   vec2 dl = (uLight - fuv) * uCardK;
-  vec3 h = normalize(vec3(dl * 0.6 + t * 0.75, 1.0));
+  vec2 mir = dl + t * 0.12;
 
-  // Polished copper mirroring the room, its window strip sliding across with the tilt; its
-  // brightest is pale gold, never white.
-  float r = dot(q, EN_ROOM_DIR) + t.x * 0.6 - t.y * 0.35;
-  float alongR = dot(q, vec2(-EN_ROOM_DIR.y, EN_ROOM_DIR.x));
-  float body = 0.5 + 0.6 * enRoom(r, alongR) - 0.06 * q.y;
-  vec3 plate = mix(EN_COPPER * body, EN_PALE * min(body, 1.0), smoothstep(0.75, 1.05, body) * 0.5);
-  plate = min(plate, EN_PALE);
+  // Bright polished copper: a slow falloff across the plate that slides with the tilt, and a narrow
+  // pale-gold flash where it mirrors the light, never white.
+  float r = dot(q, vec2(0.8, 0.6)) + t.x * 0.5 - t.y * 0.3;
+  float body = 0.74 + 0.32 * smoothstep(-0.45, 0.35, r) * smoothstep(1.4, 0.7, r) - 0.04 * q.y;
+  float flashP = exp(-dot(mir, mir) / 0.03);
+  vec3 plate = min(mix(EN_COPPER * body, EN_PALE, 0.7 * flashP), EN_PALE);
   // A faint wash of the picture's own colour, like a hand-tinted print.
   vec3 wash = face(uv, enLod(2.0 * sp, lod)).rgb;
   vec3 hue = wash / max(max(wash.r, max(wash.g, wash.b)), 0.05);
-  plate *= mix(vec3(1.0), hue, 0.2 * art);
+  plate *= mix(vec3(1.0), hue, 0.14 * art);
 
-  // The grooves: ink and oxide, a hint of the picture's colour in the art.
-  vec3 ink = mix(EN_INK, wash * 0.14, 0.2 * art);
+  // The grooves: near-black ink, a hint of the picture's colour in the art.
+  vec3 ink = mix(EN_INK, wash * 0.1, 0.15 * art);
   float cut = mix(max(frameCut, solid), cutArt, art);
   vec3 col = mix(plate, ink, cut);
 
-  // The lips of the art's strokes catch the light together: a sheen along the lines, never white.
-  float lipArt = art * lipA * cutA * (1.0 - cutB) * (1.0 - edge);
-  col = mix(col, enWall(acrossA, sideA, h, r, alongR), 0.7 * lipArt);
+  // The wall of each stroke that faces the light catches it, brightest round the flash.
+  vec2 lw = normalize(mir + vec2(1e-4, 0.0)) * smoothstep(0.02, 0.25, length(mir));
+  float lit = enWall(acrossA, sideA, lw);
+  float lipArt = art * lipA * cutA * (1.0 - cutB);
+  vec3 wall = min(EN_COPPER * (0.75 + 0.45 * exp(-dot(mir, mir) / 0.08)) + EN_PALE * 0.25 * flashP, EN_PALE);
+  col = mix(col, wall, 0.85 * lipArt * smoothstep(0.2, 0.9, lit));
   return col;
 }
 `;
