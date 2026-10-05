@@ -28,7 +28,7 @@ name below.
 
 | ja | en | Meaning |
 | --- | --- | --- |
-| 加工 | Finish | One of the 36 effects (Foil, Holographic…). Only finishes are 加工; the way words are printed is 刷り方. |
+| 加工 | Finish | One of the 40 effects (Foil, Holographic…). Only finishes are 加工; the way words are printed is 刷り方. |
 | 加工の強さ | Finish strength | How strongly the finish shows. Not 効果の強さ. |
 | 輝き | Shine | The Fine-tune tab for pattern, light and motion. |
 | 手札 / デッキ / パック | Hand / Deck / Pack | Up to seven finishes to pick from / the other owned finishes / a theme set opened once. |

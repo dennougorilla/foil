@@ -40,3 +40,13 @@ test('the Lab pack draws Neon on shader 92', () => {
   assert.match(src, /e == 92\) col = neon\(c, uv, uTilt, L, m\.r\)/);
   assert.match(src, /NEON_GLSL/);
 });
+
+test('the frame tube never flickers, so it is always there', () => {
+  assert.match(NEON_GLSL, /neonIsBorder\(id\)\) return 1\.0;/);
+});
+
+test('the picture shows on the board only as a faint matte print; the light on it is the tubes\' spill', () => {
+  const print = +NEON_GLSL.match(/\* ([\d.]+) \* art;/)![1];
+  assert.ok(print <= 0.06, `print at ${print}`);
+  assert.doesNotMatch(NEON_GLSL, /pool \* \([^)]*luma/, 'the spill must not brighten the picture');
+});
