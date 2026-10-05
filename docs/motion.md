@@ -20,7 +20,8 @@ version of any motion and no export-only motion.
   stage. A file has no hand in it, so in a GIF or APNG an unseen finger strokes the busiest part of the
   picture once per loop and the finish cools between strokes.
 - Blacklight's lamp drifts round the art in six seconds and glows dimmer while nobody holds it, on the
-  stage and in a file alike; under the pointer it turns up to full.
+  stage and in a file alike; under the pointer it turns up to full. Under a Light motion the lamp is
+  the light whatever the light setting; otherwise a fixed light holds it still.
 - Reduced motion stops the motion on the stage (the card faces you); exports still move.
 
 ## Groups and loop lengths

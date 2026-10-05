@@ -9,6 +9,7 @@ import {
   IDLE_MODES,
   IdleClock,
   idlePose,
+  lampLights,
   legacyMotion,
   LIGHT_MODES,
   lightAt,
@@ -97,6 +98,7 @@ test('each motion has its own loop, and every one divides the six-second cycle',
   assert.equal(loopCycle(t('gyre', 'orbit')), 6);
   assert.equal(loopCycle(t('pulse'), true), 6);
   // except where the motion brings its own light.
+  assert.ok(lampLights(t('spotlight', 'fixed'), true) && lampLights(t('sway'), true) && !lampLights(t('sway', 'fixed'), true) && !lampLights(t('beam'), false));
   assert.equal(loopCycle(t('beam', 'orbit')), 3);
   assert.equal(loopCycle(t('sweep', 'orbit')), 3);
   assert.equal(loopCycle(t('none')), 6);

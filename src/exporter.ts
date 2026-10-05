@@ -2,7 +2,7 @@ import { exportFrame } from './card/shape';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { exportLoop, fixedLight, framePlan, loopCycle, loopView, roomShade, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+import { exportLoop, fixedLight, framePlan, lampLights, loopCycle, loopView, roomShade, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
 // Every motion, so a file can be made with any of them.
 import './tune/moves';
 import { GIF_SAVE, type GifSize } from './exportSize';
@@ -214,7 +214,7 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
           tilt,
           // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
           // Blacklight's lamp drifts round the art, as dim as on the stage left alone (unless the tune fixes the light).
-          light: torch && tune.light !== 'fixed' ? torchAt(time / TORCH_DRIFT) : light,
+          light: lampLights(tune, torch) ? torchAt(time / TORCH_DRIFT) : light,
           lamp: torch ? TORCH_IDLE : undefined,
           alpha: 1,
           flash: pose.flash,

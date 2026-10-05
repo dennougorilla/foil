@@ -371,6 +371,12 @@ export function idlePose(t: Tune, s: number): IdlePose {
   };
 }
 
+/**
+ * Whether Blacklight's lamp (`torch`) is the light: always under the Light motions (the light setting
+ * waits there), otherwise unless the light is fixed. The stage and the files ask the same.
+ */
+export const lampLights = (t: Tune, torch: boolean) => torch && (t.light !== 'fixed' || OWN_LIGHT.has(t.idle));
+
 /** Idle seconds of one exported loop: the motion's own, or the whole cycle while the orbiting light or Blacklight's lamp goes round. */
 export const loopCycle = (t: Tune, torch = false) => (torch || orbits(t) ? IDLE_CYCLE : PERIOD[t.idle]);
 

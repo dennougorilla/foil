@@ -3,7 +3,7 @@ import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } f
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
-import { loopCycle, roomShade, tuneGl } from './tune/model';
+import { lampLights, loopCycle, roomShade, tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardPoint, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
@@ -654,7 +654,7 @@ export class Stage {
       this.pose = cardPose;
       const pointed = over && !this.drag.active && !this.hold;
       const lamp = ed.torch ? this.aimLamp(pointed ? cardUv(px, py, cardPose) : null, torchAt(motion.idleTime / TORCH_DRIFT), dt) : null;
-      const light = lamp && tune.light !== 'fixed' ? lamp : motion.light(tune, pose, tilt, pointed ? [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)] : null);
+      const light = lamp && lampLights(tune, true) ? lamp : motion.light(tune, pose, tilt, pointed ? [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)] : null);
       const shade = pose.dim ? roomShade(pose.dim) : 0;
       if (Math.abs(shade - this.roomShown) > 1e-3) this.room.style.opacity = String((this.roomShown = shade));
 
