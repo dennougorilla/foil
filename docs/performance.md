@@ -36,7 +36,7 @@ in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 | Fine-tune's tabs: Shine, Lettering (message, nameplate, print), Layers (area, brush, layer 2, mini preview), the frame's own colors (`adjust.ts`) | Fine-tune is opened, or the Lettering shortcut is pressed (at once if Fine-tune was left open) | idle, pointing at Fine-tune |
 | The print menu of one piece of text (`printPop.ts`) | a word on the card is tapped, or Fine-tune loads | idle |
 | Free placement on the card (`arrangeEdit.ts`) | a piece is set to Free (at once if it was left so) | — |
-| The trading-card layout's painter (`card/tcgFace.ts`) | the card is set to the trading-card layout (at once if it was left so) | idle, pointing at Layout |
+| The trading-card layout's painter (`card/tcgFace.ts`) and the layout of its card text (`card/effect.ts`) | the card is set to the trading-card layout (at once if it was left so) | idle, pointing at Layout |
 | The motion tray above the deck (`tune/quickTray.ts`) | the motion button is pressed | idle, pointing at the button |
 | Making a file: PNG and GIF (`exporter.ts`), APNG (`anim/apngExport.ts`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |

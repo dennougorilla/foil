@@ -1,7 +1,7 @@
 // The Foil range: which pixels of the card face take the finish.
 // Region presets come from the face mask (and a re-render without text), the brush paints on top,
 // and the brightness key is applied live in the shader so it follows animated sources.
-import { artOf, drawFace, type FaceSpec } from './card/face';
+import { artOf, drawFace, tcgContent, type FaceSpec } from './card/face';
 import { RANGE_H, RANGE_W, type RangeSnapshot } from './gl/range';
 import type { BrushMode, RangeRegion } from './featureState';
 import type { Area } from './editions';
@@ -88,7 +88,8 @@ export class RangeModel {
 
   /**
    * Text is found by drawing the same face with its words blanked and keeping what differs,
-   * so it follows whatever the card does with its lettering.
+   * so it follows whatever the card does with its lettering. A trading card keeps its parts
+   * (plates, art window) while its words are blanked, so only the words differ.
    */
   private textRegion(): Uint8Array {
     const { face, spec } = this;
@@ -97,7 +98,7 @@ export class RangeModel {
     void image;
     const key = JSON.stringify(rest);
     if (this.regions.text && key === this.textKey) return this.regions.text;
-    drawFace(this.blank.face, this.blank.mask, { ...spec, name: ' ', message: { ...spec.message, text: '' }, cardType: '' });
+    drawFace(this.blank.face, this.blank.mask, { ...spec, tcg: tcgContent(spec), name: ' ', message: { ...spec.message, text: '' }, cardType: '' });
     const a = sample(face, this.scratch).slice();
     const b = sample(this.blank.face, this.scratch);
     const out = new Uint8Array(N);
