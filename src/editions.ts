@@ -32,6 +32,7 @@ export type EditionId =
   | 'stardust'
   | 'snowglobe'
   | 'rain'
+  | 'marble'
   // Shaders in src/gl/finishes/jewel.ts and supporter.ts
   | 'kintsugi'
   | 'opal'
@@ -100,6 +101,8 @@ export const EDITIONS: Edition[] = [
   { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7, solo: true },
   // Shader in src/gl/rain.ts.
   { id: 'rain', shader: 94, color: '#a9c6d8', swirl: ['#0a1018', '#2a4152', '#8fb0c4'], value: 7, dither: true, touch: 'rain' },
+  // Shader in src/gl/marble.ts.
+  { id: 'marble', shader: 102, color: '#7f95c8', swirl: ['#07080d', '#1f2b4a', '#c9b79a'], value: 7, dither: true, touch: 'marble' },
   // Shaders in src/gl/finishes/jewel.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },

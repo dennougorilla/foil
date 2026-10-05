@@ -41,7 +41,7 @@ test('five theme packs and the supporter pack of celebrations, showpiece last', 
     metal: METAL,
     jewel: ['crystal', 'opal', 'raden', 'kintsugi'],
     light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
-    nature: ['sakura', 'frost', 'stardust', 'rain', 'magma'],
+    nature: ['sakura', 'frost', 'stardust', 'rain', 'marble', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
     supporter: ['confetti', 'snowglobe', 'fireworks'],
   });
