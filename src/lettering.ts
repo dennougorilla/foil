@@ -7,6 +7,7 @@
 // metal catch the same light and tilt as the rest of the card — on screen and
 // in every export.
 
+import { holdWord } from './card/words';
 import { createTexture, hexToRgb, uploadTexture, type Program } from './gl/gl';
 
 export type LetterStyle = 'ink' | 'deboss' | 'emboss' | 'foil' | 'spot';
@@ -231,6 +232,8 @@ export interface TextRun {
   rot?: number;
   cx?: number;
   cy?: number;
+  /** Letters printed on the pixel art's grid (dot/words.ts): their dots, and the face box they fill. */
+  glyphs?: { image: CanvasImageSource; x: number; y: number; w: number; h: number };
 }
 
 /** Turns a context about a run's pivot, if it has a turn. */
@@ -269,10 +272,13 @@ function paintMap(W: number, H: number, runs: TextRun[], radius: number) {
     glyphCtx.font = r.font;
     glyphCtx.save();
     turnFor(glyphCtx, r);
-    glyphCtx.fillText(r.text, r.x, r.y);
+    const g = r.glyphs;
+    if (g) {
+      glyphCtx.imageSmoothingEnabled = false;
+      glyphCtx.drawImage(g.image, g.x, g.y, g.w, g.h);
+    } else glyphCtx.fillText(r.text, r.x, r.y);
     glyphCtx.restore();
-    const w = glyphCtx.measureText(r.text).width;
-    let b = { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + w, y1: r.y + r.size * 0.75 };
+    let b = g ? { x0: g.x, y0: g.y, x1: g.x + g.w, y1: g.y + g.h } : { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + glyphCtx.measureText(r.text).width, y1: r.y + r.size * 0.75 };
     if (r.rot) {
       // The box that holds the turned line.
       const c = Math.cos(r.rot);
@@ -351,9 +357,12 @@ export function fieldAt([u, v]: [number, number]): TextField | null {
 }
 
 /** Paints a piece of text onto the face in its lettering's flat colour. Call with the context's font already set. */
-export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, frameInk: string, field: TextField = 'name'): void {
+export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, frameInk: string, field: TextField = 'name', stock?: number): void {
   const fill = letterFill(letteringOf(field), frameInk);
   ctx.textBaseline = 'middle';
+  const size = parseFloat(/([\d.]+)px/.exec(ctx.font)?.[1] ?? '16');
+  // Under pixel art the word is printed later, on the pixel grid (card/words.ts).
+  if (holdWord(ctx, { text, font: ctx.font, size, width: ctx.measureText(text).width, x, y, align: 'left', fill, alpha: 1, edge: null, part: field, stock })) return;
   if (fill) {
     ctx.fillStyle = fill;
     ctx.fillText(text, x, y);

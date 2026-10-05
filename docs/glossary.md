@@ -9,11 +9,12 @@ name below.
 
 | ja | en | Meaning |
 | --- | --- | --- |
-| カード | Card | The card on the stage, and the first Fine-tune tab (strength, frame, shape, layout, pixelate, backdrop). |
+| カード | Card | The card on the stage, and the first Fine-tune tab (strength, frame, shape, layout, pixelate, pixel art, backdrop). |
 | 画像 | Picture | The picture you open (or a sample). Also the second picture of Flip Lenticular (傾けると出る画像 / Picture shown on tilt). |
 | イラスト | Art | The art window of the card, where the picture shows. As an area: only inside it. |
 | 窓 | Window | The box in the crop view that you drag to choose what the card shows. Never 枠 / Frame, which is the card's border. |
 | 枠 | Frame | The card's border and its color. |
+| ピクセル化 / ドット絵 | Pixelate / Pixel art | Coarsens only the picture / redraws the card as pixel art, on カード全体 / Whole card or 枠だけ / Frame only (the frame and nameplate; the picture stays as it is). Either way the words are printed afterwards in the pixel typeface on its grid, so they stay readable. |
 | 形 | Shape | Trading card, wide, square, postcard upright or on its side, business card, and 画像の形 / Picture (the picture's own proportions). |
 | カードそのものとして使う | Use as the whole card | The picture is the whole card: no frame, nameplate or words of FOIL's, only the finish on it. |
 | 名前 | Name | The card's name on its nameplate. Not カード名. |
@@ -82,6 +83,12 @@ name below.
 | やり直す | Redo | Do again what was undone. |
 | 変える | Change | Open the choice again (a step's recap, the motion). |
 | 完了 / 閉じる | Done / Close | Finish a mode / close a panel or menu. |
+
+## Page settings
+
+| ja | en | Meaning |
+| --- | --- | --- |
+| CRT フィルター | CRT filter | The screen filter that makes the page look like an old CRT (rounded glass, scanlines, an RGB grille, glow). Off by default; its header button says only CRT. Never in exports. |
 
 ## Writing rules
 

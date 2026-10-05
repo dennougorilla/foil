@@ -59,7 +59,7 @@ test('no pack shader code is in the first load', () => {
  * the motion tray, the motions other than Sway, the backdrops other than the swirl, making a file (with the MP4 muxer),
  * reading an animated picture, each language's texts, the service worker's registration (with the Update chip and a
  * picture shared to FOIL), the deck builder's and the shop's rules, touch (only the touch finishes, which come in
- * packs, use it) and the ?fps=1 meter.
+ * packs, use it), the ?fps=1 meter and pixel art's conversion.
  */
 const ON_DEMAND = [
   'i18n/ja.ts',
@@ -92,6 +92,8 @@ const ON_DEMAND = [
   'gl/backdrops.ts',
   'fpsMeter.ts',
   'touch/heat.ts',
+  'dot/dot.ts',
+  'dot/convert.ts',
 ];
 
 test('the on-demand modules are not in the first load', () => {

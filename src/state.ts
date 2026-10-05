@@ -7,6 +7,7 @@ import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Letteri
 import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
 import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
 import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
+import { sanitizeDot, sanitizeDotScope, type Dot, type DotScope } from './dot/model';
 import { DEFAULT_BACKDROP, PLAIN_DEFAULT, sanitizeBackdrop, sanitizeBackdropColor, type BackdropId } from './backdrop';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
@@ -19,7 +20,8 @@ export const EXPORT_FORMATS: ExportFormat[] = ['gif', 'apng', 'mp4'];
 export interface State extends RangeColorState {
   lang: Lang;
   sound: boolean;
-  crt: boolean;
+  /** The CRT screen filter over the page (off unless turned on; never in exports). */
+  crtFilter: boolean;
   edition: EditionId;
   /** Layer 2: a finish laid over the card's own in an area of its own, or null (docs/layering.md). Layer 1 is `edition` with the range fields. */
   layer2: Layer2 | null;
@@ -36,7 +38,12 @@ export interface State extends RangeColorState {
   /** The picture is the whole card: FOIL's frame, nameplate and words are not drawn (their settings stay). */
   frameless: boolean;
   intensity: number;
+  /** Pixelate: the art window's step (0 = off, see dot/model.ts PIXEL_STEPS); the frame and words stay crisp. */
   pixel: number;
+  /** Pixel art, or null (src/dot). */
+  dot: Dot | null;
+  /** Where pixel art goes: the whole card, or the frame only (the picture stays as it is); whole card when frameless. */
+  dotScope: DotScope;
   name: string;
   /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
@@ -87,7 +94,7 @@ const KEY = 'foil:v1';
 const PERSIST: (keyof State)[] = [
   'lang',
   'sound',
-  'crt',
+  'crtFilter',
   'edition',
   'layer2',
   'hand',
@@ -97,6 +104,8 @@ const PERSIST: (keyof State)[] = [
   'frameless',
   'intensity',
   'pixel',
+  'dot',
+  'dotScope',
   'name',
   'nameEdited',
   'message',
@@ -125,7 +134,7 @@ const PERSIST: (keyof State)[] = [
 const APP_KEYS: (keyof State)[] = [
   'lang',
   'sound',
-  'crt',
+  'crtFilter',
   'hand',
   'adjustOpen',
   'panelTab',
@@ -151,7 +160,7 @@ export function cardOf(s: State): Card {
 const defaults = (): State => ({
   lang: 'en',
   sound: true,
-  crt: true,
+  crtFilter: false,
   edition: 'holo',
   layer2: null,
   areaLayer: 1,
@@ -163,6 +172,8 @@ const defaults = (): State => ({
   frameless: false,
   intensity: 1,
   pixel: 0,
+  dot: null,
+  dotScope: 'card',
   name: '',
   nameEdited: false,
   message: { ...DEFAULT_MESSAGE },
@@ -192,6 +203,8 @@ const defaults = (): State => ({
 function sanitize(state: State) {
   if (state.lang !== 'ja') state.lang = 'en';
   state.tune = sanitizeTune(state.tune);
+  state.dot = sanitizeDot(state.dot);
+  state.dotScope = sanitizeDotScope(state.dotScope);
   state.shape = shapeOf(state.shape);
   state.frameless = state.frameless === true;
   state.adjustOpen = state.adjustOpen === true;
@@ -210,6 +223,7 @@ function sanitize(state: State) {
   state.backdrop = sanitizeBackdrop(state.backdrop);
   state.backdropColor = sanitizeBackdropColor(state.backdropColor);
   state.flicked = state.flicked === true;
+  state.crtFilter = state.crtFilter === true;
   if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
   Object.assign(state, sanitizeRangeColors(state));
   state.layer2 = sanitizeLayer2(state.layer2);

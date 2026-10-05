@@ -3,6 +3,7 @@
 import { hexToRgb } from '../gl/gl';
 import { letterFill, letteringOf, turnFor, type TextField, type TextRun } from '../lettering';
 import type { FreeField, Placement } from '../arrange';
+import { holdWord } from './words';
 import { MESSAGE_FACES, layoutMessage, messageFont, messageLines, type Message, type MessageFont, type Rect } from '../message';
 
 const OUTLINE = '#161c1f';
@@ -24,10 +25,13 @@ type Turn = Pick<TextRun, 'rot' | 'cx' | 'cy'>;
  */
 function outlined(ctx: CanvasRenderingContext2D, lines: Line[], font: string, size: number, field: TextField, turn: Turn) {
   const fill = letterFill(letteringOf(field), PAPER);
-  if (!fill) return;
+  ctx.font = font;
+  // Under pixel art the lines are printed later, on the pixel grid (card/words.ts).
+  const edge = fill && luma(fill) < 0.28 ? PAPER : OUTLINE;
+  const held = lines.map((l) => holdWord(ctx, { text: l.text, font, size, width: ctx.measureText(l.text).width, x: l.x, y: l.y, align: 'center', fill, alpha: 1, edge, part: field, ...turn }));
+  if (held.some(Boolean) || !fill) return;
   ctx.save();
   turnFor(ctx, turn);
-  ctx.font = font;
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(4, size * 0.2);
@@ -38,7 +42,7 @@ function outlined(ctx: CanvasRenderingContext2D, lines: Line[], font: string, si
     ctx.fillText(l.text, l.x, l.y + drop);
   }
   // Dark ink gets a light edge, so it still parts from a dark picture.
-  ctx.strokeStyle = luma(fill) < 0.28 ? PAPER : OUTLINE;
+  ctx.strokeStyle = edge;
   for (const l of lines) ctx.strokeText(l.text, l.x, l.y);
   ctx.fillStyle = fill;
   for (const l of lines) ctx.fillText(l.text, l.x, l.y);
