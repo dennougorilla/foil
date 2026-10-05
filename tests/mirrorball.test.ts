@@ -41,3 +41,13 @@ test('its uniforms carry their own prefix, so they never clash with another prog
   assert.ok(names.length > 0);
   for (const n of names) assert.match(n, /^uMb[A-Z]/);
 });
+
+test('its frame is chrome in full, and its mirrors read the picture once each', async () => {
+  const { readFileSync } = await import('node:fs');
+  const card = readFileSync(new URL('../src/gl/shaders.ts', import.meta.url), 'utf8');
+  const full = card.split('\n').find((l) => l.includes('cover the frame in full')) ?? '';
+  assert.match(full, /e == 104\b/);
+  // One tone per mirror: the picture is read at the mirror's middle, not under every pixel.
+  assert.equal(MIRRORBALL_GLSL.match(/\bface\(/g)?.length, 1);
+  assert.match(MIRRORBALL_GLSL, /face\(g0 \+ atUv - uv/);
+});
