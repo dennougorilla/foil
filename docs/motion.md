@@ -1,12 +1,12 @@
 # Motion
 
 The card's automatic motion. There is one list of motions: the one picked on screen (the motion
-button above the deck, or Fine-tune → Shine) is the one a GIF or APNG is made with. The stage is the
+button above the deck, or Fine-tune → Shine) is the one a GIF, APNG or MP4 is made with. The stage is the
 preview of the export.
 
 ## The stage is the preview
 
-Left alone, the card on the stage is exactly what a GIF or APNG will show: the same motion, the same
+Left alone, the card on the stage is exactly what a GIF, APNG or MP4 will show: the same motion, the same
 loop length, the same speed and size, the same light, sheen and dimmed room. There is no stage-only
 version of any motion and no export-only motion.
 
@@ -17,7 +17,7 @@ version of any motion and no export-only motion.
 - The backdrop of the stage is the page's own; an exported loop has the finish's swirl, held still so the
   file stays small (or no backdrop at all).
 - Finishes that react to touch (Warmth and the other touch finishes) keep your own strokes on the
-  stage. A file has no hand in it, so in a GIF or APNG an unseen finger strokes the busiest part of the
+  stage. A file has no hand in it, so in a file an unseen finger strokes the busiest part of the
   picture once per loop and the finish cools between strokes.
 - Blacklight's lamp drifts round the art in six seconds and glows dimmer while nobody holds it, on the
   stage and in a file alike; under the pointer it turns up to full. Under a Light motion the lamp is

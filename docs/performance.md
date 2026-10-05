@@ -38,7 +38,7 @@ in v0.13 a quick load, such as one from a cache, skipped the fetching ahead.)
 | Free placement on the card (`arrangeEdit.ts`) | a piece is set to Free (at once if it was left so) | — |
 | The trading-card layout's painter (`card/tcgFace.ts`) and the layout of its card text (`card/effect.ts`) | the card is set to the trading-card layout (at once if it was left so) | idle, pointing at Layout |
 | The motion tray above the deck (`tune/quickTray.ts`) | the motion button is pressed | idle, pointing at the button |
-| Making a file: PNG and GIF (`exporter.ts`), APNG (`anim/apngExport.ts`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
+| Making a file: GIF (`exporter.ts`), APNG (`anim/apngExport.ts`), MP4 and its muxer (`anim/mp4Export.ts`, `mp4-muxer`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
 | The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |

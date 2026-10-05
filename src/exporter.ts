@@ -52,7 +52,13 @@ const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 
 export const fileSafe = (s: string) => (s.trim().replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'card');
 
-const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
+export const nextFrame = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
+
+/**
+ * The swirl's time at loop position p: it barely breathes and returns to where it started, so the
+ * loop is seamless and most of the backdrop stays identical between frames, which keeps the file small.
+ */
+export const swirlAt = (p: number) => 40 + Math.sin(p * Math.PI * 2) * 0.15;
 
 /** Saves a made file through the browser's download; answers with its name. */
 export function download(file: File): string {
@@ -70,7 +76,7 @@ export function download(file: File): string {
 /** Clear margin round the still card, so its tilted edge and glow are not cut. */
 const STILL_PAD = 24;
 
-/** The card drawn once at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
+/** The card drawn once (the binder's thumbnail) at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
 export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement> {
   await packsLoaded(input);
   const pad = STILL_PAD;
@@ -125,14 +131,6 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
   return out;
 }
 
-/** A flat, transparent PNG of the still card. */
-export async function exportPng(input: ExportInput): Promise<File> {
-  const canvas = await renderStill(input);
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
-  if (!blob) throw new Error('png');
-  return new File([blob], `${fileSafe(input.name)}-${input.edition.id}.png`, { type: 'image/png' });
-}
-
 function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
   const a = autoTouchFor(face, kind);
   a.at(3 + AUTO_STILL[kind]);
@@ -148,9 +146,10 @@ export interface Scene {
 }
 
 /**
- * The shared stage for GIF and APNG: a pixel swirl upscaled nearest, with the card composited on top.
+ * The shared stage for GIF, APNG and MP4: a pixel swirl upscaled nearest, with the card composited on top.
  * `W0` × `H0` is the frame for the trading card; other shapes turn and resize it (shape.ts
- * exportFrame), so `out` has the frame's real size.
+ * exportFrame), so `out` has the frame's real size. The swirl's pixels grow with a frame taller than the
+ * GIF's, so it is as coarse next to the card in every file.
  * `transparent` leaves the swirl out so only the card (and its shadow, unless `shadow` is off) is drawn.
  */
 export function createScene(input: ExportInput, W0: number, H0: number, readback = false, transparent = false, shadow = true): Scene {
@@ -161,7 +160,8 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   const ctx = out.getContext('2d', { willReadFrequently: readback })!;
   const bgCanvas = document.createElement('canvas');
   const bg = new BackgroundRenderer(bgCanvas);
-  bg.resize(W / 4, H / 4);
+  const block = Math.max(4, Math.round((4 * H0) / 600));
+  bg.resize(W / block, H / block);
   const cardCanvas = document.createElement('canvas');
   const cards = new CardRenderer(cardCanvas, { settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
@@ -300,9 +300,7 @@ export async function exportGif(
     for (let i = 0, at = 0; i < frames; at += delays[i++]) {
       await nextFrame();
       const p = at / loopMs;
-      // The swirl barely breathes and returns to where it started, so the loop is seamless and
-      // most of the backdrop stays identical between frames, which is what keeps the file small.
-      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * sourceSpan);
+      scene.draw(p, swirlAt(p), p * sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, width, height);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);
