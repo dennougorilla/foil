@@ -1,7 +1,7 @@
 // Run with `npm test`. Neon's sign layout (src/gl/neonMap.ts) on synthetic faces.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, NEON_WHITE, neonDesign, neonPosts, neonTubeMap, neonWallMap, type NeonTube } from '../src/gl/neonMap.ts';
+import { NEON_MAX_TUBES, NEON_NO_POST, NEON_REACH, NEON_WHITE, calm, enclosed, glassBend, neonDesign, neonPosts, neonTubeMap, neonWallMap, unfold, type NeonTube } from '../src/gl/neonMap.ts';
 
 // A 900 × 1260 card face read at 4 face px per cell, with the classic art window.
 const FW = 900;
@@ -114,8 +114,10 @@ test('posts hold the long tubes sparingly and leave short ones alone', () => {
   const posts = neonPosts(d);
   const total = d.tubes.reduce((s, t) => s + t.len, 0);
   // Never closer than about every 400 face px of tube, and never more than the shader holds.
-  assert.ok(posts.length / 2 >= 3 && posts.length / 2 <= total / 380, `${posts.length / 2} posts on ${total.toFixed(0)} px`);
-  assert.ok(posts.length / 2 <= 40);
+  assert.ok(posts.length / 4 >= 3 && posts.length / 4 <= total / 380, `${posts.length / 4} posts on ${total.toFixed(0)} px`);
+  assert.ok(posts.length / 4 <= 40);
+  // Each carries the tube's direction there, for its clip.
+  for (let i = 0; i < posts.length; i += 4) assert.ok(Math.abs(Math.hypot(posts[i + 2], posts[i + 3]) - 1) < 1e-3);
   const short = { tubes: [{ pts: Float32Array.from([100, 100, 100 + NEON_NO_POST - 20, 100]), len: NEON_NO_POST - 20, gas: [1, 0, 0] as [number, number, number], border: false }], width: 20 };
   assert.equal(neonPosts(short).length, 0);
 });
@@ -204,4 +206,101 @@ test('a small strong spot inside a shape (an eye) gets a ring of its own', () =>
   });
   assert.ok(ring, 'a ring round the spot');
   assert.ok(ring.len > 150, `ring ${ring.len.toFixed(0)} px`);
+});
+
+/** The tightest radius a line bends at, measured over three points `step` apart either side. */
+function tightest(p: ArrayLike<number>, k = 3): number {
+  let r = Infinity;
+  for (let i = k; i < p.length / 2 - k; i++) {
+    const ax = p[i * 2] - p[(i - k) * 2];
+    const ay = p[i * 2 + 1] - p[(i - k) * 2 + 1];
+    const bx = p[(i + k) * 2] - p[i * 2];
+    const by = p[(i + k) * 2 + 1] - p[i * 2 + 1];
+    const turn = Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
+    if (turn > 1e-3) r = Math.min(r, (Math.hypot(ax, ay) + Math.hypot(bx, by)) / 2 / turn);
+  }
+  return r;
+}
+
+test('glass is bent like a glass blower bends it: straight runs, even round bends, on the traced line', () => {
+  // A wobbly square outline: its sides shake by 3 px, its corners are sharp.
+  const p: number[] = [];
+  for (let k = 0; k < 400; k++) {
+    const s = (k / 100) % 1;
+    const side = Math.floor(k / 100);
+    const wob = 3 * Math.sin(k * 1.7);
+    const [x, y] = [[100 + 300 * s, 100 + wob], [400 + wob, 100 + 300 * s], [400 - 300 * s, 400 + wob], [100 + wob, 400 - 300 * s]][side];
+    p.push(x, y);
+  }
+  const q = glassBend(p, true, 8, 12, 108, 3);
+  // Never tighter than the narrowest bend, and the wobble gone (no bends on the sides).
+  assert.ok(tightest(q) > 10, `bends at ${tightest(q).toFixed(1)} px`);
+  for (let i = 0; i < q.length; i += 2) {
+    const [x, y] = [q[i], q[i + 1]];
+    const toSide = Math.min(Math.abs(x - 100), Math.abs(x - 400), Math.abs(y - 100), Math.abs(y - 400));
+    assert.ok(toSide < 40, `off the outline at ${x.toFixed(0)}, ${y.toFixed(0)}`);
+    // Mid-side the tube runs straight along the real side.
+    if (x > 180 && x < 320 && y < 250) assert.ok(Math.abs(y - 100) < 6, `the top side runs at ${y.toFixed(1)}`);
+  }
+});
+
+test('a zigzag (feather tips) is calmed, a single hook is kept', () => {
+  const zig: number[] = [];
+  for (let x = 0; x <= 600; x += 3) zig.push(x, 500 + (Math.floor(x / 60) % 2 ? 40 : -40) * Math.sin(((x % 60) / 60) * Math.PI));
+  const z = calm(zig, 900, 3);
+  let amp = 0;
+  for (let i = 60; i < z.length - 60; i += 2) amp = Math.max(amp, Math.abs(z[i + 1] - 500));
+  assert.ok(amp < 20, `the zigzag still swings ${amp.toFixed(0)} px`);
+  // A hook: a line that turns back once round a tip (a beak).
+  const hook: number[] = [];
+  for (let a = 0; a <= Math.PI; a += 0.02) hook.push(300 + 120 * Math.cos(a - Math.PI / 2), 300 + 120 * Math.sin(a - Math.PI / 2));
+  const h = calm(hook, 900, 3);
+  let far = 0;
+  for (let i = 0; i < h.length; i += 2) far = Math.max(far, h[i]);
+  assert.ok(far > 410, `the hook's tip pulled in to ${far.toFixed(0)}`);
+});
+
+test('a line that folds back beside itself (both sides of a slot) is cut at the fold', () => {
+  const p: number[] = [];
+  for (let y = 100; y <= 600; y += 3) p.push(300, y);
+  for (let y = 600; y >= 100; y -= 3) p.push(330, y);
+  const pieces = unfold(p, 50, 150, 3);
+  assert.ok(pieces.length >= 2);
+  for (const r of pieces) {
+    const xs = r.filter((_, i) => i % 2 === 0);
+    assert.ok(Math.max(...xs) - Math.min(...xs) < 31 || r.length < 40, 'no piece runs back beside itself');
+  }
+});
+
+test('a cropped head keeps its profile through the beak, not a smoothed hull over it', () => {
+  // A round head cut off by the bottom of the window, with a hooked beak pointing left.
+  const inHead = (x: number, y: number) => {
+    if (((x - 520) / 260) ** 2 + ((y - 760) / 520) ** 2 < 1) return true;
+    // The beak: a wedge from the head out to its tip at x = 180.
+    return x > 180 && x < 320 && Math.abs(y - 560) < ((x - 180) / 140) * 90;
+  };
+  const d = neonDesign(face((x, y) => (inHead(x, y) ? [235, 235, 230] : [12, 12, 14])), w, h, FW, FH, art);
+  const outline = d.tubes.find((t) => t.role === 'outline')!;
+  assert.ok(outline, 'a silhouette');
+  let left = Infinity;
+  for (let i = 0; i < outline.pts.length; i += 2) left = Math.min(left, outline.pts[i]);
+  assert.ok(left < 230, `the tube reaches only x = ${left.toFixed(0)}, short of the beak`);
+});
+
+test('an eye gets a ring and a pupil dot inside it, the dot all glass', () => {
+  const d = neonDesign(face((x, y) => {
+    if (Math.hypot(x - 430, y - 520) < 24) return [10, 10, 10];
+    return Math.hypot(x - 450, y - 600) < 300 ? [235, 225, 200] : [20, 60, 30];
+  }), w, h, FW, FH, art);
+  const dot = d.tubes.find((t) => t.role === 'dot');
+  assert.ok(dot, 'a pupil');
+  assert.ok(dot.len < d.width, `a dot, not a dash (${dot.len.toFixed(0)} px)`);
+  assert.ok(Math.hypot(dot.pts[0] - 430, dot.pts[1] - 520) < 20, 'on the spot');
+  const ring = d.tubes.find((t) => t.role === 'detail')!;
+  for (let i = 0; i < ring.pts.length; i += 2) assert.ok(Math.hypot(ring.pts[i] - 430, ring.pts[i + 1] - 520) > 1.6 * d.width, 'the ring clears the dot');
+});
+
+test('enclosed measures what an open line closes off with its chord', () => {
+  assert.ok(Math.abs(Math.abs(enclosed([0, 0, 100, 0, 100, 100, 0, 100])) - 10000) < 1e-6);
+  assert.ok(Math.abs(enclosed([0, 0, 50, 1, 100, 0])) < 100);
 });

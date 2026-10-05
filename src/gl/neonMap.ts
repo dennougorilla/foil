@@ -91,7 +91,7 @@ export function neonGasOf(r: number, g: number, b: number): [number, number, num
 }
 export const NEON_PINK: [number, number, number] = [1.0, 0.2, 0.62];
 /** A cool white tube (a moon, an eye's glint). */
-export const NEON_WHITE: [number, number, number] = [0.86, 0.93, 1.0];
+export const NEON_WHITE: [number, number, number] = [0.66, 0.8, 1.0];
 
 type Line = { pts: number[]; closed: boolean; contrast: number };
 
@@ -476,22 +476,152 @@ function simplify(p: number[], closed: boolean, tol: number): number[] {
   return out;
 }
 
-/** Chaikin's corner cutting: each pass rounds every corner (open lines keep their ends). */
-function chaikin(p: number[], closed: boolean, passes: number): number[] {
-  let q = p;
-  for (let k = 0; k < passes; k++) {
-    const n = q.length / 2;
-    const out: number[] = closed ? [] : [q[0], q[1]];
-    const segs = closed ? n : n - 1;
-    for (let i = 0; i < segs; i++) {
+/**
+ * A traced outline bent the way a glass blower bends a tube: the line kept within `tol` of where
+ * it ran (Douglas–Peucker), so it follows the real contour, then each corner rounded with a
+ * circular bend as wide as the straight runs either side allow (up to `rMax`, never tighter than
+ * `rMin` unless the runs are too short for it). A gentle turn becomes a long sweep, a sharp one (a
+ * beak's hook) a tight, even bend; no freehand wobble survives. Points `step` apart.
+ */
+export function glassBend(p: number[], closed: boolean, tol: number, rMin: number, rMax: number, step: number): number[] {
+  let v = simplify(p, closed, tol);
+  // Merge corners closer than the narrowest bend (they read as a kink, not a bend).
+  for (let pass = 0; pass < 3; pass++) {
+    const n = v.length / 2;
+    if (n < (closed ? 4 : 3)) break;
+    const keep: number[] = [];
+    for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
-      out.push(0.75 * q[i * 2] + 0.25 * q[j * 2], 0.75 * q[i * 2 + 1] + 0.25 * q[j * 2 + 1]);
-      out.push(0.25 * q[i * 2] + 0.75 * q[j * 2], 0.25 * q[i * 2 + 1] + 0.75 * q[j * 2 + 1]);
+      const isEnd = !closed && (i === 0 || i === n - 1);
+      const nextEnd = !closed && j === n - 1;
+      if (!isEnd && !nextEnd && j !== 0 && Math.hypot(v[j * 2] - v[i * 2], v[j * 2 + 1] - v[i * 2 + 1]) < rMin) {
+        // Replace this pair by its midpoint.
+        keep.push((v[i * 2] + v[j * 2]) / 2, (v[i * 2 + 1] + v[j * 2 + 1]) / 2);
+        i++;
+        continue;
+      }
+      keep.push(v[i * 2], v[i * 2 + 1]);
     }
-    if (!closed) out.push(q[q.length - 2], q[q.length - 1]);
-    q = out;
+    if (keep.length === v.length) break;
+    v = keep;
   }
-  return q;
+  const n = v.length / 2;
+  if (n < 2) return resample(v, closed, step);
+  const out: number[] = [];
+  const segLen = (i: number, j: number) => Math.hypot(v[j * 2] - v[i * 2], v[j * 2 + 1] - v[i * 2 + 1]);
+  if (!closed) out.push(v[0], v[1]);
+  for (let i = closed ? 0 : 1; i < (closed ? n : n - 1); i++) {
+    const a = (i + n - 1) % n;
+    const b = (i + 1) % n;
+    const vx = v[i * 2];
+    const vy = v[i * 2 + 1];
+    const la = segLen(a, i);
+    const lb = segLen(i, b);
+    const ux = (v[a * 2] - vx) / (la || 1);
+    const uy = (v[a * 2 + 1] - vy) / (la || 1);
+    const wx = (v[b * 2] - vx) / (lb || 1);
+    const wy = (v[b * 2 + 1] - vy) / (lb || 1);
+    const cosT = Math.max(-1, Math.min(1, ux * wx + uy * wy));
+    const theta = Math.acos(cosT); // the inside angle at the corner
+    const phi = Math.PI - theta; // how far the tube turns
+    if (phi < 0.02 || la < 1e-3 || lb < 1e-3) {
+      out.push(vx, vy);
+      continue;
+    }
+    // Room on each side: half a run that has a bend at its other end too, nearly all of an end run.
+    const ra = !closed && a === 0 ? 0.85 * la : 0.5 * la;
+    const rb = !closed && b === n - 1 ? 0.85 * lb : 0.5 * lb;
+    const tanH = Math.tan(phi / 2);
+    let r = Math.min(rMax, Math.min(ra, rb) / tanH);
+    r = Math.max(r, Math.min(rMin, Math.min(ra, rb) / tanH));
+    const t = r * tanH;
+    const bx = ux + wx;
+    const by = uy + wy;
+    const bl = Math.hypot(bx, by) || 1;
+    const cd = r / Math.sin(theta / 2);
+    const cx = vx + (bx / bl) * cd;
+    const cy = vy + (by / bl) * cd;
+    const p1x = vx + ux * t;
+    const p1y = vy + uy * t;
+    const p2x = vx + wx * t;
+    const p2y = vy + wy * t;
+    const a1 = Math.atan2(p1y - cy, p1x - cx);
+    let a2 = Math.atan2(p2y - cy, p2x - cx);
+    let da = a2 - a1;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    a2 = a1 + da;
+    const m = Math.max(2, Math.ceil((Math.abs(da) * r) / (step * 0.5)));
+    for (let k = 0; k <= m; k++) {
+      const ang = a1 + (da * k) / m;
+      out.push(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r);
+    }
+  }
+  if (!closed) out.push(v[(n - 1) * 2], v[(n - 1) * 2 + 1]);
+  return resample(out, closed, step);
+}
+
+/**
+ * An open traced line with its busy stretches calmed: where it zigzags (feather tips, a ragged
+ * edge: much turning that cancels out), it is replaced by a heavily smoothed course; where it
+ * turns one way (a crown, a beak's hook), it keeps its light smoothing. `S`: the card's short side.
+ */
+export function calm(p: number[], S: number, step: number): number[] {
+  const n = p.length / 2;
+  const light = smooth(p, false, (0.004 * S) / step);
+  if (n < 12) return light;
+  const heavy = smooth(p, false, (0.06 * S) / step);
+  const mid = smooth(p, false, (0.008 * S) / step);
+  const k = Math.max(2, Math.round((0.02 * S) / step));
+  const turn = new Float32Array(n);
+  for (let i = k; i < n - k; i++) {
+    const ax = mid[i * 2] - mid[(i - k) * 2];
+    const ay = mid[i * 2 + 1] - mid[(i - k) * 2 + 1];
+    const bx = mid[(i + k) * 2] - mid[i * 2];
+    const by = mid[(i + k) * 2 + 1] - mid[i * 2 + 1];
+    turn[i] = Math.atan2(ax * by - ay * bx, ax * bx + ay * by) / k;
+  }
+  const win = Math.round((0.1 * S) / step);
+  const busy = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let abs = 0;
+    let net = 0;
+    for (let j = Math.max(0, i - win); j <= Math.min(n - 1, i + win); j++) (abs += Math.abs(turn[j])), (net += turn[j]);
+    busy[i] = Math.min(1, Math.max(0, (abs - Math.abs(net) - 0.5 * Math.PI) / Math.PI));
+  }
+  const out = new Array<number>(p.length);
+  for (let i = 0; i < n; i++) {
+    let wsum = 0;
+    let c = 0;
+    for (let j = Math.max(0, i - win); j <= Math.min(n - 1, i + win); j++) (wsum += busy[j]), c++;
+    const wgt = Math.min(1, (2 * wsum) / c);
+    for (let d = 0; d < 2; d++) out[i * 2 + d] = light[i * 2 + d] + (heavy[i * 2 + d] - light[i * 2 + d]) * wgt;
+  }
+  return out;
+}
+
+/**
+ * An open line cut where it folds back along itself (both sides of a narrow slot, a hairpin): a
+ * sign tube never runs back beside its own glass. `near`: how close a fold comes; `apart`: how far
+ * along the line two points must be before they count as a fold.
+ */
+export function unfold(p: number[], near: number, apart: number, step: number): number[][] {
+  const n = p.length / 2;
+  const gap = Math.max(2, Math.round(apart / step));
+  const back = Math.max(1, Math.round(near / step));
+  const pieces: number[][] = [];
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    let fold = false;
+    for (let j = start; j < i - gap && !fold; j++) fold = Math.hypot(p[i * 2] - p[j * 2], p[i * 2 + 1] - p[j * 2 + 1]) < near;
+    if (fold) {
+      const end = Math.max(start, i - back);
+      if (end - start > 2) pieces.push(p.slice(start * 2, end * 2));
+      start = i;
+    }
+  }
+  if (n - start > 2) pieces.push(p.slice(start * 2));
+  return pieces;
 }
 
 /** How much of each side of the window a region runs along: top, bottom, left, right (0..1). */
@@ -568,6 +698,17 @@ function straight(ax: number, ay: number, bx: number, by: number, step: number):
   return out;
 }
 
+/** The area an open line encloses with the straight chord between its ends (signed). */
+export function enclosed(p: ArrayLike<number>): number {
+  const n = p.length / 2;
+  let A = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    A += p[i * 2] * p[j * 2 + 1] - p[j * 2] * p[i * 2 + 1];
+  }
+  return A / 2;
+}
+
 /** Where the horizontal line at y crosses a closed loop: its leftmost and rightmost crossing. */
 function spanAt(p: ArrayLike<number>, y: number): [number, number] | null {
   let lo = Infinity;
@@ -586,7 +727,7 @@ function spanAt(p: ArrayLike<number>, y: number): [number, number] | null {
 }
 
 /** The tube's role in the sign: the subject's silhouette, a detail inside it, a stylised stroke, or the frame. */
-export type NeonRole = 'outline' | 'detail' | 'stroke' | 'border';
+export type NeonRole = 'outline' | 'detail' | 'dot' | 'stroke' | 'border';
 
 /** Details inside the silhouette (an eye, a beak, a face) and stylised strokes, at most. */
 const NEON_MAX_DETAILS = 3;
@@ -610,6 +751,10 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
   const STEP = 3;
   // Glass bends no tighter than this (centre line).
   const minBend = 1.6 * W;
+  // Bent tubes: kept within tol of the traced contour, corners bent between rMin and rMax.
+  const tol = 0.009 * S;
+  const rMin = 0.5 * W;
+  const rMax = 0.12 * S;
   const tubes: NeonTube[] = [];
 
   // The art window in cells, a little inside its edge.
@@ -662,6 +807,9 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
   // Kept inside the art window by this much (centre line), so no tube grazes its edge.
   const margin = 1.8 * W;
   const inside = (x: number, y: number) => x > art.x + margin && x < art.x + art.w - margin && y > art.y + margin && y < art.y + art.h - margin;
+  // Both ends of an open line at the window's edge (within a tube and a half of where tubes may go).
+  const atEdge = (x: number, y: number) => Math.min(x - art.x, art.x + art.w - x, y - art.y, art.y + art.h - y) < margin + 1.5 * W;
+  const edgeToEdge = (p: ArrayLike<number>) => atEdge(p[0], p[1]) && atEdge(p[p.length - 2], p[p.length - 1]);
 
   if (n > 64) {
     // Worked on a blurred picture, so pixel-art steps, dither and fine texture never matter.
@@ -969,7 +1117,8 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
       const subjectGrown = new Uint8Array(n);
       let gasMain = fallback;
       if (subject) {
-        const sm = blur(Float32Array.from(subject), aw, ah, boxFor((0.02 * S) / sx));
+        // Lightly blurred: it follows the subject's own contour (a beak's hook, a crest), not a hull round it.
+        const sm = blur(Float32Array.from(subject), aw, ah, boxFor((0.006 * S) / sx));
         const ones = new Float32Array(n).fill(1);
         let longest: Line | null = null;
         let longestLen = 0;
@@ -984,13 +1133,8 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
           if (all) {
             // A whole shape: simplified to a few long strokes, their corners rounded into broad
             // bends, smoothed further where glass still could not bend it.
-            const base = resample(chaikin(simplify(smooth(p, true, (0.008 * S) / STEP), true, 0.012 * S), true, 5), true, STEP);
-            let q = base;
-            for (const k of [0, 0.02, 0.035, 0.05, 0.07]) {
-              q = k ? smooth(base, true, (k * S) / STEP) : base;
-              if (!kinked(q, minBend, STEP)) break;
-            }
-            if (!kinked(q, minBend, STEP) && polyLen(q) > 0.3 * S) {
+            const q = glassBend(smooth(p, true, (0.004 * S) / STEP), true, tol, rMin, rMax, STEP);
+            if (polyLen(q) > 0.3 * S) {
               outline = q;
               outlineClosed = true;
             }
@@ -1011,10 +1155,24 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
             // A cropped subject: the part of its outline inside the window, as one open tube. Where
             // it only grazes the window's edge it is pulled in; where it runs along it, it is cut.
             const N = p.length / 2;
+            if (longest.closed) {
+              // Started inside the longest stretch along the window's edge, so a brief graze (a
+              // beak's tip) never sits at the seam.
+              let bi = 0;
+              let bl = 0;
+              for (let i = 0; i < N; i++) {
+                let l = 0;
+                while (l < N && !inside(p[((i + l) % N) * 2], p[((i + l) % N) * 2 + 1])) l++;
+                if (l > bl) (bl = l), (bi = i + (l >> 1));
+                if (l) i += l;
+              }
+              const rot = p.slice();
+              for (let k = 0; k < N; k++) (p[k * 2] = rot[((bi + k) % N) * 2]), (p[k * 2 + 1] = rot[((bi + k) % N) * 2 + 1]);
+            }
             {
               const out = new Uint8Array(N);
               for (let i = 0; i < N; i++) out[i] = inside(p[i * 2], p[i * 2 + 1]) ? 0 : 1;
-              const brief = Math.round((0.12 * S) / STEP);
+              const brief = Math.round((0.3 * S) / STEP);
               for (let i = 0; i < N; ) {
                 if (!out[i]) {
                   i++;
@@ -1042,17 +1200,12 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
             }
             if (run.length) runs.push(run);
             let best: number[] | null = null;
-            for (const r of runs) {
+            for (const r0 of runs) {
+              if (r0.length < 16) continue;
+              // Zigzags calmed, cut where it folds back beside itself (both sides of a slot).
+              for (const r of unfold(calm(r0, S, STEP), 2.4 * W, 0.2 * S, STEP)) {
               if (r.length < 16) continue;
-              const base = resample(chaikin(simplify(smooth(r, false, (0.015 * S) / STEP), false, 0.022 * S), false, 5), false, STEP);
-              // Smoothed until glass can bend it whole; a curl that never smooths out is cut.
-              let top: number[] | null = null;
-              for (const k of [0, 0.02, 0.035, 0.05, 0.07, 0.1]) {
-                const q = k ? smooth(base, false, (k * S) / STEP) : base;
-                const pieces = unkink(q, minBend, STEP);
-                top = pieces.reduce<number[] | null>((a, b) => (!a || polyLen(b) > polyLen(a) ? b : a), null);
-                if (pieces.length === 1) break;
-              }
+              const top = glassBend(r, false, tol, rMin, rMax, STEP);
               // Of the pieces of a cropped outline, the upper one reads as the subject's silhouette
               // (a head and shoulders cut off by the bottom of the window).
               const worth = (q: number[]) => {
@@ -1061,6 +1214,7 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
                 return polyLen(q) * (0.6 + 0.8 * (1 - (my / (q.length / 2) - art.y) / art.h));
               };
               if (top && (!best || worth(top) > worth(best))) best = top;
+              }
             }
             if (best && polyLen(best) > 0.35 * S) outline = best;
           }
@@ -1102,48 +1256,75 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
       }
 
       // ---- Details that mean something ----
-      type Cand = { pts: number[]; closed: boolean; score: number; ring?: boolean };
+      type Cand = { pts: number[]; closed: boolean; score: number; ring?: boolean; eye?: [number, number] };
       const cands: Cand[] = [];
       const inSubject = (x: number, y: number) => !subject || subjectGrown[cellAt(x, y)] === 1;
-      // An eye: a small, strongly darker or lighter spot well inside the subject gets a ring.
+      // An eye: a small, strongly darker or lighter spot well inside the subject gets a ring with a
+      // dot for its pupil. The strongest few spots are tried in turn (the first may be the corner of
+      // a larger shape).
       {
         const D = blur(tone, aw, ah, boxFor((0.015 * S) / sx));
         const D2 = blur(tone, aw, ah, boxFor((0.05 * S) / sx));
-        const edge = Math.round((0.12 * S) / sx);
-        let bi = -1;
-        let bv = 0;
+        const Df = blur(tone, aw, ah, boxFor((0.006 * S) / sx));
+        const edge = Math.round((0.1 * S) / sx);
+        const nms = Math.max(1, Math.round((0.05 * S) / sx));
+        const v = new Float32Array(n);
         for (let y = edge; y < ah - edge; y++)
           for (let x = edge; x < aw - edge; x++) {
             const i = y * aw + x;
-            if (subject && !subject[i]) continue;
-            const v = Math.abs(D[i] - D2[i]);
-            if (v > bv) (bv = v), (bi = i);
+            if (!subject || subject[i]) v[i] = Math.abs(D[i] - D2[i]);
           }
-        if (bi >= 0 && bv > 0.11) {
+        const spots: number[] = [];
+        for (let y = edge; y < ah - edge; y++)
+          for (let x = edge; x < aw - edge; x++) {
+            const i = y * aw + x;
+            if (v[i] < 0.07) continue;
+            let top = true;
+            for (let j = Math.max(0, y - nms); j <= Math.min(ah - 1, y + nms) && top; j++)
+              for (let k = Math.max(0, x - nms); k <= Math.min(aw - 1, x + nms) && top; k++) if (v[j * aw + k] > v[i] || (v[j * aw + k] === v[i] && j * aw + k < i)) top = false;
+            if (top) spots.push(i);
+          }
+        spots.sort((p, q) => v[q] - v[p]);
+        for (const bi of spots.slice(0, 6)) {
           const cx = ((bi % aw) + ax0 + 0.5) * sx;
           const cy = (Math.floor(bi / aw) + ay0 + 0.5) * sy;
           let br = 0;
           let bg = 0;
-          for (let r = 0.022 * S; r <= 0.07 * S; r += 3) {
+          for (let r = 0.018 * S; r <= 0.07 * S; r += 3) {
             let sg = 0;
             for (let k = 0; k < 32; k++) sg += g[cellAt(cx + Math.cos((k / 32) * Math.PI * 2) * r, cy + Math.sin((k / 32) * Math.PI * 2) * r)];
             if (sg / 32 > bg) (bg = sg / 32), (br = r);
           }
-          // A spot, not the corner of a larger shape: it stands out from its surround on every side.
-          const mid = D[cellAt(cx, cy)];
-          let all = true;
-          for (let k = 0; k < 16 && all; k++) {
-            const a = (k / 16) * Math.PI * 2;
-            all = Math.abs(D[cellAt(cx + Math.cos(a) * br * 1.6, cy + Math.sin(a) * br * 1.6)] - mid) > 0.08;
-          }
-          if (bg > 0.12 && all) {
-            const Rr = Math.max(br + 0.8 * W, 0.05 * S);
-            const ring: number[] = [];
-            const m = Math.ceil((2 * Math.PI * Rr) / STEP);
-            for (let k = 0; k < m; k++) ring.push(cx + Math.cos((k / m) * 2 * Math.PI) * Rr, cy + Math.sin((k / m) * 2 * Math.PI) * Rr);
+          // A spot, not the corner of a larger shape: at some radius it stands out from its
+          // surround on every side, and that surround is all subject (an eye sits inside a head).
+          const mid = Df[cellAt(cx, cy)];
+          let all = false;
+          let er = 0;
+          for (const rr of [1.6 * br, 0.045 * S, 0.065 * S]) {
             let ok = true;
-            for (let i = 0; i < ring.length && ok; i += 2) ok = inside(ring[i], ring[i + 1]) && !isTaken(ring[i], ring[i + 1]);
-            if (ok) cands.push({ pts: ring, closed: true, score: Infinity, ring: true });
+            for (let k = 0; k < 16 && ok; k++) {
+              const a = (k / 16) * Math.PI * 2;
+              const x = cx + Math.cos(a) * rr;
+              const y = cy + Math.sin(a) * rr;
+              ok = Math.abs(Df[cellAt(x, y)] - mid) > 0.07 && (!subject || subject[cellAt(x + Math.cos(a) * rr * 0.6, y + Math.sin(a) * rr * 0.6)] === 1);
+            }
+            if (ok) {
+              all = true;
+              er = rr;
+              break;
+            }
+          }
+          if (bg < 0.1 || !all) continue;
+          // Wide enough for the pupil's dot to sit clear inside it.
+          const Rr = Math.max(Math.min(br + 0.5 * W, 0.85 * er + 0.3 * W), 1.9 * W);
+          const ring: number[] = [];
+          const m = Math.ceil((2 * Math.PI * Rr) / STEP);
+          for (let k = 0; k < m; k++) ring.push(cx + Math.cos((k / m) * 2 * Math.PI) * Rr, cy + Math.sin((k / m) * 2 * Math.PI) * Rr);
+          let ok = true;
+          for (let i = 0; i < ring.length && ok; i += 2) ok = inside(ring[i], ring[i + 1]) && !isTaken(ring[i], ring[i + 1]);
+          if (ok) {
+            cands.push({ pts: ring, closed: true, score: Infinity, ring: true, eye: [cx, cy] });
+            break;
           }
         }
       }
@@ -1161,7 +1342,7 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
       }
       // Bent like the silhouette: a few long strokes with rounded corners.
       const bend = (q: number[], closed: boolean) =>
-        smooth(resample(chaikin(simplify(smooth(q, closed, (0.015 * S) / STEP), closed, 0.02 * S), closed, 5), closed, STEP), closed, (0.015 * S) / STEP);
+        glassBend(smooth(q, closed, (0.008 * S) / STEP), closed, 0.014 * S, rMin, rMax, STEP);
       for (const l of lines) {
         const p = resample(l.pts, l.closed, STEP);
         // A closed shape inside the subject, round enough to read as a shape (a face, a cheek, a sun).
@@ -1187,7 +1368,7 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
           }
           const compact = (4 * Math.PI * Math.abs(A / 2)) / (L * L);
           const diam = 2 * Math.sqrt(Math.abs(A / 2) / Math.PI);
-          if (compact > 0.45 && diam > 0.1 * S && diam < 0.7 * S && !kinked(q, minBend, STEP)) {
+          if (compact > 0.45 && diam > 0.1 * S && diam < 0.7 * S && !kinked(q, 0.9 * rMin, STEP)) {
             cands.push({ pts: q, closed: true, score: L * l.contrast ** 2 * 2.5 });
             continue;
           }
@@ -1258,10 +1439,15 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
         // What is left must still be a drawing, not a straight bar.
         if (!c.closed && Math.hypot(r[r.length - 2] - r[0], r[r.length - 1] - r[1]) > 0.8 * polyLen(r) && polyLen(r) < 0.6 * S) continue;
         if (r.length < 8) continue;
+        // A line from one edge of the window to another that encloses nothing with it (a band, a
+        // crease) is not a drawing.
+        if (!c.closed && edgeToEdge(r) && Math.abs(enclosed(r)) < 0.03 * S * S) continue;
         let gas = gasOfSides(r);
         // An eye ring in the outline's own color would read as part of it: it takes white light.
         if (c.ring && gas.join() === gasMain.join()) gas = NEON_WHITE;
         lay(r, gas, 'detail', c.ring ? 1.6 * W : keep);
+        // The pupil: a dot of the same gas, a stub of tube no longer than it is wide.
+        if (c.eye) lay(straight(c.eye[0] - 0.2 * W, c.eye[1], c.eye[0] + 0.2 * W, c.eye[1], STEP / 3), gas, 'dot', 0.9 * W);
         details++;
       }
 
@@ -1405,6 +1591,7 @@ export function neonDesign(rgba: ArrayLike<number>, w: number, h: number, faceW:
     }
   }
 
+  tubes.length = Math.min(tubes.length, NEON_MAX_TUBES);
   // The border: one tube bent round the art window in the frame, its two ends side by side in a
   // short break near the top right, where its electrodes sit. It frames the sign, so it is drawn
   // dimmer and paler (see neon.ts).
@@ -1493,7 +1680,7 @@ export function neonWallMap(d: NeonDesign, w: number, h: number, faceW: number, 
   const out = new Float32Array(w * h * 4);
   const S = Math.min(faceW, faceH);
   const h1 = 1.6 * d.width;
-  const h2 = 0.09 * S;
+  const h2 = 0.065 * S;
   const sx = faceW / w;
   const sy = faceH / h;
   const best = new Float32Array(w * h);
@@ -1507,7 +1694,7 @@ export function neonWallMap(d: NeonDesign, w: number, h: number, faceW: number, 
       const x = p[k];
       const y = p[k + 1];
       const ds = Math.min(step, (p.length - k) / 2) * 3;
-      const r = 6 * h2;
+      const r = 5 * h2;
       const i0 = Math.max(0, Math.floor((x - r) / sx));
       const i1 = Math.min(w - 1, Math.ceil((x + r) / sx));
       const j0 = Math.max(0, Math.floor((y - r) / sy));
@@ -1520,7 +1707,7 @@ export function neonWallMap(d: NeonDesign, w: number, h: number, faceW: number, 
           // A line of lamps a height h off the wall gives 1 right behind it: ds / (2h) · (1 + d²/h²)^-3/2.
           const a = 1 + d2 / (h1 * h1);
           const b = 1 + d2 / (h2 * h2);
-          one[j * w + i] += ds * (0.7 / (2 * h1 * a * Math.sqrt(a)) + 0.08 / (2 * h2 * b * Math.sqrt(b)));
+          one[j * w + i] += ds * (0.5 / (2 * h1 * a * Math.sqrt(a)) + 0.45 / (2 * h2 * b * Math.sqrt(b)));
         }
       }
     }
@@ -1545,7 +1732,10 @@ const NEON_BORDER_POST_GAP = 620;
 /** A tube shorter than this hangs from its electrode housings alone. */
 export const NEON_NO_POST = 300;
 
-/** Where the posts hold each tube, x, y pairs in face px: evenly along it, half a gap from each end. */
+/**
+ * Where the posts hold each tube, four numbers a post: x, y in face px and the tube's direction
+ * there (a unit vector, for the clip across it). Evenly along it, half a gap from each end.
+ */
 export function neonPosts(d: NeonDesign): number[] {
   const out: number[] = [];
   for (const t of d.tubes) {
@@ -1555,10 +1745,12 @@ export function neonPosts(d: NeonDesign): number[] {
     let k = 0;
     let s = 0;
     for (let i = 2; i < p.length && k < n; i += 2) {
-      const L = Math.hypot(p[i] - p[i - 2], p[i + 1] - p[i - 1]);
+      const dx = p[i] - p[i - 2];
+      const dy = p[i + 1] - p[i - 1];
+      const L = Math.hypot(dx, dy);
       while (k < n && ((k + 0.5) * t.len) / n <= s + L) {
         const u = (((k + 0.5) * t.len) / n - s) / (L || 1);
-        out.push(p[i - 2] + (p[i] - p[i - 2]) * u, p[i - 1] + (p[i + 1] - p[i - 1]) * u);
+        out.push(p[i - 2] + dx * u, p[i - 1] + dy * u, dx / (L || 1), dy / (L || 1));
         k++;
       }
       s += L;
