@@ -17,7 +17,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Hand, deck and packs
 
 - Pick a finish from the fanned hand at the bottom; each card in the hand is a live preview. The hand starts with seven finishes: the five editions of the game FOIL is modelled on (Base, Foil, Holographic, Polychrome and Negative), plus Prism and Glitch. Number keys pick the cards in the hand in order, ← → step through them. Press the logo to shuffle the finish.
-- Every other finish comes in a theme pack: **Metal** (Relief, Gold, Platinum, Cosmo Holo, Crystal), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Snow Globe, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
+- Every other finish comes in a theme pack: **Metal** (Relief, Gold, Platinum, Cosmo Holo, Crystal), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Snow Globe, Marble, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
 - A pack is opened once and holds its whole theme, with no random draws: trace the line across its top to tear it, swipe through the cards, and the rarest one waits until last for its own entrance. Skip jumps straight to the result, and the cards are shown on your own picture so you can try them at once. An opening can be watched again from the shop.
 - The hand holds up to seven cards; every other finish you own waits in the **deck**, a small stack of card backs at the end of the hand with its count. Press it to edit your hand like a card game's deck screen: one tap moves a finish between the deck and the hand (or drag it onto a slot), with undo and a reset to the starting seven; Base always stays.
 - Opening one of the support links in the header (GitHub Sponsors or Buy Me a Coffee) once adds the **Supporter pack** (Opal, Raden, Confetti, Fireworks, Kintsugi) to the shop in this browser and its other open tabs; until then it leaves no trace. It opens like the others, with a richer wrapper and opening. It is an honor system with no payment check.
@@ -25,7 +25,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ## Finishes
 
-33 finishes in all: seven in the starting hand and 26 in five packs.
+34 finishes in all: seven in the starting hand and 27 in five packs.
 
 | Finish | Where | Look |
 | --- | --- | --- |
@@ -50,6 +50,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Frost | Nature | Frost blooming in from the edges |
 | Stardust | Nature | Rainbow star dust that twinkles, with a big starburst now and then |
 | Snow Globe | Nature | Shake it and gold glitter swirls up |
+| Marble | Nature | Ink rings float and drift over the picture; trace them and they follow your finger |
 | Magma | Nature | Lava pulsing through the cracks |
 | Halftone | Studio | Printed in dots, like a comic panel |
 | Warmth | Studio | Stroke it and your warmth brings the color back |
@@ -71,6 +72,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 - **Shallows** sinks the art like a pool floor under a net of sunlight; tilting refocuses it and splits its brightest knots into spectrum, and its ripples loop seamlessly in exports.
 - **Stardust** scatters rainbow star dust over the art, which sits a little deeper so the grains of light lead: each fine grain is a tiny facet that catches the light at its own angle, square chips of confetti foil flash a color as they face you, and a few big starbursts blaze when the angle is right and pop on a steady beat (so its GIF and APNG loops close without a seam). A wide band of light rolls across as the card tilts, and every grain inside it fires harder.
 - **Snow Globe** sets the art behind a curved pane of clear liquid full of gold glitter; shake or toss the card and the glitter swirls up, then settles.
+- **Marble** floats ink on water over the picture, between Japanese suminagashi and European marbled paper: rings of sumi and indigo, with a thread of red ochre here and there, spread from a few drops and wander slowly in the current, laid thinly enough that the picture shows through. Tilting slides the floating ink a little over the picture and catches a wet sheen on it. Trace it with a finger (or hover with a mouse, more gently) and the ink is dragged along behind the stroke, combing the rings into the feathered veins of marbled paper; press and hold and the ink winds into a spiral round the finger. Then the water slowly draws them back, mostly within ten seconds. Like Warmth it arrives with one unseen stroke as a hint, a drag strokes the card instead of tossing it, and exports draw that stroke through the busiest part of the picture once per loop. Under reduced motion the current stands still, there is no hint stroke, and a stroke stays where it was drawn.
 - **Warmth** reacts to touch: untouched, the art is printed as a blue cyanotype in thermochromic ink. Hover with a mouse or drag a finger across it and the ink flushes rose, coral and peach, then turns clear to show the picture in its own colors, and slowly cools back. Press and hold to leave a fingerprint. The card arrives with an unseen finger swiping it once, as a hint. On this finish a drag strokes the card instead of tossing it (and on a phone it does not switch finishes). Exports play the whole story (cold, a swipe, a press, cooling) and aim the swipe at the busiest part of the picture.
 - **Stained Glass** sets the picture in leaded glass lit from behind: black lead came cuts it into panes and runs along the picture's big outlines, each pane takes its color from the picture under it, and small details stay on the glass like painted line. The frame becomes a border of pale glass strips mitred at the corners, with the name painted on. Tilting moves the light behind the window across the panes and shifts the uneven thickness of the glass, so each pane glows and mottles in its own way. It has no clock of its own, so it holds still under reduced motion and loops cleanly in every export.
 - **3D Lenticular** puts the picture under a sheet of fine vertical lenses, like a 3D lenticular print: it reads the picture's depth with the same on-device model as Shadowbox (and guesses it from color until then), so the subject floats in front of the card and the background sinks behind it. Tilting sideways steps through the views, so near and far slide against each other; tilted too far, the views flip back with a faint double image, as on a real print. The ridges show as fine lines that catch the light, and bands of light and shade sweep across them with the angle. It moves only with the tilt, so it loops in exports and holds still under reduced motion.
@@ -121,7 +123,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 - Layer two finishes, like layers in a photo app (Fine-tune → **Layers**): each layer has its own finish and its own place on the card, and a little pixel card in the list lights up exactly where each one lands. Sakura on the art and Kintsugi on the frame, or Holographic on the whole card with Gold's shine over the highlights.
 - Where the two overlap, layer 2 either adds only its light (the default, so both stay visible) or is laid over layer 1, with a strength slider.
-- Layer 2 can be any finish you own except Base and the ones that need the card to themselves (Warmth, Glow, Blacklight, Shadowbox, the two lenticulars, Snow Globe). Off by default; the card, the live previews and every export show both. How it is drawn, and the options weighed, are in [`layering.md`](layering.md).
+- Layer 2 can be any finish you own except Base and the ones that need the card to themselves (Warmth, Glow, Marble, Blacklight, Shadowbox, the two lenticulars, Snow Globe). Off by default; the card, the live previews and every export show both. How it is drawn, and the options weighed, are in [`layering.md`](layering.md).
 
 ## Finish area
 

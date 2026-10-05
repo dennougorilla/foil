@@ -31,7 +31,7 @@ const editions = [
   ...['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch'],
   ...['relief', 'gold', 'platinum', 'cosmoholo', 'crystal'],
   ...['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
-  ...['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
+  ...['sakura', 'frost', 'stardust', 'snowglobe', 'marble', 'magma'],
   ...['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
   ...['opal', 'raden', 'confetti', 'fireworks', 'kintsugi'],
 ];

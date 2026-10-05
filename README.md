@@ -31,11 +31,11 @@ Every detail, finish by finish: [`docs/features.md`](docs/features.md).
 | Starting hand | Base, Foil, Holographic, Polychrome, Negative, Prism, Glitch |
 | Metal pack | Relief, Gold, Platinum, Cosmo Holo, Crystal |
 | Light pack | Galaxy, Aurora, Glow, Blacklight, Shallows |
-| Nature pack | Sakura, Frost, Stardust, Snow Globe, Magma |
+| Nature pack | Sakura, Frost, Stardust, Snow Globe, Marble, Magma |
 | Studio pack | Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox |
 | Supporter pack | Opal, Raden, Confetti, Fireworks, Kintsugi |
 
-33 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
+34 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
 
 ## Privacy
 

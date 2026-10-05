@@ -40,7 +40,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'nature',
-    finishes: ['sakura', 'frost', 'stardust', 'snowglobe', 'magma'],
+    finishes: ['sakura', 'frost', 'stardust', 'snowglobe', 'marble', 'magma'],
     wrap: 'sakura',
     colors: ['#0f1a14', '#3f8a5c', '#ffa8c8'],
     load: () => import('./gl/finishes/nature'),

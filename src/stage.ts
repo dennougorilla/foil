@@ -557,7 +557,8 @@ export class Stage {
       this.shown = `${ed.id}|${state.shape}`;
       // A touch finish arrives with an unseen finger swiping it once, then cooling: a hint to touch.
       if (ed.touch) this.heat = new HeatField(ed.touch, kOf(state.shape));
-      this.greet = ed.touch ? new Swipe(this.heat, SWIPES[0]) : null;
+      // Under reduced motion a field that moves the picture (Marble) gets no hint: nothing would carry it back.
+      this.greet = ed.touch && (this.motion || !this.heat.moves) ? new Swipe(this.heat, SWIPES[0]) : null;
       // Held still, the swipe is simply there, and fades.
       if (this.greet && !this.motion) {
         while (this.greet.step(1 / 30)) this.heat.step(1 / 30);
@@ -744,7 +745,8 @@ export class Stage {
       this.lastTouch = null;
       this.heat.lift();
     }
-    this.heat.step(dt);
+    // Under reduced motion Marble's ink stays where a finger left it instead of drifting back.
+    if (this.motion || !this.heat.moves) this.heat.step(dt);
   }
 
   private stepHand(dt: number, state: ReturnType<Store['get']>) {

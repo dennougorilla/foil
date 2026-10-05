@@ -455,7 +455,7 @@ await step('layers: layer 2 from owned finishes, each layer its own area, the ov
   const chips = await page.locator('.layer-chip').evaluateAll((els) => els.map((e) => e.dataset.v));
   const edition = (await state()).edition;
   expect(chips.length && !chips.includes('base') && !chips.includes(edition), `unexpected choices: ${chips.join()}`);
-  expect(!chips.some((v) => ['warmth', 'glow', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
+  expect(!chips.some((v) => ['warmth', 'glow', 'marble', 'blacklight', 'shadowbox', 'lenticular3d', 'lenticularflip', 'snowglobe'].includes(v)), 'a finish that needs the card to itself is offered');
   const pick = chips.includes('negative') ? 'negative' : 'poly';
   await page.click(`.layer-chip[data-v=${pick}]`);
   let s = await state();

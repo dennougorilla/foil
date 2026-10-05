@@ -57,7 +57,7 @@ Metal, not Relief, which is subtle until it is tilted).
 |---|---|---|---|
 | `metal` Metal & Gem | 金属 | Relief → Gold → Platinum → Cosmo Holo → **Crystal** | Gold |
 | `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic |
-| `nature` Nature | 自然 | Sakura → Frost → Stardust → Snow Globe → **Magma** | Sakura |
+| `nature` Nature | 自然 | Sakura → Frost → Stardust → Snow Globe → Marble → **Magma** | Sakura |
 | `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone |
 | `supporter` Supporter | サポーター限定 | Opal → Raden → Confetti → Fireworks → **Kintsugi** | Opal (rainbow on a silver-white body) |
 
@@ -66,7 +66,8 @@ metal foil, so both join Metal (Crystal stays its showpiece). Glow (glow-in-the-
 Blacklight (a UV lamp) are about a source of light, so they join Light. Stardust (star dust) and
 Snow Globe (glitter swirling in liquid) are sky and weather, so Nature. Stained Glass and the two
 lenticular prints are crafts of the print shop, so Studio, which is the one pack of six. Confetti
-and Fireworks are celebration finishes for the Supporter pack. Packs stay at five or six finishes
+and Fireworks are celebration finishes for the Supporter pack. Marble (ink floating on water) joins Nature beside the other weather and
+water finishes for now. Packs stay at five or six finishes
 each; a haul draws at most six cards at once (see the frame budget below).
 
 Why not a separate 和 (Japanese) pack: today only Sakura would be in it (Kintsugi and Raden are
