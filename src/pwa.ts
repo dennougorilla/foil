@@ -8,12 +8,10 @@ import { dictOf, type Lang } from './i18n';
 export function registerWorker(): void {
   const sw = navigator.serviceWorker;
   if (!sw) return;
-  let switching = false;
   const offer = (next: ServiceWorker) => {
     const chip = updateChip();
     chip.onclick = () => {
       sfx.tick();
-      switching = true;
       chip.disabled = true;
       next.postMessage('update');
     };
@@ -23,8 +21,12 @@ export function registerWorker(): void {
     w?.addEventListener('statechange', () => {
       if (w.state === 'installed' && sw.controller) offer(w);
     });
+  // A new version taking over (from this tab's chip or another's) reloads every page the old one served:
+  // the chunks it has not loaded yet went with the old cache. The first install takes over without a reload.
+  let served = !!sw.controller;
   sw.addEventListener('controllerchange', () => {
-    if (switching) location.reload();
+    if (served) location.reload();
+    served = true;
   });
   sw.register('./sw.js').then(
     (reg) => {
