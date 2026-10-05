@@ -111,7 +111,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ### Placement
 
-- **Placement: Auto / Free** in the Lettering tab. Auto (the default) keeps the preset places. Free lets you drag the message (and, on the classic card, the name) anywhere on the card, size it with the corner handle and turn it (±15°) with the handle above it, or both with two fingers, with guides that snap to the centre, the picture's edges and the frame, and a bar under the card (Print · Straighten · Back to Auto · Done).
+- **Placement: Auto / Free** in the Lettering tab. Auto (the default) keeps the preset places. Free lets you drag the message (and, on the classic card, the name) anywhere on the card, size it with the corner handle and turn it (±15°) with the handle above it, or both with two fingers, with guides that snap to the centre, the picture's edges and the frame (shown only while the words are held), and a bar under the card (Print · Straighten · Back to Auto · Done). A press elsewhere, Esc, Done, a scroll or a finish switch lets go and closes the print menu, so nothing is left on screen.
 - A short tap still opens the print menu, and while words are selected the card holds still and a flick does not switch finishes. A trading card's plates stay put: there only the message is free, and it leaves its box. Places are saved as shares of the card, so exports, mini cards and other card shapes match. See [`arrange.md`](arrange.md).
 
 ### Card back

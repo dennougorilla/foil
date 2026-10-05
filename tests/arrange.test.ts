@@ -1,7 +1,7 @@
 // Run with `npm test` (Node's own test runner, which strips the types itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clampTurn, halfExtent, MAX_TURN, normalizePlacements, snapInside } from '../src/arrange.ts';
+import { clampTurn, halfExtent, MAX_TURN, normalizePlacements, overlayOf, snapInside } from '../src/arrange.ts';
 
 const DEG = Math.PI / 180;
 const INNER = { x: 0.03, y: 0.02, w: 0.94, h: 0.96 };
@@ -49,4 +49,34 @@ test('words stop at the frame and never leave the card', () => {
   const out = snapInside(-0.5, 1.4, half, { x: [], y: [] }, INNER, 0.012);
   assert.ok(Math.abs(out.x - (INNER.x + half.x)) < 1e-9);
   assert.ok(Math.abs(out.y - (INNER.y + INNER.h - half.y)) < 1e-9);
+});
+
+// foil#49: the box, the guides and the bar were left on screen after the words were let go.
+const SNAP = { gx: 0.5, gy: 0.04 };
+const NONE = { gx: null, gy: null };
+
+test('guides show only while the words are held, and go when the press ends', () => {
+  const held = overlayOf({ free: true, selected: true, dragging: true, guides: SNAP });
+  assert.deepEqual(held.guides, SNAP);
+  assert.equal(held.box, true);
+  assert.equal(held.bar, true);
+  // Let go (pointerup / pointercancel / lostpointercapture / a hidden tab): the guides go, the selection stays.
+  const up = overlayOf({ free: true, selected: true, dragging: false, guides: SNAP });
+  assert.deepEqual(up.guides, NONE);
+  assert.equal(up.box, true);
+});
+
+test('letting go of the words takes the box, its handles, the bar and the guides away', () => {
+  // Even mid-drag (Esc, Done, a press elsewhere, a scroll or a finish switch).
+  for (const dragging of [false, true]) {
+    const v = overlayOf({ free: true, selected: false, dragging, guides: SNAP });
+    assert.equal(v.box, false);
+    assert.equal(v.bar, false);
+    assert.deepEqual(v.guides, NONE);
+  }
+  // Nothing held in Free: only the faint outlines of what can be picked up.
+  assert.equal(overlayOf({ free: true, selected: false, dragging: false, guides: NONE }).idle, true);
+  assert.equal(overlayOf({ free: true, selected: true, dragging: false, guides: NONE }).idle, false);
+  // Auto: nothing at all.
+  assert.deepEqual(overlayOf({ free: false, selected: false, dragging: false, guides: SNAP }), { box: false, bar: false, idle: false, guides: NONE });
 });

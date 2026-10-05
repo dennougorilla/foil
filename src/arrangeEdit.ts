@@ -1,7 +1,8 @@
 // Free placement on the card itself (docs/arrange.md): a short tap opens a piece's print menu,
 // a drag moves it, the corner handle sizes it and the handle above it turns it (two fingers do
 // both), guides snap it, a small bar beside it offers print, level, Auto and done, and while a
-// piece is selected the card holds still and takes no toss or flick.
+// piece is selected the card holds still and takes no toss or flick. Letting go (a press
+// elsewhere, Esc, Done, a scroll, a finish switch, a hidden tab) clears all of it from the screen.
 
 import './arrange.css';
 import type { Store } from './state';
@@ -10,7 +11,7 @@ import type { Stage } from './stage';
 import { sfx } from './audio';
 import { artOf, LINE, S } from './card/face';
 import { freeBox } from './card/messageFace';
-import { clampTurn, halfExtent, MAX_SIZE, MAX_TURN, MIN_SIZE, snapInside, type FreeField, type Placement } from './arrange';
+import { clampTurn, halfExtent, MAX_SIZE, MAX_TURN, MIN_SIZE, overlayOf, snapInside, type FreeField, type Placement } from './arrange';
 import type { TextRun } from './lettering';
 
 interface Options {
@@ -25,6 +26,8 @@ interface Options {
   runs: () => TextRun[];
   /** Opens a piece's print menu at an element or a point of the page. */
   openPrint: (f: FreeField, at: HTMLElement | { x: number; y: number }) => void;
+  /** Closes the print menu (letting go of the words closes it too). */
+  closePrint: () => void;
 }
 
 /** Movement (px) that turns a tap into a drag. */
@@ -53,7 +56,10 @@ export function mountArrange(o: Options): void {
   const guideY = svgEl('line', 'ar-guide');
   const underX = svgEl('line', 'ar-guide-under');
   const underY = svgEl('line', 'ar-guide-under');
-  svg.append(idle.message, idle.name, underX, underY, guideX, guideY, boxUnder, box, stalk);
+  // The box and its stalk, shown only round selected words.
+  const sel = svgEl('g', 'ar-sel');
+  sel.append(boxUnder, box, stalk);
+  svg.append(idle.message, idle.name, underX, underY, guideX, guideY, sel);
   const handle = (cls: string) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -130,10 +136,25 @@ export function mountArrange(o: Options): void {
     if (selected === f) return;
     selected = f;
     stage.hold = !!f;
-    for (const el of [sizer, turner, bar]) el.hidden = !f;
     if (f) which.textContent = o.dict().arrange.piece[f];
     document.body.classList.toggle('is-arranging', !!f);
     labels();
+    if (f) {
+      draw();
+      return;
+    }
+    // Letting go ends any gesture with it and closes the words' print menu.
+    g = null;
+    pts.clear();
+    o.closePrint();
+    endGesture();
+  }
+
+  /** The press is over (lifted, cancelled, lost, or the tab hidden): no guides, no readout. */
+  function endGesture() {
+    if (g?.kind !== 'pinch' || pts.size < 2) g = null;
+    read.hidden = true;
+    guides = { gx: null, gy: null };
     draw();
   }
 
@@ -243,8 +264,8 @@ export function mountArrange(o: Options): void {
       }
       if (bar.contains(target)) return;
       if (!o.slot.contains(target)) {
-        // Anywhere but the card, its handles and bar lets go (the panel and the print menu keep it).
-        if (selected && !target.closest('.panel, .pp')) select(null);
+        // Anywhere but the card, its handles, its bar and the print menu lets go (the panel too).
+        if (selected && !target.closest('.pp')) select(null);
         return;
       }
       pts.set(e.pointerId, [e.clientX, e.clientY]);
@@ -270,6 +291,12 @@ export function mountArrange(o: Options): void {
       e.preventDefault();
       swallowClick = true;
       g = { kind: 'drag', f, id: e.pointerId, sx: e.clientX, sy: e.clientY, uv0: uv!, p0: { ...place(f) }, moved: false };
+      // Held by the card, so a release outside the window still ends the drag.
+      try {
+        o.slot.setPointerCapture(e.pointerId);
+      } catch {
+        // A pointer the browser no longer tracks: the window's own release still ends it.
+      }
     },
     true,
   );
@@ -321,26 +348,41 @@ export function mountArrange(o: Options): void {
   const end = (e: PointerEvent) => {
     pts.delete(e.pointerId);
     if (!g) return;
-    if (g.kind === 'pinch') {
-      if (pts.size < 2) {
-        g = null;
-        read.hidden = true;
-      }
-      return;
-    }
-    if (e.pointerId !== g.id) return;
+    if (g.kind !== 'pinch' && e.pointerId !== g.id) return;
     if (g.kind === 'drag' && !g.moved && e.type === 'pointerup') {
       // A short tap: select it and open its print menu.
-      select(g.f);
-      o.openPrint(g.f, { x: e.clientX, y: e.clientY });
+      const f = g.f;
+      g = null;
+      select(f);
+      o.openPrint(f, { x: e.clientX, y: e.clientY });
     }
-    g = null;
-    read.hidden = true;
-    guides = { gx: null, gy: null };
-    draw();
+    endGesture();
   };
   addEventListener('pointerup', end, true);
   addEventListener('pointercancel', end, true);
+  for (const el of [o.slot, sizer, turner]) el.addEventListener('lostpointercapture', end);
+  // A press that never sees its release (the window lost focus, the tab was hidden) ends anyway.
+  addEventListener('blur', () => {
+    pts.clear();
+    if (g) endGesture();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    g = null;
+    pts.clear();
+    if (selected) select(null);
+    else endGesture();
+  });
+  // Scrolling the page (or a box holding the card) lets go: the words' tools stay with the card,
+  // never on the screen. A scroll during a drag is the drag's own and is ignored.
+  document.addEventListener(
+    'scroll',
+    (e) => {
+      const t = e.target;
+      if (selected && !g && (t === document || (t instanceof Node && t.contains(o.slot)))) select(null);
+    },
+    { capture: true, passive: true },
+  );
   // The click that ends a claimed press is ours, not the card's (no bounce, no second menu).
   document.addEventListener(
     'click',
@@ -408,7 +450,7 @@ export function mountArrange(o: Options): void {
 
   /** While Free is on and nothing is selected, a faint outline says which words can be picked up. */
   function drawIdle() {
-    const show = free() && !selected && !g;
+    const show = overlayOf({ free: free(), selected: !!selected, dragging: !!g, guides }).idle;
     svg.classList.toggle('is-idle', show);
     for (const f of ['message', 'name'] as FreeField[]) {
       const pts = show && movable().includes(f) ? outline(f, 10 * S) : null;
@@ -417,8 +459,16 @@ export function mountArrange(o: Options): void {
   }
 
   function draw() {
-    const b = selected && freeBox(selected);
+    const view = overlayOf({ free: free(), selected: !!selected, dragging: !!g, guides });
+    const b = view.box && selected ? freeBox(selected) : null;
+    // Everything of the selection is hidden first, so nothing is left behind when it goes.
     svg.classList.toggle('is-on', !!b);
+    sel.style.display = b ? '' : 'none';
+    for (const el of [sizer, turner]) el.hidden = !b;
+    bar.hidden = !view.bar;
+    for (const [els, v] of [[[underX, guideX], view.guides.gx], [[underY, guideY], view.guides.gy]] as const) {
+      for (const el of els) el.classList.toggle('is-on', !!b && v !== null);
+    }
     if (!b) return;
     const c = Math.cos(b.rot);
     const s = Math.sin(b.rot);
@@ -453,8 +503,7 @@ export function mountArrange(o: Options): void {
       bar.style.left = `${Math.min(Math.max(8, mid - bw / 2), innerWidth - bw - 8)}px`;
       bar.style.top = `${below ? low + 14 : Math.max(8, high - 14 - bh)}px`;
     }
-    for (const [els, v, axis] of [[[underX, guideX], guides.gx, 'x'], [[underY, guideY], guides.gy, 'y']] as const) {
-      for (const el of els) el.classList.toggle('is-on', v !== null);
+    for (const [els, v, axis] of [[[underX, guideX], view.guides.gx, 'x'], [[underY, guideY], view.guides.gy, 'y']] as const) {
       if (v === null) continue;
       const a = stage.pageAt(axis === 'x' ? v : 0.02, axis === 'x' ? 0.02 : v);
       const z = stage.pageAt(axis === 'x' ? v : 0.98, axis === 'x' ? 0.98 : v);
@@ -514,8 +563,8 @@ export function mountArrange(o: Options): void {
     }
     if (s.arrange === 'free' && ['shape', 'name', 'message', 'text', 'layout', 'cardType'].some((k) => changed.has(k as keyof typeof s))) requestAnimationFrame(refit);
     if (changed.has('lang')) labels();
-    // A piece that can no longer move is let go.
-    if (selected && (!free() || !movable().includes(selected))) select(null);
+    // A piece that can no longer move is let go, and so is any piece when the finish changes.
+    if (selected && (!free() || !movable().includes(selected) || changed.has('edition'))) select(null);
     if (changed.has('placements')) requestAnimationFrame(draw);
   });
   labels();

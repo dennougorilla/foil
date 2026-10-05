@@ -89,3 +89,30 @@ export function snapInside(x: number, y: number, half: { x: number; y: number },
   const cy = Math.min(Math.max(sy ? sy.c : y, inner.y + half.y), inner.y + inner.h - half.y);
   return { x: cx, y: cy, gx: sx && Math.abs(cx - sx.c) < 1e-6 ? sx.g : null, gy: sy && Math.abs(cy - sy.c) < 1e-6 ? sy.g : null };
 }
+
+/** What the editing overlay shows on screen. */
+export interface Overlay {
+  /** The box round the selected words, its handles. */
+  box: boolean;
+  /** The bar under the card. */
+  bar: boolean;
+  /** The faint outlines of the words that can be picked up. */
+  idle: boolean;
+  /** The guides drawn (null: none on that axis). */
+  guides: { gx: number | null; gy: number | null };
+}
+
+/**
+ * The overlay for a moment of editing: the box and bar only round selected words, the guides only
+ * while those words are held (gone the moment the press ends or they are let go), the faint
+ * outlines only while Free is on and nothing is held.
+ */
+export function overlayOf(s: { free: boolean; selected: boolean; dragging: boolean; guides: { gx: number | null; gy: number | null } }): Overlay {
+  const held = s.free && s.selected;
+  return {
+    box: held,
+    bar: held,
+    idle: s.free && !s.selected && !s.dragging,
+    guides: held && s.dragging ? s.guides : { gx: null, gy: null },
+  };
+}
