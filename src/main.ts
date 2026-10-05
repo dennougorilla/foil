@@ -1371,7 +1371,9 @@ async function faceReady() {
 
 /** The card as a file, its progress shown on the Save button under `label`; a GIF to share is smaller. */
 async function makeFile(format: 'png' | 'gif' | 'share', label: string, progress: (p: number) => void): Promise<File> {
-  const [{ exportGif, exportPng }] = await Promise.all([useExporter(), faceReady()]);
+  const { exportGif, exportPng } = await useExporter();
+  // After the fetch: the card may have changed layout meanwhile.
+  await faceReady();
   if (format === 'png') return exportPng(exportInput());
   const small = saveBtn.querySelector('.btn-text small')!;
   return exportGif(
@@ -1602,7 +1604,9 @@ keepBtn.addEventListener('click', () => {
   if (isKept()) return void withBinder((b) => b.open());
   if (keepBtn.hasAttribute('aria-busy')) return;
   keepBtn.setAttribute('aria-busy', 'true');
-  void withBinder((b) => faceReady().then(() => b.keep())).finally(() => keepBtn.removeAttribute('aria-busy'));
+  void withBinder((b) => faceReady().then(() => b.keep()))
+    .catch(() => toast(t.loadFailed, true))
+    .finally(() => keepBtn.removeAttribute('aria-busy'));
 });
 
 /** Puts a card from the binder on the stage: its picture and every setting of the card. */

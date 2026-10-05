@@ -29,7 +29,8 @@ export function mountQuickMotion(store: Store, host: HTMLElement): void {
   let wanted = false;
   btn.addEventListener('click', () => {
     if (tray) return tray.open(tray.hidden);
-    wanted = true;
+    // A second press before it arrives calls the opening off, as it would close an open tray.
+    wanted = !wanted;
     void useTray().then(
       (t) => {
         if (wanted) t.open(true);

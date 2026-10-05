@@ -119,7 +119,12 @@ export function mountApngExport({ btn, active, loading, lang, input, prepare, pl
     };
     let stopped = false;
     try {
-      const [{ exportApng }] = await Promise.all([import('./apngExport'), prepare()]);
+      // Stop works while the encoder and the face are still on their way, too.
+      const halted = new Promise<never>((_, reject) => ctl.signal.addEventListener('abort', () => reject(new DOMException('Export cancelled', 'AbortError')), { once: true }));
+      // A stop later on is the encoder's to report; this one only cuts the waits short.
+      halted.catch(() => {});
+      const { exportApng } = await Promise.race([import('./apngExport'), halted]);
+      await Promise.race([prepare(), halted]);
       const { file, bytes } = await exportApng(input(), progress, ctl.signal);
       sfx.coin();
       toast(fill(t.saved, { file, size: formatBytes(bytes) }) + t.note);
