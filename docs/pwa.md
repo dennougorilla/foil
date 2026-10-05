@@ -66,7 +66,9 @@ appears at the left of the header's chips. At 1180 px and narrower, where the he
 spare, it keeps to its icon (the pointer shows the word, screen readers read it) and takes the GitHub
 link's place while it shows, so the row is never wider than without it. The chip and its styles come
 with `src/pwa.ts`, not with the first load. Pressing it lets the new worker take over and reloads
-the page, which then runs the new version; the old version's cache is deleted at that moment. Ignored, the chip stays; once every FOIL window is closed the browser switches by itself,
+the page, which then runs the new version; the old version's cache is deleted at that moment. Every
+other FOIL tab the old worker served is taken over too and reloads with it, since the chunks it has not
+loaded yet are gone with the old cache (its card, picture and settings are saved, so they come back). Ignored, the chip stays; once every FOIL window is closed the browser switches by itself,
 so the next launch is the new version either way. The first install never shows the chip and never
 reloads the page.
 

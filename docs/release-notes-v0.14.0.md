@@ -13,4 +13,5 @@
 ## Known issues
 
 - Snow Globe stays a hand-shaken physics simulation, so its GIF / APNG loop can jump. Finishes that change when you touch them or that run a physics simulation do not have to loop seamlessly in a file (#35).
+- Offline, a font the service worker already keeps is still fetched from the network in the background, which logs an unhandled rejection (harmless; the kept font is used).
 - Low-end Android performance (#31) and opening every pack at once (#43) come in v0.14.1.
