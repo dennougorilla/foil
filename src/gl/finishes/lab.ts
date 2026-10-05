@@ -8,6 +8,7 @@ import { HeatLayer } from '../../touch/layer';
 import { PLASMA_GLSL } from '../plasma';
 import { LIQUID_METAL_GLSL, LiquidMetalLayer } from '../liquidMetal';
 import { KALEIDOSCOPE_GLSL } from '../kaleidoscope';
+import { MARBLE_GLSL } from '../marble';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -19,6 +20,7 @@ ${RAIN_GLSL}
 ${PLASMA_GLSL}
 ${LIQUID_METAL_GLSL}
 ${KALEIDOSCOPE_GLSL}
+${MARBLE_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 90) col = chameleon(c, uv, uTilt, L, m.r);
@@ -27,13 +29,20 @@ ${KALEIDOSCOPE_GLSL}
   else if (e == 96) col = plasma(c, uv, L);
   else if (e == 98) col = liquidMetal(c, uv, uTilt, L, lod, m.r);
   else if (e == 100) col = kaleidoscope(c, uv, uTilt, lod, m.r);
+  else if (e == 102) col = marble(c, uv, uTilt, L, m.r);
 `,
   // The touch finishes here (Rainy Window, …) keep their field like Warmth's heat (see touch/).
-  // Liquid Metal's ripples are a field of their own on unit 10 (unit 6 is the heat's here).
+  // Liquid Metal's ripples and Marble's flow are fields of their own, on units 10 and 11 (unit 6 is
+  // the heat's here), so each sampler reads its own texture whichever finish is drawn.
   layers: (gl) => {
     const heat = new HeatLayer(gl);
     const liquid = new LiquidMetalLayer(gl);
-    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }, { bind: (p, d) => liquid.bind(p, 10, d.heat) }];
+    const flow = new HeatLayer(gl, 'uMarbleFlow');
+    return [
+      { bind: (p, d) => heat.bind(p, 6, d.heat) },
+      { bind: (p, d) => liquid.bind(p, 10, d.heat) },
+      { bind: (p, d) => flow.bind(p, 11, d.heat) },
+    ];
   },
 };
 export default finishes;

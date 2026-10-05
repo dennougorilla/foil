@@ -41,7 +41,7 @@ const GROUPS: { id: Group; keys: Key[] }[] = [
 
 
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
-const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'blacklight', 'neon', 'plasma', 'stardust', 'snowglobe', 'rain', 'kintsugi', 'opal', 'confetti', 'fireworks', 'liquidmetal']);
+const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'blacklight', 'neon', 'plasma', 'stardust', 'snowglobe', 'rain', 'marble', 'kintsugi', 'opal', 'confetti', 'fireworks', 'liquidmetal']);
 
 
 const formatChoice = (k: ChoiceKey, v: string, t: Dict['tune']) =>
