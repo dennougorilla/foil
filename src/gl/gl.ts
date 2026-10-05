@@ -14,8 +14,8 @@ export interface PendingProgram {
   get(): Program;
 }
 
-/** `attrib0`: an attribute pinned to location 0, so programs built from the same vertex shader share a VAO. */
-export function startProgram(gl: WebGL2RenderingContext, vs: string, fs: string, attrib0?: string): PendingProgram {
+/** `attribs`: attributes pinned to locations 0, 1…, so programs built from the same vertex shader share a VAO. */
+export function startProgram(gl: WebGL2RenderingContext, vs: string, fs: string, ...attribs: string[]): PendingProgram {
   const shader = (type: number, src: string) => {
     const s = gl.createShader(type)!;
     gl.shaderSource(s, src);
@@ -27,12 +27,16 @@ export function startProgram(gl: WebGL2RenderingContext, vs: string, fs: string,
   const prog = gl.createProgram()!;
   gl.attachShader(prog, v);
   gl.attachShader(prog, f);
-  if (attrib0) gl.bindAttribLocation(prog, 0, attrib0);
+  attribs.forEach((name, i) => gl.bindAttribLocation(prog, i, name));
   gl.linkProgram(prog);
   const parallel = gl.getExtension('KHR_parallel_shader_compile');
   let built: Program | null = null;
+  let complete = !parallel;
   return {
-    done: () => !!built || !parallel || gl.getProgramParameter(prog, parallel.COMPLETION_STATUS_KHR) === true,
+    done() {
+      complete ||= !!built || gl.getProgramParameter(prog, parallel!.COMPLETION_STATUS_KHR) === true;
+      return complete;
+    },
     get() {
       if (built) return built;
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
@@ -51,8 +55,6 @@ export function startProgram(gl: WebGL2RenderingContext, vs: string, fs: string,
     },
   };
 }
-
-export const createProgram = (gl: WebGL2RenderingContext, vs: string, fs: string): Program => startProgram(gl, vs, fs).get();
 
 export function quadBuffer(gl: WebGL2RenderingContext, half = 1): WebGLBuffer {
   const b = gl.createBuffer()!;

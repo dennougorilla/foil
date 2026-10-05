@@ -1,7 +1,7 @@
-// Live light and idle motion for the stage. Pure bookkeeping: the stage asks for numbers each
-// frame and keeps doing all of the drawing itself. The idle motion itself is `idlePose` in
-// model.ts, shared with the exported loops, so a GIF moves exactly as the card does here.
-import { IdleClock, TUNE_DEFAULTS, type Tune } from './model';
+// Live light and motion for the stage. Pure bookkeeping: the stage asks for numbers each frame and
+// keeps doing all of the drawing itself. The motion itself is `idlePose` in model.ts, shared with
+// the exported loops, so a GIF moves exactly as the card does here.
+import { hasMove, IdleClock, loadMoves, TUNE_DEFAULTS, type Tune } from './model';
 import { GyroTilt } from './gyro';
 
 /** Phones and tablets with a motion sensor tilt the card as the device tilts. */
@@ -12,15 +12,21 @@ export class LiveMotion extends IdleClock {
   comparing = false;
   /** The tune the stage should draw right now. */
   view = (t: Tune): Tune => (this.comparing ? TUNE_DEFAULTS : t);
-  /** Clock for the finishes' own animation (shader time). Stops under reduced motion. */
-  fx = 0;
+  /**
+   * Clock for the finishes' own animation (shader time): the motion's own, so the stage left alone
+   * shows the file's frame. Stops under reduced motion.
+   */
+  get fx() {
+    return this.idleTime;
+  }
   /** The stage's flip to a new picture (radians, 0 when not flipping); set by the stage each frame. */
   flip = 0;
   private gyro = { tilt: new GyroTilt(), asked: false, sx: 0, sy: 0, last: 0 };
 
   step(dt: number, t: Tune, still: boolean, facing: boolean, held = false) {
+    // A motion other than Sway is fetched the first time it is wanted; the card rests until it arrives.
+    if (!hasMove(t.idle)) void loadMoves().catch(() => {});
     super.step(dt, t, still, facing, held);
-    if (!still) this.fx += dt * t.speed;
     const k = 1 - Math.exp(-dt * 14);
     this.gyro.sx += (this.gyro.tilt.x - this.gyro.sx) * k;
     this.gyro.sy += (this.gyro.tilt.y - this.gyro.sy) * k;

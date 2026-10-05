@@ -1,42 +1,12 @@
 // High-quality animated export: the same orbit as the GIF, but full colour and with the card's
 // rounded corners and soft shadow kept on a transparent background, saved as APNG.
 import { createScene, download, fileSafe, packsLoaded, type ExportInput, type Scene } from '../exporter';
-import { exportLoop, framePlan, TUNE_DEFAULTS, type ExportMotion, type Tune } from '../tune/model';
+import { TUNE_DEFAULTS } from '../tune/model';
+import { apngPlan, H, W } from './apngPlan';
 import type { ApngRequest, ApngResponse } from './apngWorker';
-import { exportFrame } from '../card/shape';
 
-const W = 320;
-const H = 400;
-/** Up to 12.5 fps: smooth enough for the slow idle motion, and half the frames (and bytes) of 25 fps. */
-const DELAY = 80;
-/** Long loops play at a lower frame rate rather than growing the file without end. */
-const MAX_FRAMES = 60;
 /** Share of the bar given to drawing; encoding overlaps it and fills the rest. */
 const DRAW_SHARE = 0.3;
-/** Measured average for one deflated frame at this size across finishes (busy pictures run higher). */
-const BYTES_PER_FRAME = 95_000;
-
-export interface ApngPlan {
-  width: number;
-  height: number;
-  /** Delay of each frame in whole ms; together they add up to the loop length. */
-  delays: number[];
-  /** Rough size of the finished file in bytes. */
-  bytes: number;
-  /** Source time one loop covers (see `exportLoop`). */
-  sourceSpan: number;
-}
-
-/**
- * Frame timing, size and expected bytes for a card `aspect` tall (height / width): the loop of the
- * export's motion, as for the GIF.
- */
-export function apngPlan(tune: Tune, aspect: number, loopMs?: number, motion: ExportMotion = 'stage'): ApngPlan {
-  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs, motion);
-  const delays = framePlan(ms, DELAY, MAX_FRAMES, 1);
-  const f = exportFrame(aspect, W, H);
-  return { width: f.W, height: f.H, delays, bytes: Math.round(delays.length * BYTES_PER_FRAME * ((f.W * f.H) / (W * H))), sourceSpan };
-}
 
 const aborted = () => new DOMException('Export cancelled', 'AbortError');
 
@@ -72,7 +42,7 @@ export async function exportApng(
   if (signal.aborted) throw aborted();
   await packsLoaded(input);
   if (signal.aborted) throw aborted();
-  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.face.height / input.face.width, input.loopMs, input.motion);
+  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.face.height / input.face.width, input.loopMs, !!input.edition.torch);
   const worker = new Worker(new URL('./apngWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: ApngRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   let drawn = 0;
@@ -110,7 +80,7 @@ export async function exportApng(
     send({ type: 'start', width: plan.width, height: plan.height });
     for (let i = 0; i < frames; i++) {
       await nextFrame(signal);
-      scene.draw(at / loopMs, 0, loopMs / 1000, (at / loopMs) * plan.sourceSpan);
+      scene.draw(at / loopMs, 0, (at / loopMs) * plan.sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, plan.width, plan.height);
       send({ type: 'frame', data: data.buffer, delay: plan.delays[i] }, [data.buffer]);
       at += plan.delays[i];

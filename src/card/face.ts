@@ -6,7 +6,6 @@ import { paintFree, paintMessage } from './messageFace';
 import type { Arrange, FreeField, Placement, Placements } from '../arrange';
 import { artWindow, shapeById, SHORT, type ShapeId } from './shape';
 import { tcgFrame, type CardLayout } from './tcg';
-import { paintTcg } from './tcgFace';
 
 /** Pixel literals below were tuned at 600px across the short side. */
 export const S = SHORT / 600;
@@ -284,7 +283,19 @@ export function paintPips(ctx: CanvasRenderingContext2D, spec: FaceSpec, right: 
   }
 }
 
-/** Paints the face and its mask; returns the text it printed, for the lettering map (`setTextRuns`). */
+/** The trading card's painter: fetched the first time a face in that layout is wanted (docs/performance.md). */
+let tcgFace: typeof import('./tcgFace') | null = null;
+let tcgLoad: Promise<unknown> | null = null;
+export function loadTcgFace(): Promise<unknown> {
+  tcgLoad ??= import('./tcgFace').then((m) => (tcgFace = m));
+  tcgLoad.catch(() => (tcgLoad = null));
+  return tcgLoad;
+}
+
+/** Whether drawFace can paint this face now: a trading card waits for its painter (loadTcgFace). */
+export const canPaint = (spec: Pick<FaceSpec, 'layout'>) => spec.layout !== 'tcg' || !!tcgFace;
+
+/** Paints the face and its mask (see canPaint); returns the text it printed, for the lettering map (`setTextRuns`). */
 export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
   const { W, H } = sized(face, spec.shape);
   sized(mask, spec.shape);
@@ -315,7 +326,7 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   const art = faceArt(spec);
   arts.set(face, art);
   const classic = spec.layout !== 'tcg';
-  const runs = classic ? paintClassic(ctx, spec, f, frame, art, H) : paintTcg(ctx, spec, f);
+  const runs = classic ? paintClassic(ctx, spec, f, frame, art, H) : tcgFace!.paintTcg(ctx, spec, f);
 
   // Mask: red = art window, green = frame, blue = ink outline
   const m = mask.getContext('2d')!;

@@ -78,6 +78,16 @@ button {
   z-index: 0;
 }
 
+/* A Light motion's dim room over the backdrop; the stage sets its opacity (exporter.ts darkens a file's swirl alike). */
+.room {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: rgb(6 8 20);
+  opacity: 0;
+  pointer-events: none;
+}
+
 .app {
   position: relative;
   z-index: 1;
@@ -2310,21 +2320,31 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* The loop's motion: As on screen (two columns) beside Gyre, then the other motions made for exports, three a row. */
-.seg.seg-motions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+/* The loop's motion: the card's own, named in a dark pocket with its length, and a way to the tray. */
+.save-motion {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--pocket);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.45);
 }
 
-.seg-motions .seg-btn {
-  min-height: 34px;
-  padding: 2px 4px;
-  font-size: 14px;
+.save-motion b {
+  font-size: 18px;
   line-height: 1.1;
+  color: var(--text);
 }
 
-.seg-motions .seg-btn:first-child {
-  grid-column: span 2;
+.save-motion small {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.save-motion .link {
+  margin-left: auto;
 }
 
 .matte {

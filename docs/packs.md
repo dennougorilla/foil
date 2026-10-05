@@ -121,8 +121,8 @@ Nothing of a pack loads before the shop or View deck is opened, or a pack finish
   the modules of the packs on its tray for their wrappers.
 - The support links only flip a flag; the Supporter pack module loads on opening.
 
-Measured in the PR: the first-load JS (gzip) and the time to the first card frame must not be
-worse than v0.9.3.
+Measured in the PR: the first-load JS (gzip) and the time to the first card frame must not get
+worse; the budget and the latest numbers are in [`performance.md`](performance.md).
 
 ## The shop and the pack — measured against Balatro
 

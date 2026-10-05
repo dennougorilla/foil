@@ -305,104 +305,60 @@
   animation: var(--act, none) 1.6s ease-in-out infinite;
 }
 
-.tune-opt[data-value='orbit'],
-.tune-opt[data-value='spin'] {
+/* The motions in their four groups: a coloured tag over each row, six tiles a row. */
+.tune-seg.tune-motions {
+  display: block;
+}
+
+.tune-mgroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.tune-mgroup:first-child {
+  margin-top: 0;
+}
+
+/* The group's colour (acts.css), as a pixel tab before its name. */
+.tune-mgroup::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--mg);
+  box-shadow: 0 2px 0 var(--edge);
+}
+
+.tune-mrow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tune-mrow .tune-opt {
+  min-height: 46px;
+  padding: 5px 1px 4px;
+  font-size: 11px;
+  letter-spacing: -0.02em;
+}
+
+/* None closes the first row, set apart: the card held still. */
+.tune-mrow .tune-opt[data-value='none'] {
+  grid-row: 1;
+  grid-column: -2;
+}
+
+/* The motions' own moves are in acts.css. */
+.tune-opt[data-value='orbit'] {
   --act: tune-act-spin;
-}
-
-.tune-opt[data-value='sway'] {
-  --act: tune-act-sway;
-}
-
-.tune-opt[data-value='breathe'] {
-  --act: tune-act-breathe;
-}
-
-.tune-opt[data-value='float'] {
-  --act: tune-act-float;
-}
-
-.tune-opt[data-value='pendulum'] svg {
-  transform-origin: 50% 6%;
-  --act: tune-act-swing;
-}
-
-.tune-opt[data-value='wobble'] {
-  --act: tune-act-wobble;
-}
-
-.tune-opt[data-value='bounce'] {
-  --act: tune-act-bounce;
-}
-
-.tune-opt[data-value='glint'] {
-  --act: tune-act-glint;
-}
-
-.tune-opt[data-value='turn'] {
-  --act: tune-act-turn;
-}
-
-@keyframes tune-act-float {
-  50% { transform: translateY(-3px); }
-}
-
-@keyframes tune-act-swing {
-  25% { transform: rotate(14deg); }
-  75% { transform: rotate(-14deg); }
-}
-
-@keyframes tune-act-wobble {
-  20% { transform: rotate(-6deg); }
-  45% { transform: rotate(5deg); }
-  70% { transform: rotate(-3deg); }
-}
-
-@keyframes tune-act-bounce {
-  0%, 40%, 100% { transform: none; }
-  20% { transform: translateY(-4px); }
-  48% { transform: scale(1.15, 0.85); }
-}
-
-@keyframes tune-act-glint {
-  0%, 60%, 100% { transform: scale(0.8); opacity: 0.6; }
-  75% { transform: scale(1.2) rotate(45deg); opacity: 1; }
-}
-
-@keyframes tune-act-turn {
-  0%, 30% { transform: none; }
-  100% { transform: rotateY(360deg); }
 }
 
 .tune-opt[data-value='pointer'] {
   --act: tune-act-point;
-}
-
-@keyframes tune-act-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes tune-act-sway {
-  25% {
-    transform: translateX(-2px) rotate(-6deg);
-  }
-  75% {
-    transform: translateX(2px) rotate(6deg);
-  }
-}
-
-@keyframes tune-act-breathe {
-  50% {
-    transform: scale(1.25);
-  }
-}
-
-@keyframes tune-act-point {
-  50% {
-    transform: translate(2px, 2px);
-  }
 }
 
 .tune-help {

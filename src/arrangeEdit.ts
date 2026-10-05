@@ -149,16 +149,6 @@ export function mountArrange(o: Options): void {
     tLevel.textContent = t.level;
     tAuto.textContent = t.back;
     tDone.textContent = t.done;
-    hint();
-  }
-
-  /** The hint under the tag beside the card says what Free does, while it is on. */
-  function hint() {
-    const el = document.querySelector<HTMLElement>('#info .card-hint');
-    if (!el) return;
-    const t = o.dict();
-    const touch = matchMedia('(pointer: coarse)').matches;
-    el.textContent = free() ? (touch ? t.arrange.cardHintTouch : t.arrange.cardHint) : touch ? t.cardHintTouch : t.cardHint;
   }
 
   // ---------- Geometry ----------
@@ -477,12 +467,20 @@ export function mountArrange(o: Options): void {
       }
     }
   }
+  // The pieces follow the card while Free is on; once it is off, the outlines are cleared and the loop rests.
+  let looping = false;
   const loop = () => {
     if (selected) draw();
     drawIdle();
+    looping = free() || !!selected;
+    if (looping) requestAnimationFrame(loop);
+  };
+  const wake = () => {
+    if (looping) return;
+    looping = true;
     requestAnimationFrame(loop);
   };
-  requestAnimationFrame(loop);
+  wake();
 
   // ---------- Starting Free where Auto had each piece ----------
   const measure = document.createElement('canvas').getContext('2d')!;
@@ -510,9 +508,11 @@ export function mountArrange(o: Options): void {
   }
 
   store.on((s, changed) => {
-    if (changed.has('arrange') && s.arrange === 'free') seed();
+    if (changed.has('arrange') && s.arrange === 'free') {
+      seed();
+      wake();
+    }
     if (s.arrange === 'free' && ['shape', 'name', 'message', 'text', 'layout', 'cardType'].some((k) => changed.has(k as keyof typeof s))) requestAnimationFrame(refit);
-    if (changed.has('arrange')) hint();
     if (changed.has('lang')) labels();
     // A piece that can no longer move is let go.
     if (selected && (!free() || !movable().includes(selected))) select(null);

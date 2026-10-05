@@ -3,7 +3,7 @@ import { BackgroundRenderer, CardRenderer, hexToRgb, type Particle, type RGB } f
 import { sfx } from './audio';
 import type { Store } from './state';
 import { motion } from './tune/motion';
-import { restLight, tuneGl } from './tune/model';
+import { lampLights, loopCycle, roomShade, tuneGl } from './tune/model';
 import { AUTO_LOOP, AUTO_STILL, AutoTouch, cardPoint, cardUv, HeatField, Swipe, SWIPES, type TouchKind } from './touch/heat';
 import { flickDir } from './handStep';
 import { QualityGovernor } from './quality';
@@ -118,9 +118,13 @@ export class Stage {
   private drag = { active: false, id: -1, finger: false, sx: 0, sy: 0, lx: 0, ly: 0, lt: 0, vx: 0, vy: 0, moved: 0 };
   /** A press on a finish that reacts to touch (or carries a lamp): it strokes the card instead of tossing it. */
   private rub = { active: false, id: -1 };
-  /** Where Blacklight's lamp shines on the main card (card uv); it glides to the pointer or its drift. */
+  /** Where the pointer last held Blacklight's lamp on the main card (card uv), and how much of the lamp it still holds (0 adrift). */
   private lamp: [number, number] = torchAt(0);
+  private lampHeld = 0;
   private lampPower = TORCH_IDLE;
+  /** A Light motion's dim room over the backdrop (as a file darkens its swirl). */
+  private room: HTMLElement;
+  private roomShown = 0;
   /** Where the card was last touched (card uv), to warm the whole way from there, and the pointer then (css px). */
   private lastTouch: [number, number] | null = null;
   private lastPointer: [number, number] = [0, 0];
@@ -151,7 +155,10 @@ export class Stage {
   constructor(o: StageOptions) {
     this.o = o;
     this.cards = new CardRenderer(o.canvas);
-    this.bg = new BackgroundRenderer(o.bgCanvas);
+    this.bg = new BackgroundRenderer(o.bgCanvas, { live: true });
+    this.room = document.createElement('div');
+    this.room.className = 'room';
+    o.bgCanvas.after(this.room);
     const ed = EDITIONS.find((e) => e.id === o.store.get().edition) ?? EDITIONS[0];
     this.palette = ed.swirl.map(hexToRgb) as [RGB, RGB, RGB];
     this.syncHand();
@@ -603,11 +610,8 @@ export class Stage {
         this.ry.target = gyro[0] * 0.32 * amp;
         this.rx.target = -gyro[1] * 0.28 * amp;
         this.rz.target = 0;
-      } else if (this.pointer.inside) {
-        this.ry.target = clamp(nx * 0.05, -0.12, 0.12) * amp;
-        this.rx.target = -clamp(ny * 0.05, -0.12, 0.12) * amp;
-        this.rz.target = 0;
       } else {
+        // Untouched, the card is the preview of its GIF: nothing but the motion moves it.
         this.ry.target = 0;
         this.rx.target = 0;
         this.rz.target = 0;
@@ -634,8 +638,8 @@ export class Stage {
         }
       }
 
-      // Idle motion and the light come from the tune (sway and pointer-follow by default), timed by
-      // the same clock as an exported loop (see idlePose in tune/model.ts).
+      // The motion and the light come from the tune (Sway and pointer-follow by default), timed by
+      // the same clock as an exported loop (see idlePose in tune/model.ts): left alone, this is the file.
       const pose = motion.pose(tune);
       const fx = pose.dx * r.h;
       const fy = pose.dy * r.h;
@@ -649,11 +653,10 @@ export class Stage {
       const cardPose = { cx: r.cx + this.ox.x + fx, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
       this.pose = cardPose;
       const pointed = over && !this.drag.active && !this.hold;
-      let light: [number, number];
-      if (ed.torch) light = this.aimLamp(pointed ? cardUv(px, py, cardPose) : torchAt(motion.fx / TORCH_DRIFT), pointed, dt);
-      else if (pointed) light = [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)];
-      else light = restLight(tilt);
-      light = motion.light(tune, light);
+      const lamp = ed.torch ? this.aimLamp(pointed ? cardUv(px, py, cardPose) : null, torchAt(motion.idleTime / TORCH_DRIFT), dt) : null;
+      const light = lamp && lampLights(tune, true) ? lamp : motion.light(tune, pose, tilt, pointed ? [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)] : null);
+      const shade = pose.dim ? roomShade(pose.dim) : 0;
+      if (Math.abs(shade - this.roomShown) > 1e-3) this.room.style.opacity = String((this.roomShown = shade));
 
       // The card's shadow drops further as it lifts or rises off the table.
       const lift = (this.sc.x * pose.scale - 1) * 120 - fy * 0.6 + (this.drag.active ? 14 : 0);
@@ -669,6 +672,12 @@ export class Stage {
           alpha: 1,
           flash: this.flash + pose.flash,
           glint: pose.glint,
+          beam: pose.beam,
+          spot: pose.spot,
+          dim: pose.dim,
+          star: pose.star,
+          // The finishes' own motion closes on the loop's length, as in the file.
+          loop: tune.speed > 0 ? loopCycle(tune, !!ed.torch) : 0,
           shadow: [10 + lift * 0.3 - (RY - pose.spin) * 18, 16 + lift * 0.5 + RX * 10],
           rangeView: this.rangeView,
           heat: ed.touch ? this.heat : undefined,
@@ -693,14 +702,21 @@ export class Stage {
   }
 
   /**
-   * Blacklight's lamp: right under the pointer at full power, gliding more slowly back to its
-   * drift when let go, where it glows dimmer, so taking hold of it is unmistakable.
+   * Blacklight's lamp: right under the pointer (`at`) at full power, gliding more slowly back to its
+   * `drift` when let go, where it glows dimmer, so taking hold of it is unmistakable. Back on its
+   * drift it is exactly where a file puts it.
    */
-  private aimLamp(at: [number, number], pointed: boolean, dt: number): [number, number] {
-    this.lampPower += ((pointed ? 1 : TORCH_IDLE) - this.lampPower) * (1 - Math.exp(-dt * 8));
-    const k = 1 - Math.exp(-dt * (pointed ? 24 : 3));
-    this.lamp = [this.lamp[0] + (at[0] - this.lamp[0]) * k, this.lamp[1] + (at[1] - this.lamp[1]) * k];
-    return this.lamp;
+  private aimLamp(at: [number, number] | null, drift: [number, number], dt: number): [number, number] {
+    this.lampPower += ((at ? 1 : TORCH_IDLE) - this.lampPower) * (1 - Math.exp(-dt * 8));
+    if (at) {
+      const k = 1 - Math.exp(-dt * 24);
+      if (!this.lampHeld) this.lamp = drift;
+      this.lamp = [this.lamp[0] + (at[0] - this.lamp[0]) * k, this.lamp[1] + (at[1] - this.lamp[1]) * k];
+    }
+    this.lampHeld += ((at ? 1 : 0) - this.lampHeld) * (1 - Math.exp(-dt * (at ? 24 : 3)));
+    if (!at && this.lampHeld < 1e-3) this.lampHeld = 0;
+    const h = this.lampHeld;
+    return [drift[0] + (this.lamp[0] - drift[0]) * h, drift[1] + (this.lamp[1] - drift[1]) * h];
   }
 
   /** Warms the main card from the last touched spot to `at` (card uv), or ends the touch when null. */

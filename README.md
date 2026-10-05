@@ -19,7 +19,7 @@ English · [日本語](README.ja.md)
 - **Layers.** Put two finishes on one card, each in its own place (art, frame, name, highlights, or painted with a brush).
 - **Binder.** Keep cards in a binder of six pages that lives in this browser; drag them between pockets and bring any of them back to the stage.
 - **Share.** On phones, send the card as a moving GIF straight to the share sheet (X, LINE and the like).
-- **Export.** Save a transparent PNG, a looping GIF or a full-color transparent APNG. The loop moves as on screen, or with one of 13 motions made for exports.
+- **Export.** Save a transparent PNG, a looping GIF or a full-color transparent APNG. The loop is what the card does on screen: pick one of 20 motions in four groups and the file moves just like that.
 - **Phones.** The card tilts with the device's motion sensor, and a phone held upright shows the card first, nearly edge to edge.
 
 Every detail, finish by finish: [`docs/features.md`](docs/features.md).

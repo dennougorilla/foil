@@ -1,0 +1,477 @@
+/* The motion tray above the deck (quickTray.ts), loaded when the motion button is first pressed. */
+
+/* The tray rises above the button, right-aligned with it so it never leaves the stage. */
+.qm-tray {
+  position: absolute;
+  right: -10px;
+  bottom: calc(100% + 14px);
+  width: calc(var(--qm-label) + 6 * var(--qm-tile) + 6 * 6px + 24px);
+  --qm-label: 92px;
+  --qm-tile: 56px;
+  padding: 10px 12px 12px;
+  border-radius: 14px;
+  background: #141c20;
+  box-shadow: inset 0 0 0 2px #34454c, 0 0 0 2px #05080a, 0 6px 0 2px #05080a, 0 18px 40px rgba(0, 0, 0, 0.5);
+  transform-origin: calc(100% - 40px) 100%;
+  animation: qm-open 0.24s var(--ease-back);
+}
+
+.qm-tray[hidden] {
+  display: none;
+}
+
+/* A notch pointing down at the button. */
+.qm-tray::after {
+  content: '';
+  position: absolute;
+  right: var(--notch, 40px);
+  top: 100%;
+  border: 8px solid transparent;
+  border-top-color: #34454c;
+}
+
+.qm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* What the tray is for: the motion picked here is the one a GIF or APNG is made with. */
+.qm-note {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--text-dim);
+}
+
+.qm-title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.qm-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -4px -4px -4px auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #26333a;
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px #34454c, 0 3px 0 0 #05080a;
+  cursor: pointer;
+}
+
+.qm-close svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.qm-close:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px #34454c, 0 1px 0 0 #05080a;
+}
+
+/* One row per group: its name in its colour on the left, then up to six tiles. */
+.qm-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.qm-group {
+  display: grid;
+  grid-template-columns: var(--qm-label) 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.qm-glabel {
+  margin: 0;
+  /* A narrow column breaks a name only where the text allows (at its zero-width spaces). */
+  word-break: keep-all;
+  padding-left: 8px;
+  border-left: 4px solid var(--mg);
+  font-size: 12px;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.qm-row {
+  display: grid;
+  grid-template-columns: repeat(6, var(--qm-tile));
+  gap: 6px;
+}
+
+/* None closes the first row, set apart: the card held still. */
+.qm-opt[data-value='none'] {
+  grid-row: 1;
+  grid-column: -2;
+}
+
+/* Tiles dealt a little askew like a hand of cards; pointed at, one straightens and lifts. */
+.qm-opt {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 5px;
+  height: 52px;
+  padding: 3px 1px;
+  border: 0;
+  border-radius: 10px;
+  background: #26333a;
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px #34454c, 0 3px 0 0 #05080a;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.1;
+  transform: translateY(var(--lift, 0px)) rotate(var(--tilt, 0deg));
+  cursor: pointer;
+  animation: qm-deal 0.3s var(--ease-back) both;
+  animation-delay: calc(var(--i) * 18ms);
+  transition: transform 0.14s var(--ease-out), background 0.14s, box-shadow 0.14s;
+}
+
+.qm-opt svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.qm-opt span {
+  white-space: nowrap;
+}
+
+/* The picked motion: a gold pixel check on its corner, so pointing at another never hides which one is on. */
+.qm-check {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--gold) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4h1v1h1v1h1V5h1V4h1V3h1V2h1v2H7v1H6v1H5v1H4v1H3V7H2V6H1z' fill='%23261a00'/%3E%3C/svg%3E") center / 9px no-repeat;
+  box-shadow: 0 1px 0 #8f6a12;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.15s, transform 0.2s var(--ease-back);
+}
+
+.qm-opt[aria-checked='true'] .qm-check {
+  opacity: 1;
+  transform: none;
+}
+
+.qm-opt:is(:hover, :focus-visible) {
+  transform: translateY(-4px) rotate(0deg);
+  background: #34464f;
+  box-shadow: inset 0 0 0 2px #ff9a2a, 0 5px 0 0 #05080a;
+}
+
+.qm-opt[aria-checked='true'] {
+  transform: translateY(-3px) rotate(0deg);
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: inset 0 0 0 2px #fff, 0 4px 0 0 #8f8a7c;
+}
+
+.qm-opt[aria-checked='true']:is(:hover, :focus-visible) {
+  box-shadow: inset 0 0 0 2px #ff9a2a, 0 5px 0 0 #8f8a7c;
+}
+
+/* A pick lands with a little Balatro jiggle. */
+.qm-opt.is-picked {
+  animation: qm-pick 0.4s var(--ease-back);
+}
+
+/* Pointed at, focused or picked, a tile's icon acts out its motion (keyframes in tune.css). */
+.qm-opt:is(:hover, :focus-visible, [aria-checked='true']) svg {
+  animation: var(--act, none) 1.6s ease-in-out infinite;
+}
+
+
+/* Two lines are kept for the description, so the tray never changes height under the pointer. */
+.qm-help {
+  min-height: calc(2 * 1.35em);
+  margin: 10px 2px 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text-dim);
+  text-wrap: pretty;
+}
+
+.qm-help b {
+  font-weight: 400;
+  color: var(--text);
+}
+
+/* Whose line it is: the picked motion's, or (in the hover orange) the one pointed at. */
+.qm-help em {
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.qm-help.is-preview em {
+  background: #ff9a2a;
+  color: #2a1600;
+}
+
+.qm-help.is-preview b {
+  color: #ff9a2a;
+}
+
+.qm-help b::after {
+  content: ' —';
+}
+
+/* The loop's length at the set speed, as a small gold tag. */
+.qm-help small:not(:empty) {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #0b1012;
+  font-size: 12px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* Speed and size side by side: the page's one slider, with a notch at the default as on the panel. */
+.qm-tune {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 8px 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid #26333a;
+}
+
+.qm-knob {
+  display: grid;
+  grid-template: 'label value' auto 'track track' auto / 1fr auto;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.qm-label {
+  grid-area: label;
+}
+
+/* The value sits in a small dark pocket, as on the panel. */
+.qm-val {
+  grid-area: value;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #0b1012;
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.6);
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--gold);
+}
+
+.qm-track {
+  grid-area: track;
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.qm-track::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  /* The grip's centre travels 10px in from each end of the groove. */
+  left: calc(10px + (100% - 20px) * var(--def) / 100%);
+  width: 8px;
+  height: 6px;
+  margin-left: -4px;
+  background: var(--text-dim);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.qm-range {
+  display: block;
+  /* Filled in the Fine-tune orange (the panel's --orange). */
+  --hue: #ff9a2a;
+  height: 34px;
+}
+
+.qm-range:disabled {
+  opacity: 0.4;
+}
+
+.qm-reset {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 64px;
+  padding: 8px 6px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: #26333a;
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px #34454c, 0 3px 0 0 #05080a;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.qm-reset svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.qm-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.qm-reset:not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px #34454c, 0 1px 0 0 #05080a;
+}
+
+@keyframes qm-open {
+  from { transform: scale(0.88) translateY(10px); opacity: 0; }
+}
+
+@keyframes qm-deal {
+  from { transform: translateY(12px) rotate(calc(var(--tilt, 0deg) * 4)) scale(0.7); opacity: 0; }
+}
+
+@keyframes qm-pick {
+  30% { transform: translateY(-6px) rotate(-4deg) scale(1.08); }
+  60% { transform: translateY(-3px) rotate(3deg); }
+}
+
+/* Short screens: a more compact tray, so it clears the header. */
+@media (max-height: 820px) {
+  .qm-tray {
+    --qm-tile: 50px;
+    padding-top: 8px;
+  }
+  .qm-head {
+    margin-bottom: 4px;
+  }
+  .qm-grid {
+    gap: 3px;
+  }
+  .qm-opt {
+    height: 42px;
+    gap: 1px;
+  }
+  .qm-opt svg {
+    width: 20px;
+    height: 20px;
+  }
+  .qm-tune {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .qm-opt svg {
+    width: 24px;
+    height: 24px;
+  }
+  .qm-help {
+    margin-top: 8px;
+  }
+  .qm-range {
+    height: 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qm-tray,
+  .qm-opt,
+  .qm-opt svg,
+  .qm-opt.is-picked {
+    animation: none !important;
+  }
+}
+
+/* Phones: the tray is a sheet along the bottom of the screen (see quick.css). */
+@media (max-width: 900px) {
+  .qm-tray {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    z-index: 60;
+    transform-origin: 50% 100%;
+  }
+  .qm-tray::after {
+    display: none;
+  }
+  .qm-note {
+    display: none;
+  }
+  /* Narrow: each group's name in a slim column beside its row, the tiles sharing the width. */
+  .qm-tray {
+    --qm-label: 62px;
+  }
+  .qm-glabel {
+    padding-left: 5px;
+    border-left-width: 3px;
+    font-size: 10px;
+    line-height: 1.1;
+  }
+  .qm-opt span {
+    font-size: 10px;
+    letter-spacing: -0.03em;
+  }
+  .qm-help {
+    font-size: 13px;
+  }
+  .qm-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  /* Short enough that most of the card stays in view above the sheet. */
+  .qm-tray {
+    padding: 8px 10px 10px;
+  }
+  .qm-head {
+    margin-bottom: 2px;
+  }
+  .qm-close {
+    width: 40px;
+    height: 36px;
+  }
+  .qm-opt {
+    height: 42px;
+    gap: 1px;
+  }
+  .qm-opt svg {
+    width: 18px;
+    height: 18px;
+  }
+  .qm-help {
+    margin-top: 6px;
+  }
+  .qm-tune {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .qm-range {
+    height: 28px;
+  }
+
+}

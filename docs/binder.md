@@ -102,5 +102,7 @@ what is picked.
   GIF can take longer than that; then `share()` fails with `NotAllowedError`, and the button turns
   into **Send** with the file ready: the next tap opens the sheet at once. The ready file is
   dropped as soon as the card changes. Cancelling the sheet is not an error.
-- The share code is on the first load (it is small): loading it on demand would spend the tap's
-  time on a network request.
+- The share code is on the first load (it is small); the GIF encoder it calls is fetched ahead,
+  while the page is idle and again when the pointer or focus reaches Share, so the tap's time is not
+  spent on a network request (docs/performance.md). If it still arrives late, the GIF is late, and
+  Send takes over as above.

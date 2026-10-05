@@ -1,12 +1,12 @@
-// The panel's Area tab and brush mode: choose where on the card the finish lands.
-import { Paint, RangeModel } from './range';
+// The panel's Layers tab and brush mode: choose where on the card the finish lands. It loads with
+// Fine-tune and edits what areas.ts keeps on the card.
 import { BRUSH_MAX, BRUSH_MIN, MIN_BAND, type RangeRegion } from './featureState';
 import { RANGE_H, RANGE_W } from './gl/range';
 import { sfx } from './audio';
 import { editionById, type Area } from './editions';
 import { MiniPreview } from './miniPreview';
 import { initLayers } from './layersPanel';
-import type { FaceSpec } from './card/face';
+import type { Areas } from './areas';
 import type { Dict } from './i18n';
 import type { Stage } from './stage';
 import type { State, Store } from './state';
@@ -16,8 +16,6 @@ export interface RangeHost {
   stage: Stage;
   t: () => Dict;
   announce: (msg: string) => void;
-  /** Told whether the area differs from the default (whole card, no brush), after every change. */
-  onRangeChanged: (changed: boolean) => void;
 }
 
 const REGIONS: RangeRegion[] = ['all', 'art', 'frame', 'text', 'none'];
@@ -84,19 +82,15 @@ function fill(input: HTMLInputElement) {
   input.style.setProperty('--fill', `${p}%`);
 }
 
-export function initRangePanel(host: RangeHost) {
+export function initRangePanel(host: RangeHost, areas: Areas) {
   const { store, stage } = host;
-  const model = new RangeModel();
-  // Each layer keeps its own brush strokes; the editor below works on the layer chosen in the list.
-  const paints = [new Paint('rangeBrush'), new Paint('rangeBrush2')];
-  const which = (s = store.get()): 1 | 2 => (s.areaLayer === 2 && s.layer2 ? 2 : 1);
+  const { model, paints, which, areaOf, push } = areas;
+  // The editor below works on the layer chosen in the list.
   const paint = () => {
     const p = paints[which() - 1];
     p.cellAspect = model.cellAspect;
     return p;
   };
-  const areaOf = (n: 1 | 2, s = store.get()): Area =>
-    n === 2 && s.layer2 ? s.layer2 : { region: s.rangeRegion, lo: s.rangeLo, hi: s.rangeHi, invert: s.rangeInvert };
   const area = (s = store.get()) => areaOf(which(s), s);
   function setArea(p: Partial<Area>) {
     const s = store.get();
@@ -109,9 +103,6 @@ export function initRangePanel(host: RangeHost) {
     store.set(patch);
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const still = () => (stage.cards.range.motion = stage.cards.range2.motion = !reduced.matches);
-  still();
-  reduced.addEventListener('change', still);
 
   // ---------- Tab ----------
 
@@ -278,20 +269,12 @@ export function initRangePanel(host: RangeHost) {
   const layersEl = q('.layers');
   const editing = () => sec.matches(':hover, :focus-within') && !layersEl.matches(':hover, :focus-within');
 
-  {
-    let last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const s = store.get();
-      const target = painting || s.rangeShow || editing() ? 1 : 0;
-      stage.rangeView = reduced.matches ? target : stage.rangeView + (target - stage.rangeView) * (1 - Math.exp(-dt * 12));
-      if (Math.abs(stage.rangeView - target) < 0.002) stage.rangeView = target;
-      if (painting) placeLayer();
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }
+  /** While painting, the brush layer keeps over the card as it moves. */
+  const follow = () => {
+    if (!painting) return;
+    placeLayer();
+    requestAnimationFrame(follow);
+  };
 
   // ---------- Brush mode ----------
 
@@ -368,7 +351,7 @@ export function initRangePanel(host: RangeHost) {
     sync();
     // With everything already covered, adding can't show anything: start with the eraser.
     if (store.get().brushMode === 'add' && model.coverage(area(), paint()) > 0.995) store.set({ brushMode: 'erase' });
-    placeLayer();
+    follow();
     sfx.tick();
     host.announce(host.t().brushOn);
     preview.hide();
@@ -540,27 +523,6 @@ export function initRangePanel(host: RangeHost) {
 
   // ---------- Sync ----------
 
-  let pending = 0;
-  /** Re-uploads the range texture on the next frame, however many changes arrive before it. */
-  function push() {
-    if (pending) return;
-    pending = requestAnimationFrame(() => {
-      pending = 0;
-      const s = store.get();
-      const snap = model.snapshot(areaOf(1, s), paints[0]);
-      stage.cards.range.set(snap);
-      preview.setRange(snap);
-      if (s.layer2) {
-        const snap2 = model.snapshot(s.layer2, paints[1]);
-        stage.cards.range2.set(snap2);
-        preview.setRange2(snap2);
-      }
-      layers.sync();
-      syncBrush();
-      sync();
-      measure();
-    });
-  }
 
   let coverTimer = 0;
   function measure() {
@@ -624,7 +586,6 @@ export function initRangePanel(host: RangeHost) {
   function sync() {
     const s = store.get();
     const a = area(s);
-    stage.rangeLayer = which(s);
     // With two layers, the area controls name the finish they place.
     const placing = which(s) === 2 ? s.layer2!.edition : s.edition;
     q('#rangeWhereLabel').textContent = s.layer2 ? host.t().layerWhere.replace('{n}', String(which(s))).replace('{x}', host.t().edition[placing]) : host.t().rangeWhere;
@@ -680,10 +641,7 @@ export function initRangePanel(host: RangeHost) {
     softOut.style.setProperty('--blur', `${(s.brushSoft * 5).toFixed(1)}px`);
     softOut.title = pct(s.brushSoft);
     soft.setAttribute('aria-valuetext', pct(s.brushSoft));
-    // The tab's gem: layer 1 moved off the whole card, either layer painted, or a second layer.
-    const changed = s.rangeRegion !== 'all' || s.rangeLo > 0 || s.rangeHi < 1 || s.rangeInvert || paints.some((p) => p.painted) || s.layer2 !== null;
     q<HTMLElement>('.pane-tools').hidden = !(a.region !== 'all' || a.lo > 0 || a.hi < 1 || a.invert || paint().painted);
-    host.onRangeChanged(changed);
   }
 
   function applyText() {
@@ -718,40 +676,27 @@ export function initRangePanel(host: RangeHost) {
     measure();
   }
 
-  const RANGE_KEYS: (keyof State)[] = ['rangeRegion', 'rangeLo', 'rangeHi', 'rangeInvert', 'layer2', 'areaLayer'];
   store.on((_s, changed) => {
     if (changed.has('lang')) applyText();
     if (changed.has('edition')) measure();
-    if (RANGE_KEYS.some((k) => changed.has(k))) push();
     sync();
   });
 
-  let faceKey = '';
-  /** Hook for the live face: called after every redraw. */
-  function onFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec) {
-    model.onFace(face, mask, spec);
-    preview.setFace(face, mask);
-    const { image, ...rest } = spec;
-    void image;
-    const key = JSON.stringify(rest);
-    // Regions only move when the words or frame do; the brightness is read live by the shader.
-    if (key !== faceKey) {
-      faceKey = key;
-      push();
-    } else if (!coverTimer) {
-      // Animated sources redraw faster than the debounce; measure at most once per window instead.
+  areas.attach({
+    view: () => painting || editing(),
+    pushed(snap, snap2) {
+      preview.setRange(snap);
+      if (snap2) preview.setRange2(snap2);
+      layers.sync();
+      syncBrush();
+      sync();
       measure();
-    }
-  }
-
-  for (const p of paints) void p.load().then((ok) => ok && push());
+    },
+    faced(face, mask, moved) {
+      preview.setFace(face, mask);
+      // Animated sources redraw faster than the debounce; measure at most once per window instead.
+      if (!moved && !coverTimer) measure();
+    },
+  });
   applyText();
-
-  return {
-    onFace,
-    applyText,
-    /** What the exporter needs to put the finish in the same place. */
-    snapshot: () => model.snapshot(areaOf(1), paints[0]),
-    snapshot2: () => model.snapshot(areaOf(2), paints[1]),
-  };
 }

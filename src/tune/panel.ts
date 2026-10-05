@@ -1,20 +1,24 @@
 // The panel's "Shine" tab: three groups of controls (pattern, light, motion). Every
 // control shows its value, can be reset on its own, and double-click / Delete puts it back.
 import './tune.css';
-import { DICTS, type Dict } from '../i18n';
+import { dictOf, type Dict } from '../i18n';
 import type { State, Store } from '../state';
-import type { EditionId } from '../editions';
+import { editionById, type EditionId } from '../editions';
 import { sfx } from '../audio';
 import {
   changedKeys,
-  IDLE_MODES,
+  exportLoop,
   isDefault,
   LIGHT_MODES,
   lightCss,
   METALS,
+  MOTION_GROUPS,
+  MOTION_ORDER,
+  OWN_LIGHT,
   RANGES,
   TUNE_DEFAULTS,
   type ChoiceKey,
+  type IdleMode,
   type NumKey,
   type Tune,
 } from './model';
@@ -22,6 +26,9 @@ import { motion } from './motion';
 import { mountPeek } from './peek';
 import { mountSunHandle } from './handle';
 import { svg } from './icons';
+import './motionIcons';
+import { format } from './format';
+import './acts.css';
 
 type Group = 'pattern' | 'light' | 'motion';
 type Key = NumKey | ChoiceKey;
@@ -36,38 +43,6 @@ const GROUPS: { id: Group; keys: Key[] }[] = [
 /** Finishes with their own animation (they read the shader clock), so Speed always shows. */
 const ANIMATED = new Set<EditionId>(['gold', 'galaxy', 'glitch', 'aurora', 'magma', 'sakura', 'shallows', 'warmth', 'glow', 'blacklight', 'stardust', 'snowglobe', 'kintsugi', 'opal', 'confetti', 'fireworks']);
 
-
-const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
-
-/** Amounts read as a multiple of the finish's own look (×1.0); the notch under the track marks it. */
-const RELATIVE = new Set<NumKey>(['scale', 'sharp', 'sparkleSize', 'sat', 'glare']);
-
-export function format(k: NumKey, v: number, t: Dict['tune']): string {
-  if (RELATIVE.has(k)) return `×${(v / (TUNE_DEFAULTS[k] || 1)).toFixed(1)}`;
-  switch (k) {
-    case 'scale':
-    case 'sharp':
-    case 'sparkleSize':
-      return `${Math.round(v * 100)}%`;
-    case 'angle':
-    case 'hue':
-      return `${sign(Math.round(v))}°`;
-    case 'lightAngle':
-    case 'tiltMax':
-      return `${Math.round(v)}°`;
-    case 'sat':
-    case 'glare':
-      return `${Math.round(v * 100)}%`;
-    case 'sparkle':
-      return `${Math.round(v * 100)}%`;
-    case 'temp':
-      return `${Math.round(v)}K`;
-    case 'speed':
-      return v <= 0 ? t.stopped : `×${+v.toFixed(2)}`;
-    case 'idleAmp':
-      return `×${+v.toFixed(2)}`;
-  }
-}
 
 const formatChoice = (k: ChoiceKey, v: string, t: Dict['tune']) =>
   k === 'light' ? t.lightMode[v as Tune['light']] : k === 'idle' ? t.idleMode[v as Tune['idle']] : t.metalMode[v as Tune['metal']];
@@ -97,7 +72,7 @@ function trackFor(k: NumKey, v: number): string {
 
 export function mountTune(store: Store, root: HTMLElement): void {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let t = DICTS[store.get().lang].tune;
+  let t = dictOf(store.get().lang).tune;
   /** What "Reset all" replaced, offered back for a few seconds. */
   let undo: Tune | null = null;
   let undoTimer = 0;
@@ -126,7 +101,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
   // ---------- Build ----------
 
   function build() {
-    t = DICTS[store.get().lang].tune;
+    t = dictOf(store.get().lang).tune;
     root.innerHTML = `
         <div class="tune-groups"></div>
         <p class="hint tune-hint"></p>
@@ -358,9 +333,10 @@ export function mountTune(store: Store, root: HTMLElement): void {
     group.className = 'seg tune-seg';
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-labelledby', `tuneLabel-${k}`);
-    const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? IDLE_MODES : METALS;
-    // The idle motions take two rows of five, so the row stays as wide as the others.
-    group.style.gridTemplateColumns = `repeat(${Math.min(options.length, 5)}, 1fr)`;
+    const options: string[] = k === 'light' ? LIGHT_MODES : k === 'idle' ? MOTION_ORDER : METALS;
+    // The motions show in their four groups (as in the tray above the deck), None closing the first.
+    const motions = k === 'idle' ? motionRows(group) : null;
+    if (!motions) group.style.gridTemplateColumns = `repeat(${options.length}, 1fr)`;
     for (const v of options) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -373,7 +349,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
       // What each motion does, before it is picked.
       if (k === 'idle') b.title = t.idleHelp[v as Tune['idle']];
       b.addEventListener('click', () => choose(k, v));
-      group.appendChild(b);
+      (motions?.get(v as IdleMode) ?? group).appendChild(b);
     }
     group.addEventListener('keydown', (e) => {
       const items = [...group.querySelectorAll<HTMLButtonElement>('[role=radio]')];
@@ -398,6 +374,25 @@ export function mountTune(store: Store, root: HTMLElement): void {
     row.appendChild(help);
     row.appendChild(row.querySelector('.tune-reset')!);
     return row;
+  }
+
+  /** The motion groups as labelled rows inside the radio group; answers which row each motion goes in. */
+  function motionRows(group: HTMLElement): Map<IdleMode, HTMLElement> {
+    group.classList.add('tune-motions');
+    const rows = new Map<IdleMode, HTMLElement>();
+    for (const g of MOTION_GROUPS) {
+      const label = document.createElement('p');
+      label.className = 'tune-mgroup';
+      label.dataset.group = g.id;
+      label.textContent = t.motionGroup[g.id];
+      const line = document.createElement('div');
+      line.className = 'tune-mrow';
+      line.dataset.group = g.id;
+      group.append(label, line);
+      for (const m of g.motions) rows.set(m, line);
+    }
+    rows.set('none', rows.get('sway')!);
+    return rows;
   }
 
   function choose(k: ChoiceKey, v: string) {
@@ -445,7 +440,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
           b.tabIndex = on ? 0 : -1;
         });
         const help = row.querySelector('.tune-help')!;
-        help.textContent = k === 'light' ? t.lightHelp[tune.light] : k === 'idle' ? t.idleHelp[tune.idle] : t.metalHelp;
+        help.textContent = k === 'light' ? t.lightHelp[tune.light] : k === 'idle' ? motionHelp(s) : t.metalHelp;
         btn.setAttribute('aria-label', t.reset.replace('{name}', label).replace('{value}', formatChoice(k, TUNE_DEFAULTS[k], t)));
       } else if (k === 'lightAngle') {
         const v = tune[k];
@@ -523,6 +518,14 @@ export function mountTune(store: Store, root: HTMLElement): void {
     return el;
   }
 
+  /** What the motion does, how long its loop is, and that a file moves just so. */
+  function motionHelp(s: State): string {
+    if (s.tune.idle === 'none') return t.idleHelp.none;
+    const secs = exportLoop(s.tune, undefined, !!editionById(s.edition).torch).loopMs / 1000;
+    const loop = t.loopLen.replace('{s}', String(Math.round(secs * 10) / 10));
+    return t.motionHelp.replace('{help}', t.idleHelp[s.tune.idle]).replace('{loop}', loop).replace('{note}', t.trayNote);
+  }
+
   /** Why a control has no visible effect right now, or null when it does. */
   function whyIdle(k: Key, s: State): string | null {
     const tune = s.tune;
@@ -533,6 +536,7 @@ export function mountTune(store: Store, root: HTMLElement): void {
     if (k === 'sparkleSize' && tune.sparkle <= 0) return t.why.sparkle;
     if (k === 'sharp' && tune.glare <= 0) return t.why.glare;
     if (k === 'temp' && tune.glare <= 0 && (tune.sparkle <= 0 || s.edition === 'base')) return t.why.temp;
+    if ((k === 'light' || k === 'lightAngle') && OWN_LIGHT.has(tune.idle)) return t.why.ownLight;
     if (reduced.matches && (k === 'speed' || k === 'idle' || k === 'idleAmp' || (k === 'light' && tune.light === 'orbit'))) return t.why.reduced;
     if (k === 'idleAmp' && tune.idle === 'none') return t.why.noIdle;
     // Glitter twinkles on its own clock, so Speed matters whenever it shows.

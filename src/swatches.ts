@@ -9,8 +9,6 @@ export interface SwatchHost {
   store: Store;
   t: () => Dict;
   announce: (msg: string) => void;
-  redrawFace: () => void;
-  rebuildFrames: () => void;
 }
 
 const MAX = 8;
@@ -196,10 +194,6 @@ export function initSwatches(host: SwatchHost) {
     });
   }
 
-  store.on((_s, changed) => {
-    if (changed.has('frameColor')) host.redrawFace();
-    if (changed.has('frameColor') || changed.has('frameSwatches')) host.rebuildFrames();
-  });
 
   return { decorateFrames };
 }
