@@ -694,6 +694,7 @@ export class Stage {
           heat: ed.touch ? this.heat : undefined,
           lamp: this.lampPower,
           aim: ed.torch === 'plasma' && lamp ? this.aimPlasma(lamp, pointed, dt) : undefined,
+          room: true,
         },
         motion.fx,
       );

@@ -30,6 +30,7 @@ export type EditionId =
   | 'blacklight'
   | 'neon'
   | 'plasma'
+  | 'mirrorball'
   | 'lenticular3d'
   | 'lenticularflip'
   | 'stardust'
@@ -103,6 +104,8 @@ export const EDITIONS: Edition[] = [
   { id: 'neon', shader: 92, color: '#ff4fc8', swirl: ['#05030d', '#2a0c46', '#16b8d8'], value: 7, dither: true },
   // Shader in src/gl/plasma.ts.
   { id: 'plasma', shader: 96, color: '#d36bff', swirl: ['#08031a', '#3c1478', '#ff5ccf'], value: 7, dither: true, torch: 'plasma' },
+  // Shader and the spots it throws round the stage in src/gl/mirrorball.ts.
+  { id: 'mirrorball', shader: 104, color: '#e6ecf5', swirl: ['#07060f', '#2a2350', '#b86fd0'], value: 7 },
   // Shader in src/gl/lenticular3d.ts.
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
   { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6, solo: true },
