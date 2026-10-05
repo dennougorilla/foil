@@ -30,30 +30,23 @@ desktop to the Mac on 2026-10-05. Design and rules: [`backdrops.md`](backdrops.m
   step now also checks that `gl/backdrops` isn't fetched up front. Existing `createScene` calls were
   updated (`await`, a `backdrop` argument, `draw(p)`).
 
+## Done on the Mac (2026-10-05)
+
+- Round 1's fixes to the backdrops themselves: Felt's wide oval lamp pool, Studio's wider, lower
+  spot and its pool on the floor (the paper turns up under the card's foot), Velvet's broad soft
+  folds, Bokeh's soft lights (no hard edge, 1.5 times larger), half as many bright stars, confetti
+  at 60%, Plain's default `#182127`, Clear's checker at half the contrast (stage and tile), a soft
+  Bokeh tile. Checked in headless Chromium: the card shows on every backdrop after a switch.
+- `npm run build` and `npm test` pass.
+
 ## Not done
 
-1. **Run the whole e2e suite.** On Windows it was reaped for low memory before it finished, so
-   nothing in it has been verified, including the new steps.
-2. **Judging rounds 2 and 3** (criterion: does the card look its best, and does it not look cheap).
-   Round 1 scored **5.5 / 10** overall and **6.0** for the picker. Per backdrop: Swirl 4.5, Felt 6.5,
-   Studio 6.5, Velvet 6.0, Bokeh 4.0, Stars 6.0, Confetti 5.0, Plain 7.0, Clear 6.0. Its fixes,
-   most important first:
-   - The judge saw no card on Felt and Stars in the desktop shots. That is very likely my capture
-     script screenshotting before a pack finish (Gold, Galaxy) had loaded, but **check on a real
-     screen** that the card always shows after switching backdrops.
-   - **Swirl:** bring its bright band about halfway toward the dark tone. Note that the swirl is
-     also the default; how far to tone it down is the owner's call.
-   - **Bokeh:** drop the hard disc edge for a smooth radial falloff, make the lights about 1.5 times
-     larger and about half as bright.
-   - **Stars:** half as many bright stars. **Confetti:** pieces at about 60% of their size.
-   - **Plain:** default color about `#182127`. **Clear:** half the checker contrast (`#20262a` /
-     `#262c30`).
-   - **Felt:** a wide oval light round the card. **Studio:** a wider, lower spot with a pool of
-     light on the floor. **Velvet:** a broad, soft light instead of thin bright streaks.
-   - **Picker:** pictures closer to the real backdrops (the Swirl tile looks unlike the swirl),
-     pictures about 1.4 times taller, a check mark and darker text on the picked tile, a lighter
-     lip on the tiles.
-3. **Final check** (AGENTS.md step 4), a commit numbered for the issue, and dropping "WIP".
+1. **The look is the owner's call now** (no more scoring rounds). Open questions for the owner:
+   - **Swirl** (the default) is unchanged: round 1 wanted its bright band toned down.
+   - **Picker:** tile pictures closer to the real backdrops (the Swirl tile looks unlike the
+     swirl), taller pictures (about 1.4 times), a check mark on the picked tile.
+   - Whether to add a quick switch on the stage.
+2. **e2e was not run** (by request); the new steps in `scripts/e2e.mjs` have never run to the end.
 
 ## Notes
 

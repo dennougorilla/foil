@@ -7,7 +7,7 @@ export const BACKDROPS = ['swirl', 'felt', 'studio', 'velvet', 'bokeh', 'stars',
 export type BackdropId = (typeof BACKDROPS)[number];
 export const DEFAULT_BACKDROP: BackdropId = 'swirl';
 /** Plain's color until one is picked. */
-export const PLAIN_DEFAULT = '#24303a';
+export const PLAIN_DEFAULT = '#182127';
 
 export const sanitizeBackdrop = (v: unknown): BackdropId => ((BACKDROPS as readonly unknown[]).includes(v) ? (v as BackdropId) : DEFAULT_BACKDROP);
 export const sanitizeBackdropColor = (v: unknown): string => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : PLAIN_DEFAULT);

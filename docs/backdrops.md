@@ -69,4 +69,4 @@ tab, so the tiles are two taps away.
 
 To add a backdrop: add its id to `BACKDROPS` and its names to both languages, write its shader in
 `src/gl/backdrops.ts` (it reads `uPhase` as the loop's place, whole turns only, and `uCard`/`uFocus`
-for where the card is), give its tile a picture in `features.css`, and list it above.
+for where the card is), give its tile a picture in `src/style.css`, and list it above.

@@ -42,8 +42,11 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
   // the cloth darkening towards the rails. Still.
   felt: shader(/* glsl */ `
   vec2 p = cardSpace();
-  float r = length(p * vec2(0.6, 0.86));
-  vec3 col = mix(vec3(0.016, 0.06, 0.045), vec3(0.1, 0.33, 0.225), exp(-r * r * 1.5));
+  // The lamp's wide oval pool, warm in its middle, falling off to near black towards the rails.
+  float r = length(p * vec2(0.5, 0.78));
+  float lamp = 1.0 - smoothstep(0.12, 1.25, r);
+  vec3 col = mix(vec3(0.008, 0.035, 0.026), vec3(0.11, 0.36, 0.24), lamp * lamp);
+  col += vec3(0.05, 0.045, 0.01) * exp(-r * r * 6.0);
   // The nap of the cloth: a grain in every pixel and soft patches where it was brushed.
   col *= (0.93 + 0.14 * hash12(floor(gl_FragCoord.xy))) * (0.88 + 0.24 * vnoise(p * 2.6 + 4.0));
   // The mat's stitched edge, a rounded box round the card.
@@ -54,19 +57,22 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
   o = vec4(poster(col, 40.0), 1.0);`),
 
   // A photo studio: a seamless paper sweep in deep grey that curves from the floor up into the wall
-  // behind the card's lower half, a soft spotlight on the paper behind it and its pool on the floor. Still.
+  // just under the card's foot, a wide soft spotlight on the paper behind it and its pool on the floor. Still.
   studio: shader(/* glsl */ `
   vec2 p = cardSpace();
-  float y = p.y + 0.3;
-  vec3 wall = mix(vec3(0.1, 0.104, 0.115), vec3(0.03, 0.032, 0.038), smoothstep(0.0, 1.5, y));
-  vec3 ground = mix(vec3(0.115, 0.118, 0.126), vec3(0.04, 0.041, 0.046), smoothstep(0.0, -0.9, y));
-  vec3 col = mix(ground, wall, smoothstep(-0.14, 0.14, y));
-  vec2 s = (p - vec2(0.0, 0.16)) * vec2(0.95, 0.8);
-  col += vec3(0.26, 0.25, 0.235) * exp(-dot(s, s) * 1.25) * smoothstep(-0.25, 0.1, y);
-  vec2 f = (p - vec2(0.0, -0.66)) * vec2(0.85, 2.4);
-  col += vec3(0.15, 0.145, 0.14) * exp(-dot(f, f) * 1.1) * (1.0 - smoothstep(-0.1, 0.12, y));
+  // The paper turns from floor to wall just under the card's foot.
+  float y = p.y + 0.66;
+  vec3 wall = mix(vec3(0.075, 0.078, 0.088), vec3(0.018, 0.019, 0.024), smoothstep(0.0, 1.8, y));
+  vec3 ground = mix(vec3(0.085, 0.087, 0.094), vec3(0.025, 0.026, 0.03), smoothstep(0.0, -0.7, y));
+  vec3 col = mix(ground, wall, smoothstep(-0.12, 0.12, y));
+  // A wide soft spot on the paper behind the card, centred a little low ...
+  vec2 s = (p - vec2(0.0, -0.08)) * vec2(0.62, 0.72);
+  col += vec3(0.3, 0.29, 0.27) * exp(-dot(s, s) * 1.6) * smoothstep(-0.2, 0.1, y);
+  // ... and its pool on the floor in front of the card.
+  vec2 f = (p - vec2(0.0, -0.8)) * vec2(0.7, 2.6);
+  col += vec3(0.2, 0.195, 0.185) * exp(-dot(f, f) * 1.4) * (1.0 - smoothstep(-0.1, 0.12, y));
   // The gloss where the floor turns up into the wall.
-  col += vec3(0.025) * exp(-y * y * 60.0) * exp(-p.x * p.x * 0.4);
+  col += vec3(0.03) * exp(-y * y * 60.0) * exp(-p.x * p.x * 0.5);
   o = vec4(poster(col, 40.0), 1.0);`),
 
   // Wine-red velvet gathered in soft folds under the card, as in a jeweller's showcase: the pile
@@ -76,14 +82,15 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
   // Folds fanning out from a point below the card, wandering a little as they go.
   vec2 v = p - vec2(0.0, -1.5);
   float r = length(v);
-  float a = atan(v.x, v.y) * 9.0 + sin(r * 2.6 + atan(v.x, v.y) * 3.0) * 0.9;
-  float slope = abs(cos(a));
-  float sheen = pow(slope, 3.0) * (0.7 + 0.3 * vnoise(p * 7.0));
-  vec3 col = mix(vec3(0.13, 0.014, 0.04), vec3(0.6, 0.15, 0.24), sheen);
+  float a = atan(v.x, v.y) * 6.0 + sin(r * 2.2 + atan(v.x, v.y) * 3.0) * 0.8;
+  // Broad soft folds: the pile glows across the whole turn of a fold, not in a thin streak.
+  float sheen = (0.5 + 0.5 * cos(a)) * (0.85 + 0.15 * vnoise(p * 5.0));
+  vec3 col = mix(vec3(0.1, 0.01, 0.03), vec3(0.42, 0.09, 0.16), sheen * sheen);
   // The fold's shadowed side.
-  col *= 0.75 + 0.25 * sin(a);
-  float l = length(p * vec2(0.62, 0.8) - vec2(0.0, 0.1));
-  col *= mix(0.3, 1.15, exp(-l * l * 1.2));
+  col *= 0.8 + 0.2 * sin(a);
+  // One broad light from above, round the card.
+  float l = length(p * vec2(0.55, 0.75) - vec2(0.0, 0.12));
+  col *= mix(0.28, 1.2, exp(-l * l * 1.1));
   o = vec4(poster(col, 40.0), 1.0);`),
 
   // A dark room full of soft out-of-focus lights in the finish's colors, each circling once or twice
@@ -100,14 +107,14 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
     float k = 1.0 + step(0.6, hash12(vec2(fi, 9.1)));
     float a = TAU * (uPhase * k * (mod(fi, 2.0) * 2.0 - 1.0) + h.x);
     vec2 c = base + vec2(cos(a), sin(a)) * 0.05;
-    float rad = mix(0.07, 0.26, pow(hash12(vec2(fi, 1.3)), 1.5));
-    float d = length(p - c);
-    float disc = smoothstep(rad, rad - max(PX * 1.5, rad * 0.15), d);
-    float rim = smoothstep(rad * 0.6, rad, d) * disc;
+    float rad = mix(0.1, 0.39, pow(hash12(vec2(fi, 1.3)), 1.5));
+    float d = length(p - c) / rad;
+    // A soft light: full in its middle, fading smoothly to nothing at its edge.
+    float disc = 1.0 - smoothstep(0.15, 1.0, d);
     vec3 lc = mix(uC1, uC2, hash12(vec2(fi, 5.5)));
     lc = mix(lc / max(max(lc.r, lc.g), max(lc.b, 0.05)), vec3(1.0, 0.85, 0.6), 0.25);
-    float glow = mix(0.18, 0.4, hash12(vec2(fi, 2.9))) * (0.75 + 0.25 * wave(k, h.y));
-    col += lc * glow * (0.75 + 0.5 * rim) * disc;
+    float glow = mix(0.12, 0.26, hash12(vec2(fi, 2.9))) * (0.75 + 0.25 * wave(k, h.y));
+    col += lc * glow * disc;
   }
   o = vec4(poster(col, 40.0), 1.0);`),
 
@@ -127,7 +134,7 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
     vec2 d = abs(p - s) / PX;
     float k = 1.0 + floor(hash12(cell + 5.0) * 3.0);
     float tw = 0.55 + 0.45 * wave(k, h * 7.0);
-    float b = mix(0.3, 1.0, pow(hash12(cell + 2.0), 3.0)) * tw;
+    float b = mix(0.3, 1.0, pow(hash12(cell + 2.0), 6.0)) * tw;
     vec3 sc = mix(vec3(0.72, 0.82, 1.0), vec3(1.0, 0.9, 0.74), hash12(cell + 9.0));
     float lit = step(max(d.x, d.y), 0.5);
     float arm = step(0.8, b) * step(min(d.x, d.y), 0.5) * step(max(d.x, d.y), 1.5) * 0.5;
@@ -166,7 +173,7 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
     vec2 f = fract(q) - 0.5 - j * 0.4 - vec2(wave(k, h) * 0.1, 0.0);
     // A strip lying one way or the other, turning over: its long side shrinks and grows.
     float turn = wave(k, j.x + 0.25);
-    vec2 hs = j.y > 0.0 ? vec2(0.13 * max(abs(turn), 0.25), 0.075) : vec2(0.075, 0.13 * max(abs(turn), 0.25));
+    vec2 hs = j.y > 0.0 ? vec2(0.078 * max(abs(turn), 0.25), 0.045) : vec2(0.045, 0.078 * max(abs(turn), 0.25));
     vec2 e = abs(f) - hs;
     if (max(e.x, e.y) < 0.0) {
       vec3 ink = INK[int(h * 13.32)] * (l == 0 ? 0.85 : 0.42);
@@ -182,5 +189,5 @@ export const BACKDROP_FS: Record<Exclude<BackdropId, 'swirl'>, string> = {
   // Only on the stage: a dark checkerboard says a file will be transparent here.
   clear: shader(/* glsl */ `
   ivec2 c = ivec2(floor(gl_FragCoord.xy / 3.0));
-  o = vec4(((c.x + c.y) & 1) == 1 ? vec3(0.125, 0.145, 0.165) : vec3(0.085, 0.1, 0.115), 1.0);`),
+  o = vec4(((c.x + c.y) & 1) == 1 ? vec3(0.149, 0.173, 0.188) : vec3(0.125, 0.149, 0.165), 1.0);`),
 };

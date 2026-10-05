@@ -2977,10 +2977,10 @@ input[type='range']:disabled {
 
 [data-v='bokeh'] > .bd-pic {
   background:
-    radial-gradient(circle at 16% 30%, var(--c3) 0 5px, transparent 6px),
-    radial-gradient(circle at 82% 24%, var(--c2) 0 7px, transparent 8px),
-    radial-gradient(circle at 76% 78%, var(--c3) 0 4px, transparent 5px),
-    radial-gradient(circle at 24% 80%, var(--c2) 0 6px, transparent 7px),
+    radial-gradient(circle at 16% 30%, var(--c3), transparent 8px),
+    radial-gradient(circle at 82% 24%, var(--c2), transparent 11px),
+    radial-gradient(circle at 76% 78%, var(--c3), transparent 7px),
+    radial-gradient(circle at 24% 80%, var(--c2), transparent 9px),
     #08080e;
 }
 
@@ -3018,7 +3018,7 @@ input[type='range']:disabled {
 }
 
 [data-v='clear'] > .bd-pic {
-  background: repeating-conic-gradient(#2c353b 0 25%, #1a2024 0 50%) 0 0 / 8px 8px;
+  background: repeating-conic-gradient(#262c30 0 25%, #20262a 0 50%) 0 0 / 8px 8px;
 }
 
 .backdrop-color {
