@@ -38,12 +38,16 @@ placement note), docs/layering.md (frame list). i18n: en/ja names and lines.
 
 - `npm test`: 159 pass (new `tests/neon.test.ts`; Light list updated in `tests/packs.test.ts`).
 - `npm run build`: clean.
-- **e2e: not finished.** A new step ("Neon lights the outlines in a dark room, keeps the picture, and
-  its loop closes") was added at the end of `scripts/e2e.mjs`, but the run was stopped for the
-  handoff before it reached it; only the Raden/Opal step had printed. Run the whole suite again.
-  Its thresholds (`tubes > 0.01`, `dim < 0.75`, `keep > 0.4`, `seam < 0.6`) are untested guesses.
+- e2e: **not run, by the owner's call** ("e2e fits this project too badly; review first"). The step
+  "Neon lights the outlines in a dark room, keeps the picture, and its loop closes" stays at the end
+  of `scripts/e2e.mjs`; its thresholds (`tubes > 0.01`, `dim < 0.75`, `keep > 0.4`, `seam < 0.6`)
+  are still untested guesses.
+- Mac (2026-10-05): build and `npm test` (159) pass again; the production build renders Neon in
+  headless Chromium (SwiftShader) with no console errors, sunset and moon samples.
 
 ## Quality loop (Codex as independent judge, strict, 1–10)
+
+The scoring loop is closed: the owner now looks at a new finish first and sets its direction.
 
 | Round | Realism | Clarity | Quality | Picture kept |
 |---|---|---|---|---|
