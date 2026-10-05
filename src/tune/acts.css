@@ -1,4 +1,89 @@
-/* The little moves of the motion icons (the Shine tab and the motion tray both play them). */
+/* The little moves of the motion icons (the Shine tab and the motion tray both play them): each
+   motion's tile sets --act, and the tile plays it while pointed at, focused or picked. */
+
+/* The four motion groups' colours, the same in the tray and the Shine tab. */
+[data-group='gentle'] { --mg: #4fb3ff; }
+[data-group='tilt'] { --mg: #ff9a2a; }
+[data-group='light'] { --mg: #f2c14e; }
+[data-group='show'] { --mg: #ff5a4f; }
+
+:is(.tune-opt, .qm-opt)[data-value='sway'] { --act: tune-act-sway; }
+:is(.tune-opt, .qm-opt)[data-value='float'] { --act: tune-act-float; }
+:is(.tune-opt, .qm-opt)[data-value='pendulum'] svg { transform-origin: 50% 6%; --act: tune-act-swing; }
+:is(.tune-opt, .qm-opt)[data-value='breathe'] { --act: tune-act-breathe; }
+:is(.tune-opt, .qm-opt)[data-value='gyre'] { --act: tune-act-gyre; }
+:is(.tune-opt, .qm-opt)[data-value='lean'] svg { transform-origin: 50% 90%; --act: tune-act-lean; }
+:is(.tune-opt, .qm-opt)[data-value='jelly'] svg { transform-origin: 50% 90%; --act: tune-act-jelly; }
+:is(.tune-opt, .qm-opt)[data-value='figure8'] { --act: tune-act-figure8; }
+:is(.tune-opt, .qm-opt)[data-value='wobble'] { --act: tune-act-wobble; }
+:is(.tune-opt, .qm-opt)[data-value='spin'] { --act: tune-act-spin; }
+:is(.tune-opt, .qm-opt)[data-value='sweep'] { --act: tune-act-sweep; }
+:is(.tune-opt, .qm-opt)[data-value='beam'] { --act: tune-act-beam; }
+:is(.tune-opt, .qm-opt)[data-value='spotlight'] { --act: tune-act-gyre; }
+:is(.tune-opt, .qm-opt)[data-value='flare'] { --act: tune-act-glint; }
+:is(.tune-opt, .qm-opt)[data-value='reveal'] { --act: tune-act-reveal; }
+:is(.tune-opt, .qm-opt)[data-value='push'] { --act: tune-act-push; }
+:is(.tune-opt, .qm-opt)[data-value='pulse'] { --act: tune-act-pulse; }
+:is(.tune-opt, .qm-opt)[data-value='glint'] { --act: tune-act-glint; }
+:is(.tune-opt, .qm-opt)[data-value='turn'] { --act: tune-act-turn; }
+:is(.tune-opt, .qm-opt)[data-value='bounce'] { --act: tune-act-bounce; }
+
+@keyframes tune-act-gyre {
+  0%, 100% { transform: translate(2px, 0) rotate(5deg); }
+  25% { transform: translate(0, 2px); }
+  50% { transform: translate(-2px, 0) rotate(-5deg); }
+  75% { transform: translate(0, -2px); }
+}
+
+@keyframes tune-act-lean {
+  0%, 10%, 100% { transform: rotate(-12deg); }
+  40%, 60% { transform: rotate(12deg); }
+}
+
+@keyframes tune-act-jelly {
+  0%, 100% { transform: rotate(-10deg); }
+  12% { transform: rotate(14deg) scale(1.08, 0.94); }
+  22% { transform: rotate(6deg); }
+  30% { transform: rotate(11deg); }
+  45% { transform: rotate(9deg); }
+  57% { transform: rotate(-14deg) scale(1.08, 0.94); }
+  67% { transform: rotate(-6deg); }
+  75% { transform: rotate(-11deg); }
+}
+
+@keyframes tune-act-figure8 {
+  0%, 50%, 100% { transform: none; }
+  25% { transform: translate(2px, -2px) rotate(6deg); }
+  75% { transform: translate(-2px, -2px) rotate(-6deg); }
+}
+
+@keyframes tune-act-sweep {
+  0%, 100% { transform: translateX(-2px); opacity: 0.7; }
+  50% { transform: translateX(2px); opacity: 1; }
+}
+
+@keyframes tune-act-beam {
+  0%, 100% { transform: translate(-2px, -2px); opacity: 0.55; }
+  50% { transform: translate(2px, 2px); opacity: 1; }
+}
+
+@keyframes tune-act-reveal {
+  0%, 25% { transform: none; }
+  45% { transform: rotateY(180deg); }
+  60%, 100% { transform: rotateY(360deg); }
+}
+
+@keyframes tune-act-push {
+  0%, 100% { transform: translateX(-2px) scale(0.85); }
+  55%, 80% { transform: none; }
+}
+
+@keyframes tune-act-pulse {
+  0%, 40%, 100% { transform: none; }
+  8% { transform: scale(1.25); }
+  18% { transform: scale(1.02); }
+  26% { transform: scale(1.12); }
+}
 
 @keyframes tune-act-float {
   50% { transform: translateY(-3px); }

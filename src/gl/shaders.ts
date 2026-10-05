@@ -254,7 +254,7 @@ vec3 glitch(vec3 c, vec2 uv, vec2 t, float L, float lod) {
 }
 ${LETTERING_GLSL}
 ${pack?.glsl ?? ''}
-/** How much of a light motion's band or spot (see ExportView in tune/model.ts) falls here, 0..1+. */
+/** How much of a light motion's band or spot (see IdlePose in tune/model.ts) falls here, 0..1+. */
 float motionLit(vec2 uv) {
   vec2 q = (uv - 0.5) * uCardK;
   float d = dot(q, vec2(cos(uBeam.z), sin(uBeam.z))) - uBeam.x;

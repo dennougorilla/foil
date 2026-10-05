@@ -305,42 +305,56 @@
   animation: var(--act, none) 1.6s ease-in-out infinite;
 }
 
-.tune-opt[data-value='orbit'],
-.tune-opt[data-value='spin'] {
+/* The motions in their four groups: a coloured tag over each row, six tiles a row. */
+.tune-seg.tune-motions {
+  display: block;
+}
+
+.tune-mgroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.tune-mgroup:first-child {
+  margin-top: 0;
+}
+
+/* The group's colour (acts.css), as a pixel tab before its name. */
+.tune-mgroup::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--mg);
+  box-shadow: 0 2px 0 var(--edge);
+}
+
+.tune-mrow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tune-mrow .tune-opt {
+  min-height: 46px;
+  padding: 5px 1px 4px;
+  font-size: 11px;
+  letter-spacing: -0.02em;
+}
+
+/* None closes the first row, set apart: the card held still. */
+.tune-mrow .tune-opt[data-value='none'] {
+  grid-row: 1;
+  grid-column: -2;
+}
+
+/* The motions' own moves are in acts.css. */
+.tune-opt[data-value='orbit'] {
   --act: tune-act-spin;
-}
-
-.tune-opt[data-value='sway'] {
-  --act: tune-act-sway;
-}
-
-.tune-opt[data-value='breathe'] {
-  --act: tune-act-breathe;
-}
-
-.tune-opt[data-value='float'] {
-  --act: tune-act-float;
-}
-
-.tune-opt[data-value='pendulum'] svg {
-  transform-origin: 50% 6%;
-  --act: tune-act-swing;
-}
-
-.tune-opt[data-value='wobble'] {
-  --act: tune-act-wobble;
-}
-
-.tune-opt[data-value='bounce'] {
-  --act: tune-act-bounce;
-}
-
-.tune-opt[data-value='glint'] {
-  --act: tune-act-glint;
-}
-
-.tune-opt[data-value='turn'] {
-  --act: tune-act-turn;
 }
 
 .tune-opt[data-value='pointer'] {

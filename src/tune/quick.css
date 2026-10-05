@@ -89,6 +89,16 @@
   visibility: hidden;
 }
 
+.toggles {
+  transition: opacity 0.2s;
+}
+
+@media (max-height: 820px) and (min-width: 901px) {
+  .qm-open .toggles {
+    opacity: 0.25;
+  }
+}
+
 /* Tucked between the name tag and the deck (a short stage): a slimmer button, and the tray reaches
    over the panel's edge rather than over the card. */
 .qm.is-tight {

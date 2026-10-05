@@ -211,7 +211,10 @@ await step('the motion button above the deck switches the idle motion in one tap
   await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 }).catch(() => {});
   expect((await page.getAttribute(btn, 'aria-expanded')) === 'true' && (await page.isVisible('.qm-tray')), 'the tray did not open');
   const names = await page.locator('.qm-opt span').allTextContents();
-  expect(names.length === 10 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
+  expect(names.length === 21 && names.every(Boolean), `the tray shows ${names.length} motions: ${names}`);
+  const groups = await page.locator('.qm-group .qm-glabel').allTextContents();
+  expect(groups.length === 4 && groups.every(Boolean), `the tray shows ${groups.length} groups: ${groups}`);
+  expect((await page.locator('.qm-group[data-group=tilt] .qm-opt').count()) === 6 && (await page.isVisible('.qm-opt[data-value=gyre]')), 'Gyre is not in the Tilt group');
   expect((await page.getAttribute('.qm-opt[aria-checked=true]', 'data-value')) === (await state()).tune.idle, 'the tray does not mark the current motion');
   expect(await page.evaluate(() => document.activeElement?.classList.contains('qm-opt')), 'focus did not move into the tray');
   // Keyboard: Sway → Float, picked with Enter; the tray stays open to tune it, Escape closes it.
@@ -248,6 +251,34 @@ await step('the motion button above the deck switches the idle motion in one tap
   await page.mouse.click(20, 450);
   expect(!(await page.isVisible('.qm-tray')) && (await state()).tune.idle === 'bounce', 'a press elsewhere did not close the tray, or changed the motion');
   await page.click('#pane-light .tune-reset-all');
+});
+
+await step('a motion picked for exports in v0.13.0 becomes the card motion, and Save names it', async () => {
+  const saved = await page.evaluate(() => localStorage.getItem('foil:v1'));
+  try {
+    await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('foil:v1') ?? '{}');
+      localStorage.setItem('foil:v1', JSON.stringify({ ...s, exportMotion: 'moment', tune: { ...(s.tune ?? {}), idle: 'sway' } }));
+    });
+    await page.reload();
+    await page.waitForSelector('#deckDock .qm-btn');
+    expect((await page.getAttribute('#deckDock .qm-btn', 'data-value')) === 'glint', 'Moment did not become Glint');
+    await page.click('#formatSeg [role=radio][data-format=gif]');
+    if ((await page.getAttribute('#saveOptsToggle', 'aria-expanded')) !== 'true') await page.click('#saveOptsToggle');
+    expect(!(await page.isVisible('#exportMotionSeg')), 'the export still has its own motion choice');
+    const name = await page.textContent('#saveMotionName');
+    const len = await page.textContent('#saveMotionLen');
+    expect(name === 'Glint' && /^3 s/.test(len), `Save names ${name}, ${len}`);
+    expect((await page.textContent('#saveMotionNote')).length > 10, 'no line saying the file moves as the stage does');
+    // "Change" opens the tray above the deck.
+    await page.click('#saveMotionPick');
+    await page.waitForSelector('.qm-tray:not([hidden])', { timeout: 5000 });
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.evaluate((s) => localStorage.setItem('foil:v1', s), saved);
+    await page.reload();
+    await page.waitForTimeout(1500);
+  }
 });
 
 await step('lettering from the name tag', async () => {
@@ -514,7 +545,7 @@ await step('GIF with a clear background is really clear', async () => {
   await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
 });
 
-await step('a GIF moves exactly as the card does on the stage, for every idle motion', async () => {
+await step('a GIF moves exactly as the card does on the stage, for every motion', async () => {
   // Every card draw is recorded: the stage's main card with the idle clock it was drawn at, and each
   // exported frame with its loop time. Pose, sheen, light and flash are compared as the renderer gets them.
   await page.evaluate(async () => {
@@ -525,7 +556,10 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
     const rec = (window.__draws = { live: null, frames: [] });
     const draw = (window.__drawCard = CardRenderer.prototype.drawCard);
     CardRenderer.prototype.drawCard = function (d, time) {
-      const pick = ({ cx, cy, w, h, rx, ry, rz, scale, tilt, light, flash, glint }) => ({ cx, cy, w, h, rx, ry, rz, scale, tilt: [...tilt], light: [...light], flash, glint: glint ?? -2 });
+      const pick = ({ cx, cy, w, h, rx, ry, rz, scale, tilt, light, flash, glint, beam, spot, dim, star }) => ({
+        cx, cy, w, h, rx, ry, rz, scale, tilt: [...tilt], light: [...light], flash, glint: glint ?? -2,
+        beam: [...(beam ?? [0, 0, 0, 0])], spot: [...(spot ?? [0, 0])], dim: dim ?? 0, star: [...(star ?? [0, 0, 0])],
+      });
       if (this.gl.canvas === live) {
         if (d.plate !== false) {
           const c = live.getBoundingClientRect();
@@ -542,18 +576,35 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
   });
   await tab('light');
   try {
+  // Every motion in the list (docs/motion.md), under each light setting and a few speeds.
   const cases = [
-    ['pendulum', 'orbit', 1.5],
+    ['gyre', 'orbit', 1.5],
     ['sway', 'pointer', 1],
     ['float', 'pointer', 0.75],
-    ['wobble', 'fixed', 1],
-    ['bounce', 'pointer', 2],
-    ['glint', 'pointer', 1],
-    ['spin', 'orbit', 1],
-    ['turn', 'pointer', 1],
+    ['pendulum', 'orbit', 1],
     ['breathe', 'pointer', 1],
+    ['lean', 'fixed', 1],
+    ['jelly', 'pointer', 2],
+    ['figure8', 'pointer', 1],
+    ['wobble', 'fixed', 1],
+    ['spin', 'orbit', 1],
+    ['sweep', 'pointer', 1],
+    ['beam', 'orbit', 1],
+    ['spotlight', 'pointer', 0.5],
+    ['flare', 'fixed', 1],
+    ['reveal', 'pointer', 1],
+    ['push', 'pointer', 1.25],
+    ['pulse', 'pointer', 1],
+    ['glint', 'pointer', 1],
+    ['turn', 'pointer', 1],
+    ['bounce', 'pointer', 2],
+    ['none', 'orbit', 1],
   ];
-  const norm = (d, ox, oy) => ({ dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale, t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint });
+  const norm = (d, ox, oy) => ({
+    dx: (d.cx - ox) / d.h, dy: (d.cy - oy) / d.h, rx: d.rx, cry: Math.cos(d.ry), sry: Math.sin(d.ry), rz: d.rz, scale: d.scale,
+    t0: d.tilt[0], t1: d.tilt[1], l0: d.light[0], l1: d.light[1], flash: d.flash, glint: d.glint,
+    b0: d.beam[0], b3: d.beam[3], s1: d.spot[1], dim: d.dim, st: d.star[2],
+  });
   for (const [n, [idle, light, speed]] of cases.entries()) {
     await page.click(`#pane-light [data-key=light] [role=radio][data-value=${light}]`);
     await page.click(`#pane-light [data-key=idle] [role=radio][data-value=${idle}]`);
@@ -568,8 +619,9 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
       await page.evaluate(() => (window.__draws.frames = []));
       const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.click('#saveBtn')]);
       const gif = decompressFrames(parseGIF(readFileSync(await dl.path())), true);
+      // Gyre under an orbiting light: the whole six-second cycle, at the set speed.
       const total = gif.reduce((a, f) => a + f.delay, 0);
-      expect(Math.abs(total - 6000 / speed) <= 10, `the GIF lasts ${total} ms, not one ${6000 / speed} ms idle cycle`);
+      expect(Math.abs(total - 6000 / speed) <= 10, `the GIF lasts ${total} ms, not one ${6000 / speed} ms cycle`);
       await page.waitForFunction(() => !document.querySelector('#saveBtn[aria-busy]'), null, { timeout: 30000 });
       frames = await page.evaluate(() => window.__draws.frames);
       expect(frames.length === gif.length, `drew ${frames.length} frames for a ${gif.length}-frame GIF`);
@@ -586,13 +638,12 @@ await step('a GIF moves exactly as the card does on the stage, for every idle mo
         drawBack(back, 'card');
         window.__draws.frames = [];
         const scene = createScene({ face, mask: face, back, edition: editionById('base'), intensity: 1, pixel: 0, name: 't', tune: store.tune }, 480, 600, false, true, false);
-        const loop = 6 / store.tune.speed;
-        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40, loop);
+        for (let i = 0; i < 12; i++) scene.draw(i / 12, 40);
         scene.dispose();
         return window.__draws.frames;
       });
     }
-    // The pointer leaves the stage (the card leans a little toward a pointer anywhere on it) and the card settles.
+    // The pointer leaves the card and the card settles.
     await page.evaluate(() => document.getElementById('stage').dispatchEvent(new PointerEvent('pointerleave')));
     await page.waitForTimeout(1500);
     // Each exported frame against the stage held at the same moment of its idle cycle.
@@ -1222,10 +1273,11 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const box = (u0, v0, u1, v1) => [Math.round(W / 2 + (u0 - 0.5) * cw), Math.round(H / 2 + (v0 - 0.5) * 320), Math.round(W / 2 + (u1 - 0.5) * cw), Math.round(H / 2 + (v1 - 0.5) * 320)];
     const ART = box(0.1, 0.08, 0.9, 0.85);
     const PLATE = box(0.1, 0.9, 0.55, 0.965);
-    const grab = (id, intensity, ps, loop = 2.4) => {
-      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune }, W, H, true, true, false);
+    // A second loop length comes from a motion with a shorter loop (Heartbeat's two seconds).
+    const grab = (id, intensity, ps, idle = 'none') => {
+      const s = createScene({ face, mask, back, edition: editionById(id), intensity, pixel: 0, name: 't', tune: { ...tune, idle } }, W, H, true, true, false);
       const out = ps.map((p) => {
-        s.draw(p, 40, loop);
+        s.draw(p, 40);
         return s.ctx.getImageData(0, 0, W, H).data;
       });
       s.dispose();
@@ -1258,7 +1310,7 @@ await step('Confetti and Fireworks keep the message and the name, and their loop
     const out = {};
     for (const id of ['confetti', 'fireworks']) {
       const [plain] = grab(id, 0, [0]);
-      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 3.1)];
+      const [p0, p1, half, p0b, p1b] = [...grab(id, 1, [0, 1, 0.5]), ...grab(id, 1, [0, 1], 'pulse')];
       out[id] = {
         shader: editionById(id).id,
         change: marked(lumas(p0, ART), lumas(plain, ART)),

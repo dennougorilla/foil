@@ -1,5 +1,5 @@
 // How big and how long an APNG will be: the Save button says so before the exporter (apngExport.ts) loads.
-import { exportLoop, framePlan, type ExportMotion, type Tune } from '../tune/model';
+import { exportLoop, framePlan, type Tune } from '../tune/model';
 import { exportFrame } from '../card/shape';
 
 /** The frame for the trading card; other shapes turn it (shape.ts exportFrame). */
@@ -24,11 +24,11 @@ export interface ApngPlan {
 }
 
 /**
- * Frame timing, size and expected bytes for a card `aspect` tall (height / width): the loop of the
- * export's motion, as for the GIF.
+ * Frame timing, size and expected bytes for a card `aspect` tall (height / width): one loop of the
+ * card's motion, as for the GIF (`torch`: Blacklight's lamp, which goes round in the whole cycle).
  */
-export function apngPlan(tune: Tune, aspect: number, loopMs?: number, motion: ExportMotion = 'stage'): ApngPlan {
-  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs, motion);
+export function apngPlan(tune: Tune, aspect: number, loopMs?: number, torch = false): ApngPlan {
+  const { loopMs: ms, sourceSpan } = exportLoop(tune, loopMs, torch);
   const delays = framePlan(ms, DELAY, MAX_FRAMES, 1);
   const f = exportFrame(aspect, W, H);
   return { width: f.W, height: f.H, delays, bytes: Math.round(delays.length * BYTES_PER_FRAME * ((f.W * f.H) / (W * H))), sourceSpan };

@@ -1,5 +1,5 @@
-// The motion tray above the deck: the ten motions as a small tray of tiles, what the pointed one
-// does, and two sliders for its speed and size with a reset. A pick applies at once and the tray
+// The motion tray above the deck: the motions as a small tray of tiles in their four groups, what the
+// pointed one does and how long its loop is, and two sliders for its speed and size with a reset. A pick applies at once and the tray
 // stays open to tune it; the close button, a press elsewhere or Escape closes it. These are the Shine
 // tab's own settings (both read and write the store). On phones the tray is a sheet along the
 // bottom, so the card stays in view. The button that opens it is quick.ts.
@@ -9,16 +9,15 @@ import './quickTray.css';
 import { dictOf } from '../i18n';
 import type { Store } from '../state';
 import { sfx } from '../audio';
-import { IDLE_MODES, RANGES, TUNE_DEFAULTS, type IdleMode } from './model';
+import { editionById } from '../editions';
+import { exportLoop, IDLE_MODES, MOTION_GROUPS, RANGES, TUNE_DEFAULTS, type IdleMode } from './model';
 import { svg } from './icons';
+import './motionIcons';
 import { format } from './format';
 
 /** The settings the tray's sliders tune. */
 const KNOBS = ['speed', 'idleAmp'] as const;
 type Knob = (typeof KNOBS)[number];
-
-/** Options per row of the tray. */
-const COLS = 5;
 
 const pct = (k: Knob, v: number) => ((v - RANGES[k].min) / (RANGES[k].max - RANGES[k].min)) * 100;
 
@@ -30,8 +29,8 @@ export function mountTray(store: Store, root: HTMLElement, btn: HTMLButtonElemen
   tray.setAttribute('aria-labelledby', 'qmTitle');
   tray.hidden = true;
   tray.innerHTML = `
-      <div class="qm-head"><p class="qm-title" id="qmTitle"></p><button class="qm-close" type="button">${svg('close')}</button></div>
-      <div class="qm-grid" role="radiogroup" aria-labelledby="qmTitle"></div>
+      <div class="qm-head"><p class="qm-title" id="qmTitle"></p><p class="qm-note"></p><button class="qm-close" type="button">${svg('close')}</button></div>
+      <div class="qm-grid" role="radiogroup" aria-labelledby="qmTitle">${MOTION_GROUPS.map((g) => `<div class="qm-group" data-group="${g.id}"><p class="qm-glabel"></p><div class="qm-row"></div></div>`).join('')}</div>
       <p class="qm-help" aria-hidden="true"></p>
       <div class="qm-tune">
         ${KNOBS.map((k) => `<label class="qm-knob"><span class="qm-label"></span><output class="qm-val"></output><span class="qm-track" style="--def:${pct(k, TUNE_DEFAULTS[k])}%"><input class="qm-range" type="range" data-k="${k}" min="${RANGES[k].min}" max="${RANGES[k].max}" step="${RANGES[k].step}" /></span></label>`).join('')}
@@ -44,22 +43,29 @@ export function mountTray(store: Store, root: HTMLElement, btn: HTMLButtonElemen
   const dict = () => dictOf(store.get().lang).tune;
   const now = () => store.get().tune.idle;
 
-  const options = IDLE_MODES.map((v, i) => {
+  const rowOf = (v: IdleMode) => grid.querySelector(`[data-group=${(MOTION_GROUPS.find((g) => g.motions.includes(v)) ?? MOTION_GROUPS[0]).id}] .qm-row`)!;
+  // None closes the first row; the rest go in their groups, in the order of the list.
+  const options = [...IDLE_MODES.filter((v) => v !== 'none'), 'none' as const].map((v) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'qm-opt';
     b.dataset.value = v;
     b.setAttribute('role', 'radio');
-    // Dealt like a hand of cards: each tile a little askew until it is pointed at.
-    b.style.setProperty('--i', String(i));
-    b.style.setProperty('--tilt', `${[-3, 2.2, -1.2, 2.8, -2.4, 1.6, -2.8, 1, 2.6, -1.8][i]}deg`);
-    b.style.setProperty('--lift', `${[1, -1, 2, 0, -2, 0, 2, -1, 1, -2][i]}px`);
-    b.innerHTML = `${svg(v)}<span></span>`;
+    b.innerHTML = `${svg(v)}<span></span><i class="qm-check" aria-hidden="true"></i>`;
     b.addEventListener('click', () => pick(v));
     for (const ev of ['pointerenter', 'focus']) b.addEventListener(ev, () => describe(v));
-    grid.appendChild(b);
+    rowOf(v).appendChild(b);
     return b;
   });
+  // Dealt like a hand of cards: each tile a little askew until it is pointed at, row by row.
+  options.forEach((b, i) => {
+    b.style.setProperty('--i', String(i));
+    b.style.setProperty('--tilt', `${(((i * 7) % 11) - 5) * 0.6}deg`);
+    b.style.setProperty('--lift', `${((i * 3) % 5) - 2}px`);
+  });
+
+  // Leaving the tiles, the line goes back to the picked motion.
+  grid.addEventListener('pointerleave', () => describe(now()));
 
   const knobs = [...tray.querySelectorAll<HTMLInputElement>('.qm-range')];
   const reset = tray.querySelector<HTMLButtonElement>('.qm-reset')!;
@@ -72,11 +78,18 @@ export function mountTray(store: Store, root: HTMLElement, btn: HTMLButtonElemen
     store.set({ tune: { ...store.get().tune, speed: TUNE_DEFAULTS.speed, idleAmp: TUNE_DEFAULTS.idleAmp } });
   });
 
+  /** The pointed motion: its name, what it does and how long its loop runs at the set speed. */
   const describe = (v: IdleMode) => {
     const t = dict();
-    help.innerHTML = '<b></b> ';
+    const s = store.get();
+    help.innerHTML = '<em></em><b></b> <span></span><small></small>';
+    const peek = v !== now();
+    help.classList.toggle('is-preview', peek);
+    help.querySelector('em')!.textContent = peek ? t.trayPointed : t.trayPicked;
     help.querySelector('b')!.textContent = t.idleMode[v];
-    help.append(t.idleHelp[v]);
+    help.querySelector('span')!.textContent = t.idleHelp[v];
+    const secs = exportLoop({ ...s.tune, idle: v }, undefined, !!editionById(s.edition).torch).loopMs / 1000;
+    help.querySelector('small')!.textContent = v === 'none' ? '' : t.loopLen.replace('{s}', String(Math.round(secs * 10) / 10));
   };
 
   const render = () => {
@@ -84,6 +97,8 @@ export function mountTray(store: Store, root: HTMLElement, btn: HTMLButtonElemen
     const v = now();
     const tune = store.get().tune;
     tray.querySelector('.qm-title')!.textContent = t.groups.motion;
+    tray.querySelector('.qm-note')!.textContent = t.trayNote;
+    for (const g of MOTION_GROUPS) tray.querySelector(`[data-group=${g.id}] .qm-glabel`)!.textContent = t.motionGroup[g.id];
     close.setAttribute('aria-label', t.close);
     close.title = t.close;
     options.forEach((b) => {
@@ -159,12 +174,20 @@ export function mountTray(store: Store, root: HTMLElement, btn: HTMLButtonElemen
       e.preventDefault();
       return open(false);
     }
-    const i = options.indexOf(document.activeElement as HTMLButtonElement);
+    const cur = document.activeElement as HTMLButtonElement;
+    const i = options.indexOf(cur);
     if (i < 0) return;
-    const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: COLS, ArrowUp: -COLS }[e.key];
-    if (!step) return;
+    const side = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    const down = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (!side && !down) return;
     e.preventDefault();
-    options[(i + step + options.length) % options.length].focus();
+    if (side) return options[(i + side + options.length) % options.length].focus();
+    // Up and down go to the nearest tile in the group above or below.
+    const rows = [...grid.querySelectorAll<HTMLElement>('.qm-row')];
+    const r = rows.indexOf(cur.parentElement!);
+    const next = [...rows[(r + down! + rows.length) % rows.length].children] as HTMLButtonElement[];
+    const x = (b: HTMLElement) => b.getBoundingClientRect().left + b.offsetWidth / 2;
+    next.reduce((a, b) => (Math.abs(x(b) - x(cur)) < Math.abs(x(a) - x(cur)) ? b : a)).focus();
   });
   // A press anywhere else, or focus leaving the tray, closes it.
   document.addEventListener('pointerdown', (e) => {

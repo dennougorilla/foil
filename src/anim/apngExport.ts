@@ -42,7 +42,7 @@ export async function exportApng(
   if (signal.aborted) throw aborted();
   await packsLoaded(input);
   if (signal.aborted) throw aborted();
-  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.face.height / input.face.width, input.loopMs, input.motion);
+  const plan = apngPlan(input.tune ?? TUNE_DEFAULTS, input.face.height / input.face.width, input.loopMs, !!input.edition.torch);
   const worker = new Worker(new URL('./apngWorker.ts', import.meta.url), { type: 'module' });
   const send = (m: ApngRequest, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   let drawn = 0;
@@ -80,7 +80,7 @@ export async function exportApng(
     send({ type: 'start', width: plan.width, height: plan.height });
     for (let i = 0; i < frames; i++) {
       await nextFrame(signal);
-      scene.draw(at / loopMs, 0, loopMs / 1000, (at / loopMs) * plan.sourceSpan);
+      scene.draw(at / loopMs, 0, (at / loopMs) * plan.sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, plan.width, plan.height);
       send({ type: 'frame', data: data.buffer, delay: plan.delays[i] }, [data.buffer]);
       at += plan.delays[i];

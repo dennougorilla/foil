@@ -2,14 +2,15 @@ import { exportFrame } from './card/shape';
 import { BackgroundRenderer, CardRenderer, hexToRgb, type LayerDraw, type RGB } from './gl/renderers';
 import type { Edition } from './editions';
 import type { GifRequest, GifResponse } from './gifWorker';
-import { exportLoop, fixedLight, framePlan, TUNE_DEFAULTS, tuneGl, type ExportMotion, type Tune } from './tune/model';
-import { exportView } from './tune/exportMotion';
+import { exportLoop, fixedLight, framePlan, loopCycle, loopView, roomShade, TUNE_DEFAULTS, tuneGl, type Tune } from './tune/model';
+// Every motion, so a file can be made with any of them.
+import './tune/moves';
 import { GIF_SAVE, type GifSize } from './exportSize';
 import { stillPose } from './lettering';
 import type { RangeSnapshot } from './gl/range';
 import { AUTO_STILL, type TouchKind } from './touch/heat';
 import { autoTouchFor } from './touch/busy';
-import { TORCH_DRIFT, TORCH_STILL, torchAt } from './gl/torch';
+import { TORCH_DRIFT, TORCH_IDLE, TORCH_STILL, torchAt } from './gl/torch';
 import type { LayerMap } from './depth/layers';
 import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
@@ -39,8 +40,6 @@ export interface ExportInput {
   loopMs?: number;
   /** Fine-tuning of light and motion; defaults when left out. */
   tune?: Tune;
-  /** The motion of a GIF or APNG loop; the stage's own when left out. */
-  motion?: ExportMotion;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
@@ -143,8 +142,8 @@ function autoTouch(face: HTMLCanvasElement, kind: TouchKind) {
 export interface Scene {
   out: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** Draws loop position p∈[0,1) of a loop `loopSec` long: the card as the stage shows it left alone, on the swirl backdrop. */
-  draw(p: number, bgTime: number, loopSec: number, sourceMs?: number): void;
+  /** Draws loop position p∈[0,1) of the motion's loop: the card as the stage shows it left alone, on the swirl backdrop. */
+  draw(p: number, bgTime: number, sourceMs?: number): void;
   dispose(): void;
 }
 
@@ -181,17 +180,14 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
   // Touch finishes get a finger that swipes the card once per loop, then lets it cool (seamless after a run-up).
   const kind = input.edition.touch;
   const touch = kind ? autoTouchFor(input.face, kind) : null;
-  // Everything is laid out for a 900px-tall trading-card frame and scaled from there.
-  const k = H0 / 900;
+  const torch = !!input.edition.torch;
 
   return {
     out,
     ctx,
-    draw(p, bgTime, loopSec, sourceMs) {
-      // The card's motion, sheen and light: by default the stage's at the same moment of its idle cycle.
-      const view = exportView(tune, input.motion ?? 'stage', p);
-      const { pose, tilt, light } = view;
-      const time = p * loopSec * tune.speed;
+    draw(p, bgTime, sourceMs) {
+      // The card's motion, sheen and light: the stage's, left alone, at the same moment of its loop.
+      const { s: time, pose, tilt, light } = loopView(tune, p, torch);
       if (input.faceAt && animFace && animMask && sourceMs !== undefined) {
         input.faceAt(sourceMs, animFace, animMask);
         cards.setFace(animFace, animMask);
@@ -217,16 +213,19 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
           pixel: PIXEL_STEPS[input.pixel] ?? 0,
           tilt,
           // Blacklight's lamp drifts round the art as on the stage (unless the tune fixes the light).
-          light: input.edition.torch && tune.light !== 'fixed' ? torchAt(view.torch ?? time / TORCH_DRIFT) : light,
+          // Blacklight's lamp drifts round the art, as dim as on the stage left alone (unless the tune fixes the light).
+          light: torch && tune.light !== 'fixed' ? torchAt(time / TORCH_DRIFT) : light,
+          lamp: torch ? TORCH_IDLE : undefined,
           alpha: 1,
           flash: pose.flash,
           glint: pose.glint,
-          beam: view.beam,
-          spot: view.spot,
-          dim: view.dim,
-          star: view.star,
-          shadow: !shadow ? null : view.shadow ? [view.shadow[0] * k, view.shadow[1] * k] : [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u],
-          loop: loopSec * tune.speed,
+          beam: pose.beam,
+          spot: pose.spot,
+          dim: pose.dim,
+          star: pose.star,
+          shadow: shadow ? [(10 + lift * 0.3 - pose.ry * 18) * u, (16 + lift * 0.5 + pose.rx * 10) * u] : null,
+          // The finishes' own motion closes on the loop, as on the stage.
+          loop: tune.speed > 0 ? loopCycle(tune, torch) : 0,
           heat: touch ?? undefined,
           layer: input.layer?.draw,
         },
@@ -236,9 +235,9 @@ export function createScene(input: ExportInput, W0: number, H0: number, readback
       if (transparent) ctx.clearRect(0, 0, W, H);
       else {
         ctx.drawImage(bgCanvas, 0, 0, W, H);
-        // A light motion's dim room takes the backdrop down with the card.
-        if (view.dim) {
-          ctx.fillStyle = `rgba(6, 8, 20, ${Math.min(0.88, view.dim * 1.15)})`;
+        // A Light motion's dim room takes the backdrop down with the card, as on the stage.
+        if (pose.dim) {
+          ctx.fillStyle = `rgba(6, 8, 20, ${roomShade(pose.dim)})`;
           ctx.fillRect(0, 0, W, H);
         }
       }
@@ -291,10 +290,9 @@ export async function exportGif(
   result.catch(() => {});
 
   const size = opts.size ?? GIF_SAVE;
-  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs, input.motion);
+  const { loopMs, sourceSpan } = exportLoop(input.tune ?? TUNE_DEFAULTS, input.loopMs, !!input.edition.torch);
   const delays = framePlan(loopMs, size.delay, size.maxFrames, 10);
   const frames = delays.length;
-  const DUR = loopMs / 1000;
   let scene: Scene | undefined;
   try {
     scene = createScene(input, size.w, size.h, true, opts.clear, !opts.clear);
@@ -304,7 +302,7 @@ export async function exportGif(
       const p = at / loopMs;
       // The swirl barely breathes and returns to where it started, so the loop is seamless and
       // most of the backdrop stays identical between frames, which is what keeps the file small.
-      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, DUR, p * sourceSpan);
+      scene.draw(p, 40 + Math.sin(p * Math.PI * 2) * 0.15, p * sourceSpan);
       const { data } = scene.ctx.getImageData(0, 0, width, height);
       send({ type: 'frame', data: data.buffer }, [data.buffer]);
       onProgress?.(((i + 1) / frames) * GIF_DRAW_SHARE, false);

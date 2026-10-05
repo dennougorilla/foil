@@ -3,7 +3,28 @@
 // "More" drawer closed changes nothing.
 
 export type LightMode = 'pointer' | 'orbit' | 'fixed';
-export type IdleMode = 'none' | 'sway' | 'float' | 'pendulum' | 'wobble' | 'bounce' | 'glint' | 'spin' | 'turn' | 'breathe';
+export type IdleMode =
+  | 'none'
+  | 'sway'
+  | 'float'
+  | 'pendulum'
+  | 'breathe'
+  | 'gyre'
+  | 'lean'
+  | 'jelly'
+  | 'figure8'
+  | 'wobble'
+  | 'spin'
+  | 'sweep'
+  | 'beam'
+  | 'spotlight'
+  | 'flare'
+  | 'reveal'
+  | 'push'
+  | 'pulse'
+  | 'glint'
+  | 'turn'
+  | 'bounce';
 /** The metal the Relief finish is struck in; other finishes ignore it. */
 export type Metal = 'gold' | 'silver';
 
@@ -34,7 +55,7 @@ export interface Tune {
   /** Largest tilt the card reaches while you point at it, degrees. */
   tiltMax: number;
   idle: IdleMode;
-  /** Size of the idle motion: 2 sways (bobs, swings…) twice as far, 0 holds the card still. */
+  /** Size of the motion: 2 moves the card (and the light it steers) twice as far, 0 holds it still. */
   idleAmp: number;
   metal: Metal;
 }
@@ -86,7 +107,6 @@ export const RANGES: Record<NumKey, Range> = {
 };
 
 export const LIGHT_MODES: LightMode[] = ['pointer', 'orbit', 'fixed'];
-export const IDLE_MODES: IdleMode[] = ['none', 'sway', 'float', 'pendulum', 'wobble', 'bounce', 'glint', 'spin', 'turn', 'breathe'];
 export const METALS: Metal[] = ['gold', 'silver'];
 
 export const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -202,15 +222,64 @@ export function applyTune(gl: WebGL2RenderingContext, u: Uniforms, g: TuneGl): v
   gl.uniform1f(u.uTMetal, g.metal);
 }
 
-// ---------- Idle motion (the stage and exported loops) ----------
+// ---------- Motion (the stage and exported loops) ----------
+// One list of motions drives both: the card left alone on the stage is the preview of its GIF or
+// APNG (docs/motion.md). Sway, the default, is here; the others arrive with moves.ts.
 
 /**
- * Idle seconds in which every idle motion, the orbiting light and Blacklight's drifting lamp
- * come round once. The idle clock runs at the tune's speed, so at speed 1 that is six seconds,
- * and an exported loop is exactly one cycle: it moves as the stage does and closes without a seam.
+ * Idle seconds in which every motion, the orbiting light and Blacklight's drifting lamp come round
+ * together: each motion's own loop (PERIOD) divides it. The idle clock runs at the tune's speed.
  */
 export const IDLE_CYCLE = 6;
 const W = (Math.PI * 2) / IDLE_CYCLE;
+
+export type MotionGroup = 'gentle' | 'tilt' | 'light' | 'show';
+
+/** The motions in the order the tray and the Shine tab show them, None aside. */
+export const MOTION_GROUPS: { id: MotionGroup; motions: IdleMode[] }[] = [
+  { id: 'gentle', motions: ['sway', 'float', 'pendulum', 'breathe'] },
+  { id: 'tilt', motions: ['gyre', 'lean', 'jelly', 'figure8', 'wobble', 'spin'] },
+  { id: 'light', motions: ['sweep', 'beam', 'spotlight', 'flare'] },
+  { id: 'show', motions: ['reveal', 'push', 'pulse', 'glint', 'turn', 'bounce'] },
+];
+export const IDLE_MODES: IdleMode[] = ['none', ...MOTION_GROUPS.flatMap((g) => g.motions)];
+
+/** Idle seconds of one loop of each motion: the length of its GIF at speed 1. */
+export const PERIOD: Record<IdleMode, number> = {
+  none: 6,
+  sway: 6,
+  float: 6,
+  pendulum: 3,
+  breathe: 6,
+  gyre: 3,
+  lean: 3,
+  jelly: 3,
+  figure8: 3,
+  wobble: 6,
+  spin: 6,
+  sweep: 3,
+  beam: 3,
+  spotlight: 3,
+  flare: 2,
+  reveal: 3,
+  push: 3,
+  pulse: 2,
+  glint: 3,
+  turn: 6,
+  bounce: 6,
+};
+
+/** The Light motions bring their own light, whatever the light setting. */
+export const OWN_LIGHT: ReadonlySet<IdleMode> = new Set<IdleMode>(['beam', 'spotlight', 'flare']);
+/** Motions that turn the card round; pointed at, it comes round to its face and waits. */
+const TURNING: ReadonlySet<IdleMode> = new Set<IdleMode>(['spin', 'turn', 'reveal']);
+
+/** A motion picked for exports in v0.13.0 (its saved `exportMotion`) as the card's motion; null for "As on screen". */
+export function legacyMotion(raw: unknown): IdleMode | null {
+  if (raw === 'showcase') return 'gyre';
+  if (raw === 'moment') return 'glint';
+  return raw !== 'none' && IDLE_MODES.includes(raw as IdleMode) ? (raw as IdleMode) : null;
+}
 
 /** The card's automatic motion at one moment: offsets in card heights, angles in radians. */
 export interface IdlePose {
@@ -220,7 +289,7 @@ export interface IdlePose {
   ry: number;
   rz: number;
   scale: number;
-  /** Turntable angle of spin and turn, added on top of everything else. */
+  /** Turntable angle of a turning motion, added on top of everything else. */
   spin: number;
   /** Extra sheen travel, in the same -1..1 units as the shader's tilt. */
   sheen: [number, number];
@@ -228,6 +297,16 @@ export interface IdlePose {
   flash: number;
   /** A streak of light crossing the face (see CardDraw.glint), below -1 when none. */
   glint: number;
+  /** Where the light sits while nobody points at the card (card uv); opposite the lean when absent. */
+  light?: [number, number];
+  /** A band of light across the face (see CardDraw.beam): place, width, angle, power. */
+  beam?: [number, number, number, number];
+  /** A round spot of light centred on the light (see CardDraw.spot): radius, power. */
+  spot?: [number, number];
+  /** How far the face and the backdrop fall into shade away from the band or spot, 0..1. */
+  dim?: number;
+  /** A pixel star twinkling on the face (see CardDraw.star): x, y in card uv, power. */
+  star?: [number, number, number];
 }
 
 export const REST_POSE: IdlePose = { dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1, spin: 0, sheen: [0, 0], flash: 0, glint: -2 };
@@ -235,237 +314,137 @@ export const REST_POSE: IdlePose = { dx: 0, dy: 0, rx: 0, ry: 0, rz: 0, scale: 1
 export const smooth = (u: number) => u * u * (3 - 2 * u);
 export const frac = (v: number) => v - Math.floor(v);
 
-/** The idle motion `s` idle seconds in. Periodic in IDLE_CYCLE (spin and turn add whole turns). */
-export function idlePose(t: Tune, s: number): IdlePose {
+/** One motion: its pose `s` idle seconds in, for a loop of `P` idle seconds. */
+export type Move = (s: number, P: number) => IdlePose;
+
+const sway: Move = (s) => {
   const a = W * s;
-  const p: IdlePose = { ...REST_POSE, sheen: [0, 0] };
-  switch (t.idle) {
-    case 'sway':
-      p.dy = Math.sin(a) * 0.012;
-      p.rz = Math.sin(a + 0.9) * 0.022;
-      p.rx = Math.sin(a + 2) * 0.05;
-      p.ry = Math.cos(a) * 0.07 + Math.sin(2 * a) * 0.015;
-      p.sheen = [Math.sin(a + 0.4) * 0.3, Math.cos(a + 1.1) * 0.3];
-      break;
-    case 'float': {
-      // A slow hover: rising, the card tips back a little and comes closer.
-      const h = Math.sin(a) + Math.sin(2 * a + 0.6) * 0.2;
-      p.dy = -h * 0.04;
-      p.rx = Math.cos(a) * 0.08;
-      p.ry = Math.sin(2 * a) * 0.03;
-      p.rz = Math.sin(a + 1.3) * 0.02;
-      p.scale = 1 + h * 0.02;
-      p.sheen = [Math.sin(a + 0.5) * 0.2, -Math.cos(a) * 0.35];
-      break;
-    }
-    case 'pendulum': {
-      // Swinging from the middle of its top edge, twice a cycle.
-      const th = Math.sin(2 * a) * 0.13;
-      p.rz = th;
-      p.dx = -Math.sin(th) * 0.5;
-      p.dy = -(1 - Math.cos(th)) * 0.5;
-      p.ry = Math.cos(2 * a) * 0.06;
-      p.sheen = [(th / 0.13) * 0.45, 0];
-      break;
-    }
-    case 'wobble':
-      // Balatro's restless card: quick, jittery rocking on three axes that never settles.
-      p.rz = Math.sin(4 * a) * 0.03 + Math.sin(9 * a + 1) * 0.012;
-      p.rx = Math.sin(5 * a + 0.5) * 0.08;
-      p.ry = Math.sin(3 * a + 2) * 0.1 + Math.sin(7 * a) * 0.03;
-      p.dy = Math.sin(6 * a) * 0.005;
-      break;
-    case 'bounce': {
-      // Two hops a cycle, leaning one way then the other: a hop, a thud, a squash that settles, a crouch.
-      const hop = s / (IDLE_CYCLE / 2);
-      const u = frac(hop);
-      const side = Math.floor(hop) % 2 ? -1 : 1;
-      const AIR = 0.22;
-      const LAND = 0.3;
-      if (u < AIR) {
-        const q = u / AIR;
-        const h = 4 * q * (1 - q);
-        p.dy = -h * 0.07;
-        p.rz = side * Math.sin(Math.PI * q) * 0.05;
-        p.scale = 1 + h * 0.02;
-        p.sheen = [0, -h * 0.6];
-      } else if (u < AIR + LAND) {
-        const q = (u - AIR) / LAND;
-        const k = (1 - q) ** 2;
-        p.scale = 1 - Math.sin(q * Math.PI * 3) * 0.045 * k;
-        p.dy = Math.sin(q * Math.PI * 3) * 0.006 * k;
-        p.flash = 0.12 * (1 - q) ** 4;
-      } else if (u > 0.85) {
-        p.scale = 1 - Math.sin((Math.PI * (u - 0.85)) / 0.15) * 0.02;
-      }
-      break;
-    }
-    case 'glint': {
-      // A still card that a streak of light crosses twice a cycle, leaning into it; between passes the shine drifts back.
-      const u = frac(s / (IDLE_CYCLE / 2));
-      const PASS = 0.2;
-      const across = u < PASS ? smooth(u / PASS) : 1 - smooth((u - PASS) / (1 - PASS));
-      p.sheen = [-1.8 + 3.6 * across, -0.5 + across];
-      if (u < PASS) {
-        p.ry = Math.sin((Math.PI * u) / PASS) * 0.05;
-        p.glint = -0.3 + 2 * (u / PASS);
-      }
-      break;
-    }
-    case 'spin':
-      p.spin = a;
-      p.rx = Math.sin(a) * 0.08;
-      p.sheen = [Math.sin(a) * 0.6, 0];
-      break;
-    case 'turn': {
-      // Rests on its face, then one slow full turn.
-      const u = frac(s / IDLE_CYCLE);
-      const REST = 0.35;
-      const q = u < REST ? 0 : (u - REST) / (1 - REST);
-      p.spin = Math.PI * (1 - Math.cos(Math.PI * q)) + Math.floor(s / IDLE_CYCLE) * Math.PI * 2;
-      p.rx = Math.sin(a) * 0.03;
-      p.sheen = [Math.sin(p.spin) * 0.6, 0];
-      break;
-    }
-    case 'breathe': {
-      const b = Math.sin(a);
-      p.scale = 1 + b * 0.05;
-      p.dy = -b * 0.012;
-      p.rx = b * 0.03;
-      p.sheen = [Math.sin(a + 1) * 0.15, b * 0.4];
-      break;
-    }
-  }
-  const k = t.idleAmp;
-  if (k !== 1) {
-    // How far it moves, not how long it takes: a turn still goes all the way round.
-    p.dx *= k;
-    p.dy *= k;
-    p.rx *= k;
-    p.ry *= k;
-    p.rz *= k;
-    p.scale = 1 + (p.scale - 1) * k;
-    p.sheen = [p.sheen[0] * k, p.sheen[1] * k];
-    p.flash *= k;
-  }
-  return p;
+  return {
+    ...REST_POSE,
+    dy: Math.sin(a) * 0.012,
+    rz: Math.sin(a + 0.9) * 0.022,
+    rx: Math.sin(a + 2) * 0.05,
+    ry: Math.cos(a) * 0.07 + Math.sin(2 * a) * 0.015,
+    sheen: [Math.sin(a + 0.4) * 0.3, Math.cos(a + 1.1) * 0.3],
+  };
+};
+
+const MOVES: Partial<Record<IdleMode, Move>> = { sway };
+/** moves.ts hands its motions over here when it arrives. */
+export const addMoves = (m: Partial<Record<IdleMode, Move>>) => void Object.assign(MOVES, m);
+/** Whether the motion can be drawn yet (the card rests until it can). */
+export const hasMove = (m: IdleMode) => m === 'none' || !!MOVES[m];
+let moving: Promise<unknown> | null = null;
+/** Fetches every motion but Sway (once). */
+export function loadMoves(): Promise<unknown> {
+  moving ??= import('./moves.ts');
+  moving.catch(() => (moving = null));
+  return moving;
 }
 
-/** Where a turning idle motion next faces the viewer, in idle seconds; `s` itself when it already does. */
+/** Where the Size setting draws the light in to, at zero. */
+const LIGHT_HOME: [number, number] = [0.5, 0.42];
+
+/** The motion `s` idle seconds in, at the tune's size. Periodic in PERIOD (a turn adds whole turns). */
+export function idlePose(t: Tune, s: number): IdlePose {
+  const move = MOVES[t.idle];
+  const p: IdlePose = move ? move(s, PERIOD[t.idle]) : { ...REST_POSE, sheen: [0, 0] };
+  const k = t.idleAmp;
+  if (k === 1) return p;
+  // How far it moves (the card, and the light it steers), not how long it takes: a turn still goes all the way round.
+  return {
+    ...p,
+    dx: p.dx * k,
+    dy: p.dy * k,
+    rx: p.rx * k,
+    ry: p.ry * k,
+    rz: p.rz * k,
+    scale: 1 + (p.scale - 1) * k,
+    sheen: [p.sheen[0] * k, p.sheen[1] * k],
+    flash: p.flash * k,
+    light: p.light && [LIGHT_HOME[0] + (p.light[0] - LIGHT_HOME[0]) * k, LIGHT_HOME[1] + (p.light[1] - LIGHT_HOME[1]) * k],
+    beam: p.beam && [p.beam[0] * k, p.beam[1], p.beam[2], p.beam[3]],
+  };
+}
+
+/** Idle seconds of one exported loop: the motion's own, or the whole cycle while the orbiting light or Blacklight's lamp goes round. */
+export const loopCycle = (t: Tune, torch = false) => (torch || orbits(t) ? IDLE_CYCLE : PERIOD[t.idle]);
+
+/** Where a turning motion next faces the viewer, in idle seconds; `s` itself when it already does. */
 export function facingAt(t: Tune, s: number): number {
-  if (t.idle !== 'spin' && t.idle !== 'turn') return s;
+  if (!TURNING.has(t.idle)) return s;
   const turned = idlePose(t, s).spin / (Math.PI * 2);
-  return Math.abs(turned - Math.round(turned)) < 1e-6 ? s : Math.ceil(s / IDLE_CYCLE) * IDLE_CYCLE;
+  if (Math.abs(turned - Math.round(turned)) < 1e-6) return s;
+  const P = PERIOD[t.idle];
+  return Math.ceil(s / P) * P;
 }
 
 /** Position of the orbiting light in card uv, `s` idle seconds in. */
 export const orbitLight = (s: number): [number, number] => [0.5 + Math.cos(W * s) * 0.34, 0.5 + Math.sin(W * s) * 0.36];
 
+/** The light setting's orbit is on (the Light motions bring their own light instead). */
+const orbits = (t: Tune) => t.light === 'orbit' && !OWN_LIGHT.has(t.idle);
+
 /**
- * The sheen the card shows, from its rotation (`rx`, `ry`, spin left out), the idle motion's own
+ * The sheen the card shows, from its rotation (`rx`, `ry`, spin left out), the motion's own
  * sheen and an orbiting light's.
  */
 export function cardTilt(t: Tune, s: number, pose: IdlePose, rx: number, ry: number): [number, number] {
-  const orbit = t.light === 'orbit' ? [Math.cos(W * s) * 0.6, Math.sin(W * s) * 0.6] : [0, 0];
+  const orbit = orbits(t) ? [Math.cos(W * s) * 0.6, Math.sin(W * s) * 0.6] : [0, 0];
   return [ry / 0.32 + pose.sheen[0] + orbit[0], rx / 0.28 + pose.sheen[1] + orbit[1]];
 }
+
+/** How dark a Light motion's dim room makes the backdrop behind the card (0..1 black), on the stage and in a file. */
+export const roomShade = (dim: number) => Math.min(0.88, dim * 1.15);
 
 /** Where the light sits when nobody points at the card: opposite the way it leans. */
 export const restLight = (tilt: [number, number]): [number, number] => [0.5 - tilt[0] * 0.35, 0.4 - tilt[1] * 0.3];
 
-/** The light the tune asks for; `follow` is where the pointer (or the card's lean) puts it. */
-export function tunedLight(t: Tune, s: number, follow: [number, number]): [number, number] {
-  if (t.light === 'orbit') return orbitLight(s);
-  if (t.light === 'fixed') return fixedLight(t.lightAngle);
-  return follow;
+/**
+ * The light on the card `s` idle seconds in. `hand` is where a pointer or finger on the card puts it
+ * (null in a file, and on the stage while nobody touches the card). A fixed or orbiting light keeps
+ * to the setting, except under the Light motions, which bring their own.
+ */
+export function lightAt(t: Tune, s: number, pose: IdlePose, tilt: [number, number], hand: [number, number] | null): [number, number] {
+  if (!OWN_LIGHT.has(t.idle)) {
+    if (t.light === 'fixed') return fixedLight(t.lightAngle);
+    if (t.light === 'orbit') return orbitLight(s);
+  }
+  return hand ?? pose.light ?? restLight(tilt);
 }
 
-// ---------- Exported clips ----------
+// ---------- Exported loops ----------
 
 export interface LoopView {
+  /** Idle seconds into the motion. */
+  s: number;
   pose: IdlePose;
   tilt: [number, number];
   light: [number, number];
 }
 
-/** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, one idle cycle long. */
-export function loopView(t: Tune, p: number): LoopView {
-  const s = t.speed > 0 ? p * IDLE_CYCLE : 0;
+/** The card at loop position p∈[0,1) of a GIF or APNG: the stage left alone, one loop long. */
+export function loopView(t: Tune, p: number, torch = false): LoopView {
+  const s = t.speed > 0 ? p * loopCycle(t, torch) : 0;
   const pose = idlePose(t, s);
   const tilt = cardTilt(t, s, pose, pose.rx, pose.ry);
-  return { pose, tilt, light: tunedLight(t, s, restLight(tilt)) };
+  return { s, pose, tilt, light: lightAt(t, s, pose, tilt, null) };
 }
 
 /**
- * Length of an exported loop and the source time it covers. With the stage's motion it is one idle cycle at the tune's
- * speed; an animated picture plays a whole number of its own loops inside it, sped up or slowed
- * a little to fit. At speed zero nothing moves on its own, so the picture alone sets the loop:
- * short ones play whole cycles, long ones are sped up to fit six seconds.
+ * Length of an exported loop and the source time it covers: one loop of the motion at the tune's
+ * speed. An animated picture plays a whole number of its own loops inside it, sped up or slowed a
+ * little to fit. At speed zero nothing moves on its own, so the picture alone sets the loop: short
+ * ones play whole cycles, long ones are sped up to fit six seconds.
  */
-export function exportLoop(t: Tune, sourceMs?: number, motion: ExportMotion = 'stage'): { loopMs: number; sourceSpan: number } {
-  // The motions made for exports keep their own length, as v0.12's export did.
-  if (motion !== 'stage') return sourceLoop(sourceMs, SHOW_MS[motion]);
-  if (t.speed <= 0) return sourceLoop(sourceMs, 2400);
-  const loopMs = Math.round((IDLE_CYCLE * 1000) / t.speed);
+export function exportLoop(t: Tune, sourceMs?: number, torch = false): { loopMs: number; sourceSpan: number } {
+  if (t.speed <= 0) {
+    if (!sourceMs) return { loopMs: 2400, sourceSpan: 2400 };
+    const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
+    return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
+  }
+  const loopMs = Math.round((loopCycle(t, torch) * 1000) / t.speed);
   return { loopMs, sourceSpan: sourceMs ? sourceMs * Math.max(1, Math.round(loopMs / sourceMs)) : loopMs };
-}
-
-// ---------- Export-only motions ----------
-
-/**
- * The motion of an exported loop: the stage's own ('stage', the default), or one made only for
- * exports to show the foil off. Showcase is the orbit FOIL exported up to v0.12; Sweep, Figure-8
- * and Moment move the sheen and the light far while the card only leans; Gyre, Jelly and Lean
- * show the foil through the tilt; Reveal, Push in and Heartbeat are showpieces with one highlight
- * each; Light bar, Spotlight and Flare hold the card and move the light itself. Gyre leads the
- * list, as the candidate for the default.
- */
-export type ExportMotion =
-  | 'stage'
-  | 'gyre'
-  | 'jelly'
-  | 'lean'
-  | 'showcase'
-  | 'sweep'
-  | 'figure8'
-  | 'moment'
-  | 'reveal'
-  | 'push'
-  | 'pulse'
-  | 'beam'
-  | 'spotlight'
-  | 'flare';
-export const EXPORT_MOTIONS: ExportMotion[] = ['stage', 'gyre', 'jelly', 'lean', 'showcase', 'sweep', 'figure8', 'moment', 'reveal', 'push', 'pulse', 'beam', 'spotlight', 'flare'];
-
-
-/**
- * Loop length of the motions made for exports, whatever the speed (Showcase repeats round(speed)
- * times in its 2.4 s). The stage's own motion is the only one timed by the idle clock.
- */
-export const SHOW_MS: Record<Exclude<ExportMotion, 'stage'>, number> = {
-  gyre: 3000,
-  jelly: 3000,
-  lean: 3000,
-  showcase: 2400,
-  sweep: 2400,
-  figure8: 3000,
-  moment: 3000,
-  reveal: 3000,
-  push: 3000,
-  pulse: 2000,
-  beam: 3000,
-  spotlight: 3000,
-  flare: 2000,
-};
-
-/**
- * The v0.12 loop for an animated source: short sources play whole cycles, long ones are sped up
- * to fit six seconds; without one, `fallbackMs`.
- */
-function sourceLoop(sourceMs: number | undefined, fallbackMs: number): { loopMs: number; sourceSpan: number } {
-  if (!sourceMs) return { loopMs: fallbackMs, sourceSpan: fallbackMs };
-  const loopMs = Math.min(sourceMs * Math.ceil(1200 / sourceMs), 6000);
-  return { loopMs, sourceSpan: sourceMs > 6000 ? sourceMs : loopMs };
 }
 
 /**
@@ -480,19 +459,19 @@ export function framePlan(loopMs: number, minDelay: number, maxFrames: number, u
 
 /**
  * The idle clock of the live stage, in idle seconds: what `idlePose` and an exported loop are timed
- * by, so the stage left alone shows exactly the exported loop at `idleTime / IDLE_CYCLE`.
+ * by, so the stage left alone shows exactly the exported loop at `idleTime / loopCycle`.
  */
 export class IdleClock {
   idleTime = 0;
-  /** Turntable angle of spin and turn right now (0 when the motion does not turn). */
+  /** Turntable angle of a turning motion right now (0 when the motion does not turn). */
   spinAngle = 0;
-  /** How much of the idle motion shows: it eases out while the card is held and back in after. */
+  /** How much of the motion shows: it eases out while the card is held and back in after. */
   private weight = 1;
 
   /**
    * `still` is reduced motion: nothing moves on its own. `facing` (the pointer is on the card) brings
    * a turning card round to its face and keeps it there. `held` (dragged, or held flat for the
-   * brush) also faces it, and eases the idle motion out until it is let go.
+   * brush) also faces it, and eases the motion out until it is let go.
    */
   step(dt: number, t: Tune, still: boolean, facing: boolean, held = false) {
     const face = facingAt(t, this.idleTime);
@@ -507,34 +486,38 @@ export class IdleClock {
       // Let go of a turn by easing forward to the next time the face looks straight on.
       this.idleTime += Math.min(face - this.idleTime, Math.max(dt * t.speed, (face - this.idleTime) * (1 - Math.exp(-dt * 5))));
       if (face - this.idleTime < 1e-3) this.idleTime = face;
-    } else if (!held && !(facing && face === this.idleTime && (t.idle === 'spin' || t.idle === 'turn'))) {
+    } else if (!held && !(facing && face === this.idleTime && TURNING.has(t.idle))) {
       this.idleTime += dt * t.speed;
     }
     this.spinAngle = idlePose(t, this.idleTime).spin;
   }
 
-  /** The idle motion now. */
+  /** The motion now. */
   pose(t: Tune): IdlePose {
     const p = idlePose(t, this.idleTime);
     const w = this.weight;
     if (w === 1) return p;
     return {
+      ...p,
       dx: p.dx * w,
       dy: p.dy * w,
       rx: p.rx * w,
       ry: p.ry * w,
       rz: p.rz * w,
       scale: 1 + (p.scale - 1) * w,
-      spin: p.spin,
       sheen: [p.sheen[0] * w, p.sheen[1] * w],
       flash: p.flash * w,
       glint: w > 0.5 ? p.glint : -2,
+      beam: p.beam && [p.beam[0], p.beam[1], p.beam[2], p.beam[3] * w],
+      spot: p.spot && [p.spot[0], p.spot[1] * w],
+      dim: p.dim && p.dim * w,
+      star: p.star && [p.star[0], p.star[1], p.star[2] * w],
     };
   }
 
-  /** The sheen for a card turned by `rx`, `ry` (spin left out) with this idle pose. */
+  /** The sheen for a card turned by `rx`, `ry` (spin left out) with this pose. */
   tilt = (t: Tune, pose: IdlePose, rx: number, ry: number) => cardTilt(t, this.idleTime, pose, rx, ry);
 
-  /** Light position in card uv. `follow` is where the pointer or the card's lean would put it. */
-  light = (t: Tune, follow: [number, number]) => tunedLight(t, this.idleTime, follow);
+  /** Light position in card uv; `hand` is where a pointer on the card puts it (see lightAt). */
+  light = (t: Tune, pose: IdlePose, tilt: [number, number], hand: [number, number] | null) => lightAt(t, this.idleTime, pose, tilt, hand);
 }

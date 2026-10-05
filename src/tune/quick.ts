@@ -1,14 +1,14 @@
-// The motion button above the deck: the card's idle motion in one tap, without opening the panel.
-// The button names the current motion; pressed, it deals the ten motions out as a small tray of
-// tiles (quickTray.ts, fetched the first time the button is pointed at or pressed).
+// The motion button above the deck: the card's motion in one tap, without opening the panel.
+// The button names the current motion; pressed, it deals the motions out in their groups as a small
+// tray of tiles (quickTray.ts, fetched the first time the button is pointed at or pressed).
 
 import './quick.css';
 import { dictOf } from '../i18n';
 import type { Store } from '../state';
-import { svg } from './icons';
+import { hasIcon, svg } from './icons';
 import type { Tray } from './quickTray';
 
-export function mountQuickMotion(store: Store, host: HTMLElement): void {
+export function mountQuickMotion(store: Store, host: HTMLElement) {
   const root = document.createElement('div');
   root.className = 'qm';
   root.innerHTML = `<button class="qm-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="qmTray"><i class="qm-ico"></i><span class="qm-text"><small></small><b></b></span></button>`;
@@ -43,10 +43,17 @@ export function mountQuickMotion(store: Store, host: HTMLElement): void {
   document.addEventListener('pointerdown', (e) => {
     if (!root.contains(e.target as Node)) wanted = false;
   });
+  /** Opens the tray from elsewhere (the Save options), bringing the button into view first. */
+  const open = () => {
+    btn.scrollIntoView({ block: 'nearest' });
+    void useTray().then((t) => t.open(true), () => {});
+  };
 
   const render = () => {
     const t = dict();
     const v = store.get().tune.idle;
+    // Icons of the motions other than Sway and None come in their own chunk.
+    if (!hasIcon(v)) void import('./motionIcons').then(render, () => {});
     btn.querySelector('.qm-ico')!.innerHTML = svg(v);
     btn.querySelector('small')!.textContent = t.groups.motion;
     btn.querySelector('b')!.textContent = t.idleMode[v];
@@ -76,4 +83,5 @@ export function mountQuickMotion(store: Store, host: HTMLElement): void {
     if (changed.has('tune') || changed.has('lang')) render();
   });
   render();
+  return { open };
 }

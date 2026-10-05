@@ -5,7 +5,9 @@
   position: absolute;
   right: -10px;
   bottom: calc(100% + 14px);
-  width: calc(5 * 66px + 4 * 6px + 24px);
+  width: calc(var(--qm-label) + 6 * var(--qm-tile) + 6 * 6px + 24px);
+  --qm-label: 92px;
+  --qm-tile: 56px;
   padding: 10px 12px 12px;
   border-radius: 14px;
   background: #141c20;
@@ -31,8 +33,17 @@
 .qm-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 8px;
+}
+
+/* What the tray is for: the motion picked here is the one a GIF or APNG is made with. */
+.qm-note {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--text-dim);
 }
 
 .qm-title {
@@ -47,7 +58,7 @@
   place-items: center;
   width: 32px;
   height: 32px;
-  margin: -4px -4px -4px 0;
+  margin: -4px -4px -4px auto;
   padding: 0;
   border: 0;
   border-radius: 8px;
@@ -68,20 +79,51 @@
   box-shadow: inset 0 0 0 2px #34454c, 0 1px 0 0 #05080a;
 }
 
+/* One row per group: its name in its colour on the left, then up to six tiles. */
 .qm-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px 6px;
+  gap: 6px;
+}
+
+.qm-group {
+  display: grid;
+  grid-template-columns: var(--qm-label) 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.qm-glabel {
+  margin: 0;
+  /* A narrow column breaks a name only where the text allows (at its zero-width spaces). */
+  word-break: keep-all;
+  padding-left: 8px;
+  border-left: 4px solid var(--mg);
+  font-size: 12px;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.qm-row {
+  display: grid;
+  grid-template-columns: repeat(6, var(--qm-tile));
+  gap: 6px;
+}
+
+/* None closes the first row, set apart: the card held still. */
+.qm-opt[data-value='none'] {
+  grid-row: 1;
+  grid-column: -2;
 }
 
 /* Tiles dealt a little askew like a hand of cards; pointed at, one straightens and lifts. */
 .qm-opt {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
   gap: 5px;
-  height: 68px;
-  padding: 4px 2px;
+  height: 52px;
+  padding: 3px 1px;
   border: 0;
   border-radius: 10px;
   background: #26333a;
@@ -98,13 +140,33 @@
 }
 
 .qm-opt svg {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   fill: currentColor;
 }
 
 .qm-opt span {
   white-space: nowrap;
+}
+
+/* The picked motion: a gold pixel check on its corner, so pointing at another never hides which one is on. */
+.qm-check {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--gold) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M1 4h1v1h1v1h1V5h1V4h1V3h1V2h1v2H7v1H6v1H5v1H4v1H3V7H2V6H1z' fill='%23261a00'/%3E%3C/svg%3E") center / 9px no-repeat;
+  box-shadow: 0 1px 0 #8f6a12;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.15s, transform 0.2s var(--ease-back);
+}
+
+.qm-opt[aria-checked='true'] .qm-check {
+  opacity: 1;
+  transform: none;
 }
 
 .qm-opt:is(:hover, :focus-visible) {
@@ -134,21 +196,12 @@
   animation: var(--act, none) 1.6s ease-in-out infinite;
 }
 
-.qm-opt[data-value='sway'] { --act: tune-act-sway; }
-.qm-opt[data-value='float'] { --act: tune-act-float; }
-.qm-opt[data-value='pendulum'] svg { transform-origin: 50% 6%; --act: tune-act-swing; }
-.qm-opt[data-value='wobble'] { --act: tune-act-wobble; }
-.qm-opt[data-value='bounce'] { --act: tune-act-bounce; }
-.qm-opt[data-value='glint'] { --act: tune-act-glint; }
-.qm-opt[data-value='spin'] { --act: tune-act-spin; }
-.qm-opt[data-value='turn'] { --act: tune-act-turn; }
-.qm-opt[data-value='breathe'] { --act: tune-act-breathe; }
 
 /* Two lines are kept for the description, so the tray never changes height under the pointer. */
 .qm-help {
   min-height: calc(2 * 1.35em);
   margin: 10px 2px 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
   color: var(--text-dim);
   text-wrap: pretty;
@@ -156,6 +209,26 @@
 
 .qm-help b {
   font-weight: 400;
+  color: var(--text);
+}
+
+/* Whose line it is: the picked motion's, or (in the hover orange) the one pointed at. */
+.qm-help em {
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.qm-help.is-preview em {
+  background: #ff9a2a;
+  color: #2a1600;
+}
+
+.qm-help.is-preview b {
   color: #ff9a2a;
 }
 
@@ -163,10 +236,21 @@
   content: ' —';
 }
 
-/* Speed and size: the page's one slider, with a notch at the default as on the panel. */
+/* The loop's length at the set speed, as a small gold tag. */
+.qm-help small:not(:empty) {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #0b1012;
+  font-size: 12px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* Speed and size side by side: the page's one slider, with a notch at the default as on the panel. */
 .qm-tune {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   align-items: end;
   gap: 8px 12px;
   margin-top: 10px;
@@ -175,7 +259,6 @@
 }
 
 .qm-knob {
-  grid-column: 1;
   display: grid;
   grid-template: 'label value' auto 'track track' auto / 1fr auto;
   align-items: center;
@@ -232,8 +315,8 @@
 }
 
 .qm-reset {
-  grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-column: 3;
+  grid-row: 1;
   align-self: center;
   display: grid;
   justify-items: center;
@@ -282,25 +365,32 @@
 /* Short screens: a more compact tray, so it clears the header. */
 @media (max-height: 820px) {
   .qm-tray {
-    width: calc(5 * 58px + 4 * 6px + 24px);
+    --qm-tile: 50px;
     padding-top: 8px;
   }
   .qm-head {
     margin-bottom: 4px;
   }
   .qm-grid {
-    gap: 6px;
+    gap: 3px;
   }
   .qm-opt {
-    height: 52px;
-    gap: 3px;
+    height: 42px;
+    gap: 1px;
+  }
+  .qm-opt svg {
+    width: 20px;
+    height: 20px;
+  }
+  .qm-tune {
+    margin-top: 6px;
+    padding-top: 6px;
   }
   .qm-opt svg {
     width: 24px;
     height: 24px;
   }
   .qm-help {
-    min-height: 0;
     margin-top: 8px;
   }
   .qm-range {
@@ -331,10 +421,57 @@
   .qm-tray::after {
     display: none;
   }
-  .qm-opt {
-    height: 62px;
+  .qm-note {
+    display: none;
+  }
+  /* Narrow: each group's name in a slim column beside its row, the tiles sharing the width. */
+  .qm-tray {
+    --qm-label: 62px;
+  }
+  .qm-glabel {
+    padding-left: 5px;
+    border-left-width: 3px;
+    font-size: 10px;
+    line-height: 1.1;
+  }
+  .qm-opt span {
+    font-size: 10px;
+    letter-spacing: -0.03em;
   }
   .qm-help {
-    min-height: 0;
+    font-size: 13px;
   }
+  .qm-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  /* Short enough that most of the card stays in view above the sheet. */
+  .qm-tray {
+    padding: 8px 10px 10px;
+  }
+  .qm-head {
+    margin-bottom: 2px;
+  }
+  .qm-close {
+    width: 40px;
+    height: 36px;
+  }
+  .qm-opt {
+    height: 42px;
+    gap: 1px;
+  }
+  .qm-opt svg {
+    width: 18px;
+    height: 18px;
+  }
+  .qm-help {
+    margin-top: 6px;
+  }
+  .qm-tune {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .qm-range {
+    height: 28px;
+  }
+
 }

@@ -22,7 +22,7 @@ import { mountLetteringJump } from './letteringJump';
 import { bindMessageField } from './messageField';
 import { loadMessageFont, messageFonts } from './card/messageFace';
 import { MESSAGE_FACES } from './message';
-import { changedKeys, EXPORT_MOTIONS, type ExportMotion } from './tune/model';
+import { changedKeys, exportLoop } from './tune/model';
 import { DEFAULT_LETTERING, fieldAt, setFieldPrints, setTextRuns } from './lettering';
 import { initAreas } from './areas';
 import { layerDraw } from './layers';
@@ -1164,7 +1164,6 @@ function exportInput() {
     intensity: s.intensity,
     pixel: s.pixel,
     tune: s.tune,
-    motion: s.exportMotion,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     range: areas.snapshot(),
@@ -1245,28 +1244,18 @@ function buildSaveOpts() {
   $('saveOptsToggle').setAttribute('aria-expanded', String(s.saveOptsOpen));
   $('saveOptsBody').hidden = !s.saveOptsOpen;
   $('saveOpts').classList.toggle('is-open', s.saveOptsOpen);
-  const motionName = (m: ExportMotion) => (m === 'stage' ? `${t.exportMotionName.stage} (${t.tune.idleMode[s.tune.idle]})` : t.exportMotionName[m]);
-  $('saveOptsSummary').textContent = [`${t.exportMotion}: ${motionName(s.exportMotion)}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
-  // The loop's motion, for GIF and APNG alike.
-  const mo = $('exportMotionSeg');
-  mo.textContent = '';
-  for (const m of EXPORT_MOTIONS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'seg-btn';
-    b.dataset.v = m;
-    b.setAttribute('role', 'radio');
-    b.textContent = motionName(m);
-    b.title = t.exportMotionHelp[m];
-    radio(b, s.exportMotion === m);
-    b.onclick = () => {
-      if (store.get().exportMotion === m) return;
-      sfx.tick();
-      store.set({ exportMotion: m });
-    };
-    mo.appendChild(b);
-  }
-  $('exportMotionHelp').textContent = t.exportMotionHelp[s.exportMotion];
+  // The loop is the card's own motion, as the stage shows it (docs/motion.md): named here, picked above the deck.
+  const ed = editionById(s.edition);
+  const secs = exportLoop(s.tune, userAnim && s.sample < 0 ? userAnim.duration : undefined, !!ed.torch).loopMs / 1000;
+  const motion = t.tune.idleMode[s.tune.idle];
+  const loop = t.tune.loopLen.replace('{s}', String(Math.round(secs * 10) / 10));
+  $('saveOptsSummary').textContent = [`${t.saveMotion}: ${motion}`, ...(gif ? [`${t.gifBg}: ${s.gifClear ? t.gifBgName.clear : t.gifBgName.swirl}`] : [])].join(' · ');
+  $('saveMotionName').textContent = motion;
+  $('saveMotionLen').textContent = loop;
+  $('saveMotionNote').textContent = t.saveMotionNote;
+  const touch = !!(ed.touch || (s.layer2 && editionById(s.layer2.edition).touch));
+  $('saveTouchNote').hidden = !touch;
+  $('saveTouchNote').textContent = t.saveTouchNote;
   $('gifBgField').hidden = !gif;
   const bg = $('gifBgSeg');
   bg.textContent = '';
@@ -1339,7 +1328,7 @@ $('toApng').addEventListener('click', () => {
   store.set({ exportFormat: 'apng' });
   saveBtn.focus();
 });
-rovingKeys($('exportMotionSeg'));
+$('saveMotionPick').addEventListener('click', () => quickMotion.open());
 rovingKeys($('gifBgSeg'));
 rovingKeys($('matteSeg'));
 
@@ -1697,7 +1686,7 @@ const apngExport = mountApngExport({
   prepare: faceReady,
   plan: () => {
     const s = store.get();
-    return apngPlan(s.tune, face.height / face.width, userAnim && s.sample < 0 ? userAnim.duration : undefined, s.exportMotion);
+    return apngPlan(s.tune, face.height / face.width, userAnim && s.sample < 0 ? userAnim.duration : undefined, !!editionById(s.edition).torch);
   },
   toast: (msg, error) => toast(msg, error),
   onSaved: (file) => celebrate(file),
@@ -2061,17 +2050,17 @@ store.on((s, changed) => {
   if (['sample', 'name', 'message', 'plate', 'layout', 'cardType'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (['intensity', 'pixel', 'crop', 'sound', 'crt'].some((k) => changed.has(k as keyof State))) syncInputs();
   if (changed.has('exportFormat')) buildFormats();
-  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'exportMotion', 'shape', 'tune'].some((k) => changed.has(k as keyof State))) {
+  if (['exportFormat', 'saveOptsOpen', 'gifClear', 'gifMatte', 'shape', 'tune', 'edition', 'layer2', 'sample'].some((k) => changed.has(k as keyof State))) {
     buildSaveOpts();
     renderSave();
   }
   // The card changed: it is no longer the one kept, and a file waiting to be shared is out of date
-  // (as it is when the export's motion or transparency changes).
+  // (as it is when the file's transparency changes).
   if (CARD_KEYS.some((k) => changed.has(k))) {
     droppedId = null;
     if (isKept()) setKept(null);
   }
-  if (shareReady && [...CARD_KEYS, 'exportMotion', 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
+  if (shareReady && [...CARD_KEYS, 'gifClear', 'gifMatte'].some((k) => changed.has(k as keyof State))) readyToShare(null);
   syncAdjust();
   if (changed.has('sound') || changed.has('crt')) {
     $('soundBtn').setAttribute('aria-label', s.sound ? t.soundOn : t.soundOff);
@@ -2106,7 +2095,7 @@ const deck = mountDeck({
   onPrefetch: () => void import('./pack/opening'),
 });
 // The idle motion in one tap, just above the deck.
-mountQuickMotion(store, $('deckDock'));
+const quickMotion = mountQuickMotion(store, $('deckDock'));
 // The saved hand made valid; the earlier drawn card and the finish on the card take places in it.
 {
   const s = store.get();

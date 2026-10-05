@@ -2,7 +2,7 @@ import { EDITIONS, sanitizeLayer2, type EditionId, type FrameId, type Layer2, ty
 import type { Crop } from './card/face';
 import { shapeOf, type ShapeId } from './card/shape';
 import type { Lang } from './i18n';
-import { EXPORT_MOTIONS, sanitizeTune, TUNE_DEFAULTS, type ExportMotion, type Tune } from './tune/model';
+import { legacyMotion, sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Lettering } from './lettering';
 import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
 import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
@@ -65,8 +65,6 @@ export interface State extends RangeColorState {
   gifClear: boolean;
   /** 'auto' keeps the card's own edge colour; otherwise '#rrggbb' to blend the edge into. */
   gifMatte: string;
-  /** The motion of GIF and APNG loops: the stage's own, or one made for exports. */
-  exportMotion: ExportMotion;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
   /** True once the card has been flicked to change the finish; the phone's flick hint stops then. */
@@ -109,7 +107,6 @@ const PERSIST: (keyof State)[] = [
   'saveOptsOpen',
   'gifClear',
   'gifMatte',
-  'exportMotion',
   'text',
   'flicked',
   ...RANGE_COLOR_PERSIST,
@@ -127,7 +124,6 @@ const APP_KEYS: (keyof State)[] = [
   'saveOptsOpen',
   'gifClear',
   'gifMatte',
-  'exportMotion',
   'flicked',
   'rangeShow',
   'brushMode',
@@ -176,7 +172,6 @@ const defaults = (): State => ({
   saveOptsOpen: false,
   gifClear: false,
   gifMatte: 'auto',
-  exportMotion: 'stage',
   text: { ...DEFAULT_LETTERING },
   flicked: false,
   ...RANGE_COLOR_DEFAULTS,
@@ -203,7 +198,6 @@ function sanitize(state: State) {
   state.gifClear = state.gifClear === true;
   state.flicked = state.flicked === true;
   if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
-  if (!EXPORT_MOTIONS.includes(state.exportMotion)) state.exportMotion = 'stage';
   Object.assign(state, sanitizeRangeColors(state));
   state.layer2 = sanitizeLayer2(state.layer2);
 }
@@ -223,6 +217,9 @@ export function createStore() {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<State>;
     for (const k of PERSIST) if (k in saved) (state as unknown as Record<string, unknown>)[k] = saved[k];
     sanitize(state);
+    // v0.13.0 picked the motion of a GIF or APNG apart from the card's; that choice becomes the card's motion (docs/motion.md).
+    const old = legacyMotion((saved as { exportMotion?: unknown }).exportMotion);
+    if (old) state.tune = { ...state.tune, idle: old };
   } catch {
     /* storage unavailable: defaults are fine */
   }

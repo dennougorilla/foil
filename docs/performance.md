@@ -36,7 +36,8 @@ pointer or focus reaches the control that opens them, so opening one does not wa
 | Free placement on the card (`arrangeEdit.ts`) | a piece is set to Free (at once if it was left so) | — |
 | The trading-card layout's painter (`card/tcgFace.ts`) | the card is set to the trading-card layout (at once if it was left so) | idle, pointing at Layout |
 | The motion tray above the deck (`tune/quickTray.ts`) | the motion button is pressed | idle, pointing at the button |
-| Making a file: PNG and GIF (`exporter.ts`), APNG (`anim/apngExport.ts`), the 13 export motions | Save or Share is pressed | idle, pointing at Save, Share or the formats |
+| Making a file: PNG and GIF (`exporter.ts`), APNG (`anim/apngExport.ts`) | Save or Share is pressed | idle, pointing at Save, Share or the formats |
+| The motions other than Sway and None (`tune/moves.ts`; the card rests until they arrive) and their icons (`tune/motionIcons.ts`, also with the tray and Fine-tune) | another motion is picked, or was left picked | idle |
 | Reading an animated GIF, APNG or WebP (`gifDecode.ts`, `anim/apngDecode.ts`) | a picture is opened | pointing at Open, dragging a file in, or a picture from last visit |
 | The other language's texts (`i18n/ja.ts`, `i18n/en.ts`) | the language button is pressed | pointing at the button |
 | The binder, the pack shop and its opening, View deck, a pack's finishes, Shadowbox's depth model | as before (see `binder.md`, `packs.md`) | as before |
@@ -127,3 +128,8 @@ motion tray, the GIF options, APNG, a card with an area and with layer 2 were co
 with v0.13.0 (time held still, reduced motion): identical, apart from a one-pixel column of the
 backdrop and the hint beside the tag on a card left in Free placement, which now says what Free does
 from the first view (v0.13.0 showed the general hint until the language was switched).
+
+When the stage's motions and the export motions became one list (docs/motion.md), the first load
+stayed under the numbers above: 74.4 kB for an English page and 75.9 kB for a Japanese one. Only
+Sway (the default) and None are in it; the other nineteen motions (2.1 kB) and their pixel icons
+come in their own chunks.

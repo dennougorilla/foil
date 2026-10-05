@@ -56,7 +56,7 @@ test('no pack shader code is in the first load', () => {
 
 /**
  * What waits until it is used (docs/performance.md): Fine-tune's tabs, the print menu, free placement,
- * the motion tray, making a file, reading an animated picture, and each language's texts.
+ * the motion tray, the motions other than Sway, making a file, reading an animated picture, and each language's texts.
  */
 const ON_DEMAND = [
   'i18n/ja.ts',
@@ -75,7 +75,8 @@ const ON_DEMAND = [
   'printPop.ts',
   'arrangeEdit.ts',
   'exporter.ts',
-  'tune/exportMotion.ts',
+  'tune/moves.ts',
+  'tune/motionIcons.ts',
   'anim/apngExport.ts',
   'anim/png.ts',
   'gifDecode.ts',

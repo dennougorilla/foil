@@ -1,7 +1,7 @@
-// Live light and idle motion for the stage. Pure bookkeeping: the stage asks for numbers each
-// frame and keeps doing all of the drawing itself. The idle motion itself is `idlePose` in
-// model.ts, shared with the exported loops, so a GIF moves exactly as the card does here.
-import { IdleClock, TUNE_DEFAULTS, type Tune } from './model';
+// Live light and motion for the stage. Pure bookkeeping: the stage asks for numbers each frame and
+// keeps doing all of the drawing itself. The motion itself is `idlePose` in model.ts, shared with
+// the exported loops, so a GIF moves exactly as the card does here.
+import { hasMove, IdleClock, loadMoves, TUNE_DEFAULTS, type Tune } from './model';
 import { GyroTilt } from './gyro';
 
 /** Phones and tablets with a motion sensor tilt the card as the device tilts. */
@@ -19,6 +19,8 @@ export class LiveMotion extends IdleClock {
   private gyro = { tilt: new GyroTilt(), asked: false, sx: 0, sy: 0, last: 0 };
 
   step(dt: number, t: Tune, still: boolean, facing: boolean, held = false) {
+    // A motion other than Sway is fetched the first time it is wanted; the card rests until it arrives.
+    if (!hasMove(t.idle)) void loadMoves().catch(() => {});
     super.step(dt, t, still, facing, held);
     if (!still) this.fx += dt * t.speed;
     const k = 1 - Math.exp(-dt * 14);
