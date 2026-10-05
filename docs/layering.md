@@ -118,7 +118,7 @@ Where each finish goes is shown, not described:
 - "+ Layer a finish" is a dashed empty slot above layer 1; it opens the finish list, and the
   finish chosen becomes layer 2 on the whole card, adding its light.
 - Choosing a row hands the area controls below (region, brightness, invert, brush) to that
-  layer; their heading names the finish they place ("Where Kintsugi goes"). While those controls
+  layer; their heading names the finish they place ("Area of layer 2 (Kintsugi)"). While those controls
   are in use, the card shows that layer alone in its area with the proof overlay, so what is being
   changed is exactly what is marked; in the layer list the card shows both layers as they are.
 - With two layers: "Where they overlap" (Add its light / Lay it over, one line saying what that

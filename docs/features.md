@@ -107,7 +107,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ### Lettering
 
 - Print the card's text (the name, the type line and the message) in ink, deboss, emboss, hot-foil (gold, silver, rose gold, copper, rainbow or any color) or spot UV. The name tag beside the card shows the current lettering and opens the Lettering tab. The relief and shine follow the card's tilt and light, in exports too.
-- Every piece of text is printed in the card's lettering unless you give it its own: tap the words on the card, or the chip beside their field in the Lettering tab (which lists the card's words: name, type line and message), and pick a print (and a foil color) for that piece alone. Depth and gloss stay shared; a piece with its own print carries a green gem on its chip, and "Follow card", the first choice, returns it to the card's lettering. Saved cards keep only these own prints.
+- Every piece of text is printed in the card's lettering unless you give it its own: tap the words on the card, or the chip beside their field in the Lettering tab (which lists the card's words: name, type line and message), and pick a print (and a foil color) for that piece alone. Depth and gloss stay shared; a piece with its own print carries a green gem on its chip, and "Match the card", the first choice, returns it to the card's lettering. Saved cards keep only these own prints.
 
 ### Placement
 

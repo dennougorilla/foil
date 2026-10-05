@@ -4,6 +4,8 @@ Instructions for coding agents working on FOIL. `README.md` describes the produc
 
 A new finish always goes into a pack (its shader in that pack's module, never the core card shader); `docs/packs.md` says how, and how the pack opening is designed. The service worker (`src/sw.ts`, built by `vite.config.ts`) keeps every file of the build for offline use except those listed in `src/swFiles.ts`; a new file that must not be kept offline goes on that list (`docs/pwa.md`). The card comes in several shapes, so nothing may assume the 5 : 7 card: shaders read `uCardK` and `uArt`, layouts size cards with `src/card/shape.ts`.
 
+Interface texts (Japanese and English) use the names and writing rules in `docs/glossary.md`: one name for each thing, in both languages.
+
 ## Premise
 
 FOIL is under active development (pre-1.0). **Do not keep backward compatibility or write data migrations.** Remove old formats, old APIs and compatibility branches instead of carrying them, and always rewrite toward the ideal, simplest (KISS) code. When saved settings (`localStorage`) or stored images (IndexedDB) no longer match the current shape, discard them and start from defaults instead of migrating.
