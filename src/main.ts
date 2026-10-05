@@ -31,7 +31,7 @@ import type { Adjust } from './adjust';
 import { mountProof } from './proof';
 import { stepIn } from './handStep';
 import { initPackStore, packs, releaseSealedEdition } from './packStore';
-import { addToHand, available, firstSealed, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, shelf } from './packs';
+import { addToHand, available, normalizeHand, OPEN_EDITIONS, ownedGroups, packOf, sealed, shelf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { mountDeck } from './deck';
 import { mountQuickMotion } from './tune/quick';
@@ -141,7 +141,7 @@ const mask = document.createElement('canvas');
 const back = document.createElement('canvas');
 drawBack(back, store.get().shape);
 // Face-down cards drawn by the page (the deck's pile, a card still being dealt) wear the same back.
-document.documentElement.style.setProperty('--card-back', `url(${backUrl()})`);
+void backUrl().then((url) => document.documentElement.style.setProperty('--card-back', `url(${url})`));
 
 stage.cards.setBack(back);
 // Shadowbox and 3D Lenticular read the art's depth; its code loads the first time one is chosen.
@@ -1754,16 +1754,15 @@ function openShop() {
   opening = true;
   const btn = $('packsBtn');
   btn.setAttribute('aria-busy', 'true');
-  const wasOpened = new Set(packs.get().opened);
   const list = shelf(packs.get());
   // The cards in the opening wear the face as it is now (a trading card's painter may be on its way).
   void Promise.all([import('./pack/opening'), faceReady()])
     .then(([m]) =>
       m.openPack({
-        pack: firstSealed(packs.get()) ?? list[0],
+        pack: sealed(packs.get())[0] ?? list[0],
         shop: list,
         from: btn.getBoundingClientRect(),
-        isOpened: (id) => packs.isOpened(id),
+        owns: (id) => packs.get().owned.includes(id),
         deckRect: () => deck.rect(),
         dict: t,
         face,
@@ -1771,16 +1770,18 @@ function openShop() {
         back,
         tune: store.get().tune,
         intensity: store.get().intensity,
+        quality: stage.qualityNow,
         pause: (on) => stage.pause(on),
-        onOpened: (id) => packs.open(id),
-        onClose: (done, pick) => {
+        onOpened: (ids) => packs.open(ids),
+        onClose: (next, added) => {
           opening = false;
-          if (done && !wasOpened.has(done.id)) {
-            deck.bump(done.finishes.length);
-            toast(t.pack.intoDeck.replace('{name}', t.pack.name[done.id]).replace('{n}', String(done.finishes.length)));
+          if (added) {
+            deck.bump(added.n);
+            toast(added.note);
           }
-          // A pick in the haul comes into the hand and onto the card.
-          if (pick) useCard(pick);
+          // A pick in the haul comes into the hand and onto the card; the list leads to the deck builder.
+          if (next === 'deck') viewDeck();
+          else if (next) useCard(next);
           else deck.focusShop();
         },
       }),
@@ -1864,6 +1865,7 @@ function useArrange() {
       dict: () => t,
       runs: () => lastRuns,
       openPrint: (f, at) => void usePrint().then((p) => p.open(f, at), () => toast(t.loadFailed, true)),
+      closePrint: () => void printLoad?.then((p) => p.close(), () => {}),
     }),
   );
   arrangeLoad.catch(() => {
@@ -2163,9 +2165,9 @@ const boot = () => {
   redrawFace();
   drawCropPreview();
 };
-// The nameplate uses the pixel font (and a trading card's footer the logo's), so wait for them before
-// painting the face. Their stylesheet may still be on its way (index.html adds it without holding the
-// script), and fonts not declared yet would count as loaded at once.
+// The nameplate uses the pixel font (and a trading card's footer the logo's), so the face is painted
+// again once they are here (the crop preview has no text). Their stylesheet may still be on its way
+// (index.html adds it without holding the script), and fonts not declared yet would count as loaded at once.
 new Promise<unknown>((done) => {
   const sheet = document.getElementById('uiFonts') as HTMLLinkElement | null;
   if (!sheet || sheet.sheet) return done(null);
@@ -2173,8 +2175,10 @@ new Promise<unknown>((done) => {
   sheet.addEventListener('error', done);
 })
   .then(() => Promise.all([document.fonts.load('40px "DotGothic16"'), document.fonts.load('700 20px "Silkscreen"', 'FOIL·0123456789/')]))
-  .then(boot, boot);
+  .then(redrawFace, redrawFace);
 boot();
+// ?fps=1: a frame-rate meter for checking a device by hand (docs/performance.md).
+if (new URLSearchParams(location.search).get('fps') === '1') void import('./fpsMeter').then((m) => m.mountFpsMeter(stage));
 void loadUserImage('flip').then(async (blob) => {
   const img = blob ? await decodeImage(blob).catch(() => null) : null;
   // A picture chosen (or removed) meanwhile wins over last visit's.

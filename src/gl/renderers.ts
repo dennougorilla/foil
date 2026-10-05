@@ -10,6 +10,7 @@ import type { PackId } from '../packs';
 import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
 import { cardK } from '../card/shape';
+import type { QualityLevel } from '../quality';
 
 export type RGB = [number, number, number];
 
@@ -57,8 +58,33 @@ export class BackgroundRenderer {
     }
   }
 
-  render(f: BackgroundFrame): void {
-    if (this.live && !this.pending.done()) return;
+  /** What a still backdrop was last drawn with (size, colors, place), and the moment it holds. */
+  private stillKey = '';
+  private held: { time: number; pointer: [number, number] } | null = null;
+
+  /**
+   * Sizes and draws the backdrop for a window of w × h css px at a drawing level (src/quality.ts).
+   * At a still level it holds its moment and is drawn again only when its size, colors or place
+   * change, so any backdrop drawn here is light on a slow device without a light version of its own.
+   */
+  draw(f: BackgroundFrame, q: QualityLevel, w: number, h: number): void {
+    this.resize(Math.ceil(w / q.bg), Math.ceil(h / q.bg));
+    if (!q.still) {
+      this.held = null;
+      this.stillKey = '';
+      this.render(f);
+      return;
+    }
+    this.held ??= { time: f.time, pointer: f.pointer };
+    // Settled to a 256th of a color step and a pixel of place is settled.
+    const focus = f.focus ?? [0.5, 0.5];
+    const key = [this.canvas.width, this.canvas.height, ...f.colors.flat().map((c) => Math.round(c * 256)), Math.round(focus[0] * this.canvas.width), Math.round(focus[1] * this.canvas.height)].join();
+    if (key !== this.stillKey && this.render({ ...f, ...this.held })) this.stillKey = key;
+  }
+
+  /** Draws one frame; false while the program is still compiling (on the page). */
+  render(f: BackgroundFrame): boolean {
+    if (this.live && !this.pending.done()) return false;
     const { gl } = this;
     const p = this.pending.get();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -73,6 +99,7 @@ export class BackgroundRenderer {
     const focus = f.focus ?? [0.5, 0.5];
     gl.uniform2f(p.u.uFocus, focus[0], focus[1]);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    return true;
   }
 }
 

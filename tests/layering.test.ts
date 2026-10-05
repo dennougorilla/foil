@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EDITIONS, layerable, layerChoices, sanitizeLayer2 } from '../src/editions.ts';
-import { owned, type Opened } from '../src/packs.ts';
+import { openPacks, owned, PACKS, type Owned } from '../src/packs.ts';
 
-const ALL: Opened = { opened: ['metal', 'light', 'nature', 'studio', 'supporter'], supporter: true };
-const choices = (o: Opened, main: Parameters<typeof layerChoices>[1]) => layerChoices(owned(o), main);
+const ALL: Owned = { ...openPacks({ owned: [], supporter: false }, PACKS.map((p) => p.id)), supporter: true };
+const choices = (o: Owned, main: Parameters<typeof layerChoices>[1]) => layerChoices(owned(o), main);
 
 test('a finish that needs the card to itself is never layer 2', () => {
   const solo = EDITIONS.filter((e) => !layerable(e.id)).map((e) => e.id);
@@ -13,7 +13,7 @@ test('a finish that needs the card to itself is never layer 2', () => {
 });
 
 test('layer 2 offers the owned finishes, in hand-then-pack order, without the card’s own', () => {
-  assert.deepEqual(choices({ opened: [], supporter: false }, 'holo'), ['foil', 'poly', 'negative', 'prism', 'glitch']);
+  assert.deepEqual(choices({ owned: [], supporter: false }, 'holo'), ['foil', 'poly', 'negative', 'prism', 'glitch']);
   const all = choices(ALL, 'sakura');
   assert.ok(all.includes('kintsugi') && all.includes('gold') && all.includes('confetti'));
   assert.ok(!all.includes('sakura') && !all.includes('warmth') && !all.includes('base'));
@@ -21,8 +21,8 @@ test('layer 2 offers the owned finishes, in hand-then-pack order, without the ca
 });
 
 test('a sealed pack’s finish is not offered', () => {
-  assert.ok(!choices({ opened: ['metal'], supporter: false }, 'holo').includes('kintsugi'));
-  assert.ok(choices({ opened: ['metal'], supporter: false }, 'holo').includes('gold'));
+  assert.ok(!choices(openPacks({ owned: [], supporter: false }, ['metal']), 'holo').includes('kintsugi'));
+  assert.ok(choices(openPacks({ owned: [], supporter: false }, ['metal']), 'holo').includes('gold'));
 });
 
 test('a saved layer 2 keeps what fits and drops what does not', () => {
