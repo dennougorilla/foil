@@ -325,7 +325,7 @@ const ja = {
     hint: 'ダブルクリックか Delete で初期値に戻す',
     hintTouch: '矢印ボタンで初期値に戻す',
     undo: '取り消す',
-    undoDone: '初期値に戻すのを取り消しました',
+    undoDone: '調整を元どおりにしました',
     stamp: '元の見た目',
     peek: 'カードを見る',
     why: {

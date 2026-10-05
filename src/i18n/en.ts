@@ -316,7 +316,7 @@ const en: Dict = {
     hint: 'Double-click or press Delete to reset',
     hintTouch: 'Tap the arrow to reset',
     undo: 'Undo',
-    undoDone: 'Reset undone',
+    undoDone: 'Your adjustments are back',
     stamp: 'Original',
     peek: 'Show the card',
     why: {
