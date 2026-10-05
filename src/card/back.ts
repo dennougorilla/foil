@@ -209,8 +209,9 @@ function grid(w: number, h: number): HTMLCanvasElement {
   return small;
 }
 
-/** The trading card's back at its pixel size, as an image address for CSS (the deck's pile). */
-export const backUrl = () => grid(900, 1260).toDataURL();
+/** The trading card's back at its pixel size, as an image address for CSS (the deck's pile), encoded off the main thread. */
+export const backUrl = () =>
+  new Promise<string>((done, fail) => grid(900, 1260).toBlob((b) => (b ? done(URL.createObjectURL(b)) : fail(new Error('card back')))));
 
 /** The card back at the face texture's size for the shape, its pixels blown up hard. */
 export function drawBack(back: HTMLCanvasElement, shape: ShapeId): void {

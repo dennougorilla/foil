@@ -1,12 +1,12 @@
 # Motion
 
 The card's automatic motion. There is one list of motions: the one picked on screen (the motion
-button above the deck, or Fine-tune → Shine) is the one a GIF or APNG is made with. The stage is the
+button above the deck, or Fine-tune → Shine) is the one a GIF, APNG or MP4 is made with. The stage is the
 preview of the export.
 
 ## The stage is the preview
 
-Left alone, the card on the stage is exactly what a GIF or APNG will show: the same motion, the same
+Left alone, the card on the stage is exactly what a GIF, APNG or MP4 will show: the same motion, the same
 loop length, the same speed and size, the same light, sheen and dimmed room. There is no stage-only
 version of any motion and no export-only motion.
 
@@ -14,15 +14,15 @@ version of any motion and no export-only motion.
   (or a finger on it) leans it and puts the light under the pointer, a drag tosses it, the device's tilt
   (phones and tablets) leans it, and a turning motion comes round to its face and waits. Let go and the
   card goes back to the preview. None of this goes into a file.
-- The backdrop of the stage is the page's own; an exported loop has the finish's swirl, held still so the
-  file stays small (or no backdrop at all).
+- The backdrop is part of the preview too (Fine-tune → Card, [`backdrops.md`](backdrops.md)): the stage
+  and the file draw it at the same moment of the loop, and it goes round whole in one loop.
 - Finishes that react to touch (Warmth and the other touch finishes) keep your own strokes on the
-  stage. A file has no hand in it, so in a GIF or APNG an unseen finger strokes the busiest part of the
+  stage. A file has no hand in it, so in a file an unseen finger strokes the busiest part of the
   picture once per loop and the finish cools between strokes.
 - Blacklight's lamp drifts round the art in six seconds and glows dimmer while nobody holds it, on the
   stage and in a file alike; under the pointer it turns up to full. Under a Light motion the lamp is
   the light whatever the light setting; otherwise a fixed light holds it still.
-- Reduced motion stops the motion on the stage (the card faces you); exports still move.
+- Reduced motion stops the motion and the backdrop on the stage (the card faces you); exports still move.
 
 ## Groups and loop lengths
 
@@ -57,7 +57,7 @@ divides it (speed 2 halves it) on the stage and in the file alike.
   lengths above all divide 6, so the stage and the file stay in step.
 - At speed 0 nothing moves on its own: the stage holds still and an export is a still loop (an
   animated picture's own timing, or 2.4 s).
-- **Size** scales every motion: how far the card moves and turns, and how far the light travels
+- **Range** (Motion range) scales every motion: how far the card moves and turns, and how far the light travels
   under the Light motions and the ones that steer the light (Figure 8, Glint). At 0 the card
   holds still; a turn (Spin, Turn once, Reveal) still turns all the way round.
 - The Light group brings its own light, so the light setting (pointer, orbit, fixed) waits until another

@@ -1,5 +1,7 @@
 // Heat on the card for the Warmth finish (where it was touched, how warm it still is, and the
-// fingerprints left by a press), and the light stored by the Glow finish's ink. A small grid over
+// fingerprints left by a press), the light stored by the Glow finish's ink, where Rainy Window's
+// fogged glass was wiped, and how far Marble's floating ink has been carried (two numbers a cell: a
+// direction). A small grid over
 // the card face, simulated on the CPU (a few thousand cells, so it costs next to nothing) and
 // uploaded to the card shader as a texture.
 //
@@ -15,8 +17,8 @@ const COLD = 0.002;
 /** Fingerprints kept at once; the oldest makes way. */
 const PRINTS = 3;
 
-/** The touch finishes: Warmth's heat, or the light Glow's ink stores. */
-export type TouchKind = 'warmth' | 'glow';
+/** The touch finishes: Warmth's heat, the light Glow's ink stores, Rainy Window's wiped glass, or how far Marble's ink was carried. */
+export type TouchKind = 'warmth' | 'glow' | 'rain' | 'marble';
 
 interface Fade {
   /** How fast it spreads, in cells² per second. */
@@ -28,6 +30,8 @@ interface Fade {
   quench: number;
   /** A press leaves a fingerprint; without, holding still just keeps adding. */
   prints: boolean;
+  /** The field is a displacement (u, v per cell): a stroke drags it along, a press stirs it round. */
+  drag?: boolean;
 }
 
 const FADES: Record<TouchKind, Fade> = {
@@ -36,7 +40,21 @@ const FADES: Record<TouchKind, Fade> = {
   // Light stays where it was shone and dies away like a real afterglow: half gone in a couple of
   // seconds, then a faint glow that hangs on for twenty or so.
   glow: { spread: 0, cool: 0.02, loss: 0.0015, quench: 1, prints: false },
+  // A wiped patch stays clear for a few seconds while the fog creeps back in from its edges; a
+  // fingertip pressed on the glass leaves its print in the fog.
+  rain: { spread: 0.4, cool: 0.3, loss: 0.02, quench: 0, prints: true },
+  // The water draws dragged ink back gently: a third gone in a second or so, settled within a loop.
+  // A little spreading softens a comb line into the broad sweep of a current as it relaxes.
+  marble: { spread: 0.35, cool: 0.45, loss: 0, quench: 0, prints: false, drag: true },
 };
+
+/** How much of a stroke's travel the ink right under it follows: a finger, a hovering mouse. */
+const DRAG_FIRM = 1;
+const DRAG_HOVER = 0.35;
+/** How fast a finger held still turns the ink under it, radians per second at its centre. */
+const STIR = 2.6;
+/** Below this everywhere (in card uv), Marble's ink counts as settled. */
+const STILL = 0.0006;
 
 export interface Print {
   /** Centre, in card uv (y down). */
@@ -58,11 +76,14 @@ export interface HeatSource {
   /** Grid size, columns × rows. */
   readonly w: number;
   readonly h: number;
+  /** Numbers per cell: 1 (heat, light) or 2 (Marble's displacement, u then v). */
+  readonly channels: 1 | 2;
 }
 
 export class HeatField implements HeatSource {
   readonly w: number;
   readonly h: number;
+  readonly channels: 1 | 2;
   readonly data: Float32Array;
   private next: Float32Array;
   prints: Print[] = [];
@@ -79,8 +100,14 @@ export class HeatField implements HeatSource {
     this.fade = FADES[kind];
     this.w = Math.round(HEAT_CELLS * k[0]);
     this.h = Math.round(HEAT_CELLS * k[1]);
-    this.data = new Float32Array(this.w * this.h);
-    this.next = new Float32Array(this.w * this.h);
+    this.channels = this.fade.drag ? 2 : 1;
+    this.data = new Float32Array(this.w * this.h * this.channels);
+    this.next = new Float32Array(this.data.length);
+  }
+
+  /** Its field moves the picture (Marble's ink), so under reduced motion it must hold still. */
+  get moves() {
+    return !!this.fade.drag;
   }
 
   get cold() {
@@ -93,6 +120,7 @@ export class HeatField implements HeatSource {
    * about the same warmth however fast the stroke goes; lingering adds more, up to MAX.
    */
   touch(u0: number, v0: number, u1: number, v1: number, dt: number, firm: boolean) {
+    if (this.fade.drag) return this.drag(u0, v0, u1, v1, firm);
     const { w, h } = this;
     const r = (firm ? 0.07 : 0.042) * HEAT_CELLS;
     const ax = u0 * w - 0.5;
@@ -127,8 +155,98 @@ export class HeatField implements HeatSource {
     this.version++;
   }
 
+  /**
+   * Marble: the ink near the stroke follows it, most of the way right under the finger and less
+   * further out, so the rings are combed into feathered veins. The new field is the stroke's own
+   * move plus the old field fetched from where the ink came from (a semi-Lagrangian step), so
+   * strokes compose as real drags do.
+   */
+  private drag(u0: number, v0: number, u1: number, v1: number, firm: boolean) {
+    const r = (firm ? 0.075 : 0.05) * HEAT_CELLS;
+    const k = firm ? DRAG_FIRM : DRAG_HOVER;
+    const mu = (u1 - u0) * k;
+    const mv = (v1 - v0) * k;
+    this.carry(u0, v0, u1, v1, r, () => [mu, mv]);
+  }
+
+  /** Marble, a finger held at (u, v): the ink turns round it, fastest at its centre, so it winds into a spiral. */
+  private stir(u: number, v: number, dt: number) {
+    const a = STIR * dt;
+    const { w, h } = this;
+    // A turn in square cells, given back in card uv.
+    this.carry(u, v, u, v, 0.09 * HEAT_CELLS, (x, y, g) => {
+      const dx = (x - (u * w - 0.5)) * g * a;
+      const dy = (y - (v * h - 0.5)) * g * a;
+      return [-dy / w, dx / h];
+    });
+  }
+
+  /**
+   * Moves the ink near the segment a→b (card uv) by `move` (card uv for a cell, given the cell and its
+   * weight 0..1, a Gaussian of radius `r` cells round the segment).
+   */
+  private carry(u0: number, v0: number, u1: number, v1: number, r: number, move: (x: number, y: number, g: number) => [number, number]) {
+    const { w, h } = this;
+    const ax = u0 * w - 0.5;
+    const ay = v0 * h - 0.5;
+    const bx = u1 * w - 0.5;
+    const by = v1 * h - 0.5;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const reach = r * 2.6;
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach));
+    const x1 = Math.min(w - 1, Math.ceil(Math.max(ax, bx) + reach));
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach));
+    const y1 = Math.min(h - 1, Math.ceil(Math.max(ay, by) + reach));
+    if (x0 > x1 || y0 > y1) return;
+    const old = this.next;
+    old.set(this.data);
+    const inv = 1 / (r * r);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const t = len2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / len2)) : 0;
+        const ex = x - ax - dx * t;
+        const ey = y - ay - dy * t;
+        const g = Math.exp(-(ex * ex + ey * ey) * inv);
+        if (g < 1e-3) continue;
+        const [mu, mv] = move(x, y, g);
+        const su = len2 > 0 ? mu * g : mu;
+        const sv = len2 > 0 ? mv * g : mv;
+        // Where this cell's ink came from, in cells, and what had been carried there.
+        const [pu, pv] = this.sample(old, x - su * w, y - sv * h);
+        const i = (y * w + x) * 2;
+        this.data[i] = su + pu;
+        this.data[i + 1] = sv + pv;
+      }
+    }
+    this.warm = true;
+    this.lamp = [u1, v1, 1];
+    this.lit = true;
+    this.version++;
+  }
+
+  /** The displacement at cell position (x, y), bilinear, held at the edges. */
+  private sample(f: Float32Array, x: number, y: number): [number, number] {
+    const { w, h } = this;
+    x = Math.min(w - 1, Math.max(0, x));
+    y = Math.min(h - 1, Math.max(0, y));
+    const x0 = Math.min(w - 2, Math.floor(x));
+    const y0 = Math.min(h - 2, Math.floor(y));
+    const fx = x - x0;
+    const fy = y - y0;
+    const i00 = (y0 * w + x0) * 2;
+    const i10 = i00 + 2;
+    const i01 = i00 + w * 2;
+    const i11 = i01 + 2;
+    const lerp = (c: number) =>
+      (f[i00 + c] * (1 - fx) + f[i10 + c] * fx) * (1 - fy) + (f[i01 + c] * (1 - fx) + f[i11 + c] * fx) * fy;
+    return [lerp(0), lerp(1)];
+  }
+
   /** A finger held at (u, v): its print forms over the first half second or so. */
   press(u: number, v: number, dt: number) {
+    if (this.fade.drag) return this.stir(u, v, dt);
     if (!this.fade.prints) return this.touch(u, v, u, v, dt, true);
     let p = this.pressing;
     if (!p) {
@@ -162,12 +280,19 @@ export class HeatField implements HeatSource {
       const loss = this.fade.loss * dt;
       let peak = 0;
       const d = this.data;
-      for (let i = 0; i < d.length; i++) {
-        const v = Math.max(0, d[i] * (keep - quench * d[i] * dt) - loss);
-        d[i] = v;
-        if (v > peak) peak = v;
+      if (this.fade.drag) {
+        for (let i = 0; i < d.length; i++) {
+          d[i] *= keep;
+          peak = Math.max(peak, Math.abs(d[i]));
+        }
+      } else {
+        for (let i = 0; i < d.length; i++) {
+          const v = Math.max(0, d[i] * (keep - quench * d[i] * dt) - loss);
+          d[i] = v;
+          if (v > peak) peak = v;
+        }
       }
-      if (peak < COLD) {
+      if (peak < (this.fade.drag ? STILL : COLD)) {
         d.fill(0);
         this.warm = false;
       }
@@ -180,7 +305,7 @@ export class HeatField implements HeatSource {
   private spread(k: number) {
     const a = this.data;
     const b = this.next;
-    const { w, h } = this;
+    const { w, h, channels: n } = this;
     for (let y = 0; y < h; y++) {
       const up = (y > 0 ? y - 1 : y) * w;
       const row = y * w;
@@ -188,8 +313,10 @@ export class HeatField implements HeatSource {
       for (let x = 0; x < w; x++) {
         const l = x > 0 ? x - 1 : x;
         const r = x < w - 1 ? x + 1 : x;
-        const c = a[row + x];
-        b[row + x] = c + k * (a[row + l] + a[row + r] + a[up + x] + a[down + x] - 4 * c);
+        for (let ch = 0; ch < n; ch++) {
+          const c = a[(row + x) * n + ch];
+          b[(row + x) * n + ch] = c + k * (a[(row + l) * n + ch] + a[(row + r) * n + ch] + a[(up + x) * n + ch] + a[(down + x) * n + ch] - 4 * c);
+        }
       }
     }
     a.set(b);
@@ -306,9 +433,10 @@ export class Swipe {
 export const AUTO_LOOP = 10;
 /**
  * Where in the loop a still picture (PNG, a held preview) is taken: for Warmth the swipe still warm
- * and the print just made, for Glow just after the light has left, the trail glowing on its own.
+ * and the print just made, for Glow just after the light has left, the trail glowing on its own, for
+ * Rainy Window the wipe and the print still clear, for Marble the stroke just drawn through the rings.
  */
-export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36 };
+export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36, rain: 0.3, marble: 0.3 };
 /** Simulation ticks per loop: fixed, so every export of the same phase is identical. */
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */
@@ -338,6 +466,9 @@ export class AutoTouch implements HeatSource {
 
   get w() {
     return this.f.w;
+  }
+  get channels() {
+    return this.f.channels;
   }
   get h() {
     return this.f.h;
@@ -374,54 +505,4 @@ export class AutoTouch implements HeatSource {
     if (this.swipe && !this.swipe.step(dt)) this.swipe = null;
     this.f.step(dt);
   }
-}
-
-// ---------- From the screen to the card ----------
-
-/** Where the card is drawn: the same numbers the card's vertex shader gets (css px, radians). */
-export interface CardPose {
-  cx: number;
-  cy: number;
-  w: number;
-  h: number;
-  rx: number;
-  ry: number;
-  rz: number;
-  scale: number;
-}
-
-/** The card's rotation (z, then x, then y, as in CARD_VS) applied to a point on its plane. */
-function rotate(p: CardPose, x: number, y: number): [number, number, number] {
-  const x1 = Math.cos(p.rz) * x - Math.sin(p.rz) * y;
-  const y1 = Math.sin(p.rz) * x + Math.cos(p.rz) * y;
-  const y2 = Math.cos(p.rx) * y1;
-  const z2 = Math.sin(p.rx) * y1;
-  return [Math.cos(p.ry) * x1 + Math.sin(p.ry) * z2, y2, -Math.sin(p.ry) * x1 + Math.cos(p.ry) * z2];
-}
-
-const depth = (p: CardPose) => Math.max(p.w, p.h, 120) * 3.2;
-
-/** Screen position of card uv (u, v), y down. */
-export function cardPoint(u: number, v: number, p: CardPose): [number, number] {
-  const [x, y, z] = rotate(p, (u - 0.5) * p.w * p.scale, (v - 0.5) * p.h * p.scale);
-  const w = (depth(p) - z) / depth(p);
-  return [p.cx + x / w, p.cy + y / w];
-}
-
-/** The card uv under a screen position: the inverse of `cardPoint` (a ray meeting the card's plane). */
-export function cardUv(sx: number, sy: number, p: CardPose): [number, number] {
-  const D = depth(p);
-  const a = rotate(p, 1, 0);
-  const b = rotate(p, 0, 1);
-  const qx = sx - p.cx;
-  const qy = sy - p.cy;
-  // D·(X·a + Y·b).xy = q·(D − (X·a + Y·b).z), linear in the plane coordinates X and Y.
-  const m11 = D * a[0] + qx * a[2];
-  const m12 = D * b[0] + qx * b[2];
-  const m21 = D * a[1] + qy * a[2];
-  const m22 = D * b[1] + qy * b[2];
-  const det = m11 * m22 - m12 * m21;
-  const X = (qx * D * m22 - m12 * qy * D) / det;
-  const Y = (m11 * qy * D - m21 * qx * D) / det;
-  return [X / (p.w * p.scale) + 0.5, Y / (p.h * p.scale) + 0.5];
 }

@@ -7,17 +7,22 @@ of cards must not slow the page down, so nothing is read or drawn before it is l
 ## What a kept card is
 
 - **Its settings**: every saved setting that belongs to the card (`CARD_KEYS` in `src/state.ts`):
-  the finish, rarity, frame and frame color, strength, pixelation, name, line, crop, Shine,
+  the finish, rarity, frame and frame color, strength, pixelation, pixel art, name, line, crop, Shine,
   lettering, the finish area's region and band, and which picture (`sample`). The rest of the
   saved state (language, sound, the hand, which panel tab is open, the export format, the brush,
   the swatches) is about the app, not the card, and stays out. A setting added to the store later
-  joins the card unless it is listed as an app setting. The brush strokes of the finish area are
-  not kept (they are not kept across reloads either).
+  joins the card unless it is listed as an app setting.
+- **Its brush strokes**: what is painted in and out of the finish area, for both layers (the
+  strokes live beside the settings, not in them). Each layer is two 450×630 grids of one byte, so
+  1.1 MB in all, but mostly empty: they are kept deflated (`CompressionStream`), a few kilobytes
+  for a few strokes, and count towards the binder's 60 MB like the picture. A card with nothing
+  painted keeps none. Putting a card on the stage puts its strokes there too (Undo starts afresh),
+  and a card without strokes leaves the stage with none. Strokes that can't be read back, or that
+  no longer fit the area's grid, are dropped and the card comes back without them.
 - **Its picture**: a sample is kept as its number. The person's own picture is kept shrunk to
   1280 px on its long side as WebP; an animated picture keeps its own file when it is 8 MB or less
   (so it still moves), and its first frame otherwise. Flip Lenticular's other picture is not kept.
-- **A thumbnail**: the card drawn once, at the moment it is kept, by the same still renderer as the
-  PNG export, cut to the card's own outline and shrunk to fit 250×350 without stretching, kept as
+- **A thumbnail**: the card drawn once, at the moment it is kept, by the exporter's still renderer, cut to the card's own outline and shrunk to fit 250×350 without stretching, kept as
   WebP where the browser can write it (about 20 KB). The pockets are trading-card shaped; a card of
   another shape (a wide, square or postcard card, where the card has a shape setting) keeps its
   shape and sits in the middle of its pocket. Nothing here reads the shape setting itself, so the
@@ -31,9 +36,9 @@ three stores so each can be read on its own:
 
 | Store | Key | Holds | Read when |
 |---|---|---|---|
-| `meta` | id | when it was kept, its name, finish, size in bytes and its pocket | the binder opens (a few hundred bytes a card) |
+| `meta` | id | when it was kept, its name, finish, size in bytes (thumbnail, picture and strokes) and its pocket | the binder opens (a few hundred bytes a card) |
 | `thumbs` | id | the thumbnail | its page is shown |
-| `cards` | id | the settings and the picture | the card is played |
+| `cards` | id | the settings, the picture and the brush strokes | the card is played |
 
 The binder's count is mirrored in `localStorage` (`foil:binder`) so the header chip shows it
 without opening the database or loading the binder's code. As everywhere in FOIL (see
@@ -87,19 +92,20 @@ what is picked.
 
 ## Sharing
 
-- **Share** sits beside Keep and shows only where `navigator.canShare({ files })` accepts an image
-  file (most phones; most desktop browsers have no such share sheet, and Save is the way out there).
-- It always sends a moving GIF, whatever format Save is set to: X plays a GIF, and most apps won't
-  play an APNG. The GIF is made on the press, counting up on Share and on the Save button as Save shows
+- **Share** sits beside Keep and shows only where `navigator.canShare({ files })` accepts a GIF or
+  an MP4 (most phones; most desktop browsers have no such share sheet, and Save is the way out there).
+- With MP4 chosen as the format, and where `canShare` takes a `video/mp4` file, it sends the MP4 (the
+  same file Save makes), for Instagram, which plays neither GIF nor APNG. Otherwise it sends a moving
+  GIF, whatever format Save is set to: X plays a GIF, and most apps won't play an APNG. The file is made on the press, counting up on Share and on the Save button as Save shows
   it, and keeps the GIF options (backdrop, edge). It is smaller than a saved GIF, 360×450 and at
   most 50 frames (a long animated loop keeps its length with longer frames), so even a noisy
   picture stays well under the 15 MB X takes: 50 frames of 360×450 are 8.1 MB before compression.
 - It goes with a short line and the site's address (`text`); where `canShare` refuses text along
-  with files, the GIF goes alone. On a Mac it goes alone too: the share sheet's Copy put both items
+  with files, the file goes alone. On a Mac it goes alone too: the share sheet's Copy put both items
   on the clipboard, and pasting into X attached the GIF twice. A press while a sheet is open does
   nothing, so one press is one share. The card is never put in a link, and nothing is sent to a server.
 - The share sheet only opens while the browser still counts the tap that asked for it. Making a
-  GIF can take longer than that; then `share()` fails with `NotAllowedError`, and the button turns
+  file can take longer than that; then `share()` fails with `NotAllowedError`, and the button turns
   into **Send** with the file ready: the next tap opens the sheet at once. The ready file is
   dropped as soon as the card changes. Cancelling the sheet is not an error.
 - The share code is on the first load (it is small); the GIF encoder it calls is fetched ahead,

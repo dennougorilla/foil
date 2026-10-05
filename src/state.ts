@@ -7,18 +7,21 @@ import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Letteri
 import { CARD_LAYOUTS, type CardLayout } from './card/tcg';
 import { ARRANGES, normalizePlacements, type Arrange, type Placements } from './arrange';
 import { DEFAULT_MESSAGE, normalizeMessage, type Message } from './message';
+import { sanitizeDot, sanitizeDotScope, type Dot, type DotScope } from './dot/model';
+import { DEFAULT_BACKDROP, PLAIN_DEFAULT, sanitizeBackdrop, sanitizeBackdropColor, type BackdropId } from './backdrop';
 import { RANGE_COLOR_DEFAULTS, RANGE_COLOR_PERSIST, sanitizeRangeColors, type RangeColorState } from './featureState';
 
 /** Tabs of the Fine-tune area in the side panel. */
 export type PanelTab = 'card' | 'light' | 'text' | 'range';
 export const PANEL_TABS: PanelTab[] = ['card', 'light', 'text', 'range'];
-export type ExportFormat = 'png' | 'gif' | 'apng';
-export const EXPORT_FORMATS: ExportFormat[] = ['png', 'gif', 'apng'];
+export type ExportFormat = 'gif' | 'apng' | 'mp4';
+export const EXPORT_FORMATS: ExportFormat[] = ['gif', 'apng', 'mp4'];
 
 export interface State extends RangeColorState {
   lang: Lang;
   sound: boolean;
-  crt: boolean;
+  /** The CRT screen filter over the page (off unless turned on; never in exports). */
+  crtFilter: boolean;
   edition: EditionId;
   /** Layer 2: a finish laid over the card's own in an area of its own, or null (docs/layering.md). Layer 1 is `edition` with the range fields. */
   layer2: Layer2 | null;
@@ -30,8 +33,17 @@ export interface State extends RangeColorState {
   frame: FrameId;
   /** The card's shape (card/shape.ts); the trading card unless chosen. */
   shape: ShapeId;
+  /** The Picture shape's size now ('900x1260'), following the picture on the card (not saved: shape.ts setFit). */
+  fit: string;
+  /** The picture is the whole card: FOIL's frame, nameplate and words are not drawn (their settings stay). */
+  frameless: boolean;
   intensity: number;
+  /** Pixelate: the art window's step (0 = off, see dot/model.ts PIXEL_STEPS); the frame and words stay crisp. */
   pixel: number;
+  /** Pixel art, or null (src/dot). */
+  dot: Dot | null;
+  /** Where pixel art goes: the whole card, or the frame only (the picture stays as it is); whole card when frameless. */
+  dotScope: DotScope;
   name: string;
   /** True once the person typed their own name; stops samples overwriting it. */
   nameEdited: boolean;
@@ -55,15 +67,17 @@ export interface State extends RangeColorState {
   loading: boolean;
   /** Fine-tuning of light and motion, shared by every finish. */
   tune: Tune;
+  /** What the card sits on, on the stage and in a moving file (docs/backdrops.md), and Plain's color. */
+  backdrop: BackdropId;
+  backdropColor: string;
   /** Whether the Fine-tune area of the panel is open, and which of its tabs shows. */
   adjustOpen: boolean;
   panelTab: PanelTab;
   /** The format the Save button writes. */
   exportFormat: ExportFormat;
-  /** Whether the save options are open, and the GIF's own: a clear background and its edge colour. */
+  /** Whether the save options are open. */
   saveOptsOpen: boolean;
-  gifClear: boolean;
-  /** 'auto' keeps the card's own edge colour; otherwise '#rrggbb' to blend the edge into. */
+  /** A clear GIF's edges: 'auto' keeps the card's own edge colour; otherwise '#rrggbb' to blend the edge into. */
   gifMatte: string;
   /** How the name is printed: ink, deboss, emboss, foil stamp or spot UV. */
   text: Lettering;
@@ -80,15 +94,18 @@ const KEY = 'foil:v1';
 const PERSIST: (keyof State)[] = [
   'lang',
   'sound',
-  'crt',
+  'crtFilter',
   'edition',
   'layer2',
   'hand',
   'rarity',
   'frame',
   'shape',
+  'frameless',
   'intensity',
   'pixel',
+  'dot',
+  'dotScope',
   'name',
   'nameEdited',
   'message',
@@ -101,11 +118,12 @@ const PERSIST: (keyof State)[] = [
   'sample',
   'crop',
   'tune',
+  'backdrop',
+  'backdropColor',
   'adjustOpen',
   'panelTab',
   'exportFormat',
   'saveOptsOpen',
-  'gifClear',
   'gifMatte',
   'text',
   'flicked',
@@ -116,13 +134,12 @@ const PERSIST: (keyof State)[] = [
 const APP_KEYS: (keyof State)[] = [
   'lang',
   'sound',
-  'crt',
+  'crtFilter',
   'hand',
   'adjustOpen',
   'panelTab',
   'exportFormat',
   'saveOptsOpen',
-  'gifClear',
   'gifMatte',
   'flicked',
   'rangeShow',
@@ -143,7 +160,7 @@ export function cardOf(s: State): Card {
 const defaults = (): State => ({
   lang: 'en',
   sound: true,
-  crt: true,
+  crtFilter: false,
   edition: 'holo',
   layer2: null,
   areaLayer: 1,
@@ -151,8 +168,12 @@ const defaults = (): State => ({
   rarity: 'rare',
   frame: 'paper',
   shape: 'card',
+  fit: '',
+  frameless: false,
   intensity: 1,
   pixel: 0,
+  dot: null,
+  dotScope: 'card',
   name: '',
   nameEdited: false,
   message: { ...DEFAULT_MESSAGE },
@@ -166,11 +187,12 @@ const defaults = (): State => ({
   crop: { zoom: 1, x: 0.5, y: 0.5 },
   loading: false,
   tune: { ...TUNE_DEFAULTS },
+  backdrop: DEFAULT_BACKDROP,
+  backdropColor: PLAIN_DEFAULT,
   adjustOpen: false,
   panelTab: 'card',
-  exportFormat: 'png',
+  exportFormat: 'gif',
   saveOptsOpen: false,
-  gifClear: false,
   gifMatte: 'auto',
   text: { ...DEFAULT_LETTERING },
   flicked: false,
@@ -181,7 +203,10 @@ const defaults = (): State => ({
 function sanitize(state: State) {
   if (state.lang !== 'ja') state.lang = 'en';
   state.tune = sanitizeTune(state.tune);
+  state.dot = sanitizeDot(state.dot);
+  state.dotScope = sanitizeDotScope(state.dotScope);
   state.shape = shapeOf(state.shape);
+  state.frameless = state.frameless === true;
   state.adjustOpen = state.adjustOpen === true;
   state.message = normalizeMessage(state.message);
   state.plate = state.plate !== false;
@@ -193,10 +218,12 @@ function sanitize(state: State) {
   // A finish that no longer exists (a retired one) starts over on the default.
   if (!EDITIONS.some((e) => e.id === state.edition)) state.edition = 'holo';
   if (!PANEL_TABS.includes(state.panelTab)) state.panelTab = 'card';
-  if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'png';
+  if (!EXPORT_FORMATS.includes(state.exportFormat)) state.exportFormat = 'gif';
   state.saveOptsOpen = state.saveOptsOpen === true;
-  state.gifClear = state.gifClear === true;
+  state.backdrop = sanitizeBackdrop(state.backdrop);
+  state.backdropColor = sanitizeBackdropColor(state.backdropColor);
   state.flicked = state.flicked === true;
+  state.crtFilter = state.crtFilter === true;
   if (typeof state.gifMatte !== 'string' || (state.gifMatte !== 'auto' && !/^#[0-9a-f]{6}$/i.test(state.gifMatte))) state.gifMatte = 'auto';
   Object.assign(state, sanitizeRangeColors(state));
   state.layer2 = sanitizeLayer2(state.layer2);

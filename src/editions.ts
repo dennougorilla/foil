@@ -24,6 +24,7 @@ export type EditionId =
   | 'platinum'
   | 'engraving'
   | 'cosmoholo'
+  | 'chameleon'
   | 'stainedglass'
   | 'glow'
   | 'blacklight'
@@ -31,7 +32,9 @@ export type EditionId =
   | 'lenticularflip'
   | 'stardust'
   | 'snowglobe'
-  // Shaders in src/gl/finishes/supporter.ts
+  | 'rain'
+  | 'marble'
+  // Shaders in src/gl/finishes/jewel.ts and supporter.ts
   | 'kintsugi'
   | 'opal'
   | 'raden'
@@ -87,6 +90,8 @@ export const EDITIONS: Edition[] = [
   // Shader in src/gl/engraving.ts.
   { id: 'engraving', shader: 106, color: '#d98a54', swirl: ['#140a06', '#6e3a1c', '#e0a070'], value: 7 },
   { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
+  // Shader in src/gl/chameleon.ts.
+  { id: 'chameleon', shader: 90, color: '#7fd6a0', swirl: ['#0c0718', '#3a1f6e', '#2f9a74'], value: 7, dither: true },
   { id: 'stainedglass', shader: 26, color: '#e8a33c', swirl: ['#0a0710', '#3a1f4a', '#c0532e'], value: 6 },
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
   // Shader in src/gl/blacklight.ts.
@@ -97,10 +102,15 @@ export const EDITIONS: Edition[] = [
   { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
   // Glitter particles on the GPU, see src/gl/snowglobe.ts.
   { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7, solo: true },
-  // Shaders in src/gl/finishes/supporter.ts.
+  // Shader in src/gl/rain.ts.
+  { id: 'rain', shader: 94, color: '#a9c6d8', swirl: ['#0a1018', '#2a4152', '#8fb0c4'], value: 7, dither: true, touch: 'rain' },
+  // Shader in src/gl/marble.ts.
+  { id: 'marble', shader: 102, color: '#7f95c8', swirl: ['#07080d', '#1f2b4a', '#c9b79a'], value: 7, dither: true, touch: 'marble' },
+  // Shaders in src/gl/finishes/jewel.ts.
   { id: 'kintsugi', shader: 40, color: '#e9b955', swirl: ['#120e0a', '#5a3b1c', '#e0b25a'], value: 8 },
   { id: 'opal', shader: 41, color: '#9fe6ff', swirl: ['#0b1420', '#2f6f9a', '#e889c8'], value: 8 },
   { id: 'raden', shader: 43, color: '#b9a6ff', swirl: ['#07060a', '#2c1a3a', '#4fc0c8'], value: 8 },
+  // Shaders in src/gl/finishes/supporter.ts.
   { id: 'confetti', shader: 80, color: '#ffcf5a', swirl: ['#1a0f24', '#a8386a', '#e8b94e'], value: 8 },
   { id: 'fireworks', shader: 82, color: '#ffc24a', swirl: ['#04061a', '#1a2658', '#d89a3a'], value: 8, dither: true },
 ];

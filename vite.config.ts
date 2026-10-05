@@ -1,6 +1,9 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { defineConfig, type Plugin } from 'vite';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import { defineConfig, transformWithOxc, type Plugin } from 'vite';
+import { offlineFiles } from './src/swFiles.ts';
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
@@ -63,11 +66,41 @@ function firstLoad(id: string, ctx: { getModuleInfo(id: string): { isEntry: bool
 let firstLoadIds: Set<string> | null = null;
 const entryIds = new Set<string>();
 
+/**
+ * The service worker (docs/pwa.md). Once the build is written, src/sw.ts becomes dist/sw.js under the
+ * list of files to keep offline and a hash of the build, so every build that changes a file is a new
+ * worker, which is how browsers learn there is a new version.
+ */
+function serviceWorker(): Plugin {
+  let outDir = '';
+  return {
+    name: 'service-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const built = readdirSync(outDir, { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => relative(outDir, join(e.parentPath, e.name)).replaceAll('\\', '/'))
+        .filter((f) => f !== 'sw.js')
+        .sort();
+      const hash = createHash('sha256');
+      for (const f of built) hash.update(f).update(readFileSync(join(outDir, f)));
+      const { code } = await transformWithOxc(readFileSync(new URL('./src/sw.ts', import.meta.url), 'utf8'), 'sw.ts');
+      const head = `const OFFLINE = ${JSON.stringify(offlineFiles(built))};\nconst VERSION = '${hash.digest('hex').slice(0, 12)}';\n`;
+      // A classic worker script (module workers are not everywhere yet): the module marker goes.
+      writeFileSync(join(outDir, 'sw.js'), head + code.replace(/^export \{\s*\};?\s*$/m, ''));
+    },
+  };
+}
+
 // Relative base so the build works from any GitHub Pages sub-path.
 export default defineConfig({
   base: './',
   plugins: [
     langPreload(),
+    serviceWorker(),
     {
       name: 'first-load-ids',
       apply: 'build',

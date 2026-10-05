@@ -4,9 +4,11 @@
 
 import { rarityById } from '../editions';
 import { paintLettering, type TextRun } from '../lettering';
-import { layoutEffect, messageFont, messageLines, type Rect } from '../message';
+import { messageFont, messageLines, type Rect } from '../message';
+import { columnSize, layoutEffect } from './effect';
 import { paintFreeMessage, LINE, OUTLINE, RADIUS, S, fitName, paintArt, paintPips, roundRect, tcgContent, type FaceSpec } from './face';
 import { tcgFrame } from './tcg';
+import { holdWord } from './words';
 
 type Frame = { fill: string | CanvasGradient; ink: string; sub: string };
 
@@ -113,7 +115,7 @@ function artWell(ctx: CanvasRenderingContext2D, spec: FaceSpec, art: Rect) {
   ctx.save();
   shape(ctx, art, rad);
   ctx.clip();
-  paintArt(ctx, art, spec.image, spec.crop, 0);
+  paintArt(ctx, art, spec.image, spec.crop, 0, spec.crisp);
   ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.fillRect(art.x, art.y, art.w, px());
   ctx.fillRect(art.x, art.y, px(), art.h);
@@ -208,8 +210,9 @@ export function paintTcg(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: Frame
     // The name leads the card: the pixel face set bold.
     ctx.font = `700 ${ctx.font}`;
     const x = t.name.x + 18 * S;
-    runs.push({ part: 'name', text: name, font: ctx.font, size, x, y: mid + S, stock: t.name.y + 4 * S });
-    paintLettering(ctx, name, x, mid + S, PLATE_INK);
+    const stock = t.name.y + 4 * S;
+    runs.push({ part: 'name', text: name, font: ctx.font, size, x, y: mid + S, stock });
+    paintLettering(ctx, name, x, mid + S, PLATE_INK, 'name', stock);
     // On a parchment plate the diamonds keep the rarity's colour, whatever the frame.
     paintPips(ctx, { ...spec, frame: 'paper' }, t.name.x + t.name.w - 18 * S, mid);
   }
@@ -246,7 +249,9 @@ export function paintTcg(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: Frame
       ctx.font = messageFont(font, size);
       return ctx.measureText(text).width;
     };
-    const effect = layoutEffect(messageLines(spec.message.text), box, measure);
+    // In a wide card's narrower column the text gives way a little where a line would otherwise wrap.
+    const lines = messageLines(spec.message.text);
+    const effect = layoutEffect(lines, t.text!, measure, ctx.canvas.width > ctx.canvas.height ? columnSize(lines, box.w, measure) : Infinity);
     if (effect) {
       ctx.font = messageFont(font, effect.size);
       for (const l of effect.lines.filter((l) => l.text)) {
@@ -263,13 +268,17 @@ export function paintTcg(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: Frame
   ctx.font = `${fs}px "DotGothic16", monospace`;
   ctx.textBaseline = 'middle';
   setSymbol(ctx, t.foot.x + 8 * S + fs * 0.4, fmid, fs * 0.8, f.ink);
-  ctx.fillStyle = f.ink;
-  ctx.globalAlpha = 0.72;
-  ctx.fillText(`FOIL ${new Date().getFullYear()}`, t.foot.x + 14 * S + fs, fmid);
-  ctx.textAlign = 'right';
-  ctx.fillText('No. 1/1', t.foot.x + t.foot.w - 8 * S, fmid);
-  ctx.textAlign = 'left';
-  ctx.globalAlpha = 1;
+  const fine = (text: string, x: number, align: 'left' | 'right') => {
+    const width = ctx.measureText(text).width;
+    // Under pixel art it is printed later, on the pixel grid (card/words.ts).
+    if (holdWord(ctx, { text, font: ctx.font, size: fs, width, x, y: fmid, align, fill: f.ink, alpha: 0.72, edge: null })) return;
+    ctx.fillStyle = f.ink;
+    ctx.globalAlpha = 0.72;
+    ctx.fillText(text, align === 'left' ? x : x - width, fmid);
+    ctx.globalAlpha = 1;
+  };
+  fine(`FOIL ${new Date().getFullYear()}`, t.foot.x + 14 * S + fs, 'left');
+  fine('No. 1/1', t.foot.x + t.foot.w - 8 * S, 'right');
   // A freely placed message lies over the card, last.
   runs.push(...paintFreeMessage(ctx, spec));
   return runs;

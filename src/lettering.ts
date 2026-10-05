@@ -7,6 +7,7 @@
 // metal catch the same light and tilt as the rest of the card — on screen and
 // in every export.
 
+import { holdWord } from './card/words';
 import { createTexture, hexToRgb, uploadTexture, type Program } from './gl/gl';
 
 export type LetterStyle = 'ink' | 'deboss' | 'emboss' | 'foil' | 'spot';
@@ -231,6 +232,8 @@ export interface TextRun {
   rot?: number;
   cx?: number;
   cy?: number;
+  /** Letters printed on the pixel art's grid (dot/words.ts): their dots, and the face box they fill. */
+  glyphs?: { image: CanvasImageSource; x: number; y: number; w: number; h: number };
 }
 
 /** Turns a context about a run's pivot, if it has a turn. */
@@ -269,10 +272,13 @@ function paintMap(W: number, H: number, runs: TextRun[], radius: number) {
     glyphCtx.font = r.font;
     glyphCtx.save();
     turnFor(glyphCtx, r);
-    glyphCtx.fillText(r.text, r.x, r.y);
+    const g = r.glyphs;
+    if (g) {
+      glyphCtx.imageSmoothingEnabled = false;
+      glyphCtx.drawImage(g.image, g.x, g.y, g.w, g.h);
+    } else glyphCtx.fillText(r.text, r.x, r.y);
     glyphCtx.restore();
-    const w = glyphCtx.measureText(r.text).width;
-    let b = { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + w, y1: r.y + r.size * 0.75 };
+    let b = g ? { x0: g.x, y0: g.y, x1: g.x + g.w, y1: g.y + g.h } : { x0: r.x, y0: r.y - r.size * 0.75, x1: r.x + glyphCtx.measureText(r.text).width, y1: r.y + r.size * 0.75 };
     if (r.rot) {
       // The box that holds the turned line.
       const c = Math.cos(r.rot);
@@ -351,9 +357,12 @@ export function fieldAt([u, v]: [number, number]): TextField | null {
 }
 
 /** Paints a piece of text onto the face in its lettering's flat colour. Call with the context's font already set. */
-export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, frameInk: string, field: TextField = 'name'): void {
+export function paintLettering(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, frameInk: string, field: TextField = 'name', stock?: number): void {
   const fill = letterFill(letteringOf(field), frameInk);
   ctx.textBaseline = 'middle';
+  const size = parseFloat(/([\d.]+)px/.exec(ctx.font)?.[1] ?? '16');
+  // Under pixel art the word is printed later, on the pixel grid (card/words.ts).
+  if (holdWord(ctx, { text, font: ctx.font, size, width: ctx.measureText(text).width, x, y, align: 'left', fill, alpha: 1, edge: null, part: field, stock })) return;
   if (fill) {
     ctx.fillStyle = fill;
     ctx.fillText(text, x, y);
@@ -407,6 +416,24 @@ export function stillPose(tilt: [number, number], light: [number, number]): { ti
 const STYLE_INDEX: Record<LetterStyle, number> = { ink: 0, deboss: 1, emboss: 2, foil: 3, spot: 4 };
 
 /** Owns one renderer's copy of the lettering map and feeds the shader its uniforms. */
+/** Each piece's print as uniforms, worked out once per change rather than for every card drawn. */
+let fields: { key: unknown[]; styles: Int32Array; los: Float32Array; his: Float32Array; rainbows: Float32Array; bevels: Float32Array } | null = null;
+function fieldUniforms() {
+  const key = [active, prints, bevel, plateBevel];
+  if (fields && key.every((k, i) => k === fields!.key[i])) return fields;
+  // With no ink the die is the letter itself, so counters (the holes in a, e, o) stay open.
+  const blind = active.ink === 'none';
+  const each = TEXT_FIELDS.map(letteringOf);
+  return (fields = {
+    key,
+    styles: Int32Array.from(each, (f) => STYLE_INDEX[f.style]),
+    los: Float32Array.from(each.flatMap((f) => hexToRgb(foilRamp(f)[0]))),
+    his: Float32Array.from(each.flatMap((f) => hexToRgb(foilRamp(f)[1]))),
+    rainbows: Float32Array.from(each, (f) => (f.style === 'foil' && f.foil === 'rainbow' ? 1 : 0)),
+    bevels: Float32Array.from(each, (f) => ((f.style === 'deboss' || f.style === 'emboss') && !blind ? plateBevel : bevel)),
+  });
+}
+
 export class LetteringGL {
   private tex: WebGLTexture;
   private version = -1;
@@ -427,15 +454,14 @@ export class LetteringGL {
     }
     const l = active;
     gl.uniform1i(p.u.uTextMap, unit);
-    // With no ink the die is the letter itself, so counters (the holes in a, e, o) stay open.
-    const blind = l.ink === 'none';
-    const each = TEXT_FIELDS.map(letteringOf);
+    const f = fieldUniforms();
     gl.uniform4fv(p.u.uTextBox, fieldBoxes);
-    gl.uniform1iv(p.u.uTextStyles, each.map((f) => STYLE_INDEX[f.style]));
-    gl.uniform3fv(p.u.uTextLos, each.flatMap((f) => hexToRgb(foilRamp(f)[0])));
-    gl.uniform3fv(p.u.uTextHis, each.flatMap((f) => hexToRgb(foilRamp(f)[1])));
-    gl.uniform1fv(p.u.uTextRainbows, each.map((f) => (f.style === 'foil' && f.foil === 'rainbow' ? 1 : 0)));
-    gl.uniform1fv(p.u.uTextBevels, each.map((f) => ((f.style === 'deboss' || f.style === 'emboss') && !blind ? plateBevel : bevel)));
+    gl.uniform1iv(p.u.uTextStyles, f.styles);
+    gl.uniform3fv(p.u.uTextLos, f.los);
+    gl.uniform3fv(p.u.uTextHis, f.his);
+    gl.uniform1fv(p.u.uTextRainbows, f.rainbows);
+    gl.uniform1fv(p.u.uTextBevels, f.bevels);
+    const blind = l.ink === 'none';
     gl.uniform1f(p.u.uTextDepth, l.depth);
     gl.uniform1f(p.u.uTextGloss, l.gloss);
     gl.uniform1f(p.u.uTextBlind, blind ? 1 : 0);

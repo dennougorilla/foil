@@ -1548,6 +1548,109 @@ button {
   animation: none;
 }
 
+/* Use as the whole card: one switch under the pick button; gold while a card-shaped picture suggests it. */
+.whole {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.whole > svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--text-dim);
+}
+
+.whole-text b {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.whole-text small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.whole-knob {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--edge);
+}
+
+.whole-knob::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--text-dim);
+  transition: transform 0.2s var(--ease-out), background-color 0.2s;
+}
+
+.whole:hover {
+  background: var(--panel);
+}
+
+.whole:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.whole[aria-pressed='true'] .whole-knob {
+  background: var(--green);
+}
+
+.whole[aria-pressed='true'] .whole-knob::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.whole[aria-pressed='true'] > svg {
+  fill: var(--green);
+}
+
+.whole.is-suggest {
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.whole.is-suggest small {
+  color: var(--gold);
+}
+
+/* What a card that is all picture does without (a frame, a layout, Lettering, places on the card) steps aside. */
+:is(.field, .tab)[hidden] {
+  display: none;
+}
+
+/* Pixel art keeps its hard pixels in the crop frame too. */
+.crop-view.is-crisp :is(canvas, .crop-window) {
+  image-rendering: pixelated;
+}
+
+/* A card that is all picture prints no name or words: the tag keeps the finish only. */
+.info.is-frameless :is(.info-name, .info-type, .info-desc, .pill-rarity, .lt-jump, .card-hint) {
+  display: none;
+}
+
 /* The crop frame beside its zoom, the same for any shape of picture: zoom, then what to do. */
 .crop {
   display: grid;
@@ -2913,6 +3016,129 @@ input[type='range']:disabled {
   opacity: 0.85;
 }
 
+/* Backdrops (docs/backdrops.md): three to a row, each a little scene with a card in its middle. */
+.seg-backdrops {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.seg-backdrops .seg-btn {
+  display: grid;
+  justify-items: stretch;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 5px 6px;
+  font-size: 14px;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.bd-pic {
+  position: relative;
+  display: block;
+  height: 38px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--edge);
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+
+/* The card: a small foil-white slab with a sheen, the same in every tile. */
+.bd-pic::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 7px);
+  top: calc(50% - 10px);
+  width: 14px;
+  height: 20px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #f3eee2 0 30%, #ffd6f1 45%, #b8f0ff 58%, #f3eee2 72%);
+  box-shadow: 0 0 0 1px var(--edge), 2px 3px 0 rgba(0, 0, 0, 0.45);
+}
+
+[data-v='swirl'] > .bd-pic {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.45) 80%),
+    repeating-conic-gradient(from 10deg at 46% 56%, var(--c1) 0 34deg, var(--c2) 34deg 70deg, var(--c3) 70deg 82deg, var(--c1) 82deg 120deg);
+}
+
+[data-v='felt'] > .bd-pic {
+  background: radial-gradient(ellipse 70% 80% at 50% 50%, #1c573d, #0c2a1f 62%, #04110c);
+}
+
+[data-v='studio'] > .bd-pic {
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 42%, rgba(220, 214, 200, 0.5), transparent 70%),
+    linear-gradient(#0d0e11, #24272c 58%, #2b2e33 64%, #111215);
+}
+
+[data-v='velvet'] > .bd-pic {
+  background:
+    radial-gradient(ellipse 30% 40% at 22% 30%, rgba(170, 52, 80, 0.55), transparent 70%),
+    radial-gradient(ellipse 35% 45% at 80% 70%, rgba(170, 52, 80, 0.45), transparent 70%),
+    radial-gradient(ellipse 70% 80% at 50% 45%, #5e1328, #22030c 75%);
+}
+
+[data-v='bokeh'] > .bd-pic {
+  background:
+    radial-gradient(circle at 16% 30%, var(--c3), transparent 8px),
+    radial-gradient(circle at 82% 24%, var(--c2), transparent 11px),
+    radial-gradient(circle at 76% 78%, var(--c3), transparent 7px),
+    radial-gradient(circle at 24% 80%, var(--c2), transparent 9px),
+    #08080e;
+}
+
+[data-v='bokeh'] > .bd-pic::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 12, 0.45);
+}
+
+[data-v='stars'] > .bd-pic {
+  background:
+    radial-gradient(circle at 14% 22%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 30% 70%, #cfe0ff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 78% 18%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 88% 62%, #ffe9c8 0 1px, transparent 1.5px),
+    radial-gradient(circle at 66% 86%, #cfe0ff 0 1px, transparent 1.5px),
+    linear-gradient(160deg, transparent 30%, rgba(120, 100, 190, 0.25) 45%, transparent 60%),
+    linear-gradient(#02030c, #0b1230);
+}
+
+[data-v='confetti'] > .bd-pic {
+  background:
+    linear-gradient(#f5c24c, #f5c24c) 12% 20% / 5px 3px no-repeat,
+    linear-gradient(#ff6b8b, #ff6b8b) 26% 74% / 3px 5px no-repeat,
+    linear-gradient(#5fd4ff, #5fd4ff) 80% 16% / 5px 3px no-repeat,
+    linear-gradient(#59f2b0, #59f2b0) 88% 66% / 3px 5px no-repeat,
+    linear-gradient(#c58bff, #c58bff) 70% 92% / 5px 3px no-repeat,
+    linear-gradient(#f4f0e8, #f4f0e8) 10% 92% / 3px 3px no-repeat,
+    radial-gradient(ellipse at 50% 50%, #2a1838, #0a0812 75%);
+}
+
+[data-v='plain'] > .bd-pic {
+  background: var(--plain);
+}
+
+[data-v='clear'] > .bd-pic {
+  background: repeating-conic-gradient(#262c30 0 25%, #20262a 0 50%) 0 0 / 8px 8px;
+}
+
+.backdrop-color {
+  margin-top: 6px;
+}
+
+.backdrop-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border-radius: 3px;
+  background: var(--plain);
+  box-shadow: 0 0 0 2px var(--edge), 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+
 /* Side notes on the board stay readable, at full strength on the colour slabs. */
 .panel :is(.btn-text small, .hint) {
   font-size: 14px;
@@ -2975,19 +3201,116 @@ input[type='range']:disabled {
 /* ---------- Overlays ---------- */
 
 .crt {
+  display: contents;
+}
+
+/* The CRT filter (off unless turned on in the header): four layers over the page, under the drop
+   overlay and over the pack opening. The wrapper takes no box of its own, so each layer blends with
+   the page itself rather than with a group of its own. Plain CSS over the DOM: nothing is redrawn,
+   the compositor blends the layers each frame, and exports never see it. */
+.crt > * {
   position: fixed;
   inset: 0;
   z-index: 50;
   pointer-events: none;
-  background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 0 1px, transparent 1px 4px),
-    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
-  mix-blend-mode: multiply;
   transition: opacity 0.3s;
 }
 
-.crt.is-off {
+.crt.is-off > * {
   opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0s 0.3s;
+}
+
+/* Phosphor glow: a blurred copy of the screen, its dark parts pushed to black, screened back on, so
+   only what is bright bleeds into its surroundings (and over the dark gaps between scanlines). */
+.crt-glow {
+  -webkit-backdrop-filter: blur(6px) contrast(2.4) brightness(0.8);
+  backdrop-filter: blur(6px) contrast(2.4) brightness(0.8);
+  mix-blend-mode: screen;
+  opacity: 0.3;
+}
+
+/* Scanlines and the aperture grille, blended as overlay: mid-gray leaves the page as it is, lighter
+   lifts it, darker lowers it, channel by channel. Each 3 px line is brighter at its center and darker
+   at its edge; red, green and blue stripes 1 px wide each favour their own channel. Pure black and
+   pure white stay as they are, so small text keeps its edges. A faint red fringe on the left and blue
+   on the right stand for the beams converging less well toward the sides. */
+.crt-mask {
+  mix-blend-mode: overlay;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.14) 1px,
+      rgba(255, 255, 255, 0) 2px,
+      rgba(0, 0, 0, 0.32) 2.6px,
+      rgba(0, 0, 0, 0) 3px
+    ),
+    linear-gradient(to right, rgba(255, 30, 60, 0.4), rgba(255, 30, 60, 0) 6%, rgba(40, 110, 255, 0) 94%, rgba(40, 110, 255, 0.4)),
+    repeating-linear-gradient(to right, rgb(162, 112, 112) 0 1px, rgb(112, 160, 112) 1px 2px, rgb(112, 114, 166) 2px 3px);
+}
+
+/* Grain, flicker and a slow band rolling down the screen. */
+.crt-noise {
+  overflow: hidden;
+}
+
+.crt-noise::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: crt-grain 0.5s steps(3) infinite;
+}
+
+.crt-noise::after {
+  content: '';
+  position: absolute;
+  inset: -40vh 0 auto;
+  height: 40vh;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.025) 50%, rgba(255, 255, 255, 0));
+  animation:
+    crt-roll 9s linear infinite,
+    crt-flicker 3.2s steps(1) infinite;
+}
+
+@keyframes crt-grain {
+  33% { transform: translate(-3%, 2%); }
+  66% { transform: translate(2%, -3%); }
+}
+
+@keyframes crt-roll {
+  to { transform: translateY(180vh); }
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 0.4; }
+  43% { opacity: 1; }
+  77% { opacity: 0.6; }
+  78% { opacity: 1; }
+}
+
+/* The glass: rounded dark corners, edges shading off and a faint reflection, as if the screen bulged a
+   little; and the dark gaps between scanlines, so even white shows its lines. */
+.crt-glass {
+  border-radius: clamp(14px, 3.2vmin, 34px);
+  box-shadow:
+    0 0 0 60px #000,
+    inset 0 0 2px 1px rgba(0, 0, 0, 0.7),
+    inset 0 0 clamp(28px, 7vmin, 90px) rgba(0, 0, 0, 0.5);
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.13) 2px 3px),
+    radial-gradient(70% 45% at 28% 8%, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.34) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-noise {
+    display: none;
+  }
 }
 
 .drop {
@@ -3546,6 +3869,24 @@ input[type='range']:disabled {
   }
 }
 
+/* A device that has to draw less (a still level, src/quality.ts) plays every endless CSS loop once,
+   whatever it belongs to; what shows that something is loading ([aria-busy], .is-waiting) keeps moving. */
+[data-still] :not([aria-busy], [aria-busy] *, .is-waiting, .is-waiting *),
+[data-still] :not([aria-busy], [aria-busy] *, .is-waiting, .is-waiting *)::before,
+[data-still] :not([aria-busy], [aria-busy] *, .is-waiting, .is-waiting *)::after {
+  animation-iteration-count: 1 !important;
+}
+
+/* ...without the CRT filter's glow (the screen blurred again on every frame)... */
+[data-still] .crt-glow {
+  display: none;
+}
+
+/* ...and the lowest levels go without the CRT filter (layers blended over the whole screen). */
+[data-no-crt] .crt {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .support-menu,
   .chip-heart[aria-expanded='true'] svg,
@@ -3568,4 +3909,58 @@ input[type='range']:disabled {
   .chip-binder.is-bump {
     animation: none;
   }
+}
+
+/* Pixelate and Pixel art sit together, each with one line saying what it touches. */
+.row-hint {
+  grid-template-areas:
+    'label out'
+    'hint hint'
+    'input input';
+}
+
+.row-hint > .hint {
+  grid-area: hint;
+  margin-top: -4px;
+}
+
+.dot-hint {
+  margin-top: -6px;
+}
+
+/* Pixel art: its presets in one row, its four choices folded under Adjust. */
+.dot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dot-now {
+  color: var(--gold);
+  font-size: 14px;
+}
+
+.dot-more {
+  margin-left: auto;
+}
+
+.dot-more[hidden],
+.dot-scope[hidden],
+.dot-body[hidden] {
+  display: none;
+}
+
+.dot-body {
+  display: grid;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--panel-lo);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.dot-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }

@@ -8,8 +8,8 @@ import type { Dict } from './i18n';
 import type { Store } from './state';
 import type { EditionId } from './editions';
 import { contain } from './card/shape';
+import { dotGrid, dotScopeOf, pixelCellsSmall } from './dot/model';
 
-const PIXEL_STEPS = [0, 96, 72, 56, 44, 34, 26];
 const W = 84;
 const H = Math.round((W * 7) / 5);
 /** Height of the band, kept free at the top when the page scrolls a control into view. */
@@ -173,7 +173,9 @@ export class MiniPreview {
         scale: 1,
         ...cardLayers(s, view.rangeView > 0 ? view.layer : 0),
         intensity: s.intensity,
-        pixel: PIXEL_STEPS[s.pixel] ? Math.max(18, PIXEL_STEPS[s.pixel] * 0.5) : 0,
+        pixel: pixelCellsSmall(s.pixel),
+        dot: dotGrid(s.dot),
+        dotFrame: dotScopeOf(s) === 'frame',
         tilt: [ry / 0.32, rx / 0.28],
         light: [0.5 - ry, 0.35 - rx],
         alpha: 1,

@@ -5,7 +5,8 @@ import { customFrame } from '../palette';
 import { paintFree, paintMessage } from './messageFace';
 import type { Arrange, FreeField, Placement, Placements } from '../arrange';
 import { artWindow, shapeById, SHORT, type ShapeId } from './shape';
-import { tcgFrame, type CardLayout } from './tcg';
+import { tcgFrame, type CardLayout, type TcgContent } from './tcg';
+import { holdWords, takeWords, type Word } from './words';
 
 /** Pixel literals below were tuned at 600px across the short side. */
 export const S = SHORT / 600;
@@ -37,6 +38,14 @@ export interface FaceSpec {
   /** Words at their preset places, or where `placements` puts them. */
   arrange: Arrange;
   placements: Placements;
+  /** The parts a trading card makes room for; read from its words when absent (range.ts blanks the words but keeps the parts). */
+  tcg?: TcgContent;
+  /** The picture is the whole card: no frame, nameplate or words of FOIL's (their settings stay). */
+  frameless: boolean;
+  /** The picture is pixel art: it is enlarged with hard pixels (card/pixelArt.ts). */
+  crisp: boolean;
+  /** Pixel art is on: the words are held back, to be printed on its grid once the face is converted (card/words.ts). */
+  holdWords?: boolean;
 }
 
 /** Where a piece is placed freely, if the card is in free placement and it has a place. */
@@ -67,23 +76,25 @@ function sized(canvas: HTMLCanvasElement, shape: ShapeId) {
 }
 
 /** What a trading card holds, which decides its parts. */
-export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message' | 'arrange' | 'placements' | 'layout'>) => ({
-  type: !!s.cardType.trim(),
-  // A freely placed message leaves its box: the box goes.
-  lines: placed(s, 'message') ? 0 : messageLines(s.message.text).length,
-});
+export const tcgContent = (s: Pick<FaceSpec, 'cardType' | 'message' | 'arrange' | 'placements' | 'layout' | 'tcg'>): TcgContent =>
+  s.tcg ?? {
+    type: !!s.cardType.trim(),
+    // A freely placed message leaves its box: the box goes.
+    lines: placed(s, 'message') ? 0 : messageLines(s.message.text).length,
+  };
 
 /**
  * The art window of a card, in face pixels: the shape's classic one, or the trading card's for
  * what it holds (its parts take room from the art).
  */
-export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements'>): Rect {
+export function faceArt(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements' | 'tcg' | 'frameless'>): Rect {
   const { w, h } = shapeById(s.shape);
+  if (s.frameless) return { x: 0, y: 0, w, h };
   return s.layout === 'tcg' ? tcgFrame(w, h, tcgContent(s)).art : artWindow(w, h);
 }
 
 /** Width / height of a card's art window: what a crop of the picture fills. */
-export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements'>): number {
+export function artAspect(s: Pick<FaceSpec, 'shape' | 'layout' | 'cardType' | 'message' | 'arrange' | 'placements' | 'tcg' | 'frameless'>): number {
   const a = faceArt(s);
   return a.w / a.h;
 }
@@ -157,15 +168,20 @@ export function fitName(ctx: CanvasRenderingContext2D, text: string, max: number
 
 export const ART_R = RADIUS * 0.45;
 
-/** The picture cropped into the art window, under the frame's inner shade. */
-export function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop, rad = ART_R) {
-  ctx.save();
+/** The picture cropped into a window of the face, its corners rounded by `rad`; pixel art (`crisp`) with hard pixels. */
+function paintPicture(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop, rad: number, crisp: boolean) {
   roundRect(ctx, art.x, art.y, art.w, art.h, rad);
   ctx.clip();
   const { sx, sy, sw, sh } = cropRect(image.width, image.height, crop, art.w / art.h);
-  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingEnabled = !crisp;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, sx, sy, sw, sh, art.x, art.y, art.w, art.h);
+}
+
+/** The picture cropped into the art window, under the frame's inner shade. */
+export function paintArt(ctx: CanvasRenderingContext2D, art: Rect, image: FaceSpec['image'], crop: Crop, rad = ART_R, crisp = false) {
+  ctx.save();
+  paintPicture(ctx, art, image, crop, rad, crisp);
   // Inner shade so the art sits under the frame
   const shade = ctx.createLinearGradient(0, art.y, 0, art.y + 18 * S);
   shade.addColorStop(0, 'rgba(0,0,0,.28)');
@@ -293,14 +309,39 @@ export function loadTcgFace(): Promise<unknown> {
 }
 
 /** Whether drawFace can paint this face now: a trading card waits for its painter (loadTcgFace). */
-export const canPaint = (spec: Pick<FaceSpec, 'layout'>) => spec.layout !== 'tcg' || !!tcgFace;
+export const canPaint = (spec: Pick<FaceSpec, 'layout' | 'frameless'>) => spec.frameless || spec.layout !== 'tcg' || !!tcgFace;
 
-/** Paints the face and its mask (see canPaint); returns the text it printed, for the lettering map (`setTextRuns`). */
-export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
+/**
+ * Paints the face and its mask (see canPaint). Returns the text it laid out, for the lettering map
+ * (`setTextRuns`), and with `spec.holdWords` the words it left off the face (card/words.ts).
+ */
+export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): { runs: TextRun[]; words: Word[] } {
+  const ctx = face.getContext('2d')!;
+  if (spec.holdWords) holdWords(ctx);
+  const runs = paintFace(face, mask, spec);
+  return { runs, words: takeWords(ctx) };
+}
+
+function paintFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec: FaceSpec): TextRun[] {
   const { W, H } = sized(face, spec.shape);
   sized(mask, spec.shape);
   const ctx = face.getContext('2d')!;
   ctx.clearRect(0, 0, W, H);
+  const art = faceArt(spec);
+  arts.set(face, art);
+  const m = mask.getContext('2d')!;
+  m.clearRect(0, 0, W, H);
+
+  // The picture is the card: all of it is art, under the card's own corner.
+  if (spec.frameless) {
+    ctx.save();
+    paintPicture(ctx, art, spec.image, spec.crop, RADIUS, spec.crisp);
+    ctx.restore();
+    m.fillStyle = '#ff0000';
+    roundRect(m, 0, 0, W, H, RADIUS);
+    m.fill();
+    return [];
+  }
 
   // Outline silhouette
   ctx.fillStyle = OUTLINE;
@@ -323,14 +364,10 @@ export function drawFace(face: HTMLCanvasElement, mask: HTMLCanvasElement, spec:
   ctx.fillRect(0, H - LINE * 1.8, W, LINE * 0.8);
   ctx.restore();
 
-  const art = faceArt(spec);
-  arts.set(face, art);
   const classic = spec.layout !== 'tcg';
   const runs = classic ? paintClassic(ctx, spec, f, frame, art, H) : tcgFace!.paintTcg(ctx, spec, f);
 
   // Mask: red = art window, green = frame, blue = ink outline
-  const m = mask.getContext('2d')!;
-  m.clearRect(0, 0, W, H);
   m.fillStyle = '#0000ff';
   roundRect(m, 0, 0, W, H, RADIUS);
   m.fill();
@@ -362,7 +399,7 @@ function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: s
   ctx.fillStyle = frame === 'rim' ? brass(ctx, W, H) : OUTLINE;
   roundRect(ctx, art.x - 4 * S, art.y - 4 * S, art.w + 8 * S, art.h + 8 * S, ART_R + 4 * S);
   ctx.fill();
-  paintArt(ctx, art, spec.image, spec.crop);
+  paintArt(ctx, art, spec.image, spec.crop, ART_R, spec.crisp);
   const runs = placed(spec, 'message') ? [] : paintMessage(ctx, spec.message, art);
   const freeName = placed(spec, 'name');
   if (frame === 'ribbon') paintRibbon(ctx);
@@ -377,8 +414,10 @@ function paintClassic(ctx: CanvasRenderingContext2D, spec: FaceSpec, f: { ink: s
     // A freely placed name leaves the plate (the rarity stays) and is printed over the card.
     if (freeName) runs.push(...paintFree(ctx, 'name', [name], (s) => `${s}px "DotGothic16", monospace`, freeName));
     else {
-      runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y: plateY + plateH / 2 + S, stock: plateY + plateH / 2 + S - 0.0588 * SHORT });
-      paintLettering(ctx, name, art.x + 4 * S, plateY + plateH / 2 + S, f.ink);
+      const y = plateY + plateH / 2 + S;
+      const stock = y - 0.0588 * SHORT;
+      runs.push({ part: 'name', text: name, font: ctx.font, size, x: art.x + 4 * S, y, stock });
+      paintLettering(ctx, name, art.x + 4 * S, y, f.ink, 'name', stock);
     }
     paintPips(ctx, spec, art.x + art.w - 6 * S, plateY + plateH / 2);
   }

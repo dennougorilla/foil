@@ -1,6 +1,9 @@
-// Nature pack: Sakura, Frost, Stardust, Snow Globe and Magma (the showpiece). See docs/packs.md.
+// Nature pack: Sakura, Frost, Stardust, Rainy Window, Marble and Magma (the showpiece). See docs/packs.md.
 import { STARDUST_GLSL } from '../stardust';
-import { SnowGlobe, SNOWGLOBE_GLSL, SNOWGLOBE_SHADER } from '../snowglobe';
+import { RAIN_GLSL } from '../rain';
+import { MARBLE_GLSL } from '../marble';
+import { TOUCH_GLSL } from '../../touch/glsl';
+import { HeatLayer } from '../../touch/layer';
 import type { FinishModule } from './types';
 
 const finishes: FinishModule = {
@@ -69,36 +72,25 @@ vec3 sakura(vec3 c, vec2 uv, vec2 t, float L) {
   return col;
 }
 ${STARDUST_GLSL}
-${SNOWGLOBE_GLSL}
+${TOUCH_GLSL}
+${RAIN_GLSL}
+${MARBLE_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 10) col = frost(c, uv, uTilt, L);
   else if (e == 11) col = magma(c, uv, uTilt, L);
   else if (e == 14) col = sakura(c, uv, uTilt, L);
   else if (e == 22) col = stardust(c, uv, uTilt, L);
-  else if (e == 60) col = snowglobe(c, artUv, uTilt, L, lod, m.r);
+  else if (e == 94) col = rain(c, uv, uTilt, lod, m.r);
+  else if (e == 102) col = marble(c, uv, uTilt, L, m.r);
 `,
-  // Snow Globe's flakes are GPU particles drawn over its card; one set per renderer, made on first use.
-  layers: (gl, live) => {
-    let globe: SnowGlobe | null = null;
-    let face: HTMLCanvasElement | null = null;
-    return [
-      {
-        // The flakes fill the card's art window, which moves with the layout.
-        setFace: (f) => {
-          face = f;
-          globe?.setFace(f);
-        },
-        after: (view, d, time) => {
-          if (d.edition !== SNOWGLOBE_SHADER) return;
-          if (!globe) {
-            globe = new SnowGlobe(gl, !live);
-            if (face) globe.setFace(face);
-          }
-          globe.draw(view, d, time);
-        },
-      },
-    ];
+  // Rainy Window keeps where its glass was wiped, and Marble how far touch carried its ink, in a
+  // touch field like Warmth's heat (see touch/). One program holds both, so each has a sampler
+  // and a texture unit of its own: the wiped glass on 6 (uHeat), the ink on 11 (uMarbleFlow).
+  layers: (gl) => {
+    const wiped = new HeatLayer(gl);
+    const flow = new HeatLayer(gl, 'uMarbleFlow');
+    return [{ bind: (p, d) => wiped.bind(p, 6, d.heat) }, { bind: (p, d) => flow.bind(p, 11, d.heat) }];
   },
 };
 export default finishes;
