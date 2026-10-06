@@ -21,6 +21,7 @@ uniform float uCap;    // 0 = the side; 1 = the cap facing the viewer, -1 = the 
 out vec3 vL;           // x, y in px from the middle; z from -1 (back) to 1 (front)
 out vec3 vN;           // the normal, turned
 out vec3 vV;           // to the eye, turned
+out vec2 vD;           // the side's outward direction on the card's own plane (y down); 0 on a cap
 vec3 turn(vec3 p) {
   float cz = cos(uRot.z), sz = sin(uRot.z);
   p.xy = mat2(cz, sz, -sz, cz) * p.xy;
@@ -37,11 +38,13 @@ void main() {
     p = vec3(aE.xy * (uHalf - uRadius) + uRadius * dir, aE.w * uDepth * 0.5);
     n = vec3(dir, 0.0);
     vL = vec3(p.xy, aE.w);
+    vD = dir;
   } else {
     float side = (turn(vec3(0.0, 0.0, 1.0)).z >= 0.0 ? 1.0 : -1.0) * uCap;
     p = vec3(aE.xy * 2.0 * uHalf, side * uDepth * 0.5);
     n = vec3(0.0, 0.0, side);
     vL = vec3(p.xy, side);
+    vD = vec2(0.0);
   }
   vec3 q = turn(p);
   vN = turn(n);
@@ -59,6 +62,7 @@ precision highp float;
 in vec3 vL;
 in vec3 vN;
 in vec3 vV;
+in vec2 vD;
 uniform sampler2D uFace;
 uniform sampler2D uBack;
 uniform vec2 uCardHalf;  // the card's half size, px (its face spans it)
@@ -89,14 +93,21 @@ void main() {
   vec3 Ld = normalize(vec3((uLight - 0.5) * 2.0, 1.0));
   float lam = max(dot(N, Ld), 0.0);
   float z = vL.z;
+  // The side is lit apart from the face, by a key light from the top left of the card's own plane:
+  // the top and left sides bright, the right and bottom ones in shade, whatever the tilt.
+  float key = dot(vD, normalize(vec2(-0.55, -0.83)));
+  // Crisp lines along the side's two edges, a screen pixel or so wide however the side is turned.
+  float fz = max(fwidth(z), 1e-4);
+  float front = 1.0 - smoothstep(0.0, 1.6 * fz, 1.0 - z);
+  float back = 1.0 - smoothstep(0.0, 1.6 * fz, 1.0 + z);
   // The face just inside this point of the side.
   vec2 uv = clamp(vL.xy * 0.985 / (2.0 * uCardHalf) + 0.5, 0.002, 0.998);
   if (uMaterial < 0.5) {
-    // Paper: the print of the face and of the back wraps the edge; between them the core, a dark
-    // line down its middle (a trading card's), the plies split by fine glue lines.
+    // Paper: the print of the face and of the back wraps the edge; between them the core, plies of
+    // slightly different tone split by glue lines, with a dark line down its middle (a trading card's).
     float t = z * 0.5 + 0.5;
-    float band = mix(0.2, 0.07, clamp((uPlies - 2.0) / 10.0, 0.0, 1.0));
-    vec3 paper = vec3(0.93, 0.91, 0.86);
+    float band = mix(0.2, 0.0, clamp((uPlies - 2.0) / 3.0, 0.0, 1.0));
+    vec3 paper = vec3(0.94, 0.92, 0.87);
     vec3 col;
     if (t > 1.0 - band) {
       vec4 f = texture(uFace, uv);
@@ -107,44 +118,70 @@ void main() {
     } else {
       float k = (t - band) / (1.0 - 2.0 * band);
       float ply = floor(k * uPlies);
-      col = paper * (0.95 + 0.05 * hash12(vec2(ply, 3.0)));
+      col = paper * (mod(ply, 2.0) < 0.5 ? 1.0 : 0.9) * (0.97 + 0.03 * hash12(vec2(ply, 3.0)));
       // Paper grain along the edge.
       col *= 0.96 + 0.04 * hash12(vec2(floor((vL.x + vL.y) * 0.5), ply));
-      float f = fract(k * uPlies);
-      if (ply > 0.5) col *= 1.0 - 0.16 * step(f, 0.12);
-      col = mix(col, vec3(0.13, 0.15, 0.22), step(abs(k - 0.5), 0.15 / uPlies));
+      // A glue line between plies, about a pixel wide on screen.
+      float g = fract(k * uPlies);
+      float fk = max(fwidth(k * uPlies), 1e-4);
+      if (ply > 0.5) col *= 1.0 - 0.3 * (1.0 - smoothstep(0.0, 1.2 * fk, g));
+      float core = abs(k - 0.5) * uPlies;
+      col = mix(col, vec3(0.13, 0.15, 0.22), 1.0 - smoothstep(0.6 * fk, 1.4 * fk, core));
     }
-    col *= 0.8 + 0.3 * lam;
-    // A fine bright lip where the side turns into the face or the back.
-    col += 0.1 * smoothstep(0.88, 1.0, abs(z)) * lam;
+    col *= (0.87 + 0.16 * key) * (0.9 + 0.15 * lam);
+    // The side meets the face in a bright line, brightest where the key light catches it; the back
+    // edge is a dark one.
+    col = mix(col, vec3(1.0, 0.99, 0.95), front * (0.55 + 0.4 * max(key, 0.0)));
+    col *= 1.0 - 0.45 * back;
     col = floor(col * 18.0 + 0.5) / 18.0;
     o = vec4(clamp(col, 0.0, 1.0), 1.0) * uAlpha;
     return;
   }
-  // Acrylic: clear, a cool tint deepening where the side is seen edge-on.
-  vec3 tint = vec3(0.7, 0.93, 0.96);
+  // Acrylic: clear, a cool tint deepening where it is seen edge-on.
+  vec3 tint = vec3(0.62, 0.9, 0.95);
   float fres = pow(1.0 - abs(dot(N, V)), 2.0);
   if (uCap != 0.0) {
-    // The block's front and back: nearly clear, a bright rim round its outline, and a gloss that
-    // slides across the front as the card tilts.
-    float d = -box(vL.xy, uHalf, uRadius);
-    float rim = 1.0 - smoothstep(0.0, 2.5, d);
-    vec2 q = vL.xy / uHalf;
-    float g = q.x * 0.6 + q.y * 0.8 + uTilt.x * 0.9 + uTilt.y * 0.6;
-    float streak = smoothstep(0.16, 0.0, abs(g - 0.4)) * 0.16 + smoothstep(0.04, 0.0, abs(g + 0.05)) * 0.1;
-    // Off the card, the margin is a touch more tinted, so the block reads round it.
-    float margin = step(0.0, box(vL.xy, uCardHalf, uRadius * 0.6));
     float near = uCap > 0.0 ? 1.0 : 0.4;
-    float a = (0.05 + 0.07 * margin + rim * 0.55) * near;
-    o = vec4(tint * a + vec3(1.0) * (streak + rim * 0.35 + fres * 0.1) * near, a) * uAlpha;
+    // The block's front and back: a bright line round its outline and a fainter bevel inside it.
+    float d = -box(vL.xy, uHalf, uRadius);
+    float fd = max(fwidth(d), 1e-3);
+    float rim = 1.0 - smoothstep(0.5 * fd, 1.8 * fd, d);
+    float bevel = 1.0 - smoothstep(0.0, 1.4 * fd, abs(d - 4.0 * fd));
+    // A gloss that slides across the front as the card tilts.
+    vec2 q = vL.xy / uHalf;
+    float sweep = q.x * 0.6 + q.y * 0.8 + uTilt.x * 0.9 + uTilt.y * 0.6;
+    float streak = smoothstep(0.16, 0.0, abs(sweep - 0.4)) * 0.16 + smoothstep(0.04, 0.0, abs(sweep + 0.05)) * 0.1;
+    // Round the card, the thick clear rim: tinted, deeper toward the outline, and bending the card's
+    // edge colors out into it.
+    float dc = box(vL.xy, uCardHalf, uRadius * 0.6);
+    float margin = step(0.0, dc);
+    float span = max(uHalf.x - uCardHalf.x, 1.0);
+    float deep = clamp(dc / span, 0.0, 1.0);
+    vec3 bent = unpremul(texture(uFace, uv));
+    // A soft inner shadow where the card sits inside the block, falling to the lower right.
+    float sd = box(vL.xy - vec2(0.12, 0.2) * span, uCardHalf, uRadius * 0.6);
+    float shade = margin * (1.0 - smoothstep(0.0, span * 0.55, sd)) * 0.35;
+    float clear = margin * (0.14 + 0.2 * deep);
+    vec3 col = mix(tint, bent, 0.35) * (0.5 + 0.35 * deep) * clear;
+    float a = clear + shade;
+    col += vec3(1.0) * (streak + fres * 0.08);
+    col += vec3(0.85, 1.0, 1.0) * bevel * 0.3 * margin;
+    a += bevel * 0.12 * margin;
+    col = mix(col, vec3(1.0), rim * 0.9);
+    a = mix(a, 1.0, rim * 0.9);
+    o = vec4(col, clamp(a, 0.0, 1.0)) * near * uAlpha;
     return;
   }
-  // The side: the card inside shows through it, stretched by the refraction; the rims flare.
+  // The side: the card inside shows through it, stretched by the refraction, lit by the same key as
+  // paper; its edges flare in bright lines.
   vec3 inside = unpremul(texture(uFace, clamp((uv - 0.5) * 0.9 + 0.5 + N.xy * 0.03, 0.0, 1.0)));
-  float rim = smoothstep(0.78, 0.96, abs(z));
   float spec = pow(max(dot(reflect(-Ld, N), V), 0.0), 20.0);
-  float a = 0.3 + 0.3 * fres + 0.45 * rim;
-  vec3 col = (tint * (0.45 + 0.4 * lam) + inside * 0.35) * a + vec3(1.0) * (rim * 0.6 + spec * 0.5);
+  float glow = smoothstep(0.6, 1.0, abs(z));
+  float a = 0.42 + 0.25 * fres + 0.2 * glow;
+  vec3 col = (tint * (0.55 + 0.3 * lam) * (0.8 + 0.3 * key) + inside * 0.3) * a + vec3(1.0) * (glow * 0.25 + spec * 0.5);
+  float lines = max(front, back);
+  col = mix(col, vec3(1.0), lines * 0.85);
+  a = mix(a, 1.0, lines * 0.85);
   if (uWhich < 0.0) { col *= 0.5; a *= 0.5; }
   o = vec4(col, a) * uAlpha;
 }

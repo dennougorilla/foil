@@ -15,23 +15,23 @@ export type ThicknessPreset = 'thin' | 'board' | 'chunky' | 'acrylic';
 
 export const THICKNESS_PRESETS: Record<ThicknessPreset, Thickness> = {
   thin: { material: 'paper', depth: 0.012 },
-  board: { material: 'paper', depth: 0.03 },
-  chunky: { material: 'paper', depth: 0.07 },
-  acrylic: { material: 'acrylic', depth: 0.12 },
+  board: { material: 'paper', depth: 0.045 },
+  chunky: { material: 'paper', depth: 0.15 },
+  acrylic: { material: 'acrylic', depth: 0.22 },
 };
 
 export const THICKNESS_IDS = Object.keys(THICKNESS_PRESETS) as ThicknessPreset[];
 
 /** Where the slider runs for each material. */
 export const DEPTH_RANGE: Record<EdgeMaterial, [number, number]> = {
-  paper: [0.006, 0.1],
-  acrylic: [0.05, 0.22],
+  paper: [0.006, 0.18],
+  acrylic: [0.1, 0.32],
 };
 
 export const DEFAULT_THICKNESS: Thickness = THICKNESS_PRESETS.thin;
 
 /** The clear margin of an acrylic block round the card, in units of the card's short side. */
-export const ACRYLIC_MARGIN = 0.07;
+export const ACRYLIC_MARGIN = 0.1;
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
@@ -61,8 +61,30 @@ export function depthAt(material: EdgeMaterial, v: number): number {
   return a + (b - a) * clamp(v, 0, 1);
 }
 
-/** Paper plies seen on the side: two on a thin card, more as it thickens. */
-export const pliesOf = (depth: number): number => clamp(Math.round(depth / 0.006), 2, 14);
+/** Paper plies seen on the side: two on a thin card, more as it thickens (few enough to tell apart). */
+export const pliesOf = (depth: number): number => clamp(Math.round(depth / 0.016), 2, 8);
+
+/** How far a thickness turns the card to show its side, 0 (Thin, facing the viewer) to 1 (Chunky and Acrylic). */
+export function turnOf(t: Thickness): number {
+  if (t.material === 'acrylic') return 1;
+  return clamp((t.depth - 0.015) / (THICKNESS_PRESETS.chunky.depth - 0.015), 0, 1);
+}
+
+/** The resting three-quarter pose of a fully turned card (radians): leaning back, its right side toward the viewer. */
+export const REST_TURN = { rx: 0.18, ry: -0.4 };
+/** How much further a fully turned card leans as it tilts (its tilt grows by this share). */
+export const TILT_GAIN = 0.6;
+
+/**
+ * The rotation a card of thickness `t` is drawn at, from the one it is given: its tilt grows and it
+ * rests a little turned, so the side reads. The growth goes through a sine, so a whole turn stays a
+ * whole turn and a looping motion still closes.
+ */
+export function slabPose<P extends { rx: number; ry: number }>(t: Thickness, p: P): P {
+  const k = turnOf(t);
+  if (k === 0) return p;
+  return { ...p, rx: p.rx + TILT_GAIN * k * Math.sin(p.rx) + REST_TURN.rx * k, ry: p.ry + TILT_GAIN * k * Math.sin(p.ry) + REST_TURN.ry * k };
+}
 
 /**
  * How the renderer draws a thickness for a card of short side `short` (px): the slab's depth, the

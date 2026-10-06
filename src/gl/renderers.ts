@@ -10,7 +10,7 @@ import type { PackId } from '../packs';
 import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
 import { cardK } from '../card/shape';
-import { DEFAULT_THICKNESS, pliesOf, slabOf, type Thickness } from '../card/thickness';
+import { DEFAULT_THICKNESS, pliesOf, slabOf, slabPose, type Thickness } from '../card/thickness';
 import { EdgeRenderer } from './edge';
 import type { BackdropId } from '../backdrop';
 import type { QualityLevel } from '../quality';
@@ -446,8 +446,12 @@ export class CardRenderer {
   }
 
   /** `layer`: this is layer 2's pass, in its own area over what is drawn. */
-  private pass(d: CardDraw, time: number, layer: LayerDraw | null): void {
+  private pass(given: CardDraw, time: number, layer: LayerDraw | null): void {
     const { gl } = this;
+    // The card's own face is a slab of its thickness, turned so its side shows (card/thickness.ts);
+    // other faces (a pack's wrapper) are thin.
+    const t = (given.face ?? 'card') === 'card' && !given.uv ? this.thickness : DEFAULT_THICKNESS;
+    const d = slabPose(t, given);
     const cp = this.program(packOfShader(d.edition) ?? 'open')!;
     const p = cp.pending.get();
     const f = this.faces.get(d.face ?? 'card');
@@ -518,7 +522,6 @@ export class CardRenderer {
     // The slab: the card's depth (a paper face sits on its near side), and an acrylic block's clear
     // margin, the card shrunk into it so the block takes the card's place (card/thickness.ts).
     const short = Math.min(d.w, d.h) * d.scale;
-    const t = (d.face ?? 'card') === 'card' && !d.uv ? this.thickness : DEFAULT_THICKNESS;
     const slab = slabOf(t, short);
     const acrylic = t.material === 'acrylic';
     gl.uniform1f(p.u.uScale, d.scale * slab.inner);
