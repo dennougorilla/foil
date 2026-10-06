@@ -15,7 +15,7 @@ English · [日本語](README.ja.md)
 - **40 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, jewel, light, nature, studio and celebration finishes, and four new ones in a provisional Lab pack. Each one reacts to tilt and light.
 - **Packs.** Seven finishes come in the starting hand; the rest come in theme packs you tear open once, or all at once with Open all in the pack shop. Each pack holds its whole theme, with no random draws.
 - **Hand and deck.** Pick finishes from a fanned hand of up to seven live previews; the others wait in the deck, which you edit like a card game's deck screen.
-- **Card shapes.** Trading card, wide, square, postcard (upright or on its side), business card, or the picture's own proportions. Frames include Gold rim and Ribbon for celebration cards.
+- **Card shapes.** Trading card, wide, square, postcard (upright or on its side), business card, or the picture's own proportions, from a thin trading card to a chunky board or a clear acrylic block. Frames include Gold rim and Ribbon for celebration cards.
 - **The card itself.** A picture that already is a card (its frame and words drawn in) can be the whole card: no FOIL frame, nameplate or message, just the finish on it. Pixel art is enlarged with hard pixels.
 - **Message and trading-card layout.** Up to four lines of text in four typefaces, a trading-card layout with a type line and card text, a print of its own for each piece of text (ink, deboss, emboss, hot foil, spot UV), and free placement by drag.
 - **Layers.** Put two finishes on one card, each in its own place (art, frame, name, highlights, or painted with a brush).

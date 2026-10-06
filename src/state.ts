@@ -1,6 +1,7 @@
 import { EDITIONS, sanitizeLayer2, type EditionId, type FrameId, type Layer2, type RarityId } from './editions';
 import type { Crop } from './card/face';
 import { shapeOf, type ShapeId } from './card/shape';
+import { DEFAULT_THICKNESS, sanitizeThickness, type Thickness } from './card/thickness';
 import type { Lang } from './i18n';
 import { legacyMotion, sanitizeTune, TUNE_DEFAULTS, type Tune } from './tune/model';
 import { DEFAULT_LETTERING, normalizeFieldPrints, type FieldPrints, type Lettering } from './lettering';
@@ -33,6 +34,8 @@ export interface State extends RangeColorState {
   frame: FrameId;
   /** The card's shape (card/shape.ts); the trading card unless chosen. */
   shape: ShapeId;
+  /** How thick the card is: paper or an acrylic block, and its depth (card/thickness.ts). */
+  thickness: Thickness;
   /** The Picture shape's size now ('900x1260'), following the picture on the card (not saved: shape.ts setFit). */
   fit: string;
   /** The picture is the whole card: FOIL's frame, nameplate and words are not drawn (their settings stay). */
@@ -101,6 +104,7 @@ const PERSIST: (keyof State)[] = [
   'rarity',
   'frame',
   'shape',
+  'thickness',
   'frameless',
   'intensity',
   'pixel',
@@ -168,6 +172,7 @@ const defaults = (): State => ({
   rarity: 'rare',
   frame: 'paper',
   shape: 'card',
+  thickness: { ...DEFAULT_THICKNESS },
   fit: '',
   frameless: false,
   intensity: 1,
@@ -206,6 +211,7 @@ function sanitize(state: State) {
   state.dot = sanitizeDot(state.dot);
   state.dotScope = sanitizeDotScope(state.dotScope);
   state.shape = shapeOf(state.shape);
+  state.thickness = sanitizeThickness(state.thickness);
   state.frameless = state.frameless === true;
   state.adjustOpen = state.adjustOpen === true;
   state.message = normalizeMessage(state.message);

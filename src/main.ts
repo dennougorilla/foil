@@ -6,6 +6,7 @@ import { FRAMES, RARITIES, editionById, rarityById, type EditionId } from './edi
 import { canPaint, clampCrop, cropRect, drawFace, drawFlip, faceArt, loadTcgFace, type Crop, type FaceSpec } from './card/face';
 import { backUrl, drawBack } from './card/back';
 import { exportFrame, fitArea, setFit, shapeById, SHAPES } from './card/shape';
+import { DEFAULT_THICKNESS, depthAt, presetOf as thickPreset, sliderOf, THICKNESS_IDS, THICKNESS_PRESETS } from './card/thickness';
 import { isPixelArt, PIXEL_ART_MAX } from './card/pixelArt';
 import { CARD_LAYOUTS } from './card/tcg';
 import type { PrintPop } from './printPop';
@@ -533,6 +534,7 @@ function buildSegments() {
     };
     ss.appendChild(b);
   }
+  buildThickness();
   // A card that is all picture has no frame or layout of FOIL's: their choices step aside (and stay).
   fs.parentElement!.hidden = s.frameless;
   const ls = $('layoutSeg');
@@ -600,6 +602,45 @@ function showBackdrops() {
     });
   }, () => {});
 }
+/** Thickness: four presets, each with its side drawn small, and the slider for the fine step within its material. */
+function buildThickness() {
+  const s = store.get();
+  const now = thickPreset(s.thickness);
+  const host = $('thickSeg');
+  host.textContent = '';
+  for (const id of THICKNESS_IDS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn';
+    b.setAttribute('role', 'radio');
+    b.dataset.thick = id;
+    // The card's side, as thick as the preset.
+    const px = Math.max(2, Math.round(THICKNESS_PRESETS[id].depth * 90));
+    b.innerHTML = `<span class="thick-ico" style="--d:${px}px"></span><span></span>`;
+    b.lastElementChild!.textContent = t.thickName[id];
+    b.title = t.thickHint[id];
+    radio(b, now === id);
+    b.onclick = () => {
+      if (now === id && s.thickness.depth === THICKNESS_PRESETS[id].depth) return;
+      sfx.tick();
+      store.set({ thickness: { ...THICKNESS_PRESETS[id] } });
+      stage.juice(0.4);
+    };
+    host.appendChild(b);
+  }
+  syncThickness();
+}
+
+function syncThickness() {
+  const s = store.get();
+  const range = $<HTMLInputElement>('thickDepth');
+  range.value = String(sliderOf(s.thickness));
+  range.setAttribute('aria-valuetext', `${t.thickName[thickPreset(s.thickness)]} ${Math.round(sliderOf(s.thickness) * 100)}%`);
+  setRangeFill(range);
+}
+
+let prevThickness = store.get().thickness;
+
 /** Whether pixel art's four choices are open under its presets (closed on every visit). */
 let dotOpen = false;
 
@@ -1226,6 +1267,10 @@ $<HTMLInputElement>('typeInput').addEventListener('input', (e) => store.set({ ca
 $<HTMLInputElement>('intensity').addEventListener('input', (e) => {
   store.set({ intensity: +(e.target as HTMLInputElement).value });
 });
+$<HTMLInputElement>('thickDepth').addEventListener('input', (e) => {
+  const { material } = store.get().thickness;
+  store.set({ thickness: { material, depth: depthAt(material, +(e.target as HTMLInputElement).value) } });
+});
 $<HTMLInputElement>('pixel').addEventListener('input', (e) => {
   store.set({ pixel: +(e.target as HTMLInputElement).value });
 });
@@ -1253,6 +1298,7 @@ $('crtBtn').addEventListener('click', () => {
 rovingKeys($('raritySeg'));
 rovingKeys($('frameSeg'));
 rovingKeys($('shapeSeg'));
+rovingKeys($('thickSeg'));
 rovingKeys($('layoutSeg'));
 for (const id of ['dotSeg', 'dotScopeSeg', 'dotSizeSeg', 'dotColorsSeg', 'dotOutlineSeg', 'dotDitherSeg']) rovingKeys($(id));
 rovingKeys($('backdropSeg'));
@@ -1294,7 +1340,7 @@ let rangeChanged = false;
 /** Whether anything in a tab differs from the defaults; the tab then carries a dot. */
 function tabChanged(id: PanelTab): boolean {
   const s = store.get();
-  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || s.layout !== 'classic' || s.backdrop !== 'swirl';
+  if (id === 'card') return s.intensity !== 1 || s.pixel !== 0 || !!s.dot || s.frame !== 'paper' || !!s.frameColor || s.shape !== shapeDefault() || JSON.stringify(s.thickness) !== JSON.stringify(DEFAULT_THICKNESS) || s.layout !== 'classic' || s.backdrop !== 'swirl';
   if (id === 'light') return changedKeys(s.tune).length > 0;
   if (id === 'text')
     return JSON.stringify(s.text) !== JSON.stringify(DEFAULT_LETTERING) || !!s.message.text.trim() || !s.plate || Object.keys(s.prints).length > 0;
@@ -1391,7 +1437,7 @@ const tabNow = (s = store.get()): PanelTab => (tabsShown(s).includes(s.panelTab)
 
 $('cardReset').addEventListener('click', () => {
   sfx.tick();
-  store.set({ intensity: 1, pixel: 0, dot: null, dotScope: 'card', frame: 'paper', frameColor: '', shape: shapeDefault(), layout: 'classic', backdrop: 'swirl' });
+  store.set({ intensity: 1, pixel: 0, dot: null, dotScope: 'card', frame: 'paper', frameColor: '', shape: shapeDefault(), thickness: { ...DEFAULT_THICKNESS }, layout: 'classic', backdrop: 'swirl' });
 });
 
 // The tabs pin right under the pinned Fine-tune row, however tall its summary wraps.
@@ -1472,6 +1518,7 @@ function exportInput() {
     dot: dotGrid(s.dot),
     dotFrame: dotScopeOf(s) === 'frame',
     tune: s.tune,
+    thickness: s.thickness,
     name: s.name || fallback().name,
     ...(userAnim && s.sample < 0 ? animatedExport(userAnim) : {}),
     range: areas.snapshot(),
@@ -2380,6 +2427,12 @@ store.on((s, changed) => {
   const reshaped = changed.has('shape') || (changed.has('fit') && s.shape === 'fit');
   if (reshaped || ['rarity', 'frame', 'frameColor', 'frameSwatches', 'frameless', 'fit', 'dot', 'dotScope'].some((k) => changed.has(k as keyof State))) buildSegments();
   if (['backdrop', 'backdropColor', 'edition'].some((k) => changed.has(k as keyof State))) buildBackdrops();
+  if (changed.has('thickness')) {
+    // Dragging the slider moves only its own fill; a new preset lights up when it changes.
+    if (thickPreset(s.thickness) !== thickPreset(prevThickness)) buildThickness();
+    else syncThickness();
+    prevThickness = s.thickness;
+  }
   if ((changed.has('dot') || changed.has('dotScope')) && flipImage) setFlip(flipImage);
   if (changed.has('arrange')) {
     renderCardHint();

@@ -10,6 +10,8 @@ import type { PackId } from '../packs';
 import { packModule, packOfShader } from './finishes/registry';
 import type { FinishLayer } from './finishes/types';
 import { cardK } from '../card/shape';
+import { DEFAULT_THICKNESS, pliesOf, slabOf, type Thickness } from '../card/thickness';
+import { EdgeRenderer } from './edge';
 import type { BackdropId } from '../backdrop';
 import type { QualityLevel } from '../quality';
 
@@ -263,6 +265,9 @@ export class CardRenderer {
   dpr = 1;
   /** Fine-tuning shared by every card this renderer draws. */
   tune: TuneGl = TUNE_GL_DEFAULT;
+  /** How thick the card's own face is drawn (card/thickness.ts); other faces (a pack's wrapper) are thin. */
+  thickness: Thickness = DEFAULT_THICKNESS;
+  private edge: EdgeRenderer;
 
   /** `settled`: for exports, so passing moments (the lettering's stamp) are never captured. */
   constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas, opts: { preserve?: boolean; settled?: boolean } = {}) {
@@ -304,6 +309,7 @@ export class CardRenderer {
     this.lettering = new LetteringGL(gl, opts.settled);
     this.range = new RangeLayer(gl);
     this.range2 = new RangeLayer(gl);
+    this.edge = new EdgeRenderer(gl);
   }
 
   /** The program for a pack (or the open finishes), started on first ask; null until that pack's module has arrived. */
@@ -326,6 +332,10 @@ export class CardRenderer {
     const cp = this.program(packOfShader(shader) ?? 'open');
     if (!cp) return false;
     if (!this.live) return true;
+    if (!this.edge.ready()) {
+      this.countFrames();
+      return false;
+    }
     // Every ask within one animation frame shares one answer (asking waits while the GPU process is
     // busy compiling); a frame clock runs while any program is still compiling.
     if (cp.askedIn !== this.frames) {
@@ -459,7 +469,6 @@ export class CardRenderer {
     gl.uniform2f(p.u.uCenter, d.cx, d.cy);
     gl.uniform2f(p.u.uSize, d.w, d.h);
     gl.uniform3f(p.u.uRot, d.rx, d.ry, d.rz);
-    gl.uniform1f(p.u.uScale, d.scale);
     gl.uniform1i(p.u.uEdition, d.edition);
     gl.uniform1f(p.u.uIntensity, d.intensity);
     gl.uniform1f(p.u.uTime, time);
@@ -508,16 +517,77 @@ export class CardRenderer {
     gl.uniform1i(p.u.uFlip, 9);
     gl.uniform1f(p.u.uFlip2, this.hasFlip ? 1 : 0);
 
-    // Hard pixel drop shadow first, then the card itself.
+    // The slab: the card's depth (a paper face sits on its near side), and an acrylic block's clear
+    // margin, the card shrunk into it so the block takes the card's place (card/thickness.ts).
+    const short = Math.min(d.w, d.h) * d.scale;
+    const t = (d.face ?? 'card') === 'card' && !d.uv ? this.thickness : DEFAULT_THICKNESS;
+    const slab = slabOf(t, short);
+    const acrylic = t.material === 'acrylic';
+    gl.uniform1f(p.u.uScale, d.scale * slab.inner);
+    gl.uniform1f(p.u.uLift, acrylic ? 0 : slab.depth / 2);
+    const edges = !layer && !d.uv;
+    const cw = (d.w * d.scale * slab.inner) / 2;
+    const ch = (d.h * d.scale * slab.inner) / 2;
+    const radius = 0.075 * short * slab.inner;
+    const view = {
+      cx: d.cx,
+      cy: d.cy,
+      w: d.w,
+      h: d.h,
+      rx: d.rx,
+      ry: d.ry,
+      rz: d.rz,
+      card: [cw, ch] as [number, number],
+      half: [cw + slab.margin, ch + slab.margin] as [number, number],
+      radius: radius + slab.margin * 0.6,
+      depth: slab.depth,
+      acrylic,
+      plies: pliesOf(t.depth),
+      light: d.light,
+      tilt: d.tilt,
+      alpha: d.alpha,
+    };
+    const toEdge = () => this.edge.use(view, [this.cssW, this.cssH]);
+    const toCard = () => {
+      gl.useProgram(p.prog);
+      gl.bindVertexArray(this.cardVao);
+    };
+
+    // Hard pixel drop shadow first, then the card itself. A thicker card stands higher, so its shadow
+    // falls further, with a tight contact shadow where it meets the table.
     if (d.shadow) {
       gl.uniform1f(p.u.uShadow, 1);
-      gl.uniform2f(p.u.uShift, d.shadow[0], d.shadow[1]);
+      const far: [number, number] = [d.shadow[0] + slab.depth * 0.45, d.shadow[1] + slab.depth * 0.75];
+      gl.uniform2f(p.u.uShift, far[0], far[1]);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
+      if (slab.depth > 1.5) {
+        gl.uniform2f(p.u.uShift, d.shadow[0] * 0.2 + slab.depth * 0.2, d.shadow[1] * 0.2 + slab.depth * 0.35);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+      if (acrylic && edges) {
+        toEdge();
+        this.edge.shadow(far);
+        toCard();
+      }
+    }
+    if (edges) {
+      toEdge();
+      // Through clear acrylic the far cap and the far side show behind the card.
+      if (acrylic) {
+        this.edge.cap(-1);
+        this.edge.side(-1);
+      } else this.edge.side(1);
+      toCard();
     }
     gl.uniform1f(p.u.uShadow, 0);
     gl.uniform2f(p.u.uShift, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     for (const l of cp.layers) l.after?.(this, d, time);
+    if (edges && acrylic) {
+      toEdge();
+      this.edge.side(1);
+      this.edge.cap(1);
+    }
   }
 
   drawParticles(list: Particle[]): void {
