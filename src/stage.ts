@@ -7,6 +7,7 @@ import { motion } from './tune/motion';
 import { lampLights, loopCycle, roomShade, tuneGl } from './tune/model';
 import type { AutoTouch, HeatField, Swipe, TouchKind } from './touch/heat';
 import { cardPoint, cardUv } from './card/pose';
+import { slabPose } from './card/thickness';
 import { flickDir } from './handStep';
 import { QualityGovernor, startLevel, type QualityLevel } from './quality';
 import { cardLayers } from './layers';
@@ -687,16 +688,17 @@ export class Stage {
 
       const tilt = motion.tilt(tune, pose, this.rx.x + pose.rx, this.ry.x + pose.ry);
       const cardPose = { cx: r.cx + this.ox.x + fx, cy: r.cy + this.oy.x + fy, w: r.w, h: r.h, rx: RX, ry: RY, rz: RZ, scale: this.sc.x * pose.scale };
-      this.pose = cardPose;
+      // Taps and touch find the face where it is drawn: turned by the card's thickness.
+      this.pose = slabPose(state.thickness, cardPose);
       const pointed = over && !this.drag.active && !this.hold;
-      const lamp = ed.torch ? this.aimLamp(pointed ? cardUv(px, py, cardPose) : null, torchAt(motion.idleTime / TORCH_DRIFT), dt) : null;
+      const lamp = ed.torch ? this.aimLamp(pointed ? cardUv(px, py, this.pose) : null, torchAt(motion.idleTime / TORCH_DRIFT), dt) : null;
       const light = lamp && lampLights(tune, true) ? lamp : motion.light(tune, pose, tilt, pointed ? [clamp(nx * 0.5 + 0.5, 0, 1), clamp(ny * 0.5 + 0.5, 0, 1)] : null);
       const shade = pose.dim ? roomShade(pose.dim) : 0;
       if (Math.abs(shade - this.roomShown) > 1e-3) this.room.style.opacity = String((this.roomShown = shade));
 
       // The card's shadow drops further as it lifts or rises off the table.
       const lift = (this.sc.x * pose.scale - 1) * 120 - fy * 0.6 + (this.drag.active ? 14 : 0);
-      this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, cardPose) : null, dt);
+      this.warm(ed.touch && !this.hold && (over || this.rub.active) ? cardUv(px, py, this.pose) : null, dt);
       const drawn = this.cards.drawCard(
         {
           ...cardPose,
