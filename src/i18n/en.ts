@@ -108,6 +108,7 @@ const en: Dict = {
   rarity: 'Rarity',
   frame: 'Frame',
   shape: 'Shape',
+  thickness: 'Thickness',
   backdrop: 'Backdrop',
   backdropName: {
     swirl: 'Swirl',
@@ -274,6 +275,18 @@ const en: Dict = {
     fit: 'Picture',
   },
   shapeFitHint: "The picture's own proportions",
+  thickName: {
+    thin: 'Thin',
+    board: 'Thick board',
+    chunky: 'Chunky',
+    acrylic: 'Acrylic',
+  },
+  thickHint: {
+    thin: 'A standard trading card',
+    board: 'Sturdy board',
+    chunky: 'A premium thick card',
+    acrylic: 'The card sealed in a clear acrylic block',
+  },
   samplesName: ['Dusk Pass', 'Moon Tide', 'Ace of Hearts'],
   tune: {
     sunKeys: '←→ to turn',

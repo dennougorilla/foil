@@ -151,6 +151,7 @@ export class MiniPreview {
     const showing = view.rangeView > 0 && view.layer === 2 && s.layer2 ? s.layer2.edition : s.edition;
     if (showing !== this.named) this.label(showing);
     r.tune = tuneGl(s.tune);
+    r.thickness = s.thickness;
     const motion = !this.o.reduced.matches;
     r.range.motion = r.range2.motion = motion;
     const t = motion ? (now - this.t0) / 1000 : 0;

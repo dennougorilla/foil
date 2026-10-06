@@ -59,23 +59,29 @@ uniform vec3 uRot;      // rx, ry, rz in radians
 uniform float uScale;
 uniform vec2 uShift;    // extra screen offset (shadow)
 uniform vec4 uUvRect;   // the part of the face on this quad: x0, y0, x1, y1 (0, 0, 1, 1 = whole card)
+uniform float uLift;    // half a paper card's depth (gl/edge.ts): the face or back seen sits on the near side of it
 out vec2 vUv;
 out float vShade;
-void main() {
-  vec3 p = vec3(aPos * uSize * uScale, 0.0);
+vec3 turn(vec3 p) {
   float cz = cos(uRot.z), sz = sin(uRot.z);
   p.xy = mat2(cz, sz, -sz, cz) * p.xy;
   float cx = cos(uRot.x), sx = sin(uRot.x);
   p.yz = mat2(cx, sx, -sx, cx) * p.yz;
   float cy = cos(uRot.y), sy = sin(uRot.y);
   p.xz = mat2(cy, -sy, sy, cy) * p.xz;
+  return p;
+}
+void main() {
+  vec3 n = turn(vec3(0.0, 0.0, 1.0));
+  vec3 q = turn(vec3(aPos * uSize * uScale, 0.0));
+  vec3 p = q + n * (n.z >= 0.0 ? uLift : -uLift);
   float D = max(max(uSize.x, uSize.y), 120.0) * 3.2;
   float w = (D - p.z) / D;
   vec2 s = uCenter + uShift + p.xy / w;
   vec2 ndc = vec2(s.x / uRes.x * 2.0 - 1.0, 1.0 - s.y / uRes.y * 2.0);
   gl_Position = vec4(ndc * w, 0.0, w);
   vUv = mix(uUvRect.xy, uUvRect.zw, aPos + 0.5);
-  vShade = p.z / (max(uSize.x, uSize.y) * uScale);
+  vShade = q.z / (max(uSize.x, uSize.y) * uScale);
 }
 `;
 

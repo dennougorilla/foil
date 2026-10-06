@@ -1,6 +1,7 @@
 // The Japanese texts. Each language is its own chunk; the page loads only the one it shows (docs/performance.md).
 import type { EditionId, FrameId, RarityId } from '../editions';
 import type { ShapeId } from '../card/shape';
+import type { ThicknessPreset } from '../card/thickness';
 import type { FoilTone, LetterStyle, TextField } from '../lettering';
 import type { CardLayout } from '../card/tcg';
 import type { Arrange, FreeField } from '../arrange';
@@ -118,6 +119,7 @@ const ja = {
   rarity: 'レアリティ',
   frame: '枠',
   shape: '形',
+  thickness: '厚み',
   backdrop: '背景',
   backdropName: {
     swirl: 'うずまき',
@@ -284,6 +286,18 @@ const ja = {
     fit: '画像の形',
   } satisfies Record<ShapeId, string>,
   shapeFitHint: '画像の縦横比のまま',
+  thickName: {
+    thin: '薄い',
+    board: '厚紙',
+    chunky: '分厚い',
+    acrylic: 'アクリル',
+  } satisfies Record<ThicknessPreset, string>,
+  thickHint: {
+    thin: '標準的なトレカ',
+    board: 'しっかりした厚紙',
+    chunky: 'プレミアムな厚いカード',
+    acrylic: 'カードを透明なアクリルに封入',
+  } satisfies Record<ThicknessPreset, string>,
   samplesName: ['夕焼けの峠', '月の潮', 'ハートのA'],
   tune: {
     sunKeys: '←→ で回す',

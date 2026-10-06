@@ -561,6 +561,7 @@ export class Stage {
       this.lastTune = tune;
       this.cards.tune = tuneGl(tune);
     }
+    this.cards.thickness = state.thickness;
 
     // Resize canvases to their boxes
     const q = this.quality.current;

@@ -16,6 +16,7 @@ import type { LayerMap } from './depth/layers';
 import { packOf } from './packs';
 import { loadPack } from './gl/finishes/registry';
 import { pixelCells } from './dot/model';
+import { DEFAULT_THICKNESS, type Thickness } from './card/thickness';
 
 /** A pack's finish draws once its pack's module has arrived (it usually has: the finish is in the hand). */
 async function packLoaded(edition: Edition): Promise<void> {
@@ -47,6 +48,8 @@ export interface ExportInput {
   loopMs?: number;
   /** Fine-tuning of light and motion; defaults when left out. */
   tune?: Tune;
+  /** How thick the card is; the thin card when left out. */
+  thickness?: Thickness;
   /** Where on the face the finish lands; whole card when absent. */
   range?: RangeSnapshot;
   /** The Shadowbox sheets cut from the picture; 3D Lenticular reads their depth. */
@@ -74,17 +77,22 @@ export function download(file: File): string {
   return file.name;
 }
 
-/** Clear margin round the still card, so its tilted edge and glow are not cut. */
+/** Clear margin round the still card, so its tilted edge and glow are not cut (its shadow adds its depth). */
 const STILL_PAD = 24;
 
-/** The card drawn once (the binder's thumbnail) at the face texture's native resolution (plus STILL_PAD all round), with a sheen frozen mid-tilt. */
+/**
+ * The card drawn once (the binder's thumbnail) at the face texture's native resolution (plus a clear
+ * margin all round), turned a little so its side shows, with a sheen frozen mid-tilt.
+ */
 export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement> {
   await packsLoaded(input);
-  const pad = STILL_PAD;
+  const thickness = input.thickness ?? DEFAULT_THICKNESS;
+  const pad = STILL_PAD + Math.ceil(thickness.depth * Math.min(input.face.width, input.face.height));
   const canvas = document.createElement('canvas');
   const r = new CardRenderer(canvas, { preserve: true, settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
   r.tune = tuneGl(tune);
+  r.thickness = thickness;
   r.setFace(input.face, input.mask);
   r.setBack(input.back);
   if (input.range) r.range.set(input.range);
@@ -104,10 +112,11 @@ export async function renderStill(input: ExportInput): Promise<HTMLCanvasElement
       cy: H / 2 + pad,
       w: W,
       h: H,
-      rx: 0,
-      ry: 0,
+      // Turned so the right and bottom sides show, toward its shadow.
+      rx: 0.08,
+      ry: -0.12,
       rz: 0,
-      scale: 1,
+      scale: 0.97,
       edition: input.edition.shader,
       intensity: input.intensity,
       pixel: pixelCells(input.pixel),
@@ -172,6 +181,7 @@ export async function createScene(input: ExportInput, W0: number, H0: number, re
   const cards = new CardRenderer(cardCanvas, { settled: true });
   const tune = input.tune ?? TUNE_DEFAULTS;
   cards.tune = tuneGl(tune);
+  cards.thickness = input.thickness ?? DEFAULT_THICKNESS;
   cards.setFace(input.face, input.mask);
   cards.setBack(input.back);
   if (input.range) cards.range.set(input.range);
