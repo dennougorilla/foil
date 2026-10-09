@@ -65,7 +65,7 @@ pack, three celebrations.
 |---|---|---|---|---|
 | `metal` Metal | 金属 | Platinum → Gold → Relief → Chameleon → **Cosmo Holo** | Gold | a gold coin on a platinum ingot |
 | `jewel` Jewel | 宝飾 | Crystal → Opal → Raden → **Kintsugi** | Opal | a brilliant-cut gem, a pearl, a seam of gold, on lacquer red |
-| `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic | a star and a planet |
+| `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → Thermal → **Shallows** | Holographic | a star and a planet |
 | `nature` Nature | 自然 | Sakura → Frost → Stardust → Rainy Window → Marble → **Magma** | Sakura | a blossom branch |
 | `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone | a palette and brush |
 | `supporter` Supporter (celebrations) | サポーター限定 | Confetti → Snow Globe → **Fireworks** | Prism (rainbow shards on a silver-white body) | a crowned heart among fireworks |
@@ -83,7 +83,7 @@ pack to be the celebrations and the rest to be tidied):
 | Opal | Jewel | A precious stone. |
 | Raden | Jewel | Mother-of-pearl inlaid in lacquer: a precious material worked by hand. |
 | Kintsugi | Jewel (showpiece) | Gold-mended lacquer, one of a kind: the rarest-looking of the four, the old Supporter showpiece. |
-| Galaxy, Aurora, Glow, Blacklight, Shallows | Light | Each is about a source of light (the night sky, a curtain of light, glow ink, a UV lamp, light under water). Unchanged. |
+| Galaxy, Aurora, Glow, Blacklight, Thermal, Shallows | Light | Each is about a source of light (the night sky, a curtain of light, glow ink, a UV lamp, the heat a thermal camera sees, light under water). Thermal is a prototype in the light pack for now. |
 | Sakura, Frost, Stardust, Magma | Nature | Seasons, weather, sky and earth. Snow Globe left for the celebrations. |
 | Rainy Window | Nature | Rain running down a fogged pane: weather, before the showpiece (added in v0.15). |
 | Marble | Nature | Ink floating on water (suminagashi): the element water, the card before the showpiece (added in v0.15). |

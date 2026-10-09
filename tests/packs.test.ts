@@ -40,7 +40,7 @@ test('five theme packs and the supporter pack of celebrations, showpiece last', 
   assert.deepEqual(packs, {
     metal: METAL,
     jewel: ['crystal', 'opal', 'raden', 'kintsugi'],
-    light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
+    light: ['galaxy', 'aurora', 'glow', 'blacklight', 'thermal', 'shallows'],
     nature: ['sakura', 'frost', 'stardust', 'rain', 'marble', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
     supporter: ['confetti', 'snowglobe', 'fireworks'],
@@ -57,6 +57,7 @@ test("a pack's wrapper is drawn with a finish that is loaded with it", () => {
 test('packOf names the pack of a finish, none for the open ones', () => {
   assert.equal(packOf('relief')?.id, 'metal');
   assert.equal(packOf('kintsugi')?.id, 'jewel');
+  assert.equal(packOf('thermal')?.id, 'light');
   assert.equal(packOf('snowglobe')?.id, 'supporter');
   assert.equal(packOf('holo'), undefined);
 });
@@ -185,17 +186,18 @@ test('the showpiece gets the biggest entrance, the card before it the next', () 
   assert.deepEqual(studio.finishes.map((_, i) => tierOf(studio, i)), [1, 1, 1, 1, 2, 3]);
 });
 
-test('a v0.14 save keeps every finish it owned; Metal and Nature are sealed again for only their new cards', () => {
+test('a v0.14 save keeps every finish it owned; Metal, Light and Nature are sealed again for only their new cards', () => {
   // Everything a browser could own in v0.14.1, as it saved it.
   const v014 = ['platinum', 'gold', 'relief', 'cosmoholo', 'crystal', 'opal', 'raden', 'kintsugi', 'galaxy', 'aurora', 'glow', 'blacklight', 'shallows', 'sakura', 'frost', 'stardust', 'magma', 'halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox', 'confetti', 'snowglobe', 'fireworks'];
   const o = parsePacks(JSON.stringify({ owned: v014, supporter: true }));
   assert.deepEqual([...o.owned].sort(), [...v014].sort());
-  assert.deepEqual(sealed(o).map((p) => p.id), ['metal', 'nature']);
+  assert.deepEqual(sealed(o).map((p) => p.id), ['metal', 'light', 'nature']);
   // Opening them adds just the new finishes; the showpieces stay last.
-  const after = openPacks(o, ['metal', 'nature']);
-  assert.deepEqual(after.owned.filter((id) => !v014.includes(id)), ['chameleon', 'rain', 'marble']);
+  const after = openPacks(o, ['metal', 'light', 'nature']);
+  assert.deepEqual(after.owned.filter((id) => !v014.includes(id)), ['chameleon', 'thermal', 'rain', 'marble']);
   assert.deepEqual(sealed(after), []);
   assert.equal(PACKS.find((p) => p.id === 'metal')!.finishes.at(-1), 'cosmoholo');
+  assert.equal(PACKS.find((p) => p.id === 'light')!.finishes.at(-1), 'shallows');
   assert.equal(PACKS.find((p) => p.id === 'nature')!.finishes.at(-1), 'magma');
   // A saved hand keeps its finishes.
   assert.deepEqual(normalizeHand(['base', 'cosmoholo', 'magma', 'warmth'], o), ['base', 'cosmoholo', 'magma', 'warmth']);

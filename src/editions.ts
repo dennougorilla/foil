@@ -27,6 +27,7 @@ export type EditionId =
   | 'stainedglass'
   | 'glow'
   | 'blacklight'
+  | 'thermal'
   | 'lenticular3d'
   | 'lenticularflip'
   | 'stardust'
@@ -93,6 +94,8 @@ export const EDITIONS: Edition[] = [
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
   // Shader in src/gl/blacklight.ts.
   { id: 'blacklight', shader: 72, color: '#b77bff', swirl: ['#07031a', '#34126e', '#ff4fb8'], value: 7, dither: true, torch: true },
+  // Shader in src/gl/finishes/light.ts. Prototype: the light pack is provisional.
+  { id: 'thermal', shader: 96, color: '#ff8c1a', swirl: ['#080409', '#4a0f2a', '#e8641a'], value: 6 },
   // Shader in src/gl/lenticular3d.ts.
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
   { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6, solo: true },

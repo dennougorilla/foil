@@ -12,7 +12,7 @@ English · [日本語](README.ja.md)
 
 - **Any picture.** Open a file, drop it or paste it. Animated GIF, APNG and WebP keep moving on the card.
 - **Pixel art.** Draw the whole card, or only its frame around the picture, as chunky pixel art with few colors and a dark outline, from three presets or your own coarseness, colors, outline and dither. The words stay readable: they are printed crisp in a pixel typeface on the same grid. The finish's light steps on the same pixels, and files are saved the same way.
-- **36 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, jewel, light, nature, studio and celebration finishes. Each one reacts to tilt and light.
+- **37 finishes.** Holographic, Polychrome, Negative and the other editions of the game FOIL is modelled on, plus metal, jewel, light, nature, studio and celebration finishes. Each one reacts to tilt and light.
 - **Packs.** Seven finishes come in the starting hand; the rest come in theme packs you tear open once, or all at once with Open all in the pack shop. Each pack holds its whole theme, with no random draws.
 - **Hand and deck.** Pick finishes from a fanned hand of up to seven live previews; the others wait in the deck, which you edit like a card game's deck screen.
 - **Card shapes.** Trading card, wide, square, postcard (upright or on its side), business card, or the picture's own proportions. Frames include Gold rim and Ribbon for celebration cards.
@@ -35,12 +35,12 @@ Every detail, finish by finish: [`docs/features.md`](docs/features.md).
 | Starting hand | Base, Foil, Holographic, Polychrome, Negative, Prism, Glitch |
 | Metal pack | Platinum, Gold, Relief, Chameleon, Cosmo Holo |
 | Jewel pack | Crystal, Opal, Raden, Kintsugi |
-| Light pack | Galaxy, Aurora, Glow, Blacklight, Shallows |
+| Light pack | Galaxy, Aurora, Glow, Blacklight, Thermal, Shallows |
 | Nature pack | Sakura, Frost, Stardust, Rainy Window, Marble, Magma |
 | Studio pack | Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox |
 | Supporter pack | Confetti, Snow Globe, Fireworks |
 
-36 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
+37 finishes in all. The Supporter pack appears in the pack shop after you open one of the support links once. It is an honor system: there is no payment check. How packs and their opening are designed: [`docs/packs.md`](docs/packs.md).
 
 ## Privacy
 
