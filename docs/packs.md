@@ -59,7 +59,7 @@ new finish has an obvious home and a pack's theme reads at a glance from its nam
 Inside a pack the order is the reveal order; the last one is the showpiece, the finish that makes
 the strongest first impression on most pictures. A theme pack holds four to six finishes (a haul
 draws at most six cards at once, see the frame budget below); the Supporter pack is the one small
-pack, three celebrations.
+pack, three celebrations. (The Studio pack carries a provisional seventh, Cyanotype, until the owner has looked at it.)
 
 | Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish | Wrapper art |
 |---|---|---|---|---|
@@ -67,7 +67,7 @@ pack, three celebrations.
 | `jewel` Jewel | 宝飾 | Crystal → Opal → Raden → **Kintsugi** | Opal | a brilliant-cut gem, a pearl, a seam of gold, on lacquer red |
 | `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic | a star and a planet |
 | `nature` Nature | 自然 | Sakura → Frost → Stardust → Rainy Window → Marble → **Magma** | Sakura | a blossom branch |
-| `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone | a palette and brush |
+| `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → Cyanotype → **Shadowbox** | Halftone | a palette and brush |
 | `supporter` Supporter (celebrations) | サポーター限定 | Confetti → Snow Globe → **Fireworks** | Prism (rainbow shards on a silver-white body) | a crowned heart among fireworks |
 
 Why each finish is where it is (reorganized after v0.13.1, when the owner asked for the Supporter
@@ -87,7 +87,7 @@ pack to be the celebrations and the rest to be tidied):
 | Sakura, Frost, Stardust, Magma | Nature | Seasons, weather, sky and earth. Snow Globe left for the celebrations. |
 | Rainy Window | Nature | Rain running down a fogged pane: weather, before the showpiece (added in v0.15). |
 | Marble | Nature | Ink floating on water (suminagashi): the element water, the card before the showpiece (added in v0.15). |
-| Halftone, Warmth, Stained Glass, the two lenticulars, Shadowbox | Studio | Crafts of the print shop. Unchanged. |
+| Halftone, Warmth, Stained Glass, the two lenticulars, Cyanotype, Shadowbox | Studio | Crafts of the print shop (Cyanotype, a sun-print, is a provisional seventh here; the pack is one over its usual size while the prototype is looked at). |
 | Confetti, Snow Globe, Fireworks | Supporter | Celebrations, for birthday and greeting cards: confetti thrown, a globe shaken, fireworks to finish (the showpiece, the biggest show). |
 
 Why Jewel and not a 和 (Japanese) pack for Raden and Kintsugi: with Sakura it would make three

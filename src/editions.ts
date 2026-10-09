@@ -29,6 +29,7 @@ export type EditionId =
   | 'blacklight'
   | 'lenticular3d'
   | 'lenticularflip'
+  | 'cyanotype'
   | 'stardust'
   | 'snowglobe'
   | 'rain'
@@ -96,6 +97,7 @@ export const EDITIONS: Edition[] = [
   // Shader in src/gl/lenticular3d.ts.
   { id: 'lenticular3d', shader: 74, color: '#9ad8ff', swirl: ['#061018', '#1f4f6e', '#e6a0c8'], value: 7, depth: true },
   { id: 'lenticularflip', shader: 76, color: '#8fb4ff', swirl: ['#0a0f24', '#2c3f8f', '#e7a0ff'], value: 6, solo: true },
+  { id: 'cyanotype', shader: 28, color: '#3d7fb8', swirl: ['#0a1622', '#1f5a8a', '#dfe6dd'], value: 6 },
   { id: 'stardust', shader: 22, color: '#ffe48a', swirl: ['#070512', '#3b2a8a', '#e86ad0'], value: 7 },
   // Glitter particles on the GPU, see src/gl/snowglobe.ts.
   { id: 'snowglobe', shader: 60, color: '#ffd77a', swirl: ['#0a1424', '#24507a', '#e8c06a'], value: 7, solo: true },

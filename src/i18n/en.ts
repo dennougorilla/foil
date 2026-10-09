@@ -211,6 +211,7 @@ const en: Dict = {
     raden: 'Raden',
     confetti: 'Confetti',
     fireworks: 'Fireworks',
+    cyanotype: 'Cyanotype',
   },
   look: {
     base: 'As it is. No finish',
@@ -249,6 +250,7 @@ const en: Dict = {
     raden: 'Shell mosaic on black lacquer, turning blue, green, pink and gold',
     confetti: 'Gold, silver and rainbow foil confetti that glints piece by piece',
     fireworks: 'Willows, chrysanthemums, hearts and stars burst in gold, silver, crimson and jade',
+    cyanotype: 'A sun print in Prussian blue on paper; the coat frays at the edges and a fresh-print sheen slips over it as you tilt',
   },
   rarityName: {
     common: 'Common',
