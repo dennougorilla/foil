@@ -17,8 +17,8 @@ const COLD = 0.002;
 /** Fingerprints kept at once; the oldest makes way. */
 const PRINTS = 3;
 
-/** The touch finishes: Warmth's heat, the light Glow's ink stores, Rainy Window's wiped glass, or how far Marble's ink was carried. */
-export type TouchKind = 'warmth' | 'glow' | 'rain' | 'marble';
+/** The touch finishes: Warmth's heat, the light Glow's ink stores, Rainy Window's wiped glass, how far Marble's ink was carried, or how hard Scratch's foil was scraped. */
+export type TouchKind = 'warmth' | 'glow' | 'rain' | 'marble' | 'scratch';
 
 interface Fade {
   /** How fast it spreads, in cells² per second. */
@@ -46,6 +46,9 @@ const FADES: Record<TouchKind, Fade> = {
   // The water draws dragged ink back gently: a third gone in a second or so, settled within a loop.
   // A little spreading softens a comb line into the broad sweep of a current as it relaxes.
   marble: { spread: 0.35, cool: 0.45, loss: 0, quench: 0, prints: false, drag: true },
+  // A scraped scratch-off foil stays scraped: the field barely fades (a minute or two), and it does
+  // not spread, so the revealed picture keeps the shape the finger drew and no more.
+  scratch: { spread: 0, cool: 0.03, loss: 0.001, quench: 0, prints: false },
 };
 
 /** How much of a stroke's travel the ink right under it follows: a finger, a hovering mouse. */
@@ -436,7 +439,7 @@ export const AUTO_LOOP = 10;
  * and the print just made, for Glow just after the light has left, the trail glowing on its own, for
  * Rainy Window the wipe and the print still clear, for Marble the stroke just drawn through the rings.
  */
-export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36, rain: 0.3, marble: 0.3 };
+export const AUTO_STILL: Record<TouchKind, number> = { warmth: 0.3, glow: 0.36, rain: 0.3, marble: 0.3, scratch: 0.34 };
 /** Simulation ticks per loop: fixed, so every export of the same phase is identical. */
 const TICKS = 200;
 /** The card shows cold for a moment before the finger comes. */

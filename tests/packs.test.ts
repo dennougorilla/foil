@@ -39,7 +39,7 @@ test('five theme packs and the supporter pack of celebrations, showpiece last', 
   const packs = Object.fromEntries(PACKS.map((p) => [p.id, [...p.finishes]]));
   assert.deepEqual(packs, {
     metal: METAL,
-    jewel: ['crystal', 'opal', 'raden', 'kintsugi'],
+    jewel: ['crystal', 'opal', 'raden', 'scratch', 'kintsugi'],
     light: ['galaxy', 'aurora', 'glow', 'blacklight', 'shallows'],
     nature: ['sakura', 'frost', 'stardust', 'rain', 'marble', 'magma'],
     studio: ['halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox'],
@@ -76,8 +76,8 @@ test('a v0.13 save (opened pack ids) becomes every finish those packs held then,
   // The old Supporter pack held Opal, Raden, Confetti, Fireworks and Kintsugi; the old Metal pack Crystal.
   const o = parsePacks('{"opened":["supporter","metal","nope"],"supporter":true}');
   assert.deepEqual(o, { owned: ['platinum', 'gold', 'relief', 'cosmoholo', 'crystal', 'opal', 'raden', 'kintsugi', 'confetti', 'fireworks'], supporter: true });
-  // Jewel lacks nothing; Metal gained Chameleon (v0.15) and the new Supporter pack Snow Globe, so both are sealed again.
-  assert.ok(isOpened(o, 'jewel'));
+  // Metal gained Chameleon (v0.15), Jewel gained Scratch, and the new Supporter pack gained Snow Globe, so all three are sealed again.
+  assert.ok(!isOpened(o, 'jewel') && !o.owned.includes('scratch'));
   assert.ok(!isOpened(o, 'metal') && !o.owned.includes('chameleon'));
   assert.ok(!isOpened(o, 'supporter') && !o.owned.includes('snowglobe'));
   // The old Nature pack held Snow Globe: with it, the new Supporter pack is whole too. Nature gained
@@ -107,7 +107,7 @@ test('two tabs opening at once both keep what they opened', () => {
 
 test('opening packs owns every finish in them; a pack is opened once all of it is owned', () => {
   const o = openPacks(NONE, ['metal', 'jewel']);
-  assert.deepEqual(o.owned, [...METAL, 'crystal', 'opal', 'raden', 'kintsugi']);
+  assert.deepEqual(o.owned, [...METAL, 'crystal', 'opal', 'raden', 'scratch', 'kintsugi']);
   assert.ok(isOpened(o, 'metal') && !isOpened(o, 'light'));
   assert.ok(!isOpened({ owned: ['gold'], supporter: false }, 'metal'));
 });
@@ -185,15 +185,15 @@ test('the showpiece gets the biggest entrance, the card before it the next', () 
   assert.deepEqual(studio.finishes.map((_, i) => tierOf(studio, i)), [1, 1, 1, 1, 2, 3]);
 });
 
-test('a v0.14 save keeps every finish it owned; Metal and Nature are sealed again for only their new cards', () => {
+test('a v0.14 save keeps every finish it owned; Metal, Jewel and Nature are sealed again for only their new cards', () => {
   // Everything a browser could own in v0.14.1, as it saved it.
   const v014 = ['platinum', 'gold', 'relief', 'cosmoholo', 'crystal', 'opal', 'raden', 'kintsugi', 'galaxy', 'aurora', 'glow', 'blacklight', 'shallows', 'sakura', 'frost', 'stardust', 'magma', 'halftone', 'warmth', 'stainedglass', 'lenticularflip', 'lenticular3d', 'shadowbox', 'confetti', 'snowglobe', 'fireworks'];
   const o = parsePacks(JSON.stringify({ owned: v014, supporter: true }));
   assert.deepEqual([...o.owned].sort(), [...v014].sort());
-  assert.deepEqual(sealed(o).map((p) => p.id), ['metal', 'nature']);
+  assert.deepEqual(sealed(o).map((p) => p.id), ['metal', 'jewel', 'nature']);
   // Opening them adds just the new finishes; the showpieces stay last.
-  const after = openPacks(o, ['metal', 'nature']);
-  assert.deepEqual(after.owned.filter((id) => !v014.includes(id)), ['chameleon', 'rain', 'marble']);
+  const after = openPacks(o, ['metal', 'nature', 'jewel']);
+  assert.deepEqual(after.owned.filter((id) => !v014.includes(id)), ['chameleon', 'scratch', 'rain', 'marble']);
   assert.deepEqual(sealed(after), []);
   assert.equal(PACKS.find((p) => p.id === 'metal')!.finishes.at(-1), 'cosmoholo');
   assert.equal(PACKS.find((p) => p.id === 'nature')!.finishes.at(-1), 'magma');

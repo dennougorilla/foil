@@ -64,7 +64,7 @@ pack, three celebrations.
 | Pack | 日本語 | Reveal order (last = showpiece) | Wrapper finish | Wrapper art |
 |---|---|---|---|---|
 | `metal` Metal | 金属 | Platinum → Gold → Relief → Chameleon → **Cosmo Holo** | Gold | a gold coin on a platinum ingot |
-| `jewel` Jewel | 宝飾 | Crystal → Opal → Raden → **Kintsugi** | Opal | a brilliant-cut gem, a pearl, a seam of gold, on lacquer red |
+| `jewel` Jewel | 宝飾 | Crystal → Opal → Raden → Scratch → **Kintsugi** | Opal | a brilliant-cut gem, a pearl, a seam of gold, on lacquer red |
 | `light` Light | 光 | Galaxy → Aurora → Glow → Blacklight → **Shallows** | Holographic | a star and a planet |
 | `nature` Nature | 自然 | Sakura → Frost → Stardust → Rainy Window → Marble → **Magma** | Sakura | a blossom branch |
 | `studio` Studio | 工房 | Halftone → Warmth → Stained Glass → Flip Lenticular → 3D Lenticular → **Shadowbox** | Halftone | a palette and brush |
@@ -82,6 +82,7 @@ pack to be the celebrations and the rest to be tidied):
 | Crystal | Jewel | A cut stone: it was Metal's showpiece while Metal was "Metal & Gem"; gems now have their own pack. |
 | Opal | Jewel | A precious stone. |
 | Raden | Jewel | Mother-of-pearl inlaid in lacquer: a precious material worked by hand. |
+| Scratch | Jewel | A silver scratch-off foil over the picture, scratched away by hand to reveal it (prototype; placement provisional). |
 | Kintsugi | Jewel (showpiece) | Gold-mended lacquer, one of a kind: the rarest-looking of the four, the old Supporter showpiece. |
 | Galaxy, Aurora, Glow, Blacklight, Shallows | Light | Each is about a source of light (the night sky, a curtain of light, glow ink, a UV lamp, light under water). Unchanged. |
 | Sakura, Frost, Stardust, Magma | Nature | Seasons, weather, sky and earth. Snow Globe left for the celebrations. |
