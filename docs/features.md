@@ -19,7 +19,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 ## Hand, deck and packs
 
 - Pick a finish from the fanned hand at the bottom; each card in the hand is a live preview. The hand starts with seven finishes: the five editions of the game FOIL is modelled on (Base, Foil, Holographic, Polychrome and Negative), plus Prism and Glitch. Number keys pick the cards in the hand in order, ← → step through them. Press the logo to shuffle the finish.
-- Every other finish comes in a theme pack: **Metal** (Platinum, Gold, Relief, Chameleon, Cosmo Holo), **Jewel** (Crystal, Opal, Raden, Kintsugi), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Rainy Window, Marble, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
+- Every other finish comes in a theme pack: **Metal** (Platinum, Gold, Relief, Chameleon, Guilloche, Cosmo Holo), **Jewel** (Crystal, Opal, Raden, Kintsugi), **Light** (Galaxy, Aurora, Glow, Blacklight, Shallows), **Nature** (Sakura, Frost, Stardust, Rainy Window, Marble, Magma) and **Studio** (Halftone, Warmth, Stained Glass, Flip Lenticular, 3D Lenticular, Shadowbox). The small pack beside the deck at the right end of the hand (it glows while one is sealed) opens the pack shop, where every pack sits on a tray.
 - A pack is opened once and holds its whole theme, with no random draws: trace the line across its top to tear it, swipe through the cards, and the rarest one waits until last for its own entrance. Skip jumps straight to the result, and the cards are shown on your own picture so you can try them at once. An opening can be watched again from the shop.
 - **Open all** in the shop opens every sealed pack on the tray at once (a second tap confirms), without their openings: one list shows what came in, pack by pack, and leads to the deck builder. Each opening can still be watched from the shop afterwards.
 - The hand holds up to seven cards; every other finish you own waits in the **deck**, a small stack of card backs at the end of the hand with its count. Press it to edit your hand like a card game's deck screen; it opens on everything you own in one list, your hand first, with a tab per pack to narrow it. One tap moves a finish between the deck and the hand (or drag it onto a slot), with undo and a reset to the starting seven; Base always stays.
@@ -28,7 +28,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 
 ## Finishes
 
-36 finishes in all: seven in the starting hand and 29 in six packs.
+37 finishes in all: seven in the starting hand and 30 in six packs.
 
 | Finish | Where | Look |
 | --- | --- | --- |
@@ -43,6 +43,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Gold | Metal | Gold leaf with a scatter of sparks |
 | Relief | Metal | Struck like a medal; light runs across as you tilt |
 | Chameleon | Metal | Color-shift car paint: violet, green and gold flow over it as it tilts |
+| Guilloche | Metal | Banknote security engraving that turns iridescent as you tilt |
 | Cosmo Holo | Metal | Rows of foil circles and stars that flash rainbow as it tilts |
 | Crystal | Jewel | Light bent through cut facets |
 | Opal | Jewel | Patches of color welling up in the stone, flashing as you tilt |
@@ -69,6 +70,7 @@ The detailed behavior of FOIL, one area at a time. The short tour is in [`README
 | Snow Globe | Supporter | Shake it and gold glitter swirls up |
 | Fireworks | Supporter | Willows, chrysanthemums, hearts and stars burst in gold, silver, crimson and jade |
 
+- **Guilloche** engraves the card like a banknote or passport security print: fine interlaced lines wind a rosette round the centre and cross broad wavy bands over it, all cut into the picture as dark grooves. The lines are dead flat until the card tilts, then they turn iridescent only where they catch the light, sliding through the spectrum across the face, and a small diffraction seal sits on the top-right frame with its own fine grating. It has no clock, so it moves only with the tilt and the light, loops in exports and holds still under reduced motion.
 - **Relief** strikes the picture in metal like a proof coin: the subject stands up as a matte relief in a few flat levels with crisp steps, the background becomes a flat mirror field that flashes as the card tilts, and line work sinks into grooves. Dark pictures are lifted rather than crushed. The frame gets a stamped dot texture and the name a mirror foil on a matte plate. Gold by default; silver is a choice under Shine.
 - **Platinum** prints the art on cold white metal brushed with fine hairlines: the light is a hard streak across the lines, and tilting slides it along them, glinting on single lines as it passes. It moves only with the tilt and the light, so it holds still when motion is reduced.
 - **Cosmo Holo** is the cosmos foil of trading cards laid over the art: a regular print of circles, stars and fine dots, each one a tiny diffraction grating. Rainbow bands run across the rows of motifs and slide over the card as it tilts, the star facets flash one after another and the dots twinkle; off the bands the foil all but disappears and the art shows through. It moves only with the tilt, so it loops in exports and holds still under reduced motion.
@@ -172,7 +174,7 @@ The Card tab has two separate choices, side by side, each with one line under it
 - The **MP4** is for Instagram and other apps that take neither GIF nor APNG. It is H.264 video at 30 fps with no sound track, its index at the front of the file (as Instagram asks), and the card's backdrop (video has no transparency, so the Transparent backdrop comes out black); its backdrop is as coarse next to the card as the GIF's. The loop plays as many whole times as it takes to last at least 6 seconds (Instagram takes nothing under 3): a 2.4-second loop plays three times (7.2 s), a 6-second one once; the frames are spread so the last loop closes on the first frame, so it loops in a player too. About 4 Mbit/s, so a 7-second video is around 3–4 MB. Each frame is drawn and handed to the browser's own video encoder (WebCodecs) one by one, never recorded in real time. Only browsers that can encode H.264 at that size offer it (checked once when the page loads: recent Chrome, Edge, Safari and Firefox on desktop, Chrome and Safari on phones); elsewhere the MP4 button is not shown, and a saved MP4 choice falls back to GIF.
 - A loop is the card exactly as it moves on the stage when nobody touches it — the motion, the speed and size, the light and its sheen as set — one loop of the motion long (see [`motion.md`](motion.md); 6 seconds while the light orbits or Blacklight's lamp drifts), so it closes without a seam. With an animated picture, its own loop plays a whole number of times inside (slightly retimed to fit); at speed zero the card holds still and the loop follows the picture's timing.
 - The loop options say so in one line, and how touch finishes are exported: a file has no hand in it, so an unseen finger strokes the busiest part of the picture once per loop.
-- Relief, Platinum, Chameleon, Glow, Blacklight, Rainy Window and Marble GIFs are dithered so their smooth gradients don't band in 256 colors (with layers, the GIF is dithered if either finish asks for it).
+- Relief, Platinum, Chameleon, Guilloche, Glow, Blacklight, Rainy Window and Marble GIFs are dithered so their smooth gradients don't band in 256 colors (with layers, the GIF is dithered if either finish asks for it).
 
 ### Loop options
 

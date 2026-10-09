@@ -15,7 +15,9 @@ test('Chameleon is a Metal finish on shader 90, the card before the showpiece', 
   assert.ok(!OPEN_EDITIONS.includes('chameleon'));
   const metal = packOf('chameleon');
   assert.equal(metal?.id, 'metal');
-  assert.equal(metal.finishes.at(-2), 'chameleon');
+  // Guilloche (the prototype) now sits between it and the showpiece; Chameleon is still before both.
+  assert.equal(metal.finishes.at(-1), 'cosmoholo');
+  assert.ok(metal.finishes.indexOf('chameleon') < metal.finishes.indexOf('cosmoholo'));
 });
 
 test('its smooth paint is dithered in a GIF, and it can be layer 2', () => {
