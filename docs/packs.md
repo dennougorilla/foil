@@ -83,6 +83,7 @@ pack to be the celebrations and the rest to be tidied):
 | Crystal | Jewel | A cut stone: it was Metal's showpiece while Metal was "Metal & Gem"; gems now have their own pack. |
 | Opal | Jewel | A precious stone. |
 | Raden | Jewel | Mother-of-pearl inlaid in lacquer: a precious material worked by hand. |
+| Scratch | Jewel | A silver scratch-off foil over the picture, scratched away by hand to reveal it (prototype; placement provisional). |
 | Kintsugi | Jewel (showpiece) | Gold-mended lacquer, one of a kind: the rarest-looking of the four, the old Supporter showpiece. |
 | Galaxy, Aurora, Glow, Blacklight, Thermal, Shallows | Light | Each is about a source of light (the night sky, a curtain of light, glow ink, a UV lamp, the heat a thermal camera sees, light under water). Thermal is a prototype in the light pack for now. |
 | Sakura, Frost, Stardust, Magma | Nature | Seasons, weather, sky and earth. Snow Globe left for the celebrations. |

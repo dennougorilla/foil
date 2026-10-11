@@ -33,7 +33,7 @@ export const PACKS: readonly Pack[] = [
   },
   {
     id: 'jewel',
-    finishes: ['crystal', 'opal', 'raden', 'kintsugi'],
+    finishes: ['crystal', 'opal', 'raden', 'scratch', 'kintsugi'],
     wrap: 'opal',
     colors: ['#14080b', '#9e1f2e', '#f3e2c4'],
     load: () => import('./gl/finishes/jewel'),

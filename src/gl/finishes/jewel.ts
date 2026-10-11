@@ -1,8 +1,11 @@
-// Jewel pack: Crystal, Opal, Raden and Kintsugi (the showpiece): precious things worked by hand.
-// See docs/packs.md. Shader indices: Crystal 13, Kintsugi 40, Opal 41, Raden 43.
+// Jewel pack: Crystal, Opal, Raden, Scratch and Kintsugi (the showpiece): precious things worked by hand.
+// See docs/packs.md. Shader indices: Crystal 13, Kintsugi 40, Opal 41, Raden 43, Scratch 44.
+import { TOUCH_GLSL } from '../../touch/glsl';
+import { HeatLayer } from '../../touch/layer';
 import type { FinishModule } from './types';
 
 const GLSL = /* glsl */ `
+${TOUCH_GLSL}
 // Set just before Raden runs: 1 inside the art window, 0 on the frame.
 float artMask = 1.0;
 vec3 kintsugi(vec3 c, vec2 uv, vec2 t, float L) {
@@ -168,6 +171,34 @@ vec3 crystal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   col += hsv2rgb(vec3(fract(hash12(id) + disp), 0.4, 1.0)) * lit * 0.25;
   return col;
 }
+
+vec3 scratch(vec3 c, vec2 uv, vec2 t, float L, float art) {
+  // A lottery scratch-off: a matte silver foil over the picture. A drag on the card scrapes the
+  // foil away along the stroke (the 'scratch' touch field, touch/heat.ts), baring the picture
+  // beneath; the scraped edge breaks into flakes and the foil carries a sheen that slides as it tilts.
+  vec2 cuv = tuneFaceUv(uv);
+  vec2 p = uv * uCardK;
+  // How hard the foil was scraped here, 0 (whole) to ~1 (gone).
+  float cut = heatAt(cuv);
+  // Fine grain so the boundary tears into flakes instead of cutting a clean line.
+  float grain = fbm(cuv * 34.0);
+  float gone = smoothstep(0.12, 0.36, cut + (grain - 0.5) * 0.2);
+  // Brushed silver: fine streaks along a diagonal, brightened by the broad sheen that runs with the tilt.
+  float brush = vnoise(vec2(dot(p, vec2(0.7, 0.7)) * 9.0, dot(p, vec2(-0.7, 0.7)) * 210.0));
+  vec3 silver = mix(vec3(0.70, 0.72, 0.76), vec3(0.86, 0.88, 0.92), brush);
+  silver *= 0.82 + 0.35 * L; // the picture's light shows faintly through the foil
+  float sheen = smoothstep(0.55, 1.0, 0.5 + 0.5 * sin(dot(p, vec2(0.8, 0.6)) * 4.0 - (t.x + t.y) * 3.0));
+  silver += vec3(0.9, 0.95, 1.0) * sheen * 0.22;
+  // Metal flakes: bright chips where the foil just gave way along the edge of the stroke.
+  float lip = (1.0 - gone) * smoothstep(0.10, 0.30, cut);
+  float flake = lip * smoothstep(0.45, 0.80, grain);
+  vec3 col = mix(silver, c, gone);
+  col += vec3(1.0, 0.98, 0.9) * flake * 0.55;
+  // A darker crease at the very edge, so the foil reads as a raised layer.
+  col *= 1.0 - lip * smoothstep(0.18, 0.08, cut) * 0.18;
+  // Only the picture is coated: the frame and nameplate keep their own colours.
+  return mix(c, col, art);
+}
 `;
 
 const DISPATCH = /* glsl */ `
@@ -178,7 +209,17 @@ const DISPATCH = /* glsl */ `
   else if (e == 41) col = mix(c, opal(c, uv, uTilt, L), 0.3 + 0.7 * m.r);
   // Raden inlays the art; the frame only takes a light coat so the nameplate stays readable.
   else if (e == 43) { artMask = m.r; col = raden(c, uv, uTilt, L); }
+  // Scratch-off foil: only the picture is coated; the touch field is where the foil was scraped off.
+  else if (e == 44) col = scratch(c, uv, uTilt, L, m.r);
 `;
 
-const finishes: FinishModule = { glsl: GLSL, dispatch: DISPATCH };
+const finishes: FinishModule = {
+  glsl: GLSL,
+  dispatch: DISPATCH,
+  // Scratch reads the touch field its drags leave (touch/heat.ts, HeatLayer): the scraped foil on 6 (uHeat).
+  layers: (gl) => {
+    const heat = new HeatLayer(gl);
+    return [{ bind: (p, d) => heat.bind(p, 6, d.heat) }];
+  },
+};
 export default finishes;
