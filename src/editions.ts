@@ -24,6 +24,7 @@ export type EditionId =
   | 'platinum'
   | 'cosmoholo'
   | 'chameleon'
+  | 'guilloche'
   | 'stainedglass'
   | 'glow'
   | 'blacklight'
@@ -90,6 +91,8 @@ export const EDITIONS: Edition[] = [
   { id: 'cosmoholo', shader: 18, color: '#a9c8ff', swirl: ['#080a1c', '#33307a', '#c8a8ff'], value: 6 },
   // Shader in src/gl/chameleon.ts.
   { id: 'chameleon', shader: 90, color: '#7fd6a0', swirl: ['#0c0718', '#3a1f6e', '#2f9a74'], value: 7, dither: true },
+  // Shader in src/gl/finishes/metal.ts.
+  { id: 'guilloche', shader: 91, color: '#86d9c9', swirl: ['#04140f', '#0e5a4a', '#8fe0c8'], value: 7, dither: true },
   { id: 'stainedglass', shader: 26, color: '#e8a33c', swirl: ['#0a0710', '#3a1f4a', '#c0532e'], value: 6 },
   { id: 'glow', shader: 70, color: '#c8f58a', swirl: ['#030605', '#0e2318', '#4c7444'], value: 6, dither: true, touch: 'glow' },
   // Shader in src/gl/blacklight.ts.

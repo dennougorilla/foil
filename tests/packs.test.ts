@@ -22,7 +22,7 @@ import { placeAt, removeFromHand, tierOf } from '../src/pack/rules.ts';
 import { EDITIONS } from '../src/editions.ts';
 
 const NONE = { owned: [], supporter: false };
-const METAL = ['platinum', 'gold', 'relief', 'chameleon', 'cosmoholo'];
+const METAL = ['platinum', 'gold', 'relief', 'chameleon', 'guilloche', 'cosmoholo'];
 
 test('the hand starts with the five editions of the original game plus Prism and Glitch', () => {
   assert.deepEqual([...OPEN_EDITIONS], ['base', 'foil', 'holo', 'poly', 'negative', 'prism', 'glitch']);
@@ -129,7 +129,7 @@ test('a saved hand keeps up to seven owned finishes, once each, with Base always
 
 test('the deck is every owned finish not in the hand; the builder lists everything owned, a pack sealed again by what is owned of it', () => {
   const hand = ['base', 'relief', 'holo', 'poly', 'negative', 'prism', 'glitch'] as const;
-  assert.deepEqual(deckOf([...hand], M), ['foil', 'platinum', 'gold', 'chameleon', 'cosmoholo']);
+  assert.deepEqual(deckOf([...hand], M), ['foil', 'platinum', 'gold', 'chameleon', 'guilloche', 'cosmoholo']);
   assert.deepEqual(deckOf([...OPEN_EDITIONS], NONE), []);
   assert.deepEqual(ownedGroups({ owned: ['gold', 'kintsugi'], supporter: false }), [
     { group: 'open', finishes: [...OPEN_EDITIONS] },

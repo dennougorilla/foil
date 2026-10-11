@@ -33,7 +33,7 @@ Every detail, finish by finish: [`docs/features.md`](docs/features.md).
 | Where | Finishes |
 | --- | --- |
 | Starting hand | Base, Foil, Holographic, Polychrome, Negative, Prism, Glitch |
-| Metal pack | Platinum, Gold, Relief, Chameleon, Cosmo Holo |
+| Metal pack | Platinum, Gold, Relief, Chameleon, Guilloche, Cosmo Holo |
 | Jewel pack | Crystal, Opal, Raden, Kintsugi |
 | Light pack | Galaxy, Aurora, Glow, Blacklight, Thermal, Shallows |
 | Nature pack | Sakura, Frost, Stardust, Rainy Window, Marble, Magma |
