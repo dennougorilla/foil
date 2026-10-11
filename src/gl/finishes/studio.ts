@@ -35,6 +35,52 @@ vec3 halftone(vec3 c, vec2 uv, vec2 t, float L) {
   col *= 1.0 - dk * 0.88;
   return col;
 }
+// Cyanotype: the picture as a sun-print. The face is a hand-brushed coating of Prussian blue on
+// paper: the picture's lights leave the paper bare, its darks carry the blue, the coating pools
+// unevenly, and outside the picture the brush's edge frays into the fibers of the sheet. Tilting
+// slips a faint fresh-print sheen across it. It reads the face and the tilt only, never the clock.
+vec3 cyanotype(vec3 c, vec2 uv, vec2 t, float L, float art) {
+  vec2 px = uv * uCardK * 900.0; // face pixels; the short side is 900 on every shape
+  vec2 win = uCardK * 900.0;
+  vec3 paper = vec3(0.936, 0.930, 0.876);
+  vec3 cyan = vec3(0.278, 0.494, 0.678);
+  vec3 ink = vec3(0.047, 0.129, 0.298);
+
+  // The print: the picture's lights keep the paper, its darks take the blue.
+  float d = pow(smoothstep(0.02, 0.98, L), 0.82);
+  vec3 col = mix(ink, cyan, smoothstep(0.0, 0.58, d));
+  col = mix(col, paper, smoothstep(0.58, 1.0, d));
+  // The coating is not even: it pools and thins where the brush crossed it.
+  col *= 0.85 + 0.30 * fbm(px * 0.016 + 4.2);
+
+  // The hand-brushed edge: past the picture the emulsion frays into bare paper. Bristle streaks
+  // run one way and make the boundary ragged, and a few of them bite deeper.
+  vec2 dp = min(px, win - px);
+  float border = min(dp.x, dp.y);
+  float wob = fbm(px * 0.055 + 9.0) * 0.6 + fbm(px * 0.15 + 2.0) * 0.4;
+  float streak = vnoise(vec2(dot(px, vec2(0.82, 0.57)) * 0.8, dot(px, vec2(-0.57, 0.82)) * 0.07));
+  float reach = 14.0 + 40.0 * wob + 46.0 * streak;
+  float coat = smoothstep(reach, reach + 10.0, border);
+  coat *= 1.0 - 0.45 * smoothstep(0.66, 1.0, vnoise(px * vec2(0.6, 0.05) + 5.0));
+  coat = mix(1.0, coat, 1.0 - art);
+
+  // Bare paper has its fibers and a little tooth.
+  float fiber = vnoise(px * vec2(0.5, 5.5)) - 0.5;
+  float grain = hash12(floor(px * 1.6) + 0.5) - 0.5;
+  vec3 bare = paper * (1.0 + fiber * 0.05 + grain * 0.025);
+
+  col = mix(bare, col, coat);
+  // The emulsion pools a shade darker where the brush lifted, so the edge reads as a stroke.
+  col *= 1.0 - 0.22 * coat * (1.0 - coat) * 4.0;
+
+  // Fresh-print sheen: a soft gloss slips across the coated art as the card tilts, plus the
+  // room light's own faint reflection.
+  float sweep = dot(px / 900.0, vec2(0.78, 0.62)) - (t.x + t.y) * 0.55;
+  col += uTLight * exp(-pow((sweep - 0.18) / 0.52, 2.0)) * 0.05 * coat;
+  vec2 gq = (uv - uLight) * uCardK;
+  col += uTLight * exp(-dot(gq, gq) * 1.6) * 0.055 * coat;
+  return col;
+}
 ${TOUCH_GLSL}
 ${SHADOWBOX_GLSL}
 ${LENTICULAR3D_GLSL}
@@ -43,6 +89,7 @@ ${LENTICULAR_FLIP_GLSL}
 `,
   dispatch: /* glsl */ `
   else if (e == 12) col = halftone(c, uv, uTilt, L);
+  else if (e == 28) col = cyanotype(c, uv, uTilt, L, m.r);
   else if (e == 20) col = warmth(c, uv, uTilt, L, m.r);
   else if (e == 74) col = lenticular3d(c, uv, uTilt, lod);
   else if (e == 16) col = shadowbox(c, uv, uTilt, lod);

@@ -223,6 +223,7 @@ const ja = {
     raden: '螺鈿',
     confetti: '紙吹雪',
     fireworks: '花火',
+    cyanotype: '青写真',
   } satisfies Record<EditionId, string>,
   look: {
     base: '素のまま。加工なし',
@@ -263,6 +264,7 @@ const ja = {
     raden: '漆黒に貝のモザイク。傾けると青・緑・桃・金に移ろう',
     confetti: '金銀と虹の箔が舞い、傾けると一枚ずつきらめく',
     fireworks: '柳・菊・ハート・星。色とりどりの花火が絵の上に開く',
+    cyanotype: '日なたの青い写し。絵は紺と紙の白に、縁は刷毛の跡でかすれ、傾けると刷りたての艶が走る',
   } satisfies Record<EditionId, string>,
   rarityName: {
     common: 'コモン',
