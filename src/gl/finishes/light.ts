@@ -50,23 +50,27 @@ vec3 aurora(vec3 c, vec2 uv, vec2 t, float L) {
   col += tone * 0.2 * curtain;
   return col;
 }
-// The heat ramp of a thermal camera: black, violet, red, orange, yellow and a white-hot core.
+// The heat ramp of a thermal camera: cold black and deep blue, then violet, magenta, red and
+// orange, up to a white-hot core. Built from one chunk per band, so the cold end stays clearly
+// blue and the picture's own hues never stand in for the ramp.
 vec3 iron(float x) {
   x = clamp(x, 0.0, 1.0);
-  vec3 col = vec3(0.02, 0.0, 0.04);
-  col = mix(col, vec3(0.16, 0.01, 0.30), smoothstep(0.00, 0.16, x));
-  col = mix(col, vec3(0.47, 0.02, 0.44), smoothstep(0.16, 0.32, x));
-  col = mix(col, vec3(0.80, 0.05, 0.13), smoothstep(0.32, 0.48, x));
-  col = mix(col, vec3(0.96, 0.30, 0.01), smoothstep(0.48, 0.64, x));
-  col = mix(col, vec3(1.00, 0.62, 0.02), smoothstep(0.64, 0.80, x));
-  col = mix(col, vec3(1.00, 0.92, 0.42), smoothstep(0.80, 0.93, x));
-  col = mix(col, vec3(1.00, 0.99, 0.94), smoothstep(0.93, 1.00, x));
+  vec3 col = vec3(0.01, 0.00, 0.03);
+  col = mix(col, vec3(0.02, 0.05, 0.32), smoothstep(0.00, 0.13, x));
+  col = mix(col, vec3(0.20, 0.03, 0.55), smoothstep(0.13, 0.30, x));
+  col = mix(col, vec3(0.62, 0.03, 0.44), smoothstep(0.30, 0.45, x));
+  col = mix(col, vec3(0.86, 0.08, 0.08), smoothstep(0.45, 0.60, x));
+  col = mix(col, vec3(0.98, 0.33, 0.01), smoothstep(0.60, 0.73, x));
+  col = mix(col, vec3(1.00, 0.66, 0.02), smoothstep(0.73, 0.86, x));
+  col = mix(col, vec3(1.00, 0.92, 0.40), smoothstep(0.86, 0.95, x));
+  col = mix(col, vec3(1.00, 0.99, 0.95), smoothstep(0.95, 1.00, x));
   return col;
 }
 
-// A thermal camera's view: the picture's tones are temperatures, mapped through the heat ramp.
-// Tilting slides the window the camera reads, a slow drift and a fine detector grain keep the
-// field alive, and a thin crosshair and scale read as the camera's own display, not a cartoon HUD.
+// A thermal camera's view: the picture's tones are temperatures, so the heat ramp replaces the
+// picture's own hues rather than tinting them. Tilting slides the window the camera reads, a slow
+// drift and a fine detector grain keep the field alive, and a thin crosshair and scale read as the
+// camera's own display, not a cartoon HUD.
 vec3 thermal(vec3 c, vec2 uv, vec2 t, float L) {
   float gain = 1.0 + t.x * 0.22 + t.y * 0.10;
   float bias = t.x * 0.16 + t.y * 0.08;
@@ -75,8 +79,6 @@ vec3 thermal(vec3 c, vec2 uv, vec2 t, float L) {
   float heat = clamp(L * gain + bias + drift * 0.16 + grain * 0.05, 0.0, 1.0);
   vec3 col = iron(heat);
   col += vec3(1.0, 0.97, 0.9) * smoothstep(0.84, 1.0, heat) * 0.35;
-  // A hint of the picture's own colour survives in the cold end, so it reads as a lens, not a print.
-  col = mix(col, col * (0.7 + 0.6 * c), 0.12 * (1.0 - heat));
   // The readout sits inside the art window: a crosshair, corner brackets and a scale of ticks.
   vec2 hk = (uArt.zw - uArt.xy) * 0.5 * uCardK;
   vec2 q = (uv - mix(uArt.xy, uArt.zw, 0.5)) * uCardK;
