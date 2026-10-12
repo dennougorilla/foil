@@ -50,30 +50,30 @@ vec3 aurora(vec3 c, vec2 uv, vec2 t, float L) {
   col += tone * 0.2 * curtain;
   return col;
 }
-// The heat ramp of a thermal camera: cold black and deep blue, then violet, magenta, red and
-// orange, up to a white-hot core. Built from one chunk per band, so the cold end stays clearly
-// blue and the picture's own hues never stand in for the ramp.
+// The heat ramp of a thermal camera: near-black and deep indigo at the cold end, then violet,
+// magenta, red and orange, up to a white-hot core. One chunk per band keeps the cold end dark and
+// indigo, so the picture's own hues never stand in for the ramp.
 vec3 iron(float x) {
   x = clamp(x, 0.0, 1.0);
-  vec3 col = vec3(0.01, 0.00, 0.03);
-  col = mix(col, vec3(0.02, 0.05, 0.32), smoothstep(0.00, 0.13, x));
-  col = mix(col, vec3(0.20, 0.03, 0.55), smoothstep(0.13, 0.30, x));
-  col = mix(col, vec3(0.62, 0.03, 0.44), smoothstep(0.30, 0.45, x));
-  col = mix(col, vec3(0.86, 0.08, 0.08), smoothstep(0.45, 0.60, x));
-  col = mix(col, vec3(0.98, 0.33, 0.01), smoothstep(0.60, 0.73, x));
-  col = mix(col, vec3(1.00, 0.66, 0.02), smoothstep(0.73, 0.86, x));
-  col = mix(col, vec3(1.00, 0.92, 0.40), smoothstep(0.86, 0.95, x));
-  col = mix(col, vec3(1.00, 0.99, 0.95), smoothstep(0.95, 1.00, x));
+  vec3 col = vec3(0.02, 0.00, 0.04);
+  col = mix(col, vec3(0.16, 0.01, 0.30), smoothstep(0.00, 0.16, x));
+  col = mix(col, vec3(0.47, 0.02, 0.44), smoothstep(0.16, 0.32, x));
+  col = mix(col, vec3(0.80, 0.05, 0.13), smoothstep(0.32, 0.48, x));
+  col = mix(col, vec3(0.96, 0.30, 0.01), smoothstep(0.48, 0.64, x));
+  col = mix(col, vec3(1.00, 0.62, 0.02), smoothstep(0.64, 0.80, x));
+  col = mix(col, vec3(1.00, 0.92, 0.42), smoothstep(0.80, 0.93, x));
+  col = mix(col, vec3(1.00, 0.99, 0.94), smoothstep(0.93, 1.00, x));
   return col;
 }
 
 // A tiny seven-segment glyph field, so the readout can print real degrees. Segment bits: a=1, b=2,
-// c=4, d=8, e=16, f=32, g=64; the extra glyphs are C (for the unit) and H (the hotspot mark).
+// c=4, d=8, e=16, f=32, g=64; the one extra glyph is C, for the unit.
 float thBox(vec2 p, vec2 lo, vec2 hi, float s) {
   vec2 d = max(lo - p, p - hi);
   return 1.0 - smoothstep(0.0, s, max(d.x, d.y));
 }
 float thGlyph(vec2 p, int d) {
+  p = (p - 0.09) / 0.82; // inset each glyph, so a gap separates digits and a lone 1 stays whole
   int m = 0;
   if (d == 0) m = 63;
   else if (d == 1) m = 6;
@@ -86,8 +86,7 @@ float thGlyph(vec2 p, int d) {
   else if (d == 8) m = 127;
   else if (d == 9) m = 111;
   else if (d == 10) m = 57;  // C
-  else if (d == 11) m = 118; // H
-  float s = 0.10;
+  float s = 0.06;
   float g = 0.0;
   g = max(g, thBox(p, vec2(0.16, 0.88), vec2(0.84, 1.00), s) * float((m >> 0) & 1));
   g = max(g, thBox(p, vec2(0.88, 0.52), vec2(1.00, 0.88), s) * float((m >> 1) & 1));
@@ -112,6 +111,10 @@ float thNum(vec2 p, float v, float n) {
 float thRing(vec2 p, float r, float w) {
   return 1.0 - smoothstep(w, w + 0.02, abs(length(p) - r));
 }
+// A small solid diamond: the hotspot's marker, replacing a bulky letter prefix.
+float thMark(vec2 p) {
+  return 1.0 - smoothstep(0.26, 0.40, abs(p.x) + abs(p.y));
+}
 // A temperature in degrees: its digits, a degree ring and the unit C.
 float thTemp(vec2 p, float v, float n) {
   float s = thNum(p, v, n);
@@ -121,32 +124,31 @@ float thTemp(vec2 p, float v, float n) {
 }
 
 // A thermal camera's view: the picture's tones are temperatures, so the heat ramp replaces the
-// picture's own hues rather than tinting them. The detector reads hot dots as one warm blob and the
-// window shift has a soft shoulder, so tilting slides the range without blowing the picture out, and
-// the camera's own display — a graded scale with its low/high degrees, a reticle, brackets and a
-// hotspot reading — sits inside the art window.
+// picture's own hues rather than tinting them. Tilting slides the read window hard — one way the
+// scene cools to near-black with only its core glowing, the other warms it — while a soft shoulder
+// keeps a true hot core from blowing out. The camera's own display — a graded scale with its low and
+// high in degrees, a reticle, brackets and a small hotspot marker — sits inside the art window.
 vec3 thermal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
-  // Detector blur: neighbouring hot pixels merge into a blob instead of scattering into dots.
-  vec2 px = 1.4 / (uCardK * 150.0);
+  // Detector blur: a hair of neighbour bleed so a lone hot pixel reads as a dot, not a cross.
+  vec2 px = 0.4 / (uCardK * 150.0);
   float Ld = L;
   for (int i = 0; i < 4; i++) {
     vec2 o = i == 0 ? vec2(px.x, 0.0) : (i == 1 ? vec2(-px.x, 0.0) : (i == 2 ? vec2(0.0, px.y) : vec2(0.0, -px.y)));
-    vec4 b = face(uv + o, lod + 1.4);
+    vec4 b = face(uv + o, lod + 1.0);
     Ld = max(Ld, luma(b.rgb / max(b.a, 1e-4)));
   }
-  Ld = mix(L, Ld, 0.7);
-  // The window the camera reads, in degrees; tilting slides it slowly.
-  float wCenter = 31.0 - t.x * 7.0 - t.y * 3.0;
+  Ld = mix(L, Ld, 0.32);
+  // The window the camera reads, in degrees; tilting slides it, so one way cools and one way warms.
+  float wCenter = 31.0 + t.x * 14.0 + t.y * 6.0;
   float wSpan = 20.0;
   float wLo = wCenter - wSpan * 0.5;
   float wHi = wCenter + wSpan * 0.5;
-  float gain = 1.0 + t.x * 0.08 + t.y * 0.04;
-  float bias = t.x * 0.04 + t.y * 0.02;
+  float gain = 1.0 + t.x * 0.22 + t.y * 0.10;
+  float bias = t.x * 0.16 + t.y * 0.08;
   float drift = fbm(asTrading(uv) * 2.4 + vec2(uTime * 0.02, -uTime * 0.013) + t * 0.5) - 0.5;
   float grain = hash12(floor(uv * uCardK * 260.0) + floor(uTime * 14.0) * 0.37) - 0.5;
-  float heat = clamp(Ld * gain + bias + drift * 0.10 + grain * 0.035, 0.0, 1.0);
-  heat = pow(heat, 0.82);       // lift the cold end so dark subjects stay legible
-  heat = 0.05 + heat * 0.95;    // a small detector floor over black
+  float heat = clamp(Ld * gain + bias + drift * 0.12 + grain * 0.04, 0.0, 1.0);
+  heat = 0.02 + heat * 0.98;    // a small detector floor over black
   heat = heat - 0.16 * smoothstep(0.80, 1.0, heat); // soft shoulder: only a true core blooms
   heat = clamp(heat, 0.0, 1.0);
   vec3 col = iron(heat);
@@ -159,7 +161,7 @@ vec3 thermal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   vec2 q = (uv - mix(uArt.xy, uArt.zw, 0.5)) * uCardK;
   q.y = -q.y; // card uv runs downward, so measure the display with y up
   float art = texture(uMask, uv).r;
-  float dh = hk.y * 0.11, dw = dh * 0.62;
+  float dh = hk.y * 0.077, dw = dh * 0.62; // readings ~30% smaller than before
   float w = 0.003;
   // Reticle at the centre: a ring, four short arms and a centre dot.
   float rc = 0.026, arm = 0.020;
@@ -171,27 +173,29 @@ vec3 thermal(vec3 c, vec2 uv, vec2 t, float L, float lod) {
   float bx = hk.x * 0.86, by = hk.y * 0.88, len = min(hk.x, hk.y) * 0.15;
   float vArm = (1.0 - smoothstep(0.0, w, abs(abs(q.x) - bx))) * step(abs(abs(q.y) - by), len);
   float hArm = (1.0 - smoothstep(0.0, w, abs(abs(q.y) - by))) * step(abs(abs(q.x) - bx), len);
-  // Vertical temperature scale on the left: a graded translucent bar with ticks and its readings.
-  float sx = -hk.x * 0.80, sTop = hk.y * 0.54, sBot = -hk.y * 0.54;
+  // Vertical temperature scale on the left, inset from the corner brackets: a graded translucent
+  // bar with ticks and its low and high printed below and above as plain degrees.
+  float sx = -hk.x * 0.70, sTop = hk.y * 0.50, sBot = -hk.y * 0.50;
   float bar = (1.0 - smoothstep(0.012, 0.014, abs(q.x - sx))) * step(sBot - 0.012, q.y) * step(q.y, sTop + 0.012);
   float g = clamp((q.y - sBot) / (sTop - sBot), 0.0, 1.0);
   float sp = (sTop - sBot) / 8.0;
   float near = abs(fract((q.y - sBot) / sp + 0.5) - 0.5) * sp;
   float ticks = (1.0 - smoothstep(0.0, 0.0022, near)) * step(abs(q.x - sx), 0.020) * step(sBot - 0.012, q.y) * step(q.y, sTop + 0.012);
-  float mxLab = thTemp(vec2((q.x - (sx + 0.026)) / dw, (q.y - (sTop + 0.010)) / dh), wHi, 2.0);
-  float mnLab = thTemp(vec2((q.x - (sx + 0.026)) / dw, (q.y - (sBot - dh - 0.010)) / dh), wLo, 2.0);
-  // Hotspot reading: a small panel, an H mark and the peak temperature in three digits.
-  float hx0 = hk.x * 0.30, hy0 = -hk.y * 0.80, hw = hk.x * 0.66, hh = dh * 1.35;
+  float mxLab = thTemp(vec2((q.x - (sx + 0.024)) / dw, (q.y - (sTop + 0.008)) / dh), wHi, 2.0);
+  float mnLab = thTemp(vec2((q.x - (sx + 0.024)) / dw, (q.y - (sBot - dh - 0.008)) / dh), wLo, 2.0);
+  // Hotspot reading: a small panel inset from the corner, a diamond marker and the peak in degrees.
+  float hx0 = hk.x * 0.14, hy0 = -hk.y * 0.70, hw = hk.x * 0.50, hh = dh * 1.30;
   float panel = thBox(q, vec2(hx0, hy0), vec2(hx0 + hw, hy0 + hh), 0.006);
-  float hsLab = thGlyph(vec2((q.x - (hx0 + 0.018)) / dw, (q.y - (hy0 + dh * 0.18)) / dh), 11);
-  hsLab = max(hsLab, thTemp(vec2((q.x - (hx0 + 0.018 + dw * 0.80)) / dw, (q.y - (hy0 + dh * 0.18)) / dh), wHi + 3.0, 3.0));
-  // The scale bar carries the heat ramp; the marks, labels and panel are the display's cool white.
+  float hmark = thMark(vec2((q.x - (hx0 + 0.014)) / dh, (q.y - (hy0 + dh * 0.15)) / dh));
+  float hsLab = thTemp(vec2((q.x - (hx0 + 0.038)) / dw, (q.y - (hy0 + dh * 0.15)) / dh), wHi + 3.0, 2.0);
+  // The scale bar carries the heat ramp; the marks and readings are the display's cool white.
   float ui = max(max(ring, rcH), max(cdot, max(max(vArm, hArm), max(mxLab, mnLab))));
-  col += iron(g) * bar * 0.55;
-  col += vec3(0.86, 0.94, 1.0) * ui * art * (0.42 + 0.34 * heat);
-  col += vec3(0.55, 0.85, 1.0) * ticks * art * 0.5;
-  col = mix(col, col * 0.45 + vec3(0.02, 0.05, 0.10), panel * art * 0.6);
-  col += vec3(1.0, 0.85, 0.55) * hsLab * art * 0.62;
+  col += iron(g) * bar * 0.34;
+  col += vec3(0.86, 0.94, 1.0) * ui * art * (0.30 + 0.22 * heat);
+  col += vec3(0.55, 0.85, 1.0) * ticks * art * 0.32;
+  col = mix(col, col * 0.45 + vec3(0.02, 0.05, 0.10), panel * art * 0.5);
+  col += vec3(1.0, 0.85, 0.55) * hmark * art * 0.7;
+  col += vec3(0.9, 0.95, 1.0) * hsLab * art * 0.42;
   return col;
 }
 
